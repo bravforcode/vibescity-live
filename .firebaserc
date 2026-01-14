@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "vibescity-live",
+    "prod": "vibescity-live"
+  },
+  "targets": {},
+  "etags": {}
+}
