@@ -35,6 +35,12 @@ const props = defineProps({
 
   // ✅ POI list for current floor (from App.vue computed indoorPois)
   indoorPois: { type: Array, default: () => [] },
+
+  // ✅ Sidebar Open State (from App.vue)
+  isSidebarOpen: { type: Boolean, default: false },
+
+  // ✅ Navigation Legend Height (from App.vue)
+  legendHeight: { type: Number, default: 0 },
 });
 
 // ✅ indoorNavItems: alias เพื่อให้อ่านง่าย/ใช้ต่อได้
@@ -45,7 +51,7 @@ const chiangMaiBounds = [
   [20.6, 100.3], // NE
 ];
 
-const emit = defineEmits(["select-shop", "open-detail", "open-building"]);
+const emit = defineEmits(["select-shop", "open-detail", "open-building", "exit-indoor"]);
 
 const bounceTick = ref(0);
 const zoom = ref(15);
@@ -71,7 +77,7 @@ const indoorBlend = computed(() => {
   // end:   จุดที่ indoor เต็ม 100%
   // แนะนำให้ end ใหญ่หน่อยเพื่อให้ curve หน่วง
   const start = 12.0; // เริ่ม “มี indoor”
-  const end = 20.2; // indoor เต็มช้ากว่าเดิม
+  const end = 20; // indoor เต็มช้ากว่าเดิม
 
   const t = clamp01((zoom.value - start) / (end - start));
 
@@ -124,6 +130,10 @@ const focusLocation = (latlng, targetZoom = 17) => {
 };
 
 const centerOnUser = () => {
+  // ✅ Exit Indoor Mode when clicking Locate Me
+  if (props.isIndoorView) {
+    emit('exit-indoor');
+  }
   if (props.userLocation) focusLocation(props.userLocation, 17);
 };
 
@@ -162,6 +172,11 @@ const isShopOnActiveFloor = (shop) => {
 };
 
 const displayMarkers = computed(() => {
+  // ✅ Indoor Mode: Hide ALL shop markers, show only POI
+  if (props.isIndoorView) {
+    return []; // Shop markers hidden, Indoor POI markers render separately
+  }
+
   let list = props.shops || [];
 
   // Filter by Category (if active)
@@ -174,47 +189,18 @@ const displayMarkers = computed(() => {
     });
   }
 
-  if (props.isIndoorView && props.activeBuilding) {
-    return list.filter(
-      (s) => isShopInActiveBuilding(s) && isShopOnActiveFloor(s)
-    );
-  }
   return list;
 });
 
-// ✅ HYBRID CANVAS RENDERING - Split markers for performance
-// Rich Markers: DOM-based (nearby, live, highlighted) - Full visual features
+// ✅ STABLE RENDERING - All markers use DOM for reliability
+// Hybrid Canvas was removed due to Vue-Leaflet lifecycle issues
 const richMarkers = computed(() => {
-  // Indoor view: ALL markers use DOM rendering (no Canvas)
-  if (props.isIndoorView) {
-    return displayMarkers.value;
-  }
-  
-  return displayMarkers.value.filter((item) => {
-    // Always show in DOM: highlighted, live, or within 3km
-    const dist = item.distance;
-    const isNearby = dist === undefined || dist <= 3;
-    const status = (item.status || item.Status || '').toUpperCase();
-    const isLiveStatus = status === 'LIVE';
-    return isNearby || isLiveStatus || item.id === props.highlightedId;
-  });
+  return displayMarkers.value; // All markers use DOM rendering
 });
 
-// Lite Markers: Canvas-based (distant, not live) - Lightweight circles
+// Lite Markers disabled - was causing '_leaflet_id undefined' errors
 const liteMarkers = computed(() => {
-  // Indoor view: No Canvas markers (all use DOM)
-  if (props.isIndoorView) {
-    return [];
-  }
-  
-  return displayMarkers.value.filter((item) => {
-    const dist = item.distance;
-    const isDistant = dist !== undefined && dist > 3;
-    const status = (item.status || item.Status || '').toUpperCase();
-    const isLiveStatus = status === 'LIVE';
-    // Only use canvas for distant non-live non-highlighted markers
-    return isDistant && !isLiveStatus && item.id !== props.highlightedId;
-  });
+  return []; // Disabled for stability
 });
 
 // ✅ Category Filters Logic
@@ -308,18 +294,32 @@ const getMarkerOpacity = (item) => {
   // Highlighted (clicked) marker always fully visible
   if (isHighlighted(item)) return 1;
 
+  // Indoor mode = full visibility
   if (props.isIndoorView) return 1;
 
-  // Province/Zone dim takes priority
-  if (shouldDimMarker(item)) return 0.1;
+  const z = zoom.value;
 
-  // Distance-based opacity: >3km = 40% opacity
-  // Debug: uncomment to see distance values
-  // console.log(item?.name, 'distance:', item?.distance);
-  const distance = item?.distance;
-  if (distance !== undefined && distance > 3) return 0.4;
+  // ✅ GLOBAL ZOOM OVERRIDE:
+  // If zoomed OUT (<= 15), show EVERYTHING clearly. (Adjusted to 15 per user request)
+  // This ensures user sees all markers clearly without needing to zoom out extremely far.
+  if (z <= 15) return 1;
 
-  return 1;
+  // Province/Zone dim takes priority (only at very high zoom 16+)
+  if (shouldDimMarker(item)) return 0.15;
+  
+  // ✅ Calculate base distance opacity (if location available)
+  let baseOpacity = 1;
+  if (props.userLocation && item?.distance !== undefined) {
+    if (item.distance > 5) {
+      baseOpacity = 0.35; // Very far = dim
+    } else if (item.distance > 3) {
+      baseOpacity = 0.55; // Far = slightly dim
+    }
+  }
+  
+  // ✅ ZOOM-BASED RECOVERY: (Only needed if we went deeper than 15, but logic holds)
+  // Since we return 1 for <= 15, this part only affects z > 15
+  return baseOpacity;
 };
 
 const getMarkerScale = (item) => {
@@ -598,6 +598,33 @@ const hasUpcomingEvent = (item) => {
   }
 };
 
+// ✅ Smart Content Switching: Determines if marker shows Detail or Dot
+const isDetailsVisible = (item) => {
+  if (props.isIndoorView) return true; // Indoor always detailed
+  if (isHighlighted(item) || isLive(item)) return true; // Important markers always detailed
+  if (item.distance && item.distance <= 2.0) return true; // Nearby < 2km detailed
+  return false; // Distant & Inactive -> Dot
+};
+
+// ✅ Dynamic Locate Button Position
+const locateButtonBottom = computed(() => {
+  // If not in indoor view OR sidebar is open (VIBE NOW list), use standard position
+  if (!props.isIndoorView || props.isSidebarOpen) return "80px"; 
+
+  // Use actual Navigation Legend height + fixed 16px gap
+  // If legendHeight is 0 (not yet measured), use fallback calculation
+  if (props.legendHeight > 0) {
+    return `${props.legendHeight + 16}px`;
+  }
+
+  // Fallback: Calculate estimated height
+  // This provides a reasonable default while waiting for real measurement
+  const itemCount = indoorNavItems.value.length;
+  const estimatedHeight = 180 + (itemCount * 28) + 12; 
+  
+  return `${estimatedHeight}px`;
+});
+
 defineExpose({ focusLocation });
 </script>
 
@@ -618,7 +645,6 @@ defineExpose({ focusLocation });
         attributionControl: false,
         maxBounds: chiangMaiBounds,
         maxBoundsViscosity: 1.0,
-        preferCanvas: true,
       }"
       @ready="onMapReady"
       @click="handleMapClick"
@@ -885,8 +911,9 @@ defineExpose({ focusLocation });
                 transform: getMarkerTransform(item),
               }"
             >
+                <!-- 1. FULL CARD MODE (Nearby / Live / Highlighted) -->
+              <template v-if="isDetailsVisible(item)">
                 <!-- ✅ MINI POPUP (Conditional: Hide for distant inactive markers) -->
-                <!-- Optimization: Reduces DOM load by ~50% for crowded areas -->
                 <div
                   v-if="isHighlighted(item) || isLive(item) || (item.distance !== undefined && item.distance <= 3)"
                   class="relative mb-1 w-[120px] rounded-lg shadow-lg overflow-hidden"
@@ -897,121 +924,136 @@ defineExpose({ focusLocation });
                     isLive(item) ? 'live-popup-blue-glow' : '',
                   ]"
                 >
-                <!-- Mini Image Placeholder -->
-                <div
-                  class="h-12 w-full bg-gradient-to-br from-purple-600/30 to-red-600/30 flex items-center justify-center"
-                >
-                  <span class="text-lg">🎵</span>
+                  <!-- Mini Image Placeholder -->
+                  <div
+                    class="h-12 w-full bg-gradient-to-br from-purple-600/30 to-red-600/30 flex items-center justify-center"
+                  >
+                    <span class="text-lg">🎵</span>
+                  </div>
+                  <!-- Mini Name -->
+                  <div class="px-2 py-1.5 flex items-center justify-between gap-1">
+                    <span
+                      :class="[
+                        'text-[9px] font-bold truncate flex-1',
+                        isDarkMode ? 'text-white' : 'text-gray-800',
+                      ]"
+                    >
+                      {{ item.name }}
+                    </span>
+                    <span
+                      v-if="item.distance !== undefined"
+                      class="text-[9px] font-mono opacity-80"
+                      :class="isDarkMode ? 'text-gray-400' : 'text-gray-500'"
+                    >
+                      {{ item.distance.toFixed(1) }}km
+                    </span>
+                    <span
+                      v-if="isLive(item)"
+                      class="w-2 h-2 rounded-full bg-red-500 live-pulse-dot"
+                    ></span>
+                    <span
+                      v-else-if="item.status === 'ACTIVE'"
+                      class="w-1.5 h-1.5 rounded-full bg-green-500"
+                    ></span>
+                  </div>
                 </div>
-                <!-- Mini Name -->
-                <div
-                  class="px-2 py-1.5 flex items-center justify-between gap-1"
-                >
-                  <span
+
+                <!-- ✅ FULL POPUP (Only on Click) -->
+                <transition name="label-pop">
+                  <div
+                    v-if="isHighlighted(item)"
+                    @click.stop
+                    class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-[180px] rounded-xl shadow-2xl overflow-hidden z-50"
                     :class="[
-                      'text-[9px] font-bold truncate flex-1',
-                      isDarkMode ? 'text-white' : 'text-gray-800',
+                      isDarkMode
+                        ? 'bg-zinc-900 border border-white/20'
+                        : 'bg-white border border-gray-200',
+                      hasUpcomingEvent(item)
+                        ? 'ring-2 ring-blue-400 event-popup-glow'
+                        : '',
                     ]"
                   >
-                    {{ item.name }}
-                  </span>
-                  <span
-                    v-if="item.distance !== undefined"
-                    class="text-[9px] font-mono opacity-80"
-                    :class="isDarkMode ? 'text-gray-400' : 'text-gray-500'"
-                  >
-                    {{ item.distance.toFixed(1) }}km
-                  </span>
-                  <span
-                    v-if="isLive(item)"
-                    class="w-2 h-2 rounded-full bg-red-500 live-pulse-dot"
-                  ></span>
-                </div>
-              </div>
+                    <!-- Image Placeholder -->
+                    <div
+                      class="h-16 w-full bg-gradient-to-br from-purple-600/30 to-red-600/30 flex items-center justify-center"
+                    >
+                      <span class="text-2xl">🎵</span>
+                    </div>
 
-              <!-- ✅ FULL POPUP (Only on Click) -->
-              <transition name="label-pop">
-                <div
-                  v-if="isHighlighted(item)"
-                  @click.stop
-                  class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-[180px] rounded-xl shadow-2xl overflow-hidden z-50"
+                    <!-- Full Content -->
+                    <div class="p-3">
+                      <div class="flex items-start justify-between gap-2 mb-2">
+                        <h4
+                          :class="[
+                            'text-xs font-bold leading-tight',
+                            isDarkMode ? 'text-white' : 'text-gray-900',
+                          ]"
+                        >
+                          {{ item.name }}
+                        </h4>
+                        <span
+                          :class="[
+                            'shrink-0 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase',
+                            isLive(item)
+                              ? 'bg-blue-500 text-white live-pulse-badge'
+                              : item.status === 'TONIGHT'
+                              ? 'bg-orange-500 text-white'
+                              : item.status === 'ACTIVE'
+                              ? 'bg-green-500 text-white'
+                              : 'bg-zinc-600 text-white',
+                          ]"
+                        >
+                          {{ isLive(item) ? "🔵 LIVE" : item.status === 'ACTIVE' ? "🟢 OPEN" : item.status || "OFF" }}
+                        </span>
+                      </div>
+
+                      <!-- Event Badge -->
+                      <div
+                        v-if="hasUpcomingEvent(item)"
+                        class="mb-2 px-2 py-1 bg-blue-500/20 rounded-lg border border-blue-500/30"
+                      >
+                        <p class="text-[9px] font-bold text-blue-400">
+                          🎉 {{ item.EventName }}
+                        </p>
+                      </div>
+
+                      <div
+                        :class="[
+                          'text-[10px] mb-3',
+                          isDarkMode ? 'text-white/60' : 'text-gray-500',
+                        ]"
+                      >
+                        <span>{{ item.category }}</span>
+                        <span v-if="item.openTime" class="ml-1"
+                          >• {{ item.openTime }} - {{ item.closeTime }}</span
+                        >
+                      </div>
+
+                      <button
+                        :onclick="`window.openVibeDetail(${item.id})`"
+                        :class="[
+                          'w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all active:scale-95',
+                          isDarkMode
+                            ? 'bg-gradient-to-r from-purple-600 to-red-600 text-white'
+                            : 'bg-gradient-to-r from-purple-500 to-red-500 text-white',
+                        ]"
+                      >
+                        <span>ดูรายละเอียด</span>
+                      </button>
+                    </div>
+                  </div>
+                </transition>
+              </template>
+
+              <!-- 2. DOT MODE (Distant & Inactive) - Ultra Light DOM -->
+              <template v-else>
+                <div 
+                  class="w-3 h-3 rounded-full border-2 border-white shadow-sm transition-all hover:scale-150"
                   :class="[
-                    isDarkMode
-                      ? 'bg-zinc-900 border border-white/20'
-                      : 'bg-white border border-gray-200',
-                    hasUpcomingEvent(item)
-                      ? 'ring-2 ring-blue-400 event-popup-glow'
-                      : '',
+                    item.status === 'ACTIVE' ? 'bg-green-500' : 'bg-gray-400'
                   ]"
-                >
-                  <!-- Image Placeholder (Ready for real images) -->
-                  <div
-                    class="h-16 w-full bg-gradient-to-br from-purple-600/30 to-red-600/30 flex items-center justify-center"
-                  >
-                    <span class="text-2xl">🎵</span>
-                  </div>
-
-                  <!-- Full Content -->
-                  <div class="p-3">
-                    <div class="flex items-start justify-between gap-2 mb-2">
-                      <h4
-                        :class="[
-                          'text-xs font-bold leading-tight',
-                          isDarkMode ? 'text-white' : 'text-gray-900',
-                        ]"
-                      >
-                        {{ item.name }}
-                      </h4>
-                      <span
-                        :class="[
-                          'shrink-0 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase',
-                          isLive(item)
-                            ? 'bg-red-500 text-white live-pulse-badge'
-                            : item.status === 'TONIGHT'
-                            ? 'bg-orange-500 text-white'
-                            : 'bg-zinc-600 text-white',
-                        ]"
-                      >
-                        {{ isLive(item) ? "🔴 LIVE" : item.status || "OFF" }}
-                      </span>
-                    </div>
-
-                    <!-- Event Badge -->
-                    <div
-                      v-if="hasUpcomingEvent(item)"
-                      class="mb-2 px-2 py-1 bg-blue-500/20 rounded-lg border border-blue-500/30"
-                    >
-                      <p class="text-[9px] font-bold text-blue-400">
-                        🎉 {{ item.EventName }}
-                      </p>
-                    </div>
-
-                    <div
-                      :class="[
-                        'text-[10px] mb-3',
-                        isDarkMode ? 'text-white/60' : 'text-gray-500',
-                      ]"
-                    >
-                      <span>{{ item.category }}</span>
-                      <span v-if="item.openTime" class="ml-1"
-                        >• {{ item.openTime }} - {{ item.closeTime }}</span
-                      >
-                    </div>
-
-                    <button
-                      :onclick="`window.openVibeDetail(${item.id})`"
-                      :class="[
-                        'w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all active:scale-95',
-                        isDarkMode
-                          ? 'bg-gradient-to-r from-purple-600 to-red-600 text-white'
-                          : 'bg-gradient-to-r from-purple-500 to-red-500 text-white',
-                      ]"
-                    >
-                      <span>ดูรายละเอียด</span>
-                    </button>
-                  </div>
-                </div>
-              </transition>
+                ></div>
+              </template>
 
               <!-- Pin with LIVE-only Glow -->
               <svg
@@ -1072,12 +1114,13 @@ defineExpose({ focusLocation });
       />
     </l-map>
 
-    <!-- Locate button -->
+    <!-- Locate button (shows in Indoor mode OR when user location available) -->
     <button
-      v-if="userLocation"
+      v-if="userLocation || isIndoorView"
       @click="centerOnUser"
+      :style="{ bottom: locateButtonBottom }"
       :class="[
-        'absolute bottom-20 left-4 z-[1000] w-10 h-10 flex items-center justify-center rounded-full shadow-lg active:scale-90 transition-all border',
+        'absolute left-4 z-[1000] w-10 h-10 flex items-center justify-center rounded-full shadow-lg active:scale-90 border transition-all duration-500 ease-out',
         isDarkMode
           ? 'bg-zinc-900/90 border-white/20'
           : 'bg-white/90 border-gray-200',

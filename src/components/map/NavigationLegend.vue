@@ -1,6 +1,8 @@
 <script setup>
-import { computed } from "vue";
+import { computed, ref, onMounted, onUnmounted, watch } from "vue";
 import PoiIcon from "./PoiIcon.vue";
+
+const emit = defineEmits(['height-change']);
 
 const props = defineProps({
   isDarkMode: { type: Boolean, default: true },
@@ -129,6 +131,55 @@ const groupLabel = (g) => {
   };
   return dict[g] || g;
 };
+
+// ✅ Track panel height and emit to parent (MapContainer)
+const panelRef = ref(null);
+const resizeObserver = ref(null);
+
+const updateHeight = () => {
+  if (panelRef.value) {
+    const height = panelRef.value.offsetHeight;
+    emit('height-change', height);
+  }
+};
+
+onMounted(() => {
+  if (panelRef.value) {
+    resizeObserver.value = new ResizeObserver(updateHeight);
+    resizeObserver.value.observe(panelRef.value);
+    updateHeight(); // Initial emission
+  }
+});
+
+onUnmounted(() => {
+  if (resizeObserver.value) {
+    resizeObserver.value.disconnect();
+  }
+});
+
+// Watch for visibility changes
+watch(() => props.isVisible, (newVal) => {
+  if (newVal) {
+    // When becoming visible, measure after DOM update
+    setTimeout(updateHeight, 100);
+  }
+});
+
+// ✅ Watch for POI items changes (when floor changes, items change)
+watch(() => props.poiItems, () => {
+  // Wait for DOM to update with new items, then measure height
+  setTimeout(updateHeight, 150);
+}, { deep: true });
+
+// ✅ Watch for floor name changes
+watch(() => props.floorName, () => {
+  setTimeout(updateHeight, 150);
+});
+
+// ✅ Watch for building name changes (when switching buildings)
+watch(() => props.buildingName, () => {
+  setTimeout(updateHeight, 150);
+});
 </script>
 
 <template>
@@ -137,6 +188,7 @@ const groupLabel = (g) => {
     <div v-if="isVisible" class="absolute left-0 right-0 bottom-0 z-[2500] pointer-events-none">
       <!-- ✅ panel - Solid colors, no glassmorphism -->
       <div
+        ref="panelRef"
         class="pointer-events-auto mx-2 mb-2 overflow-hidden rounded-3xl shadow-2xl border"
         :class="isDarkMode ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-300'"
       >

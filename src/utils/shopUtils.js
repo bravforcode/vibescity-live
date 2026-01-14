@@ -37,24 +37,23 @@ export const calculateShopStatus = (shop, nowObj) => {
   const manualStatus = shop.originalStatus?.toUpperCase()?.trim() || '';
 
   // 1. MANUAL OVERRIDE (เชื่อ Sheet ก่อนเสมอ)
+  // 'LIVE' = มี Event (เรืองแสง) -> ต้องระบุใน CSV เท่านั้น
+  if (manualStatus === 'LIVE') return 'LIVE';
+  
+  // 'ACTIVE' = เปิดปกติ (ไม่เรืองแสง) -> ระบุ Manual ได้
+  if (manualStatus === 'ACTIVE') return 'ACTIVE';
+
   if (manualStatus && manualStatus !== 'AUTO') {
     if (['OFF', 'CLOSED', 'CLOSE', 'TEMP CLOSED', 'MAINTENANCE'].includes(manualStatus)) return 'OFF';
-    
-    // ✅ CHANGED: 'LIVE' or 'OPEN' in CSV should NOT override time logic. 
-    // Only strong overrides like 'FORCE OPEN' or 'ALWAYS OPEN' should force it.
-    if (['FORCE OPEN', 'ALWAYS OPEN'].includes(manualStatus)) return 'LIVE';
-    
+    if (['FORCE OPEN', 'ALWAYS OPEN'].includes(manualStatus)) return 'ACTIVE';
     if (['TONIGHT'].includes(manualStatus)) return 'TONIGHT';
-    
-    // If status is 'LIVE' or 'OPEN' but we want to check time, just continue to Time Calculation.
-    // return manualStatus; // ❌ Don't return here if it's just 'LIVE'
   }
 
-  // 2. TIME CALCULATION
+  // 2. TIME CALCULATION (AUTO)
   if (shop.openTime && shop.closeTime) {
     // Check 1: ร้านเปิดอยู่มั้ย?
     const isOpen = isTimeInRange(shop.openTime, shop.closeTime, nowObj);
-    if (isOpen) return 'LIVE';
+    if (isOpen) return 'ACTIVE'; // ✅ เปลี่ยนจาก LIVE เป็น ACTIVE (เปิดปกติ ไม่เรืองแสง)
 
     // Check 2: TONIGHT Logic (06:00 -> เวลาเปิด)
     const currentMinutes = nowObj.getHours() * 60 + nowObj.getMinutes();

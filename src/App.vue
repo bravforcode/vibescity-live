@@ -30,6 +30,13 @@ const toggleVibeNow = () => {
   isVibeNowCollapsed.value = !isVibeNowCollapsed.value;
 };
 
+// ✅ Navigation Legend height tracking
+const legendHeight = ref(0);
+const handleLegendHeightChange = (height) => {
+  legendHeight.value = height;
+};
+
+
 // --- Zone & Building Navigation State ---
 const buildingsData = ref({});
 const activeZone = ref(null);
@@ -543,6 +550,7 @@ const liveCount = computed(() => {
           :activeFloor="activeFloor"
           :indoorPois="indoorPois"
           @select-shop="handleMarkerClick"
+          @exit-indoor="handleCloseFloorSelector"
         />
 
         <!-- Floor Selector Popup - Moved outside for better z-index control -->
@@ -600,8 +608,11 @@ const liveCount = computed(() => {
         :activeBuilding="activeBuilding"
         :activeFloor="activeFloor"
         :indoorPois="indoorPois"
+        :isSidebarOpen="!isVibeNowCollapsed"
+        :legendHeight="legendHeight"
         @select-shop="handleMarkerClick"
         @open-detail="handleOpenDetail"
+        @exit-indoor="handleCloseFloorSelector"
         class="absolute inset-0"
       />
 
@@ -614,6 +625,7 @@ const liveCount = computed(() => {
         :poiLegendMeta="poiLegendMeta"
         :buildingName="activeBuilding?.shortName || activeBuilding?.name || ''"
         :floorName="activeFloorLabel"
+        @height-change="handleLegendHeightChange"
       />
 
       <!-- Floor Selector Popup (mobile) -->
