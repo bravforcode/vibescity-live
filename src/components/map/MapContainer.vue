@@ -185,6 +185,11 @@ const displayMarkers = computed(() => {
 // ✅ HYBRID CANVAS RENDERING - Split markers for performance
 // Rich Markers: DOM-based (nearby, live, highlighted) - Full visual features
 const richMarkers = computed(() => {
+  // Indoor view: ALL markers use DOM rendering (no Canvas)
+  if (props.isIndoorView) {
+    return displayMarkers.value;
+  }
+  
   return displayMarkers.value.filter((item) => {
     // Always show in DOM: highlighted, live, or within 3km
     const dist = item.distance;
@@ -197,6 +202,11 @@ const richMarkers = computed(() => {
 
 // Lite Markers: Canvas-based (distant, not live) - Lightweight circles
 const liteMarkers = computed(() => {
+  // Indoor view: No Canvas markers (all use DOM)
+  if (props.isIndoorView) {
+    return [];
+  }
+  
   return displayMarkers.value.filter((item) => {
     const dist = item.distance;
     const isDistant = dist !== undefined && dist > 3;
