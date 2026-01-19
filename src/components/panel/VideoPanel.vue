@@ -1,23 +1,33 @@
 <script setup>
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
-import ShopCard from './ShopCard.vue';
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from "vue";
+import ShopCard from "./ShopCard.vue";
 
 const props = defineProps({
   shops: {
     type: Array,
-    required: true
+    required: true,
   },
   activeShopId: {
     type: [Number, String],
-    default: null
+    default: null,
   },
   isDarkMode: {
     type: Boolean,
-    default: true
-  }
+    default: true,
+  },
+  favorites: {
+    type: Array,
+    default: () => [],
+  },
 });
 
-const emit = defineEmits(['scroll-to-shop', 'select-shop', 'open-detail', 'hover-shop']);
+const emit = defineEmits([
+  "scroll-to-shop",
+  "select-shop",
+  "open-detail",
+  "hover-shop",
+  "toggle-favorite",
+]);
 
 // Card refs for scrolling
 const cardRefs = ref({});
@@ -43,18 +53,18 @@ onUnmounted(() => {
 const setupIntersectionObserver = () => {
   const options = {
     root: panelRef.value,
-    rootMargin: '-40% 0px -40% 0px',
-    threshold: 0.5
+    rootMargin: "-40% 0px -40% 0px",
+    threshold: 0.5,
   };
 
   observerInstance = new IntersectionObserver((entries) => {
     if (isUserScrolling.value) {
-      entries.forEach(entry => {
+      entries.forEach((entry) => {
         if (entry.isIntersecting) {
           const shopId = parseInt(entry.target.dataset.shopId);
-          const shop = props.shops.find(s => s.id === shopId);
+          const shop = props.shops.find((s) => s.id === shopId);
           if (shop) {
-            emit('scroll-to-shop', shop);
+            emit("scroll-to-shop", shop);
           }
         }
       });
@@ -62,23 +72,26 @@ const setupIntersectionObserver = () => {
   }, options);
 
   nextTick(() => {
-    Object.values(cardRefs.value).forEach(el => {
+    Object.values(cardRefs.value).forEach((el) => {
       if (el) observerInstance.observe(el);
     });
   });
 };
 
 // Re-observe when shops change
-watch(() => props.shops, () => {
-  nextTick(() => {
-    if (observerInstance) {
-      observerInstance.disconnect();
-      Object.values(cardRefs.value).forEach(el => {
-        if (el) observerInstance.observe(el);
-      });
-    }
-  });
-});
+watch(
+  () => props.shops,
+  () => {
+    nextTick(() => {
+      if (observerInstance) {
+        observerInstance.disconnect();
+        Object.values(cardRefs.value).forEach((el) => {
+          if (el) observerInstance.observe(el);
+        });
+      }
+    });
+  }
+);
 
 // Handle scroll events
 const handleScroll = () => {
@@ -95,8 +108,8 @@ const scrollToShop = (shopId) => {
   const card = cardRefs.value[shopId];
   if (card) {
     card.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center'
+      behavior: "smooth",
+      block: "center",
     });
   }
 };
@@ -110,35 +123,44 @@ const setCardRef = (el, shopId) => {
 
 // Handle hover on shop card - emit to parent for map sync
 const handleCardHover = (shop) => {
-  emit('hover-shop', shop);
+  emit("hover-shop", shop);
 };
 
 // Count live shops
 const liveCount = computed(() => {
-  return props.shops.filter(s => s.status === 'LIVE').length;
+  return props.shops.filter((s) => s.status === "LIVE").length;
 });
 
 defineExpose({ scrollToShop });
 </script>
 
 <template>
-  <div 
+  <div
     ref="panelRef"
     :class="[
       'video-panel h-full overflow-y-auto border-l',
-      isDarkMode 
-        ? 'bg-zinc-950/95 backdrop-blur-xl border-white/10' 
-        : 'bg-white/95 backdrop-blur-xl border-gray-200'
+      isDarkMode
+        ? 'bg-zinc-950/95 backdrop-blur-xl border-white/10'
+        : 'bg-white/95 backdrop-blur-xl border-gray-200',
     ]"
     @scroll="handleScroll"
   >
     <!-- Header -->
-    <div :class="[
-      'sticky top-0 z-20 backdrop-blur-xl border-b p-4',
-      isDarkMode ? 'bg-zinc-950/95 border-white/10' : 'bg-white/95 border-gray-200'
-    ]">
+    <div
+      :class="[
+        'sticky top-0 z-20 backdrop-blur-xl border-b p-4',
+        isDarkMode
+          ? 'bg-zinc-950/95 border-white/10'
+          : 'bg-white/95 border-gray-200',
+      ]"
+    >
       <div class="flex items-center justify-between">
-        <h2 :class="['text-lg font-semibold', isDarkMode ? 'text-white' : 'text-gray-900']">
+        <h2
+          :class="[
+            'text-lg font-semibold',
+            isDarkMode ? 'text-white' : 'text-gray-900',
+          ]"
+        >
           Vibes Now
         </h2>
         <div class="flex items-center gap-2">
@@ -159,21 +181,29 @@ defineExpose({ scrollToShop });
         :data-shop-id="shop.id"
         :class="[
           'transition-all duration-300',
-          activeShopId === shop.id ? 'scale-[1.02]' : ''
+          activeShopId === shop.id ? 'scale-[1.02]' : '',
         ]"
       >
         <ShopCard
           :shop="shop"
           :isActive="activeShopId === shop.id"
           :isDarkMode="isDarkMode"
+          :favorites="favorites"
           @click="emit('select-shop', shop)"
           @open-detail="emit('open-detail', shop)"
           @hover="handleCardHover"
+          @toggle-favorite="(id) => emit('toggle-favorite', id)"
         />
       </div>
 
       <!-- Empty State -->
-      <div v-if="shops.length === 0" :class="['py-20 text-center space-y-3', isDarkMode ? 'text-white/30' : 'text-gray-400']">
+      <div
+        v-if="shops.length === 0"
+        :class="[
+          'py-20 text-center space-y-3',
+          isDarkMode ? 'text-white/30' : 'text-gray-400',
+        ]"
+      >
         <p class="text-sm">ไม่พบร้านค้า</p>
       </div>
     </div>

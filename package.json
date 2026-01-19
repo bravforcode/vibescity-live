@@ -6,9 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+        "build:roads:cm": "node scripts/build-chiangmai-roads.mjs",
+    "build:roads:cm:lanes": "node scripts/road-lanes.mjs"
   },
   "dependencies": {
+    "@turf/helpers": "^7.3.2",
+    "@turf/line-offset": "^7.3.2",
     "@vue-leaflet/vue-leaflet": "^0.10.1",
     "@vueuse/motion": "^3.0.3",
     "aos": "^2.3.4",

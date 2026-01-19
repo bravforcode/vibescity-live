@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Generated Data (Large Files)
+public/data/chiangmai-main-roads-lanes.geojson
+public/data/chiangmai-main-roads.geojson

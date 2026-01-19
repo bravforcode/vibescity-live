@@ -4,6 +4,9 @@ import PoiIcon from "./PoiIcon.vue";
 
 const emit = defineEmits(['height-change']);
 
+// ✅ Collapse state for right-side panel
+const isCollapsed = ref(false);
+
 const props = defineProps({
   isDarkMode: { type: Boolean, default: true },
   isVisible: { type: Boolean, default: true },
@@ -183,115 +186,115 @@ watch(() => props.buildingName, () => {
 </script>
 
 <template>
-  <transition name="nav-slide-up">
-    <!-- ✅ outer wrapper: ไม่บล็อกการลาก/ซูม map -->
-    <div v-if="isVisible" class="absolute left-0 right-0 bottom-0 z-[2500] pointer-events-none">
-      <!-- ✅ panel - Solid colors, no glassmorphism -->
-      <div
-        ref="panelRef"
-        class="pointer-events-auto mx-2 mb-2 overflow-hidden rounded-3xl shadow-2xl border"
-        :class="isDarkMode ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-300'"
-      >
-        <!-- ✅ handle -->
-        <div class="flex justify-center pt-2">
-          <div class="h-1 w-10 rounded-full" :class="isDarkMode ? 'bg-white/30' : 'bg-gray-400'" />
+  <transition name="nav-slide-right">
+    <!-- ✅ Right-side morphing panel -->
+    <div 
+      v-if="isVisible" 
+      class="fixed right-0 top-1/2 -translate-y-1/2 z-[2500] shadow-2xl transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] overflow-hidden border"
+      :class="[
+        isCollapsed ? 'w-9 h-24 rounded-l-xl cursor-pointer hover:w-10' : 'w-[160px] max-h-[60vh] rounded-l-2xl',
+        isDarkMode ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-200'
+      ]"
+      @click="isCollapsed ? (isCollapsed = false) : null"
+    >
+      <!-- ✅ Content Wrapper for Fade -->
+      <transition name="fade" mode="out-in">
+        
+        <!-- STATE 1: COLLAPSED BUTTON -->
+        <div 
+          v-if="isCollapsed" 
+          key="collapsed"
+          class="w-full h-full flex flex-col items-center justify-center gap-1"
+          :class="isDarkMode ? 'text-white' : 'text-gray-700'"
+        >
+          <span class="text-sm">🧭</span>
+          <svg class="w-3 h-3 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+          </svg>
         </div>
 
-        <!-- Header -->
-        <div class="px-4 pt-2 pb-3 border-b" :class="isDarkMode ? 'border-white/10' : 'border-gray-200'">
-          <div class="flex items-center justify-between">
+        <!-- STATE 2: EXPANDED PANEL -->
+        <div 
+          v-else 
+          key="expanded"
+          class="w-full h-full flex flex-col"
+        >
+          <!-- Header -->
+          <div class="px-3 py-2 border-b flex items-center justify-between shrink-0" :class="isDarkMode ? 'border-white/10' : 'border-gray-200'">
             <div class="flex items-center gap-2">
-              <span class="text-sm">🧭</span>
-              <span
-                :class="[
-                  'text-xs font-bold tracking-widest uppercase',
-                  isDarkMode ? 'text-white' : 'text-gray-900'
-                ]"
-              >
-                NAVIGATION
+              <span class="text-xs">🧭</span>
+              <span :class="['text-[9px] font-bold tracking-widest uppercase', isDarkMode ? 'text-white' : 'text-gray-900']">
+                NAV
               </span>
             </div>
-
-            <div
-              v-if="buildingName"
-              :class="[
-                'text-xs font-semibold truncate max-w-[55%]',
-                isDarkMode ? 'text-gray-300' : 'text-gray-700'
-              ]"
+            <button 
+              @click.stop="isCollapsed = true"
+              class="w-5 h-5 flex items-center justify-center rounded-full transition-all hover:bg-black/5"
+              :class="isDarkMode ? 'text-white/60 hover:bg-white/10' : 'text-gray-500'"
             >
-              {{ buildingName }}<span v-if="floorName"> • {{ floorName }}</span>
+              <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Scrollable Content -->
+          <div class="overflow-y-auto flex-1 custom-scrollbar">
+            <!-- Building Info -->
+            <div v-if="buildingName" class="px-3 py-2 border-b" :class="isDarkMode ? 'border-white/10' : 'border-gray-200'">
+              <div :class="['text-xs font-semibold truncate', isDarkMode ? 'text-white' : 'text-gray-900']">{{ buildingName }}</div>
+              <div v-if="floorName" :class="['text-[10px]', isDarkMode ? 'text-gray-400' : 'text-gray-500']">{{ floorName }}</div>
             </div>
-          </div>
 
-          <div class="mt-1 text-xs" :class="isDarkMode ? 'text-gray-400' : 'text-gray-600'">
-            จุดสำคัญในตึก (POI)
-          </div>
-        </div>
-
-        <!-- Content -->
-        <div class="px-4 pt-3 pb-3">
-          <template v-if="visibleGrouped.length">
-            <div class="space-y-3">
-              <div v-for="g in visibleGrouped" :key="g.groupName">
-                <div
-                  class="mb-2 text-xs font-bold tracking-widest uppercase"
-                  :class="isDarkMode ? 'text-gray-400' : 'text-gray-600'"
-                >
-                  {{ groupLabel(g.groupName) }}
-                </div>
-
-                <div class="grid gap-x-4 gap-y-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
-                  <div v-for="p in g.items" :key="p.id" class="flex items-center gap-2 min-w-0">
-                    <span class="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm" :style="{ backgroundColor: p.color }" />
-                    <span
-                      :class="[
-                        'text-sm leading-tight truncate',
-                        isDarkMode ? 'text-white' : 'text-gray-800'
-                      ]"
-                      :title="p.label"
-                    >
-                      <PoiIcon :type="p.type" :size="14" :color="p.color" class="mr-1.5 flex-shrink-0" />{{ p.label }}
-                    </span>
+            <!-- List -->
+            <div class="px-3 py-2 space-y-3">
+              <template v-if="visibleGrouped.length">
+                <div v-for="g in visibleGrouped" :key="g.groupName">
+                  <div class="mb-1 text-[9px] font-bold tracking-widest uppercase opacity-70" :class="isDarkMode ? 'text-gray-400' : 'text-gray-500'">
+                    {{ groupLabel(g.groupName) }}
+                  </div>
+                  <div class="space-y-1.5">
+                    <div v-for="p in g.items" :key="p.id" class="flex items-center gap-2">
+                      <span class="w-2 h-2 rounded-full shrink-0" :style="{ backgroundColor: p.color }" />
+                      <span :class="['text-[10px] truncate', isDarkMode ? 'text-white/90' : 'text-gray-700']" :title="p.label">
+                        {{ p.label }}
+                      </span>
+                    </div>
                   </div>
                 </div>
+                <!-- More count -->
+                <div v-if="hasMore" class="pt-1 text-[9px] opacity-50" :class="isDarkMode ? 'text-white' : 'text-black'">
+                  + {{ flattened.length - visibleFlat.length }} more
+                </div>
+              </template>
+              <div v-else class="text-[10px] italic opacity-50 text-center py-2">
+                (No POIs)
               </div>
             </div>
-
-            <div v-if="hasMore" class="mt-3 text-[10px]" :class="isDarkMode ? 'text-white/40' : 'text-gray-500'">
-              + อีก {{ flattened.length - visibleFlat.length }} รายการ
-            </div>
-          </template>
-
-          <div
-            v-else
-            :class="['text-[11px] italic', isDarkMode ? 'text-white/40' : 'text-gray-400']"
-          >
-            (ยังไม่มี POI ของชั้นนี้)
           </div>
         </div>
-
-        <!-- ✅ safe area -->
-        <div class="h-[env(safe-area-inset-bottom)]" />
-      </div>
+      </transition>
     </div>
   </transition>
 </template>
 
 <style scoped>
-.nav-slide-up-enter-active {
-  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+.nav-slide-right-enter-active,
+.nav-slide-right-leave-active {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s;
 }
-.nav-slide-up-leave-active {
-  transition: transform 0.2s ease, opacity 0.2s ease;
-}
-.nav-slide-up-enter-from,
-.nav-slide-up-leave-to {
-  transform: translateY(110%);
+.nav-slide-right-enter-from,
+.nav-slide-right-leave-to {
+  transform: translateX(120%);
   opacity: 0;
 }
-.nav-slide-up-enter-to,
-.nav-slide-up-leave-from {
-  transform: translateY(0);
-  opacity: 1;
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>

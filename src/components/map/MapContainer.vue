@@ -6,11 +6,15 @@ import {
   LIcon,
   LCircleMarker,
   LPolygon,
-  LImageOverlay,
+  // LImageOverlay, // REMOVED
 } from "@vue-leaflet/vue-leaflet";
 import "leaflet/dist/leaflet.css";
+// ✅ Import atmosphere styles
+import "../../assets/map-atmosphere.css";
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import PoiIcon from "./PoiIcon.vue";
+import L from "leaflet";
+import { TrafficPolylineLayer } from "./TrafficPolylineLayer";
 
 const props = defineProps({
   shops: Array,
@@ -19,22 +23,19 @@ const props = defineProps({
   highlightedShopId: [Number, String],
   isDarkMode: { type: Boolean, default: true },
   activeZone: { type: String, default: null },
+  uiTopOffset: { type: Number, default: 0 },
+  uiBottomOffset: { type: Number, default: 0 },
 
   // Province focus
   activeProvince: { type: String, default: null },
 
-  // Indoor floor plan
-  activeFloorPlan: { type: String, default: null },
-  isIndoorView: { type: Boolean, default: false },
+  // Indoor floor plan REMOVED
   activeBuilding: { type: Object, default: null },
 
   buildings: { type: Object, default: () => ({}) },
 
-  // ✅ selected floor
-  activeFloor: { type: [String, Number], default: null },
-
-  // ✅ POI list for current floor (from App.vue computed indoorPois)
-  indoorPois: { type: Array, default: () => [] },
+  // activeFloor: { type: [String, Number], default: null }, // REMOVED
+  // indoorPois: { type: Array, default: () => [] }, // REMOVED
 
   // ✅ Sidebar Open State (from App.vue)
   isSidebarOpen: { type: Boolean, default: false },
@@ -51,48 +52,72 @@ const chiangMaiBounds = [
   [20.6, 100.3], // NE
 ];
 
-const emit = defineEmits(["select-shop", "open-detail", "open-building", "exit-indoor"]);
+const emit = defineEmits([
+  "select-shop",
+  "open-detail",
+  "open-building",
+  "exit-indoor",
+  "open-ride-modal",
+]);
 
 const bounceTick = ref(0);
 const zoom = ref(15);
 const center = ref([18.7985, 98.968]);
 const mapObject = ref(null);
+const trafficLayerRef = ref(null);
+const trafficRoutesLoaded = ref(false);
+const isMapMoving = ref(false); // ✅ For physics wobble
+const isRaining = ref(false); // ✅ Atmosphere state
+const showClouds = ref(true); // ✅ Atmosphere state
+
+const getTrafficProfileByTime = (d = new Date()) => {
+  const h = d.getHours();
+
+  // peak เช้า/เย็น
+  const isMorningPeak = h >= 7 && h <= 10;
+  const isEveningPeak = h >= 16 && h <= 20;
+
+  // night โล่งมาก
+  const isNight = h >= 0 && h <= 5;
+
+  // default กลางวันทั่วไป
+  let vehicleCount = 120;
+  let speedMin = 18;
+  let speedMax = 42;
+
+  if (isMorningPeak || isEveningPeak) {
+    vehicleCount = 260; // ✅ รถเยอะมาก
+    speedMin = 10;
+    speedMax = 26;
+  } else if (isNight) {
+    vehicleCount = 60; // ✅ โล่ง
+    speedMin = 22;
+    speedMax = 55;
+  }
+
+  return { vehicleCount, speedMin, speedMax };
+};
+
+watch(
+  () => props.currentTime,
+  (t) => {
+    if (!trafficLayerRef.value) return;
+    const profile = getTrafficProfileByTime(t || new Date());
+    trafficLayerRef.value.setOptions({
+      vehicleCount: profile.vehicleCount,
+      speedMin: profile.speedMin,
+      speedMax: profile.speedMax,
+    });
+  },
+  { immediate: true }
+);
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
-/**
- * ✅ ทำให้ indoor อยู่ได้นานขึ้นตอนซูมออก + เฟดช้ากว่าเดิมมาก
- * - ใช้ smoother curve แบบ "easeOutCubic-ish"
- * - เป้าหมาย: ซูมออกมาแล้ว floorplan ยังเห็นอยู่นาน ก่อนค่อย ๆ ไป base map
- */
-const smoothstep = (t) => t * t * (3 - 2 * t);
-const easeOut = (t) => 1 - Math.pow(1 - t, 3);
-
-const indoorBlend = computed(() => {
-  if (!props.activeFloorPlan || !props.activeBuilding) return 0;
-  if (!props.isIndoorView) return 0;
-
-  // ✅ ขยาย range เยอะ และ “เฟดช้าตอนซูมออก”
-  // start: จุดเริ่มเริ่มเห็น indoor
-  // end:   จุดที่ indoor เต็ม 100%
-  // แนะนำให้ end ใหญ่หน่อยเพื่อให้ curve หน่วง
-  const start = 12.0; // เริ่ม “มี indoor”
-  const end = 20; // indoor เต็มช้ากว่าเดิม
-
-  const t = clamp01((zoom.value - start) / (end - start));
-
-  // ทำให้ช่วงต้นขึ้นช้า (ยังเห็น base อยู่) แต่ช่วงกลาง/ท้ายจะเข้า indoor แบบนิ่ม
-  const s = smoothstep(t);
-
-  // ✅ ปรับ curve ให้ “คา indoor นาน” ตอนซูมออก
-  // - ตอน t ต่ำ: ยังเห็น base เยอะ
-  // - ตอน t สูง: indoor ครองนานขึ้น
-  const slowFade = 1 - Math.pow(1 - easeOut(s), 1.8);
-  return slowFade;
-});
-
-const baseOpacity = computed(() => 1 - indoorBlend.value);
-const floorOpacity = computed(() => indoorBlend.value);
+// Indoor blend logic REMOVED. Map is always base map.
+// const indoorBlend = ...
+// const baseOpacity = ...
+// const floorOpacity = ...
 
 /** -----------------------------
  * ✅ Theme tile
@@ -110,30 +135,140 @@ watch(
   }
 );
 
+const updateTrafficEnabled = () => {
+  const layer = trafficLayerRef.value;
+  const map = mapObject.value;
+  if (!layer || !map) return;
+
+  /* const enabled = !props.isIndoorView && zoom.value >= 13.2; */
+  const enabled = zoom.value >= 13.2;
+  layer.setEnabled(enabled);
+};
+
+watch([/* () => props.isIndoorView, */ zoom], () => {
+  updateTrafficEnabled();
+});
+
+watch(
+  () => props.currentTime,
+  (t) => {
+    const layer = trafficLayerRef.value;
+    if (!layer) return;
+
+    const profile = getTrafficProfileByTime(t || new Date());
+
+    // ต้องมีเมธอด setOptions ใน TrafficPolylineLayer (เดี๋ยวด้านล่างบอกให้เพิ่ม)
+    layer.setOptions({
+      vehicleCount: profile.vehicleCount,
+      speedMin: profile.speedMin,
+      speedMax: profile.speedMax,
+    });
+  },
+  { deep: false }
+);
+
+// ✅ Load main road routes from GeoJSON
+const loadMainRoadRoutes = async () => {
+  try {
+    // Try to load the lanes version first
+    const res = await fetch("/data/chiangmai-main-roads-lanes.geojson");
+    if (!res.ok) throw new Error("No lanes data");
+    const data = await res.json();
+
+    // Convert GeoJSON LineString coordinates to Leaflet [lat, lng]
+    return (data.features || [])
+      .map((f) => {
+        const coords = f.geometry?.coordinates || [];
+        // GeoJSON is [lng, lat], Leaflet wants [lat, lng]
+        return coords.map((c) => [c[1], c[0]]);
+      })
+      .filter((route) => route.length > 1);
+  } catch (e) {
+    console.warn("Could not load road lanes, traffic disabled:", e);
+    return [];
+  }
+};
+
 /** -----------------------------
  * ✅ Map ready / focus
  * ----------------------------- */
-const onMapReady = (mapInstance) => {
+const onMapReady = async (mapInstance) => {
   mapObject.value = mapInstance;
   console.log("Map ready, shops:", props.shops?.length || 0);
+
+  mapObject.value.on("zoomend", () => {
+    zoom.value = mapObject.value.getZoom();
+  });
+
+  // ✅ Physics Wobble Listeners
+  mapObject.value.on("movestart", () => {
+    isMapMoving.value = true;
+  });
+  mapObject.value.on("moveend", () => {
+    // Small delay for "settling" feel
+    setTimeout(() => {
+      isMapMoving.value = false;
+    }, 150);
+  });
+
+  // ✅ Random Atmosphere cycle (optional)
+  setInterval(() => {
+    // 30% chance of rain every 5 mins
+    isRaining.value = Math.random() > 0.7;
+  }, 300000);
+
+  // Traffic system disabled due to performance issues
+  // if (!trafficLayerRef.value) { ... }
+  // if (!trafficRoutesLoaded.value) { ... }
+  // updateTrafficEnabled();
 };
 
-const focusLocation = (latlng, targetZoom = 17) => {
-  if (latlng && mapObject.value) {
-    mapObject.value.flyTo(latlng, targetZoom, {
+const focusLocation = (latlng, targetZoom = 17, manualYOffset = null) => {
+  const map = mapObject.value;
+  if (!latlng || !map) return;
+
+  const currentZoom = map.getZoom();
+  const center = map.getCenter();
+  const dist = map.distance(center, latlng); // Distance in meters? Leaflet uses meters.
+  // Actually, let's use pixel distance for decision or just check zoom match.
+
+  // ✅ Calculate target point in "visual center" logic
+  // yOffset adjusts for the top/bottom UI bars (Search vs Carousel)
+  // Default: Center in the *visible* space between top and bottom bars
+  let yOffset = (props.uiTopOffset - props.uiBottomOffset) / 2;
+
+  // If manual override is provided, use it explicitly (ignoring UI)
+  if (manualYOffset !== null && manualYOffset !== undefined) {
+    yOffset = manualYOffset;
+  }
+
+  const targetPoint = map.project(latlng, targetZoom);
+  const targetPointWithOffset = targetPoint.subtract([0, yOffset]);
+  const finalLatLng = map.unproject(targetPointWithOffset, targetZoom);
+
+  // ✅ Smart Move:
+  // If target zoom is same as current AND distance is reasonable, use panTo (Smoother, no zoom effect)
+  // If zoom needs change, use flyTo (Cinematic)
+
+  if (currentZoom === targetZoom) {
+    map.panTo(finalLatLng, {
       animate: true,
-      duration: 0.6,
-      easeLinearity: 0.15,
-      noMoveStart: false,
+      duration: 1.0, // Smooth slide
+      easeLinearity: 0.25,
+      noMoveStart: true,
+    });
+  } else {
+    map.flyTo(finalLatLng, targetZoom, {
+      animate: true,
+      duration: 1.5, // Slower for elegance
+      easeLinearity: 0.2,
+      noMoveStart: true,
     });
   }
 };
 
 const centerOnUser = () => {
-  // ✅ Exit Indoor Mode when clicking Locate Me
-  if (props.isIndoorView) {
-    emit('exit-indoor');
-  }
+  // ✅ Exit Indoor Mode logic REMOVED
   if (props.userLocation) focusLocation(props.userLocation, 17);
 };
 
@@ -165,18 +300,10 @@ const isShopInActiveBuilding = (shop) => {
   return shopB === bKey || shopB === bName;
 };
 
-const isShopOnActiveFloor = (shop) => {
-  if (!props.activeFloor) return true;
-  if (!shop.Floor) return true; // ถ้าไม่มีข้อมูลชั้น ไม่ตัดทิ้ง
-  return normalize(shop.Floor) === normalize(props.activeFloor);
-};
+// isShopOnActiveFloor REMOVED
 
 const displayMarkers = computed(() => {
-  // ✅ Indoor Mode: Hide ALL shop markers, show only POI
-  if (props.isIndoorView) {
-    return []; // Shop markers hidden, Indoor POI markers render separately
-  }
-
+  // ✅ Indoor Mode Check REMOVED
   let list = props.shops || [];
 
   // Filter by Category (if active)
@@ -244,6 +371,25 @@ const leafPositions = Array.from({ length: 12 }, (_, i) => ({
   duration: `${8 + (i % 6)}s`,
 }));
 
+// ✅ NEW: Clouds & Rain particle generation
+const clouds = Array.from({ length: 8 }, (_, i) => ({
+  id: i,
+  width: `${250 + Math.random() * 300}px`,
+  height: `${150 + Math.random() * 200}px`,
+  top: `${Math.random() * 80}%`,
+  left: `${Math.random() * 100}%`,
+  delay: `${Math.random() * 20}s`,
+  duration: `${40 + Math.random() * 60}s`,
+}));
+
+const raindrops = Array.from({ length: 40 }, (_, i) => ({
+  id: i,
+  left: `${Math.random() * 100}%`,
+  top: `${Math.random() * 100}%`,
+  delay: `${Math.random() * 2}s`,
+  duration: `${0.6 + Math.random() * 0.4}s`,
+}));
+
 // ✅ ทำ index ต่อ floor เพื่อ fallback zoneNo ให้ stable ภายในชั้น
 const indoorIndexMap = computed(() => {
   if (!props.isIndoorView) return new Map();
@@ -266,7 +412,15 @@ const indoorIndexMap = computed(() => {
  * ✅ Marker states
  * ----------------------------- */
 const handleMarkerClick = (item) => {
-  emit("select-shop", item);
+  if (!item) return;
+
+  // ✅ toggle open/close
+  if (String(item.id) === String(props.highlightedShopId)) {
+    emit("select-shop", null);
+  } else {
+    emit("select-shop", item);
+  }
+
   bounceTick.value++;
 };
 
@@ -284,7 +438,7 @@ const isInActiveZone = (item) => {
 };
 
 const shouldDimMarker = (item) => {
-  if (props.isIndoorView) return false;
+  // if (props.isIndoorView) return false; (REMOVED)
   if (props.activeProvince && !isInActiveProvince(item)) return true;
   if (props.activeZone && !isInActiveZone(item)) return true;
   return false;
@@ -294,8 +448,8 @@ const getMarkerOpacity = (item) => {
   // Highlighted (clicked) marker always fully visible
   if (isHighlighted(item)) return 1;
 
-  // Indoor mode = full visibility
-  if (props.isIndoorView) return 1;
+  // Indoor mode logic REMOVED
+  // if (props.isIndoorView) return 1;
 
   const z = zoom.value;
 
@@ -306,7 +460,7 @@ const getMarkerOpacity = (item) => {
 
   // Province/Zone dim takes priority (only at very high zoom 16+)
   if (shouldDimMarker(item)) return 0.15;
-  
+
   // ✅ Calculate base distance opacity (if location available)
   let baseOpacity = 1;
   if (props.userLocation && item?.distance !== undefined) {
@@ -316,22 +470,28 @@ const getMarkerOpacity = (item) => {
       baseOpacity = 0.55; // Far = slightly dim
     }
   }
-  
+
   // ✅ ZOOM-BASED RECOVERY: (Only needed if we went deeper than 15, but logic holds)
   // Since we return 1 for <= 15, this part only affects z > 15
   return baseOpacity;
 };
 
 const getMarkerScale = (item) => {
-  if (props.isIndoorView) return 1;
+  // if (props.isIndoorView) return 1; (REMOVED)
   if (!props.activeProvince && !props.activeZone) return 1;
   return shouldDimMarker(item) ? 0.62 : 1;
 };
 
 const getMarkerTranslateY = (item) => {
-  if (props.isIndoorView) return 0;
+  // if (props.isIndoorView) return 0; (REMOVED)
   if (!props.activeProvince && !props.activeZone) return 0;
   return shouldDimMarker(item) ? 10 : 0;
+};
+
+const getMarkerStyle = (item) => {
+  const s = getMarkerScale(item);
+  const y = getMarkerTranslateY(item);
+  return `transform: translateY(${y}px) scale(${s})`;
 };
 
 const getMarkerTransform = (item) => {
@@ -341,17 +501,41 @@ const getMarkerTransform = (item) => {
 };
 
 /** -----------------------------
+ * ✅ Giant Pin (Building Markers)
+ * ----------------------------- */
+const handleBuildingClick = (key, building) => {
+  // Emit event to open Mall Drawer (via activeBuilding in App.vue)
+  const buildingWithKey = { ...building, key: key };
+  emit("open-building", buildingWithKey);
+
+  // Also focus the map on the building
+  if (building.lat && building.lng) {
+    focusLocation([building.lat, building.lng], 16, 120); // offset to show drawer
+  }
+};
+
+const getBuildingIconSize = (key) => {
+  const isActive = props.activeBuilding && props.activeBuilding.key === key;
+  return isActive ? [60, 60] : [50, 50]; // Giant size
+};
+
+const getBuildingZIndex = (key) => {
+  const isActive = props.activeBuilding && props.activeBuilding.key === key;
+  return isActive ? 1000 : 900; // Above normal shops
+};
+
+/** -----------------------------
  * ✅ Province mask polygon with HIGH-RESOLUTION boundary
  * ----------------------------- */
 const hiResChiangMaiBoundary = ref(null);
 
-// Load high-resolution Chiang Mai boundary on mount
+// Load high-resolution Chiang Mai boundary on mount (already in [lat, lng] Leaflet format)
 onMounted(async () => {
   try {
-    const response = await fetch("/data/chiang-mai-boundary.json");
-    const geoJsonCoords = await response.json();
-    // Convert from GeoJSON [lng, lat] to Leaflet [lat, lng]
-    hiResChiangMaiBoundary.value = geoJsonCoords.map((c) => [c[1], c[0]]);
+    const response = await fetch("/data/chiang-mai-leaflet.json");
+    const leafletCoords = await response.json();
+    // Already in [lat, lng] format - use directly
+    hiResChiangMaiBoundary.value = leafletCoords;
     console.log(
       "✅ Loaded high-res Chiang Mai boundary:",
       hiResChiangMaiBoundary.value.length,
@@ -363,7 +547,8 @@ onMounted(async () => {
 });
 
 const provinceMaskPolygon = computed(() => {
-  if (!props.activeProvince) return null;
+  // ✅ Show mask when zoomed out (< 14) - always visible on base map
+  // if (props.isIndoorView) return null; (REMOVED)
 
   const outerRing = [
     [25, 90],
@@ -428,14 +613,21 @@ const provinceMaskPolygon = computed(() => {
   return [outerRing, chiangMaiHole];
 });
 
-const provinceMaskOptions = computed(() => ({
-  color: "transparent",
-  fillColor: "#09090b",
-  fillOpacity: props.activeProvince ? 0.7 : 0,
-  stroke: false,
-  interactive: false,
-  className: "feathered-mask", // CSS blur for smooth edge
-}));
+const provinceMaskOptions = computed(() => {
+  // ✅ Fade in mask when zoomed out (below zoom 13)
+  // Zoom 15+ = 0 opacity, Zoom 11- = 0.85 opacity
+  const zoomFactor = Math.max(0, Math.min(1, (14 - zoom.value) / 3));
+  const baseOpacity = 0.85 * zoomFactor;
+
+  return {
+    color: "transparent",
+    fillColor: props.isDarkMode ? "#09090b" : "#1f2937",
+    fillOpacity: baseOpacity,
+    stroke: false,
+    interactive: false,
+    className: "province-mask-blur",
+  };
+});
 
 // Empty - gradient rings removed
 
@@ -457,110 +649,8 @@ const floorPlanBounds = computed(() => {
   ];
 });
 
-/** -----------------------------
- * ✅ Indoor POI (minimal dot + icon + zoneNo) + click flyTo highlight
- * ----------------------------- */
-const POI_STYLE = {
-  entrance: { color: "#22C55E", icon: "🚪" },
-  lift: { color: "#A855F7", icon: "🛗" },
-  escalator: { color: "#F59E0B", icon: "🪜" },
-  stairs: { color: "#F59E0B", icon: "🪜" },
-  toilet: { color: "#0EA5E9", icon: "🚻" },
-  info: { color: "#38BDF8", icon: "ℹ️" },
-  food: { color: "#EF4444", icon: "🍽️" },
-  parking: { color: "#64748B", icon: "🅿️" },
-};
-
-// ✅ สีหมุดร้านใน indoor (ใช้ CategoryColor จาก CSV ก่อน ถ้ามี)
-const getIndoorShopColor = (shop) => {
-  // CSV ของคุณมี CategoryColor อยู่แล้ว -> ใช้อันนี้ดีที่สุด
-  const cc = shop?.CategoryColor;
-  if (cc && String(cc).trim()) return String(cc).trim();
-
-  // fallback: map จาก category
-  const key = (shop?.Category || shop?.category || "")
-    .toString()
-    .trim()
-    .toLowerCase();
-  const MAP = {
-    cafe: "#8B4513",
-    restaurant: "#E74C3C",
-    bar: "#9B59B6",
-    "bar/nightlife": "#9B59B6",
-    dessert: "#FF69B4",
-    healthy: "#27AE60",
-    "community mall": "#F39C12",
-    fashion: "#E91E63",
-    "hotel/bar": "#3498DB",
-    "work space": "#3498DB",
-    supermarket: "#27AE60",
-  };
-  return MAP[key] || "#60A5FA";
-};
-
-// ✅ เลขโซนร้าน (อ่านจาก CSV: IndoorZoneNo) ถ้าไม่มี -> สร้างอัตโนมัติจากลำดับในชั้น
-const getIndoorShopZoneNo = (shop, indexOnFloor = 0) => {
-  const raw =
-    shop?.IndoorZoneNo ??
-    shop?.ZoneNo ??
-    shop?.indoorZoneNo ??
-    shop?.zoneNo ??
-    null;
-
-  if (raw !== null && raw !== undefined && String(raw).trim() !== "")
-    return String(raw).trim();
-  return String(indexOnFloor + 1); // fallback 1..N
-};
-
-const getPoiStyle = (poi) =>
-  POI_STYLE[poi?.type] || { color: "#94A3B8", icon: "📍" };
-
-const activePoiId = ref(null);
-const poiPulseTick = ref(0);
-
-const isPoiHighlighted = (poi) => poi?.id && poi.id === activePoiId.value;
-
-const handlePoiClick = (poi) => {
-  if (!poi?.lat || !poi?.lng) return;
-  activePoiId.value = poi.id;
-  poiPulseTick.value++;
-  focusLocation([poi.lat, poi.lng], Math.max(zoom.value, 18.2));
-};
-
-// clear POI highlight when exit indoor
-watch(
-  () => props.isIndoorView,
-  (v) => {
-    if (!v) activePoiId.value = null;
-  }
-);
-
-// ✅ DEV MODE: Click on map to get coordinates for POI placement
-// Enable by setting window.POI_DEV_MODE = true in browser console
-const handleMapClick = (e) => {
-  if (!window.POI_DEV_MODE) return;
-  if (!props.isIndoorView) return;
-
-  const { lat, lng } = e.latlng;
-  const coordStr = `"lat": ${lat.toFixed(4)}, "lng": ${lng.toFixed(4)}`;
-
-  console.log(
-    "%c📍 POI Coordinate Picked:",
-    "color: #22C55E; font-weight: bold; font-size: 14px;"
-  );
-  console.log(`   Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`);
-  console.log(`   JSON: { ${coordStr} }`);
-  console.log("   Floor:", props.activeFloor);
-  console.log("   Building:", props.activeBuilding?.name);
-
-  // Copy to clipboard
-  navigator.clipboard
-    .writeText(`{ ${coordStr} }`)
-    .then(() => {
-      console.log("%c✅ Copied to clipboard!", "color: #0EA5E9;");
-    })
-    .catch(() => {});
-};
+// Indoor POI logic REMOVED
+const isPoiHighlighted = () => false;
 
 /** -----------------------------
  * ✅ Keep legacy detail open (same as your old system)
@@ -579,6 +669,12 @@ onMounted(() => {
 
 onUnmounted(() => {
   delete window.openVibeDetail;
+
+  if (trafficLayerRef.value && mapObject.value) {
+    try {
+      trafficLayerRef.value.removeFrom(mapObject.value);
+    } catch {}
+  }
 });
 
 // ✅ Check if shop has an upcoming event within 1 hour (for blue glow popup)
@@ -599,33 +695,21 @@ const hasUpcomingEvent = (item) => {
 };
 
 // ✅ Smart Content Switching: Determines if marker shows Detail or Dot
+// ✅ Smart Content Switching: Determines if marker shows Detail or Dot
 const isDetailsVisible = (item) => {
-  if (props.isIndoorView) return true; // Indoor always detailed
   if (isHighlighted(item) || isLive(item)) return true; // Important markers always detailed
   if (item.distance && item.distance <= 2.0) return true; // Nearby < 2km detailed
   return false; // Distant & Inactive -> Dot
 };
 
 // ✅ Dynamic Locate Button Position
+// ✅ Dynamic Locate Button Position
 const locateButtonBottom = computed(() => {
-  // If not in indoor view OR sidebar is open (VIBE NOW list), use standard position
-  if (!props.isIndoorView || props.isSidebarOpen) return "80px"; 
-
-  // Use actual Navigation Legend height + fixed 16px gap
-  // If legendHeight is 0 (not yet measured), use fallback calculation
-  if (props.legendHeight > 0) {
-    return `${props.legendHeight + 16}px`;
-  }
-
-  // Fallback: Calculate estimated height
-  // This provides a reasonable default while waiting for real measurement
-  const itemCount = indoorNavItems.value.length;
-  const estimatedHeight = 180 + (itemCount * 28) + 12; 
-  
-  return `${estimatedHeight}px`;
+  if (props.isSidebarOpen) return "80px";
+  return "80px";
 });
 
-defineExpose({ focusLocation });
+defineExpose({ focusLocation, centerOnUser, mapObject });
 </script>
 
 <template>
@@ -634,7 +718,7 @@ defineExpose({ focusLocation });
       'relative w-full h-full z-0 transition-colors duration-500',
       isDarkMode ? 'bg-[#09090b]' : 'bg-gray-200',
     ]"
-    style="content-visibility: auto;"
+    style="content-visibility: auto"
   >
     <l-map
       v-model:zoom="zoom"
@@ -650,174 +734,9 @@ defineExpose({ focusLocation });
       @click="handleMapClick"
       class="z-0"
     >
-      <!-- ✅ 1. Category Filter Dropdown (Tab Style) -->
-      <div
-        class="absolute top-5 left-1/2 -translate-x-1/2 z-[1000] font-sans pointer-events-auto"
-      >
-        <div class="relative">
-          <!-- Main Toggle Button -->
-          <button
-            @click.stop="isFilterOpen = !isFilterOpen"
-            :class="[
-              'flex items-center gap-2 pl-3 pr-2 py-2.5 rounded-2xl shadow-xl transition-all duration-300 ease-spring border backdrop-blur-xl',
-              isFilterOpen
-                ? 'bg-white/95 ring-2 ring-blue-500/20'
-                : 'bg-white/80 hover:bg-white',
-              isDarkMode
-                ? 'bg-zinc-900/90 border-white/10 text-white'
-                : 'border-white/40 text-slate-700',
-            ]"
-          >
-            <span class="text-sm shadow-sm">{{
-              availableCategories.find((c) => c.label === activeCategory)?.icon
-            }}</span>
-            <span class="text-xs font-bold tracking-wide">{{
-              activeCategory
-            }}</span>
-            <div
-              :class="[
-                'w-5 h-5 flex items-center justify-center rounded-full bg-slate-100/50 transition-transform duration-300',
-                isFilterOpen ? 'rotate-180' : '',
-              ]"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="w-3 h-3 opacity-60"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="3"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-            </div>
-          </button>
+      <!-- Category Filter is now in App.vue - removed duplicate here -->
 
-          <!-- Dropdown Menu -->
-          <transition
-            enter-active-class="transition duration-200 ease-out"
-            enter-from-class="transform scale-95 opacity-0 -translate-y-2"
-            enter-to-class="transform scale-100 opacity-100 translate-y-0"
-            leave-active-class="transition duration-150 ease-in"
-            leave-from-class="transform scale-100 opacity-100 translate-y-0"
-            leave-to-class="transform scale-95 opacity-0 -translate-y-2"
-          >
-            <div
-              v-if="isFilterOpen"
-              class="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-40 p-1.5 rounded-2xl shadow-2xl backdrop-blur-xl border origin-top overflow-hidden"
-              :class="
-                isDarkMode
-                  ? 'bg-zinc-900/95 border-white/10'
-                  : 'bg-white/95 border-white/40'
-              "
-            >
-              <button
-                v-for="cat in availableCategories"
-                :key="cat.label"
-                @click.stop="setCategory(cat.label)"
-                :class="[
-                  'w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200',
-                  activeCategory === cat.label
-                    ? isDarkMode
-                      ? 'bg-white/10 text-white'
-                      : 'bg-blue-50 text-blue-600'
-                    : isDarkMode
-                    ? 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'
-                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800',
-                ]"
-              >
-                <span>{{ cat.icon }}</span>
-                <span>{{ cat.label }}</span>
-                <span
-                  v-if="activeCategory === cat.label"
-                  class="ml-auto w-1.5 h-1.5 rounded-full bg-current"
-                ></span>
-              </button>
-            </div>
-          </transition>
-        </div>
-      </div>
-
-      <!-- ✅ 2. Premium Custom Zoom Controls -->
-      <div
-        class="absolute bottom-10 right-5 z-[1000] flex flex-col gap-3 pointer-events-auto"
-      >
-        <div
-          class="flex flex-col p-1 rounded-[20px] shadow-2xl backdrop-blur-xl border transition-colors duration-300"
-          :class="
-            isDarkMode
-              ? 'bg-zinc-900/80 border-white/10'
-              : 'bg-white/80 border-white/40'
-          "
-        >
-          <!-- Zoom In -->
-          <button
-            @click.stop="zoomIn"
-            class="group w-10 h-10 flex items-center justify-center rounded-xl relative overflow-hidden transition-all duration-200 active:scale-90 hover:bg-blue-500/10"
-          >
-            <span
-              :class="[
-                'absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300',
-                isDarkMode ? 'bg-white/5' : 'bg-black/5',
-              ]"
-            ></span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              :class="[
-                'w-5 h-5 transition-transform duration-300 group-hover:scale-110 group-active:scale-95',
-                isDarkMode ? 'text-white' : 'text-slate-700',
-              ]"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-          </button>
-
-          <!-- Divider -->
-          <div
-            :class="[
-              'h-[1px] w-6 mx-auto',
-              isDarkMode ? 'bg-white/10' : 'bg-slate-200/50',
-            ]"
-          ></div>
-
-          <!-- Zoom Out -->
-          <button
-            @click.stop="zoomOut"
-            class="group w-10 h-10 flex items-center justify-center rounded-xl relative overflow-hidden transition-all duration-200 active:scale-90 hover:bg-blue-500/10"
-          >
-            <span
-              :class="[
-                'absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300',
-                isDarkMode ? 'bg-white/5' : 'bg-black/5',
-              ]"
-            ></span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              :class="[
-                'w-5 h-5 transition-transform duration-300 group-hover:scale-110 group-active:scale-95',
-                isDarkMode ? 'text-white' : 'text-slate-700',
-              ]"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-          </button>
-        </div>
-      </div>
+      <!-- Zoom Controls Removed -->
       <!-- Base tiles (fade out as indoorBlend increases) -->
       <l-tile-layer
         :url="tileLayerUrl"
@@ -826,18 +745,139 @@ defineExpose({ focusLocation });
         :key="tileLayerUrl"
       />
 
-      <!-- Floorplan overlay (fade in as indoorBlend increases) -->
-      <l-image-overlay
-        v-if="activeFloorPlan && floorPlanBounds"
-        :url="activeFloorPlan"
-        :bounds="floorPlanBounds"
-        :opacity="floorOpacity"
-        :z-index="200"
-      />
+      <!-- ✅ Entertainment Atmosphere (Spotlights) -->
+      <div class="spotlight-container">
+        <div class="spotlight s1"></div>
+        <div class="spotlight s2"></div>
+        <div class="spotlight s3"></div>
+      </div>
+      <div class="entertainment-particles">
+        <span
+          class="music-note"
+          style="left: 20%; animation-delay: 0s; color: #3b82f6"
+          >🎵</span
+        >
+        <span
+          class="music-note"
+          style="left: 45%; animation-delay: -5s; color: #9333ea"
+          >🎶</span
+        >
+        <span
+          class="music-note"
+          style="left: 75%; animation-delay: -10s; color: #ef4444"
+          >🎵</span
+        >
+        <span
+          class="music-note"
+          style="left: 30%; animation-delay: -15s; color: #fbbf24"
+          >🎶</span
+        >
+        <span
+          class="music-note"
+          style="left: 60%; animation-delay: -7s; color: #10b981"
+          >🎵</span
+        >
+        <span
+          class="music-note"
+          style="left: 90%; animation-delay: -12s; color: #f59e0b"
+          >🎶</span
+        >
+      </div>
+
+      <!-- Floorplan overlay REMOVED -->
+
+      <template v-for="b in buildings" :key="b.key">
+        <l-marker
+          :lat-lng="[b.lat, b.lng]"
+          :z-index-offset="getBuildingZIndex(b.key)"
+          @click="handleBuildingClick(b.key, b)"
+        >
+          <l-icon
+            :icon-size="getBuildingIconSize(b.key)"
+            :icon-anchor="[25, 50]"
+            class-name="giant-pin-marker"
+          >
+            <div
+              class="relative w-full h-full drop-shadow-2xl transition-transform duration-300 hover:scale-110"
+              :class="isMapMoving ? 'is-wobbling' : ''"
+            >
+              <!-- Ripple Effect for All Giant Pins/Buildings -->
+              <div class="ripple-effect"></div>
+
+              <!-- Glowing Base -->
+              <div
+                class="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-2 bg-black/40 blur-sm rounded-full"
+              ></div>
+
+              <!-- Icon Image -->
+              <img
+                src="/images/pins/pin-red.svg"
+                class="w-full h-full object-contain filter drop-shadow-lg"
+                alt="Mall"
+                @error="
+                  (e) =>
+                    (e.target.src =
+                      'https://cdn-icons-png.flaticon.com/512/3721/3721703.png')
+                "
+              />
+
+              <!-- Live Badge (Optional if Mall has event) -->
+              <div
+                v-if="b.status === 'LIVE'"
+                class="absolute -top-2 -right-2 px-1.5 py-0.5 bg-red-600 text-white text-[9px] font-bold rounded-full shadow-md animate-bounce"
+              >
+                LIVE
+              </div>
+            </div>
+          </l-icon>
+        </l-marker>
+      </template>
+
+      <!-- ✅ ATMOSPHERE LAYERS (Between Tile & Markers) -->
+      <div v-if="showClouds" class="clouds-container">
+        <div
+          v-for="c in clouds"
+          :key="c.id"
+          class="cloud-particle"
+          :style="{
+            width: c.width,
+            height: c.height,
+            top: c.top,
+            left: c.left,
+            animationDelay: c.delay,
+            animationDuration: c.duration,
+          }"
+        ></div>
+      </div>
+
+      <div v-if="isRaining" class="rain-container">
+        <div
+          v-for="r in raindrops"
+          :key="r.id"
+          class="rain-drop"
+          :style="{
+            left: r.left,
+            top: r.top,
+            animationDelay: r.delay,
+            animationDuration: r.duration,
+          }"
+        ></div>
+      </div>
+
+      <!-- ✅ Ambient Lighting Overlay (Dynamic based on time) -->
+      <div
+        class="ambient-overlay absolute inset-0 pointer-events-none z-[350]"
+        :style="{
+          backgroundColor: isDarkMode
+            ? 'rgba(15, 23, 42, 0.4)'
+            : 'rgba(255, 247, 237, 0.15)',
+          mixBlendMode: isDarkMode ? 'multiply' : 'soft-light',
+        }"
+      ></div>
 
       <!-- Province mask (hide during indoor) -->
       <l-polygon
-        v-if="provinceMaskPolygon && !isIndoorView"
+        v-if="provinceMaskPolygon"
         :lat-lngs="provinceMaskPolygon"
         :color="provinceMaskOptions.color"
         :fill-color="provinceMaskOptions.fillColor"
@@ -845,48 +885,12 @@ defineExpose({ focusLocation });
         :stroke="provinceMaskOptions.stroke"
         :interactive="provinceMaskOptions.interactive"
         :class-name="provinceMaskOptions.className"
+        :opacity="1"
       />
 
-      <!-- ✅ Indoor POI pins (minimal vibe) -->
-      <template v-if="isIndoorView && indoorNavItems?.length">
-        <l-marker
-          v-for="poi in indoorNavItems"
-          :key="`poi-${poi.id}`"
-          :lat-lng="[poi.lat, poi.lng]"
-          :z-index-offset="900"
-          @click="handlePoiClick(poi)"
-        >
-          <l-icon class-name="vibe-marker-icon" :icon-anchor="[12, 12]">
-            <div class="poi-wrap pointer-events-auto select-none">
-              <!-- dot -->
-              <div
-                class="poi-dot"
-                :class="[isPoiHighlighted(poi) ? 'poi-dot-active' : '']"
-                :style="{ backgroundColor: getPoiStyle(poi).color }"
-              >
-                <PoiIcon
-                  :type="poi.type"
-                  :size="14"
-                  color="white"
-                  class="poi-icon"
-                />
-                <span v-if="poi.zoneNo" class="poi-no">{{ poi.zoneNo }}</span>
-              </div>
+      <!-- ✅ INDOOR POI MARKERS REMOVED -->
 
-              <!-- label (only show if highlighted OR zoom high) -->
-              <div
-                v-if="isPoiHighlighted(poi) || zoom >= 18"
-                class="poi-label"
-                :class="isDarkMode ? 'poi-label-dark' : 'poi-label-light'"
-              >
-                {{ poi.label }}
-              </div>
-            </div>
-          </l-icon>
-        </l-marker>
-      </template>
-
-      <!-- Shop markers (Rich DOM - nearby, live, highlighted) -->
+      <!-- ✅ Markers Pane (Above Map) -->
       <template v-for="item in richMarkers" :key="item.id">
         <l-marker
           :lat-lng="[item.lat, item.lng]"
@@ -900,157 +904,212 @@ defineExpose({ focusLocation });
           <l-icon class-name="vibe-marker-icon" :icon-anchor="[60, 160]">
             <div
               :class="[
-                'marker-container relative flex flex-col items-center cursor-pointer',
+                'marker-container relative flex flex-col items-center cursor-pointer transition-all duration-300',
                 isLive(item) && !isHighlighted(item)
                   ? 'marker-live-glow-subtle'
                   : '',
                 shouldDimMarker(item) ? 'province-dimmed' : '',
+                isMapMoving ? 'is-wobbling' : '',
               ]"
               :style="{
                 opacity: getMarkerOpacity(item),
                 transform: getMarkerTransform(item),
               }"
             >
-                <!-- 1. FULL CARD MODE (Nearby / Live / Highlighted) -->
+              <!-- Ripple Effect for Giant Pins (Events) Only -->
+              <div v-if="item.isEvent" class="ripple-effect"></div>
+              <!-- 1. FULL CARD MODE (Nearby / Live / Highlighted) -->
               <template v-if="isDetailsVisible(item)">
-                <!-- ✅ MINI POPUP (Conditional: Hide for distant inactive markers) -->
-                <div
-                  v-if="isHighlighted(item) || isLive(item) || (item.distance !== undefined && item.distance <= 3)"
-                  class="relative mb-1 w-[120px] rounded-lg shadow-lg overflow-hidden"
-                  :class="[
-                    isDarkMode
-                      ? 'bg-zinc-900/95 border border-white/10'
-                      : 'bg-white/95 border border-gray-200',
-                    isLive(item) ? 'live-popup-blue-glow' : '',
-                  ]"
-                >
-                  <!-- Mini Image Placeholder -->
+                <!-- ✅ MINI-POPUP: Name + Distance Only (Simple Label) -->
+                <transition name="label-pop">
                   <div
-                    class="h-12 w-full bg-gradient-to-br from-purple-600/30 to-red-600/30 flex items-center justify-center"
+                    v-if="isDetailsVisible(item) && !isHighlighted(item)"
+                    class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 pointer-events-none"
                   >
-                    <span class="text-lg">🎵</span>
-                  </div>
-                  <!-- Mini Name -->
-                  <div class="px-2 py-1.5 flex items-center justify-between gap-1">
-                    <span
+                    <!-- Simple Label -->
+                    <div
+                      class="flex items-center gap-2 px-3 py-1.5 rounded-full backdrop-blur-lg shadow-xl border whitespace-nowrap"
                       :class="[
-                        'text-[9px] font-bold truncate flex-1',
-                        isDarkMode ? 'text-white' : 'text-gray-800',
+                        isDarkMode
+                          ? 'bg-zinc-900/80 border-white/10 text-white'
+                          : 'bg-white/90 border-gray-200 text-gray-900',
+                        isLive(item)
+                          ? 'ring-2 ring-blue-500/50 shadow-blue-500/20'
+                          : '',
                       ]"
                     >
-                      {{ item.name }}
-                    </span>
-                    <span
-                      v-if="item.distance !== undefined"
-                      class="text-[9px] font-mono opacity-80"
-                      :class="isDarkMode ? 'text-gray-400' : 'text-gray-500'"
-                    >
-                      {{ item.distance.toFixed(1) }}km
-                    </span>
-                    <span
-                      v-if="isLive(item)"
-                      class="w-2 h-2 rounded-full bg-red-500 live-pulse-dot"
-                    ></span>
-                    <span
-                      v-else-if="item.status === 'ACTIVE'"
-                      class="w-1.5 h-1.5 rounded-full bg-green-500"
-                    ></span>
+                      <span
+                        v-if="isLive(item)"
+                        class="w-2 h-2 rounded-full bg-red-500 animate-pulse"
+                      ></span>
+                      <span class="text-[11px] font-bold">{{ item.name }}</span>
+                      <span
+                        v-if="item.distance !== undefined"
+                        class="text-[10px] opacity-60"
+                      >
+                        {{ item.distance.toFixed(1) }}km
+                      </span>
+                    </div>
+                    <!-- Triangle -->
+                    <div
+                      class="w-2 h-2 rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2"
+                      :class="isDarkMode ? 'bg-zinc-900/80' : 'bg-white/90'"
+                    ></div>
                   </div>
-                </div>
+                </transition>
 
-                <!-- ✅ FULL POPUP (Only on Click) -->
+                <!-- ✅ BIG POPUP: Full Details (Above Mini Popup, On Marker Click) -->
                 <transition name="label-pop">
                   <div
                     v-if="isHighlighted(item)"
+                    class="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 z-[100] w-[220px]"
                     @click.stop
-                    class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-[180px] rounded-xl shadow-2xl overflow-hidden z-50"
-                    :class="[
-                      isDarkMode
-                        ? 'bg-zinc-900 border border-white/20'
-                        : 'bg-white border border-gray-200',
-                      hasUpcomingEvent(item)
-                        ? 'ring-2 ring-blue-400 event-popup-glow'
-                        : '',
-                    ]"
                   >
-                    <!-- Image Placeholder -->
                     <div
-                      class="h-16 w-full bg-gradient-to-br from-purple-600/30 to-red-600/30 flex items-center justify-center"
+                      class="rounded-xl shadow-2xl border overflow-hidden backdrop-blur-xl"
+                      :class="
+                        isDarkMode
+                          ? 'bg-zinc-900/95 border-white/10'
+                          : 'bg-white/95 border-gray-200'
+                      "
                     >
-                      <span class="text-2xl">🎵</span>
+                      <!-- Header with Image/Gradient -->
+                      <div
+                        class="h-32 w-full relative bg-gradient-to-br from-purple-700 via-pink-600 to-red-600 flex items-center justify-center"
+                      >
+                        <img
+                          v-if="item.Image_URL1"
+                          :src="item.Image_URL1"
+                          class="absolute inset-0 w-full h-full object-cover opacity-70"
+                        />
+                        <div
+                          class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"
+                        ></div>
+
+                        <!-- LIVE Badge -->
+                        <div
+                          v-if="isLive(item)"
+                          class="absolute top-2 left-2 px-2 py-0.5 rounded bg-red-600 text-white text-[9px] font-bold animate-pulse"
+                        >
+                          🔴 LIVE
+                        </div>
+
+                        <!-- Close Button -->
+                        <button
+                          @click.stop="$emit('select-shop', null)"
+                          class="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/40 text-white/90 flex items-center justify-center text-xs hover:bg-black/60"
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      <!-- Content -->
+                      <div class="p-3">
+                        <div class="flex items-start justify-between mb-1">
+                          <h3
+                            :class="[
+                              'text-sm font-bold leading-tight',
+                              isDarkMode ? 'text-white' : 'text-gray-900',
+                            ]"
+                          >
+                            {{ item.name }}
+                          </h3>
+                          <span
+                            v-if="item.distance !== undefined"
+                            class="text-[10px] font-mono opacity-70 whitespace-nowrap ml-2"
+                          >
+                            📍 {{ item.distance.toFixed(1) }} km
+                          </span>
+                        </div>
+
+                        <!-- Category + Hours -->
+                        <div
+                          class="flex items-center gap-1 text-[10px] opacity-60 mb-2"
+                        >
+                          <span>{{ item.category || "Bar" }}</span>
+                          <span v-if="item.openTime"
+                            >• {{ item.openTime }} - {{ item.closeTime }}</span
+                          >
+                        </div>
+
+                        <!-- ✅ Vibe Info (Modal Style) -->
+                        <div
+                          v-if="item.Vibe_Info"
+                          class="mb-2 p-2 rounded-lg bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20"
+                        >
+                          <p
+                            :class="[
+                              'text-[10px] italic leading-relaxed text-center',
+                              isDarkMode
+                                ? 'text-purple-200'
+                                : 'text-purple-700',
+                            ]"
+                          >
+                            "{{ item.Vibe_Info }}"
+                          </p>
+                        </div>
+
+                        <!-- ✅ Tags: Crowd + Zone -->
+                        <div class="flex flex-wrap gap-1 mb-3">
+                          <span
+                            v-if="item.Crowd_Info"
+                            class="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+                            :class="
+                              isDarkMode
+                                ? 'bg-blue-500/20 text-blue-300'
+                                : 'bg-blue-100 text-blue-700'
+                            "
+                          >
+                            👥 {{ item.Crowd_Info }}
+                          </span>
+                          <span
+                            v-if="item.Zone"
+                            class="px-2 py-0.5 rounded text-[9px] font-bold uppercase"
+                            :class="
+                              isDarkMode
+                                ? 'bg-gray-500/20 text-gray-300'
+                                : 'bg-gray-100 text-gray-600'
+                            "
+                          >
+                            📍 {{ item.Zone }}
+                          </span>
+                        </div>
+
+                        <!-- Action Buttons (Navigate + Ride) -->
+                        <div class="grid grid-cols-2 gap-2 mt-2">
+                          <a
+                            :href="`https://www.google.com/maps/search/?api=1&query=${item.lat},${item.lng}`"
+                            target="_blank"
+                            @click.stop
+                            class="flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold bg-black hover:bg-zinc-800 text-white transition-all"
+                          >
+                            นำทาง
+                          </a>
+                          <button
+                            @click.stop="$emit('open-ride-modal', item)"
+                            class="flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold bg-gradient-to-r from-green-600 to-emerald-500 text-white transition-all active:scale-95"
+                          >
+                            เรียกรถ
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
-                    <!-- Full Content -->
-                    <div class="p-3">
-                      <div class="flex items-start justify-between gap-2 mb-2">
-                        <h4
-                          :class="[
-                            'text-xs font-bold leading-tight',
-                            isDarkMode ? 'text-white' : 'text-gray-900',
-                          ]"
-                        >
-                          {{ item.name }}
-                        </h4>
-                        <span
-                          :class="[
-                            'shrink-0 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase',
-                            isLive(item)
-                              ? 'bg-blue-500 text-white live-pulse-badge'
-                              : item.status === 'TONIGHT'
-                              ? 'bg-orange-500 text-white'
-                              : item.status === 'ACTIVE'
-                              ? 'bg-green-500 text-white'
-                              : 'bg-zinc-600 text-white',
-                          ]"
-                        >
-                          {{ isLive(item) ? "🔵 LIVE" : item.status === 'ACTIVE' ? "🟢 OPEN" : item.status || "OFF" }}
-                        </span>
-                      </div>
-
-                      <!-- Event Badge -->
-                      <div
-                        v-if="hasUpcomingEvent(item)"
-                        class="mb-2 px-2 py-1 bg-blue-500/20 rounded-lg border border-blue-500/30"
-                      >
-                        <p class="text-[9px] font-bold text-blue-400">
-                          🎉 {{ item.EventName }}
-                        </p>
-                      </div>
-
-                      <div
-                        :class="[
-                          'text-[10px] mb-3',
-                          isDarkMode ? 'text-white/60' : 'text-gray-500',
-                        ]"
-                      >
-                        <span>{{ item.category }}</span>
-                        <span v-if="item.openTime" class="ml-1"
-                          >• {{ item.openTime }} - {{ item.closeTime }}</span
-                        >
-                      </div>
-
-                      <button
-                        :onclick="`window.openVibeDetail(${item.id})`"
-                        :class="[
-                          'w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all active:scale-95',
-                          isDarkMode
-                            ? 'bg-gradient-to-r from-purple-600 to-red-600 text-white'
-                            : 'bg-gradient-to-r from-purple-500 to-red-500 text-white',
-                        ]"
-                      >
-                        <span>ดูรายละเอียด</span>
-                      </button>
-                    </div>
+                    <!-- Triangle Pointer -->
+                    <div
+                      class="w-3 h-3 rotate-45 absolute -bottom-1.5 left-1/2 -translate-x-1/2 shadow-lg"
+                      :class="isDarkMode ? 'bg-zinc-900/95' : 'bg-white/95'"
+                    ></div>
                   </div>
                 </transition>
               </template>
 
               <!-- 2. DOT MODE (Distant & Inactive) - Ultra Light DOM -->
               <template v-else>
-                <div 
+                <div
                   class="w-3 h-3 rounded-full border-2 border-white shadow-sm transition-all hover:scale-150"
                   :class="[
-                    item.status === 'ACTIVE' ? 'bg-green-500' : 'bg-gray-400'
+                    item.status === 'ACTIVE' ? 'bg-green-500' : 'bg-gray-400',
                   ]"
                 ></div>
               </template>
@@ -1113,52 +1172,6 @@ defineExpose({ focusLocation });
         pane="popupPane"
       />
     </l-map>
-
-    <!-- Locate button (shows in Indoor mode OR when user location available) -->
-    <button
-      v-if="userLocation || isIndoorView"
-      @click="centerOnUser"
-      :style="{ bottom: locateButtonBottom }"
-      :class="[
-        'absolute left-4 z-[1000] w-10 h-10 flex items-center justify-center rounded-full shadow-lg active:scale-90 border transition-all duration-500 ease-out',
-        isDarkMode
-          ? 'bg-zinc-900/90 border-white/20'
-          : 'bg-white/90 border-gray-200',
-      ]"
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        class="w-5 h-5 text-blue-400"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-        />
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-        />
-      </svg>
-    </button>
-
-    <!-- Count -->
-    <div
-      :class="[
-        'absolute top-4 right-4 z-[1000] px-2.5 py-1 rounded-full text-xs font-medium shadow-md',
-        isDarkMode
-          ? 'bg-zinc-900/90 text-white/80 border border-white/10'
-          : 'bg-white/90 text-gray-700 border border-gray-200',
-      ]"
-    >
-      📍 {{ displayMarkers.length }} ร้าน
-    </div>
 
     <!-- ✅ Firefly / Floating Particles Effect -->
     <div class="absolute inset-0 z-[1502] pointer-events-none overflow-hidden">
