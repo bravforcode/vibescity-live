@@ -6,6 +6,7 @@ import {
   LIcon,
   LCircleMarker,
   LPolygon,
+  LPolyline,
   // LImageOverlay, // REMOVED
 } from "@vue-leaflet/vue-leaflet";
 import "leaflet/dist/leaflet.css";
@@ -14,7 +15,7 @@ import "../../assets/map-atmosphere.css";
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import PoiIcon from "./PoiIcon.vue";
 import L from "leaflet";
-import { TrafficPolylineLayer } from "./TrafficPolylineLayer";
+// TrafficPolylineLayer removed as we use CSS flow now
 
 const props = defineProps({
   shops: Array,
@@ -69,6 +70,33 @@ const trafficRoutesLoaded = ref(false);
 const isMapMoving = ref(false); // ✅ For physics wobble
 const isRaining = ref(false); // ✅ Atmosphere state
 const showClouds = ref(true); // ✅ Atmosphere state
+const confettiParticles = ref([]); // ✅ Confetti explosion state
+
+// ✅ Holographic Beams Data
+const landmarkBeams = [
+  { id: "maya", lat: 18.8021, lng: 98.9675, color: "#ec4899", height: "120px" }, // Maya (Pink)
+  {
+    id: "onenimman",
+    lat: 18.8,
+    lng: 98.968,
+    color: "#f59e0b",
+    height: "100px",
+  }, // One Nimman (Orange)
+  {
+    id: "threekings",
+    lat: 18.7902,
+    lng: 98.9874,
+    color: "#3b82f6",
+    height: "150px",
+  }, // Three Kings (Blue)
+  {
+    id: "thaapae",
+    lat: 18.7877,
+    lng: 98.9932,
+    color: "#ef4444",
+    height: "110px",
+  }, // Tha Phae Gate (Red)
+];
 
 const getTrafficProfileByTime = (d = new Date()) => {
   const h = d.getHours();
@@ -114,10 +142,8 @@ watch(
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
-// Indoor blend logic REMOVED. Map is always base map.
-// const indoorBlend = ...
-// const baseOpacity = ...
-// const floorOpacity = ...
+// ✅ Base map opacity (always 1 since indoor mode was removed)
+const baseOpacity = computed(() => 1);
 
 /** -----------------------------
  * ✅ Theme tile
@@ -168,31 +194,110 @@ watch(
 );
 
 // ✅ Load main road routes from GeoJSON
-const loadMainRoadRoutes = async () => {
-  try {
-    // Try to load the lanes version first
-    const res = await fetch("/data/chiangmai-main-roads-lanes.geojson");
-    if (!res.ok) throw new Error("No lanes data");
-    const data = await res.json();
+// ✅ Import OSM Utility
+import { fetchRoadsFromOSM } from "../../utils/osmRoads";
 
-    // Convert GeoJSON LineString coordinates to Leaflet [lat, lng]
-    return (data.features || [])
-      .map((f) => {
-        const coords = f.geometry?.coordinates || [];
-        // GeoJSON is [lng, lat], Leaflet wants [lat, lng]
-        return coords.map((c) => [c[1], c[0]]);
-      })
-      .filter((route) => route.length > 1);
+// ✅ Load main road routes based on bounds
+const loadMainRoadRoutes = async (bounds = null) => {
+  try {
+    const osmRoutes = await fetchRoadsFromOSM(bounds);
+    if (osmRoutes && osmRoutes.length > 0) return osmRoutes;
+
+    // Only fallback if initial load fails
+    if (!bounds) {
+      const res = await fetch("/data/chiangmai-main-roads-lanes.geojson");
+      if (res.ok) {
+        const data = await res.json();
+        // Safer coordinate mapping
+        return (data.features || [])
+          .map((f) => {
+            if (!f.geometry || !f.geometry.coordinates) return [];
+            return f.geometry.coordinates.map((c) => [c[1], c[0]]);
+          })
+          .filter((r) => r && r.length > 1);
+      }
+    }
+    return [];
   } catch (e) {
-    console.warn("Could not load road lanes, traffic disabled:", e);
+    console.warn("Road load error:", e);
+    // Hardcoded fallback only on init
+    if (!bounds) {
+      return [
+        [
+          [18.7955, 98.9772],
+          [18.7955, 98.9932],
+          [18.7822, 98.9932],
+          [18.7822, 98.9772],
+          [18.7955, 98.9772],
+        ],
+      ];
+    }
     return [];
   }
 };
+
+// ✅ Static Glow Routes
+const mainRoadRoutes = ref([]);
+
+// ✅ Handle Map Movement (Infinite Road Loading)
+const handleMapMoveEnd = async () => {
+  if (!mapObject.value) return;
+
+  // Get current bounds
+  const b = mapObject.value.getBounds();
+  const bounds = {
+    south: b.getSouth(),
+    west: b.getWest(),
+    north: b.getNorth(),
+    east: b.getEast(),
+  };
+
+  // Fetch new roads for this area
+  const newRoutes = await loadMainRoadRoutes(bounds);
+
+  if (!isComponentMounted.value) return; // ✅ Guard against unmount during fetch
+
+  if (newRoutes.length > 0) {
+    // Append unique roads to Ref (for Glow)
+    const currentStrings = new Set(
+      mainRoadRoutes.value.map((r) => JSON.stringify(r))
+    );
+    const uniqueNew = newRoutes.filter(
+      (r) => !currentStrings.has(JSON.stringify(r))
+    );
+
+    if (uniqueNew.length > 0) {
+      mainRoadRoutes.value = [...mainRoadRoutes.value, ...uniqueNew];
+      console.log(`🗺️ Loaded ${uniqueNew.length} new road segments.`);
+    }
+  }
+};
+
+const isComponentMounted = ref(false);
+
+onMounted(async () => {
+  isComponentMounted.value = true;
+  try {
+    const routes = await loadMainRoadRoutes();
+    if (isComponentMounted.value) {
+      mainRoadRoutes.value = routes;
+      console.log("Road glow routes loaded:", routes.length);
+    }
+  } catch (e) {
+    console.warn("Failed to load road glow:", e);
+  }
+});
+
+onUnmounted(() => {
+  isComponentMounted.value = false;
+  mainRoadRoutes.value = []; // Clear routes to help cleanup
+});
 
 /** -----------------------------
  * ✅ Map ready / focus
  * ----------------------------- */
 const onMapReady = async (mapInstance) => {
+  if (!isComponentMounted.value) return;
   mapObject.value = mapInstance;
   console.log("Map ready, shops:", props.shops?.length || 0);
 
@@ -200,27 +305,28 @@ const onMapReady = async (mapInstance) => {
     zoom.value = mapObject.value.getZoom();
   });
 
-  // ✅ Physics Wobble Listeners
+  // ✅ Physics Wobble Listeners & Dynamic Loading
   mapObject.value.on("movestart", () => {
     isMapMoving.value = true;
   });
   mapObject.value.on("moveend", () => {
-    // Small delay for "settling" feel
+    // ✅ Long delay to prevent API spam (429 errors) and allow smooth panning
     setTimeout(() => {
+      if (!isComponentMounted.value) return;
       isMapMoving.value = false;
-    }, 150);
+      handleMapMoveEnd(); // ✅ Fetch new roads
+    }, 1000);
   });
 
   // ✅ Random Atmosphere cycle (optional)
-  setInterval(() => {
+  const rainInterval = setInterval(() => {
+    if (!isComponentMounted.value) {
+      clearInterval(rainInterval);
+      return;
+    }
     // 30% chance of rain every 5 mins
     isRaining.value = Math.random() > 0.7;
   }, 300000);
-
-  // Traffic system disabled due to performance issues
-  // if (!trafficLayerRef.value) { ... }
-  // if (!trafficRoutesLoaded.value) { ... }
-  // updateTrafficEnabled();
 };
 
 const focusLocation = (latlng, targetZoom = 17, manualYOffset = null) => {
@@ -390,6 +496,15 @@ const raindrops = Array.from({ length: 40 }, (_, i) => ({
   duration: `${0.6 + Math.random() * 0.4}s`,
 }));
 
+// ✅ Star Twinkle Effect
+const starPositions = Array.from({ length: 20 }, (_, i) => ({
+  id: i,
+  left: `${Math.random() * 100}%`,
+  top: `${Math.random() * 100}%`,
+  delay: `${Math.random() * 8}s`,
+  duration: `${3 + Math.random() * 4}s`,
+}));
+
 // ✅ ทำ index ต่อ floor เพื่อ fallback zoneNo ให้ stable ภายในชั้น
 const indoorIndexMap = computed(() => {
   if (!props.isIndoorView) return new Map();
@@ -414,6 +529,11 @@ const indoorIndexMap = computed(() => {
 const handleMarkerClick = (item) => {
   if (!item) return;
 
+  // ✅ Confetti Explosion for LIVE items
+  if (item.status === "LIVE") {
+    triggerConfetti();
+  }
+
   // ✅ toggle open/close
   if (String(item.id) === String(props.highlightedShopId)) {
     emit("select-shop", null);
@@ -426,6 +546,39 @@ const handleMarkerClick = (item) => {
 
 const isHighlighted = (item) => item.id === props.highlightedShopId;
 const isLive = (item) => item.status === "LIVE";
+
+// ✅ Handle map click (deselect shop)
+const handleMapClick = () => {
+  emit("select-shop", null);
+};
+
+// ✅ Confetti Explosion Function
+const confettiColors = [
+  "#ef4444",
+  "#f59e0b",
+  "#10b981",
+  "#3b82f6",
+  "#8b5cf6",
+  "#ec4899",
+];
+const triggerConfetti = () => {
+  const particles = [];
+  for (let i = 0; i < 30; i++) {
+    const angle = (Math.PI * 2 * i) / 30;
+    const distance = 80 + Math.random() * 60;
+    particles.push({
+      id: i,
+      x: Math.cos(angle) * distance,
+      y: Math.sin(angle) * distance - 50,
+      color: confettiColors[Math.floor(Math.random() * confettiColors.length)],
+      delay: Math.random() * 0.15,
+    });
+  }
+  confettiParticles.value = particles;
+  setTimeout(() => {
+    confettiParticles.value = [];
+  }, 1200);
+};
 
 const isInActiveProvince = (item) => {
   if (!props.activeProvince) return true;
@@ -745,44 +898,19 @@ defineExpose({ focusLocation, centerOnUser, mapObject });
         :key="tileLayerUrl"
       />
 
-      <!-- ✅ Entertainment Atmosphere (Spotlights) -->
-      <div class="spotlight-container">
-        <div class="spotlight s1"></div>
-        <div class="spotlight s2"></div>
-        <div class="spotlight s3"></div>
-      </div>
-      <div class="entertainment-particles">
-        <span
-          class="music-note"
-          style="left: 20%; animation-delay: 0s; color: #3b82f6"
-          >🎵</span
-        >
-        <span
-          class="music-note"
-          style="left: 45%; animation-delay: -5s; color: #9333ea"
-          >🎶</span
-        >
-        <span
-          class="music-note"
-          style="left: 75%; animation-delay: -10s; color: #ef4444"
-          >🎵</span
-        >
-        <span
-          class="music-note"
-          style="left: 30%; animation-delay: -15s; color: #fbbf24"
-          >🎶</span
-        >
-        <span
-          class="music-note"
-          style="left: 60%; animation-delay: -7s; color: #10b981"
-          >🎵</span
-        >
-        <span
-          class="music-note"
-          style="left: 90%; animation-delay: -12s; color: #f59e0b"
-          >🎶</span
-        >
-      </div>
+      <!-- ✅ Static Road Glow (Blue Veins) -->
+      <!-- ✅ Static Road Glow (Blue Veins) - RGB Animated via CSS -->
+      <l-polyline
+        v-for="(route, i) in mainRoadRoutes"
+        :key="`road-${i}`"
+        :lat-lngs="route"
+        color="#3b82f6"
+        :weight="3"
+        :opacity="0.4"
+        class-name="road-glow"
+      />
+
+      <!-- ✅ Visual effects moved outside l-map for proper rendering -->
 
       <!-- Floorplan overlay REMOVED -->
 
@@ -1160,6 +1288,40 @@ defineExpose({ focusLocation, centerOnUser, mapObject });
         @click="handleMarkerClick(item)"
       />
 
+      <!-- ✅ Holographic Beams (Holo-Markers) -->
+      <l-marker
+        v-for="beam in landmarkBeams"
+        :key="`beam-${beam.id}`"
+        :lat-lng="[beam.lat, beam.lng]"
+        :z-index-offset="-500"
+      >
+        <l-icon
+          :icon-size="[24, 200]"
+          :icon-anchor="[12, 190]"
+          class-name="vibe-marker-icon"
+        >
+          <div
+            class="holo-beam"
+            :style="{ '--beam-color': beam.color, height: beam.height }"
+          ></div>
+        </l-icon>
+      </l-marker>
+
+      <!-- ✅ Sonar Pulse (Heartbeat) at Moat Center -->
+      <l-marker :lat-lng="[18.7883, 98.9853]" :z-index-offset="-1000">
+        <l-icon
+          :icon-size="[300, 300]"
+          :icon-anchor="[150, 150]"
+          class-name="vibe-marker-icon"
+        >
+          <div class="sonar-pulse-container" style="--pulse-color: #3b82f6">
+            <div class="sonar-wave"></div>
+            <div class="sonar-wave"></div>
+            <div class="sonar-wave"></div>
+          </div>
+        </l-icon>
+      </l-marker>
+
       <!-- User location -->
       <l-circle-marker
         v-if="userLocation"
@@ -1173,6 +1335,34 @@ defineExpose({ focusLocation, centerOnUser, mapObject });
       />
     </l-map>
 
+    <!-- ✅ Entertainment Atmosphere Effects (Outside l-map for proper rendering) -->
+    <div class="absolute inset-0 z-[1] pointer-events-none overflow-hidden">
+      <!-- Gradient Vignette -->
+      <div class="gradient-vignette"></div>
+
+      <!-- Spotlights -->
+      <div class="spotlight-container">
+        <div class="spotlight s1"></div>
+        <div class="spotlight s2"></div>
+        <div class="spotlight s3"></div>
+      </div>
+
+      <!-- Star Twinkle -->
+      <div class="star-field">
+        <div
+          v-for="star in starPositions"
+          :key="`star-${star.id}`"
+          class="star"
+          :style="{
+            left: star.left,
+            top: star.top,
+            animationDelay: star.delay,
+            animationDuration: star.duration,
+          }"
+        ></div>
+      </div>
+    </div>
+
     <!-- ✅ Firefly / Floating Particles Effect -->
     <div class="absolute inset-0 z-[1502] pointer-events-none overflow-hidden">
       <div
@@ -1184,6 +1374,23 @@ defineExpose({ focusLocation, centerOnUser, mapObject });
           top: ff.top,
           animationDelay: ff.delay,
           animationDuration: ff.duration,
+        }"
+      ></div>
+    </div>
+
+    <!-- ✅ Confetti Explosion Effect -->
+    <div v-if="confettiParticles.length" class="confetti-container">
+      <div
+        v-for="p in confettiParticles"
+        :key="`confetti-${p.id}`"
+        class="confetti-particle"
+        :style="{
+          left: '50%',
+          top: '40%',
+          backgroundColor: p.color,
+          '--x': `${p.x}px`,
+          '--y': `${p.y}px`,
+          animationDelay: `${p.delay}s`,
         }"
       ></div>
     </div>

@@ -142,7 +142,10 @@ this._canvas.style.zIndex = "1200";
 
     const routes = (this._routes || []).filter(r => Array.isArray(r) && r.length >= 2);
 
-    for (const latlngs of routes) {
+    for (const rawLatlngs of routes) {
+      // ✅ Convert [lat, lng] arrays to L.LatLng objects
+      const latlngs = rawLatlngs.map(pt => L.latLng(pt));
+      
       const cum = [0];
       let total = 0;
       for (let i = 1; i < latlngs.length; i++) {
@@ -227,10 +230,21 @@ this._canvas.style.zIndex = "1200";
     for (const v of this._vehicles) {
       const route = this._routeMeta[v.routeIdx];
       if (!route) continue;
-      const p = this._interpLatLng(route, v.meters);
-      if (!p) continue;
-      const pt = this._map.latLngToContainerPoint(p);
-      this._drawLight(pt.x, pt.y, v.kind);
+
+      // 1. Head Position
+      const pHead = this._interpLatLng(route, v.meters);
+      
+      // 2. Tail Position (a bit behind)
+      const length = this.options.vehicleLength || 25; // Length in meters
+      const mTail = (v.meters - length + route.totalMeters) % route.totalMeters;
+      const pTail = this._interpLatLng(route, mTail);
+
+      if (!pHead || !pTail) continue;
+
+      const ptHead = this._map.latLngToContainerPoint(pHead);
+      const ptTail = this._map.latLngToContainerPoint(pTail);
+
+      this._drawStreak(ptHead, ptTail, v.kind);
     }
   }
 
@@ -253,17 +267,30 @@ this._canvas.style.zIndex = "1200";
     return L.latLng(a.lat + (b.lat - a.lat) * t, a.lng + (b.lng - a.lng) * t);
   }
 
-  _drawLight(x, y, kind) {
+  _drawStreak(p1, p2, kind) {
     const ctx = this._ctx;
     const isTail = kind === "tail";
-    const r = isTail ? this.options.taillightRadius : this.options.headlightRadius;
     const alpha = isTail ? this.options.taillightAlpha : this.options.headlightAlpha;
-    const glow = this.options.glowRadius;
+    const width = isTail ? 2.5 : 2.5; 
+    
+    // Cyberpunk Colors: Hot Pink (Tail) / Cyan (Head)
+    const color = isTail ? `rgba(236, 72, 153, ${alpha})` : `rgba(6, 182, 212, ${alpha})`;
+    const glowColor = isTail ? `rgba(236, 72, 153, ${alpha * 0.4})` : `rgba(6, 182, 212, ${alpha * 0.4})`;
 
-    const color = isTail ? `rgba(239, 68, 68, ${alpha})` : `rgba(251, 191, 36, ${alpha})`;
-    const glowColor = isTail ? `rgba(239, 68, 68, ${alpha * 0.35})` : `rgba(251, 191, 36, ${alpha * 0.35})`;
+    // Draw Glow
+    ctx.shadowBlur = this.options.glowRadius || 5;
+    ctx.shadowColor = glowColor;
 
-    ctx.beginPath(); ctx.fillStyle = glowColor; ctx.arc(x, y, glow, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.fillStyle = color; ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    // Draw Streak
+    ctx.beginPath();
+    ctx.moveTo(p2.x, p2.y); // From Tail
+    ctx.lineTo(p1.x, p1.y); // To Head
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.lineCap = "round";
+    ctx.stroke();
+    
+    // Reset Shadow for performance
+    ctx.shadowBlur = 0;
   }
 }

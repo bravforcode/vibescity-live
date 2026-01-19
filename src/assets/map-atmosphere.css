@@ -187,7 +187,97 @@
   filter: drop-shadow(0 0 10px currentColor);
 }
 
+/* --- 🎉 Event Confetti Explosion --- */
+.confetti-container {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: hidden;
+}
 
+.confetti-particle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  animation: confettiBurst 1s ease-out forwards;
+}
 
+.confetti-particle:nth-child(odd) { border-radius: 50%; }
+.confetti-particle:nth-child(even) { border-radius: 2px; }
 
+@keyframes confettiBurst {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--x, 50px), var(--y, -100px)) rotate(720deg) scale(0);
+    opacity: 0;
+  }
+}
+
+/* --- ✨ Star Twinkle Effect --- */
+.star-field {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  overflow: hidden;
+}
+
+.star {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  background: white;
+  border-radius: 50%;
+  opacity: 0;
+  animation: starTwinkle ease-in-out infinite;
+}
+
+@keyframes starTwinkle {
+  0%, 100% { opacity: 0; transform: scale(0.5); }
+  50% { opacity: 0.6; transform: scale(1); }
+}
+
+/* --- 🌈 Gradient Vignette Effect --- */
+.gradient-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 40%,
+    rgba(99, 102, 241, 0.08) 70%,
+    rgba(147, 51, 234, 0.12) 100%
+  );
+  animation: vignetteBreathe 30s ease-in-out infinite;
+}
+
+@keyframes vignetteBreathe {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.8; }
+}
+
+/* ✅ RGB Road Glow Animation */
+.road-glow {
+  /* Pattern: 20px Line (Car) + 600px Gap = Sparse Traffic */
+  stroke-dasharray: 20, 600; 
+  stroke-linecap: round;
+  opacity: 0.8; /* Make the "cars" brighter */
+  animation: rgbCycle 10s infinite linear, dashFlow 60s linear infinite;
+}
+
+@keyframes rgbCycle {
+  0% { stroke: #3b82f6; }   /* Blue */
+  33% { stroke: #ec4899; }  /* Pink */
+  66% { stroke: #8b5cf6; }  /* Violet */
+  100% { stroke: #3b82f6; } /* Back to Blue */
+}
+
+@keyframes dashFlow {
+  to { stroke-dashoffset: -1000; }
+}
 

@@ -963,40 +963,147 @@ const liveCount = computed(() => {
       </button>
     </div>
 
-    <!-- ✅ CATEGORY CHIPS (Below Search Bar) -->
+    <!-- ✅ CATEGORY DROPDOWN (Premium Glassmorphism - Centered) -->
     <div
-      class="fixed top-20 left-0 right-0 z-[5900] flex justify-center pointer-events-none p-2"
+      class="fixed top-20 left-0 right-0 z-[5900] flex justify-center pointer-events-none"
     >
-      <div
-        class="flex gap-2 overflow-x-auto scrollbar-hide pointer-events-auto max-w-full px-4 justify-start scroll-smooth"
-      >
+      <div class="pointer-events-auto">
+        <!-- Dropdown Trigger Button -->
         <button
-          v-for="cat in [
-            'ALL',
-            'Live Music',
-            'Club',
-            'Bar',
-            'Restaurant',
-            'Cafe',
-          ]"
-          :key="cat"
-          @click="
-            cat === 'ALL'
-              ? ((activeCategories = []), (activeStatus = 'ALL'))
-              : ((activeCategories = [cat]), (activeStatus = 'ALL'))
-          "
-          class="flex-shrink-0 px-5 py-2 rounded-xl text-xs font-bold border backdrop-blur-xl transition-all duration-300 active:scale-95 shadow-lg"
+          @click="showCategoryDropdown = !showCategoryDropdown"
+          class="flex items-center gap-2 px-4 py-2.5 rounded-2xl backdrop-blur-2xl border shadow-2xl transition-all duration-300 active:scale-95"
           :class="[
-            (cat === 'ALL' && activeCategories.length === 0) ||
-            activeCategories.includes(cat)
-              ? 'bg-blue-600 text-white border-blue-400 shadow-blue-500/20'
-              : isDarkMode
-              ? 'bg-zinc-900/40 text-white/70 border-white/10 hover:bg-zinc-800'
-              : 'bg-white/60 text-gray-700 border-gray-200 hover:bg-gray-100',
+            isDarkMode
+              ? 'bg-zinc-900/60 border-white/10 text-white hover:bg-zinc-800/80'
+              : 'bg-white/80 border-gray-200 text-gray-800 hover:bg-white',
+            activeCategories.length > 0
+              ? 'ring-2 ring-blue-500/50 shadow-blue-500/20'
+              : '',
           ]"
         >
-          {{ cat }}
+          <span class="text-sm font-bold">
+            {{
+              activeCategories.length === 0
+                ? "🎯 ทุกประเภท"
+                : activeCategories.length === 1
+                ? `🎯 ${activeCategories[0]}`
+                : `🎯 ${activeCategories.length} ประเภท`
+            }}
+          </span>
+          <svg
+            :class="[
+              'w-4 h-4 transition-transform duration-300',
+              showCategoryDropdown ? 'rotate-180' : '',
+            ]"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
         </button>
+
+        <!-- Dropdown Panel -->
+        <transition name="dropdown-slide">
+          <div
+            v-if="showCategoryDropdown"
+            class="absolute top-full mt-2 w-56 rounded-2xl backdrop-blur-2xl border shadow-2xl overflow-hidden z-[6000]"
+            :class="
+              isDarkMode
+                ? 'bg-zinc-900/90 border-white/10'
+                : 'bg-white/95 border-gray-200'
+            "
+          >
+            <!-- Clear All -->
+            <button
+              @click="
+                activeCategories = [];
+                activeStatus = 'ALL';
+              "
+              class="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold border-b transition-colors"
+              :class="[
+                isDarkMode
+                  ? 'border-white/5 hover:bg-white/5'
+                  : 'border-gray-100 hover:bg-gray-50',
+                activeCategories.length === 0
+                  ? isDarkMode
+                    ? 'text-blue-400'
+                    : 'text-blue-600'
+                  : isDarkMode
+                  ? 'text-white/70'
+                  : 'text-gray-600',
+              ]"
+            >
+              <span>🌟 ทุกประเภท</span>
+              <svg
+                v-if="activeCategories.length === 0"
+                class="w-4 h-4 text-blue-500"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+            </button>
+
+            <!-- Category Options -->
+            <div class="max-h-64 overflow-y-auto">
+              <button
+                v-for="cat in [
+                  { id: 'Live Music', icon: '🎸', label: 'Live Music' },
+                  { id: 'Club', icon: '🪩', label: 'Club' },
+                  { id: 'Bar', icon: '🍸', label: 'Bar' },
+                  { id: 'Restaurant', icon: '🍽️', label: 'Restaurant' },
+                  { id: 'Cafe', icon: '☕', label: 'Cafe' },
+                ]"
+                :key="cat.id"
+                @click="
+                  activeCategories.includes(cat.id)
+                    ? (activeCategories = activeCategories.filter(
+                        (c) => c !== cat.id
+                      ))
+                    : (activeCategories = [...activeCategories, cat.id])
+                "
+                class="w-full flex items-center justify-between px-4 py-3 text-sm transition-colors"
+                :class="[
+                  isDarkMode ? 'hover:bg-white/5' : 'hover:bg-gray-50',
+                  activeCategories.includes(cat.id)
+                    ? isDarkMode
+                      ? 'text-blue-400 bg-blue-500/10'
+                      : 'text-blue-600 bg-blue-50'
+                    : isDarkMode
+                    ? 'text-white/80'
+                    : 'text-gray-700',
+                ]"
+              >
+                <span class="flex items-center gap-2">
+                  <span>{{ cat.icon }}</span>
+                  <span class="font-medium">{{ cat.label }}</span>
+                </span>
+                <svg
+                  v-if="activeCategories.includes(cat.id)"
+                  class="w-4 h-4 text-blue-500"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </transition>
       </div>
     </div>
 
@@ -1015,7 +1122,7 @@ const liveCount = computed(() => {
           :isDarkMode="isDarkMode"
           :activeZone="activeZone"
           :activeProvince="activeProvince"
-          :buildings="activeEvents"
+          :buildings="{}"
           :is-sidebar-open="isPanelOpen"
           @select-shop="handleMarkerClick"
           @open-detail="handleOpenDetail"
@@ -1060,10 +1167,9 @@ const liveCount = computed(() => {
         :isDarkMode="isDarkMode"
         :activeZone="activeZone"
         :activeProvince="activeProvince"
-        :buildings="activeEvents"
+        :buildings="{}"
         :isSidebarOpen="!isVibeNowCollapsed"
         :legendHeight="legendHeight"
-        :is-3d-mode="is3DMode"
         @select-shop="handleMarkerClick"
         @open-detail="handleOpenDetail"
         @open-ride-modal="openRideModal"
@@ -1543,5 +1649,21 @@ const liveCount = computed(() => {
 ::-webkit-scrollbar-thumb {
   background-color: rgba(255, 255, 255, 0.2);
   border-radius: 4px;
+}
+
+/* Dropdown slide animation */
+.dropdown-slide-enter-active {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.dropdown-slide-leave-active {
+  transition: all 0.15s ease-in;
+}
+.dropdown-slide-enter-from {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.95);
+}
+.dropdown-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.98);
 }
 </style>
