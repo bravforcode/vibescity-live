@@ -3,13 +3,13 @@
  * OnboardingTour.vue - First-time user tutorial
  * Feature #11: Onboarding Tour
  */
-import { ref, onMounted } from "vue";
+import { onMounted, ref } from "vue";
 
 const props = defineProps({
-  isDarkMode: {
-    type: Boolean,
-    default: true,
-  },
+	isDarkMode: {
+		type: Boolean,
+		default: true,
+	},
 });
 
 const emit = defineEmits(["complete", "skip"]);
@@ -19,75 +19,75 @@ const currentStep = ref(0);
 const isVisible = ref(false);
 
 const steps = [
-  {
-    title: "Welcome to VibeCity! 🎉",
-    description: "Discover the hottest nightlife spots in Chiang Mai",
-    icon: "🗺️",
-    target: null,
-  },
-  {
-    title: "Live Venues 🔴",
-    description: "Red pins show venues that are LIVE right now",
-    icon: "📍",
-    target: ".vibe-marker-live",
-  },
-  {
-    title: "Collect Coins 🪙",
-    description: "Visit venues to collect coins and unlock rewards",
-    icon: "💰",
-    target: ".coin-badge",
-  },
-  {
-    title: "Call a Ride 🚗",
-    description: "Tap any pin, then use Navigate or Call Ride",
-    icon: "🚕",
-    target: ".popup-ride-btn",
-  },
-  {
-    title: "You're Ready! 🚀",
-    description: "Start exploring the nightlife scene",
-    icon: "✨",
-    target: null,
-  },
+	{
+		title: "Welcome to VibeCity! 🎉",
+		description: "Discover the hottest nightlife spots in Chiang Mai",
+		icon: "🗺️",
+		target: null,
+	},
+	{
+		title: "Live Venues 🔴",
+		description: "Red pins show venues that are LIVE right now",
+		icon: "📍",
+		target: ".vibe-marker-live",
+	},
+	{
+		title: "Collect Coins 🪙",
+		description: "Visit venues to collect coins and unlock rewards",
+		icon: "💰",
+		target: ".coin-badge",
+	},
+	{
+		title: "Call a Ride 🚗",
+		description: "Tap any pin, then use Navigate or Call Ride",
+		icon: "🚕",
+		target: ".popup-ride-btn",
+	},
+	{
+		title: "You're Ready! 🚀",
+		description: "Start exploring the nightlife scene",
+		icon: "✨",
+		target: null,
+	},
 ];
 
 onMounted(() => {
-  const completed = localStorage.getItem(STORAGE_KEY);
-  if (!completed) {
-    isVisible.value = true;
-  }
+	const completed = localStorage.getItem(STORAGE_KEY);
+	if (!completed) {
+		isVisible.value = true;
+	}
 });
 
 const nextStep = () => {
-  if (currentStep.value < steps.length - 1) {
-    currentStep.value++;
-  } else {
-    complete();
-  }
+	if (currentStep.value < steps.length - 1) {
+		currentStep.value++;
+	} else {
+		complete();
+	}
 };
 
 const prevStep = () => {
-  if (currentStep.value > 0) {
-    currentStep.value--;
-  }
+	if (currentStep.value > 0) {
+		currentStep.value--;
+	}
 };
 
 const complete = () => {
-  localStorage.setItem(STORAGE_KEY, "true");
-  isVisible.value = false;
-  emit("complete");
+	localStorage.setItem(STORAGE_KEY, "true");
+	isVisible.value = false;
+	emit("complete");
 };
 
 const skip = () => {
-  complete();
-  emit("skip");
+	complete();
+	emit("skip");
 };
 
 // Expose reset for testing
 const reset = () => {
-  localStorage.removeItem(STORAGE_KEY);
-  currentStep.value = 0;
-  isVisible.value = true;
+	localStorage.removeItem(STORAGE_KEY);
+	currentStep.value = 0;
+	isVisible.value = true;
 };
 
 defineExpose({ reset });

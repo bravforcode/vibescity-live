@@ -2,17 +2,19 @@
 
 <script setup>
 import { computed, defineAsyncComponent } from "vue";
+
 const AchievementBadges = defineAsyncComponent(
-  () => import("../ui/AchievementBadges.vue"),
+	() => import("../ui/AchievementBadges.vue"),
 );
-import { useI18n } from "vue-i18n";
-import { useShopStore } from "../../store/shopStore";
+
 import { storeToRefs } from "pinia";
+import { useI18n } from "vue-i18n";
 import { Z } from "../../constants/zIndex";
+import { useShopStore } from "../../store/shopStore";
 
 const props = defineProps({
-  isOpen: Boolean,
-  isDarkMode: Boolean,
+	isOpen: Boolean,
+	isDarkMode: Boolean,
 });
 
 const emit = defineEmits(["close", "toggle-language"]);
@@ -20,14 +22,14 @@ const emit = defineEmits(["close", "toggle-language"]);
 const { t, locale } = useI18n();
 const shopStore = useShopStore();
 const { userLevel, totalCoins, nextLevelXP, levelProgress } =
-  storeToRefs(shopStore);
+	storeToRefs(shopStore);
 
 const currentXP = computed(() =>
-  Math.floor(levelProgress.value * nextLevelXP.value),
+	Math.floor(levelProgress.value * nextLevelXP.value),
 );
 
 const handleBackdropClick = () => {
-  emit("close");
+	emit("close");
 };
 </script>
 

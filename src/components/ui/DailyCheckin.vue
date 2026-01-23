@@ -3,13 +3,13 @@
  * DailyCheckin.vue - Daily check-in bonus system
  * Feature #29: Daily Check-in Bonus
  */
-import { ref, computed, onMounted } from "vue";
+import { computed, onMounted, ref } from "vue";
 
 const props = defineProps({
-  isDarkMode: {
-    type: Boolean,
-    default: true,
-  },
+	isDarkMode: {
+		type: Boolean,
+		default: true,
+	},
 });
 
 const emit = defineEmits(["claim", "close"]);
@@ -17,84 +17,84 @@ const emit = defineEmits(["claim", "close"]);
 const STORAGE_KEY = "vibecity_checkin";
 const isVisible = ref(false);
 const checkinData = ref({
-  streak: 0,
-  lastCheckin: null,
-  totalDays: 0,
+	streak: 0,
+	lastCheckin: null,
+	totalDays: 0,
 });
 const canClaimToday = ref(false);
 
 const rewards = [
-  { day: 1, coins: 10, icon: "🪙" },
-  { day: 2, coins: 15, icon: "🪙" },
-  { day: 3, coins: 20, icon: "🪙" },
-  { day: 4, coins: 25, icon: "🪙" },
-  { day: 5, coins: 30, icon: "🪙" },
-  { day: 6, coins: 40, icon: "🪙" },
-  { day: 7, coins: 100, icon: "🎁" },
+	{ day: 1, coins: 10, icon: "🪙" },
+	{ day: 2, coins: 15, icon: "🪙" },
+	{ day: 3, coins: 20, icon: "🪙" },
+	{ day: 4, coins: 25, icon: "🪙" },
+	{ day: 5, coins: 30, icon: "🪙" },
+	{ day: 6, coins: 40, icon: "🪙" },
+	{ day: 7, coins: 100, icon: "🎁" },
 ];
 
 onMounted(() => {
-  loadCheckinData();
-  checkCanClaim();
+	loadCheckinData();
+	checkCanClaim();
 });
 
 const loadCheckinData = () => {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) {
-    checkinData.value = JSON.parse(stored);
-  }
+	const stored = localStorage.getItem(STORAGE_KEY);
+	if (stored) {
+		checkinData.value = JSON.parse(stored);
+	}
 };
 
 const saveCheckinData = () => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(checkinData.value));
+	localStorage.setItem(STORAGE_KEY, JSON.stringify(checkinData.value));
 };
 
 const checkCanClaim = () => {
-  const lastCheckin = checkinData.value.lastCheckin;
-  if (!lastCheckin) {
-    canClaimToday.value = true;
-    return;
-  }
+	const lastCheckin = checkinData.value.lastCheckin;
+	if (!lastCheckin) {
+		canClaimToday.value = true;
+		return;
+	}
 
-  const lastDate = new Date(lastCheckin).toDateString();
-  const today = new Date().toDateString();
-  canClaimToday.value = lastDate !== today;
+	const lastDate = new Date(lastCheckin).toDateString();
+	const today = new Date().toDateString();
+	canClaimToday.value = lastDate !== today;
 
-  // Check if streak is broken
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (lastDate !== yesterday.toDateString() && lastDate !== today) {
-    checkinData.value.streak = 0;
-  }
+	// Check if streak is broken
+	const yesterday = new Date();
+	yesterday.setDate(yesterday.getDate() - 1);
+	if (lastDate !== yesterday.toDateString() && lastDate !== today) {
+		checkinData.value.streak = 0;
+	}
 };
 
 const claim = () => {
-  if (!canClaimToday.value) return;
+	if (!canClaimToday.value) return;
 
-  const today = new Date().toISOString();
-  checkinData.value.lastCheckin = today;
-  checkinData.value.streak = (checkinData.value.streak % 7) + 1;
-  checkinData.value.totalDays++;
+	const today = new Date().toISOString();
+	checkinData.value.lastCheckin = today;
+	checkinData.value.streak = (checkinData.value.streak % 7) + 1;
+	checkinData.value.totalDays++;
 
-  const reward = rewards[(checkinData.value.streak - 1) % 7];
+	const reward = rewards[(checkinData.value.streak - 1) % 7];
 
-  saveCheckinData();
-  canClaimToday.value = false;
+	saveCheckinData();
+	canClaimToday.value = false;
 
-  emit("claim", { coins: reward.coins, streak: checkinData.value.streak });
+	emit("claim", { coins: reward.coins, streak: checkinData.value.streak });
 };
 
 const currentDayReward = computed(() => {
-  const dayIndex = checkinData.value.streak % 7;
-  return rewards[dayIndex];
+	const dayIndex = checkinData.value.streak % 7;
+	return rewards[dayIndex];
 });
 
 const show = () => {
-  isVisible.value = true;
+	isVisible.value = true;
 };
 const hide = () => {
-  isVisible.value = false;
-  emit("close");
+	isVisible.value = false;
+	emit("close");
 };
 
 defineExpose({ show, hide });

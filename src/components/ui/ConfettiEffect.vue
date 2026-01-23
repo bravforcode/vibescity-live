@@ -3,62 +3,63 @@
  * ConfettiEffect.vue - Celebration confetti animation
  * Feature #8: Confetti Animation for Coins
  */
-import { ref, onMounted, onUnmounted } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 
 const props = defineProps({
-  active: {
-    type: Boolean,
-    default: false,
-  },
-  particleCount: {
-    type: Number,
-    default: 30,
-  },
-  duration: {
-    type: Number,
-    default: 2000,
-  },
+	active: {
+		type: Boolean,
+		default: false,
+	},
+	particleCount: {
+		type: Number,
+		default: 30,
+	},
+	duration: {
+		type: Number,
+		default: 2000,
+	},
 });
 
 const emit = defineEmits(["complete"]);
 
 const particles = ref([]);
 const colors = [
-  "#FFD700",
-  "#FF6B6B",
-  "#4ECDC4",
-  "#A06CD5",
-  "#FF9F43",
-  "#2ECC71",
+	"#FFD700",
+	"#FF6B6B",
+	"#4ECDC4",
+	"#A06CD5",
+	"#FF9F43",
+	"#2ECC71",
 ];
 
 const generateParticles = () => {
-  particles.value = Array.from({ length: props.particleCount }, (_, i) => ({
-    id: i,
-    x: 50 + (Math.random() - 0.5) * 20,
-    color: colors[Math.floor(Math.random() * colors.length)],
-    delay: Math.random() * 0.3,
-    angle: Math.random() * 360,
-    speed: 0.5 + Math.random() * 1,
-    size: 4 + Math.random() * 6,
-    type: Math.random() > 0.5 ? "circle" : "rect",
-  }));
+	particles.value = Array.from({ length: props.particleCount }, (_, i) => ({
+		id: i,
+		x: 50 + (Math.random() - 0.5) * 20,
+		color: colors[Math.floor(Math.random() * colors.length)],
+		delay: Math.random() * 0.3,
+		angle: Math.random() * 360,
+		speed: 0.5 + Math.random() * 1,
+		size: 4 + Math.random() * 6,
+		type: Math.random() > 0.5 ? "circle" : "rect",
+	}));
 
-  setTimeout(() => {
-    particles.value = [];
-    emit("complete");
-  }, props.duration);
+	setTimeout(() => {
+		particles.value = [];
+		emit("complete");
+	}, props.duration);
 };
 
 // Watch for active prop
 import { watch } from "vue";
+
 watch(
-  () => props.active,
-  (isActive) => {
-    if (isActive) {
-      generateParticles();
-    }
-  },
+	() => props.active,
+	(isActive) => {
+		if (isActive) {
+			generateParticles();
+		}
+	},
 );
 </script>
 

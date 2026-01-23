@@ -1,20 +1,20 @@
 <script setup>
-import { ref, computed } from "vue";
+import { MessageSquare, Send, ShieldCheck, Star, User } from "lucide-vue-next";
+import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
+import { useHaptics } from "../../composables/useHaptics";
 import { useShopStore } from "../../store/shopStore";
 import { useUserStore } from "../../store/userStore";
-import { useI18n } from "vue-i18n";
-import { Star, Send, User, MessageSquare, ShieldCheck } from "lucide-vue-next";
-import { useHaptics } from "../../composables/useHaptics";
 
 const props = defineProps({
-  shopId: {
-    type: [String, Number],
-    required: true,
-  },
-  shopName: {
-    type: String,
-    default: "",
-  },
+	shopId: {
+		type: [String, Number],
+		required: true,
+	},
+	shopName: {
+		type: String,
+		default: "",
+	},
 });
 
 const { t } = useI18n();
@@ -29,69 +29,69 @@ const isSubmitting = ref(false);
 const showSuccess = ref(false);
 
 const quickTags = [
-  "Amazing Music",
-  "Great Vibes",
-  "Friendly Staff",
-  "Cozy Decor",
-  "Good Value",
-  "Must Visit",
+	"Amazing Music",
+	"Great Vibes",
+	"Friendly Staff",
+	"Cozy Decor",
+	"Good Value",
+	"Must Visit",
 ];
 
 const toggleTag = (tag) => {
-  tapFeedback();
-  if (selectedTags.value.includes(tag)) {
-    selectedTags.value = selectedTags.value.filter((t) => t !== tag);
-  } else {
-    selectedTags.value.push(tag);
-  }
+	tapFeedback();
+	if (selectedTags.value.includes(tag)) {
+		selectedTags.value = selectedTags.value.filter((t) => t !== tag);
+	} else {
+		selectedTags.value.push(tag);
+	}
 };
 
 const shopReviews = computed(() => shopStore.getShopReviews(props.shopId));
 
 const averageRating = computed(() => {
-  if (shopReviews.value.length === 0) return 0;
-  const sum = shopReviews.value.reduce((acc, rev) => acc + rev.rating, 0);
-  return (sum / shopReviews.value.length).toFixed(1);
+	if (shopReviews.value.length === 0) return 0;
+	const sum = shopReviews.value.reduce((acc, rev) => acc + rev.rating, 0);
+	return (sum / shopReviews.value.length).toFixed(1);
 });
 
 const submitReview = async () => {
-  if (rating.value === 0 || isSubmitting.value) return;
+	if (rating.value === 0 || isSubmitting.value) return;
 
-  isSubmitting.value = true;
-  tapFeedback();
+	isSubmitting.value = true;
+	tapFeedback();
 
-  // Simulate network delay for premium feel
-  await new Promise((resolve) => setTimeout(resolve, 800));
+	// Simulate network delay for premium feel
+	await new Promise((resolve) => setTimeout(resolve, 800));
 
-  // Combine tags with comment for persistence
-  const finalComment =
-    selectedTags.value.length > 0
-      ? `${selectedTags.value.map((t) => `#${t.replace(/\s+/g, "")}`).join(" ")}\n${comment.value}`
-      : comment.value;
+	// Combine tags with comment for persistence
+	const finalComment =
+		selectedTags.value.length > 0
+			? `${selectedTags.value.map((t) => `#${t.replace(/\s+/g, "")}`).join(" ")}\n${comment.value}`
+			: comment.value;
 
-  shopStore.addReview(props.shopId, {
-    rating: rating.value,
-    comment: finalComment,
-    userName: userStore.userProfile?.name || "Vibe Explorer",
-    isVerified: true, // Groundwork for future verification logic
-  });
+	shopStore.addReview(props.shopId, {
+		rating: rating.value,
+		comment: finalComment,
+		userName: userStore.userProfile?.name || "Vibe Explorer",
+		isVerified: true, // Groundwork for future verification logic
+	});
 
-  successFeedback();
-  showSuccess.value = true;
-  isSubmitting.value = false;
+	successFeedback();
+	showSuccess.value = true;
+	isSubmitting.value = false;
 
-  // Reset form after delay
-  setTimeout(() => {
-    rating.value = 0;
-    comment.value = "";
-    selectedTags.value = [];
-    showSuccess.value = false;
-  }, 3000);
+	// Reset form after delay
+	setTimeout(() => {
+		rating.value = 0;
+		comment.value = "";
+		selectedTags.value = [];
+		showSuccess.value = false;
+	}, 3000);
 };
 
 const setRating = (r) => {
-  rating.value = r;
-  tapFeedback();
+	rating.value = r;
+	tapFeedback();
 };
 </script>
 

@@ -3,21 +3,21 @@
  * PullToRefresh.vue - Pull-to-refresh gesture handler
  * Feature #4: Pull-to-Refresh
  */
-import { ref, onMounted, onUnmounted } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 
 const props = defineProps({
-  disabled: {
-    type: Boolean,
-    default: false,
-  },
-  threshold: {
-    type: Number,
-    default: 80,
-  },
-  isDarkMode: {
-    type: Boolean,
-    default: true,
-  },
+	disabled: {
+		type: Boolean,
+		default: false,
+	},
+	threshold: {
+		type: Number,
+		default: 80,
+	},
+	isDarkMode: {
+		type: Boolean,
+		default: true,
+	},
 });
 
 const emit = defineEmits(["refresh"]);
@@ -28,50 +28,50 @@ const pullDistance = ref(0);
 const startY = ref(0);
 
 const handleTouchStart = (e) => {
-  if (props.disabled || isRefreshing.value) return;
+	if (props.disabled || isRefreshing.value) return;
 
-  // Only trigger if at top of scroll
-  const scrollTop = e.currentTarget.scrollTop || 0;
-  if (scrollTop > 5) return;
+	// Only trigger if at top of scroll
+	const scrollTop = e.currentTarget.scrollTop || 0;
+	if (scrollTop > 5) return;
 
-  startY.value = e.touches[0].clientY;
-  isPulling.value = true;
+	startY.value = e.touches[0].clientY;
+	isPulling.value = true;
 };
 
 const handleTouchMove = (e) => {
-  if (!isPulling.value || isRefreshing.value) return;
+	if (!isPulling.value || isRefreshing.value) return;
 
-  const currentY = e.touches[0].clientY;
-  const diff = currentY - startY.value;
+	const currentY = e.touches[0].clientY;
+	const diff = currentY - startY.value;
 
-  if (diff > 0) {
-    // Apply resistance
-    pullDistance.value = Math.min(diff * 0.5, props.threshold * 1.5);
-  }
+	if (diff > 0) {
+		// Apply resistance
+		pullDistance.value = Math.min(diff * 0.5, props.threshold * 1.5);
+	}
 };
 
 const handleTouchEnd = () => {
-  if (!isPulling.value) return;
+	if (!isPulling.value) return;
 
-  if (pullDistance.value >= props.threshold) {
-    isRefreshing.value = true;
-    emit("refresh");
+	if (pullDistance.value >= props.threshold) {
+		isRefreshing.value = true;
+		emit("refresh");
 
-    // Auto-reset after timeout (parent should call reset)
-    setTimeout(() => {
-      reset();
-    }, 3000);
-  } else {
-    pullDistance.value = 0;
-  }
+		// Auto-reset after timeout (parent should call reset)
+		setTimeout(() => {
+			reset();
+		}, 3000);
+	} else {
+		pullDistance.value = 0;
+	}
 
-  isPulling.value = false;
+	isPulling.value = false;
 };
 
 const reset = () => {
-  isRefreshing.value = false;
-  pullDistance.value = 0;
-  isPulling.value = false;
+	isRefreshing.value = false;
+	pullDistance.value = 0;
+	isPulling.value = false;
 };
 
 defineExpose({ reset });

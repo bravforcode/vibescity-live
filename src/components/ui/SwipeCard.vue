@@ -9,18 +9,18 @@ import { ref } from "vue";
 
 // Props เก็บไว้เหมือนเดิมเพื่อไม่ให้ Error ในไฟล์แม่ แต่ไม่ได้ใช้ Logic ภายในแล้ว
 const props = defineProps({
-  disabled: {
-    type: Boolean,
-    default: false,
-  },
-  threshold: {
-    type: Number,
-    default: 80,
-  },
-  showExpand: {
-    type: Boolean,
-    default: true,
-  },
+	disabled: {
+		type: Boolean,
+		default: false,
+	},
+	threshold: {
+		type: Number,
+		default: 80,
+	},
+	showExpand: {
+		type: Boolean,
+		default: true,
+	},
 });
 
 // Emits เก็บไว้กัน Error แต่ไม่ได้ใช้ Logic Swipe ภายในแล้ว

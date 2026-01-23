@@ -3,44 +3,44 @@
  * BottomNav.vue - Premium Animated Bottom Navigation
  * Feature #7: Animated Tab Bar
  */
-import { ref, computed } from "vue";
+import { computed, ref } from "vue";
 
 const props = defineProps({
-  activeTab: {
-    type: String,
-    default: "map",
-  },
-  isDarkMode: {
-    type: Boolean,
-    default: true,
-  },
-  liveCount: {
-    type: Number,
-    default: 0,
-  },
-  favoritesCount: {
-    type: Number,
-    default: 0,
-  },
+	activeTab: {
+		type: String,
+		default: "map",
+	},
+	isDarkMode: {
+		type: Boolean,
+		default: true,
+	},
+	liveCount: {
+		type: Number,
+		default: 0,
+	},
+	favoritesCount: {
+		type: Number,
+		default: 0,
+	},
 });
 
 const emit = defineEmits(["change-tab"]);
 
 const tabs = [
-  { id: "map", label: "Map", icon: "🗺️", activeIcon: "🗺️" },
-  { id: "events", label: "Events", icon: "🎪", activeIcon: "🎉" },
-  { id: "favorites", label: "Saved", icon: "🤍", activeIcon: "❤️" },
-  { id: "profile", label: "Profile", icon: "👤", activeIcon: "😎" },
+	{ id: "map", label: "Map", icon: "🗺️", activeIcon: "🗺️" },
+	{ id: "events", label: "Events", icon: "🎪", activeIcon: "🎉" },
+	{ id: "favorites", label: "Saved", icon: "🤍", activeIcon: "❤️" },
+	{ id: "profile", label: "Profile", icon: "👤", activeIcon: "😎" },
 ];
 
 const handleTabClick = (tabId) => {
-  emit("change-tab", tabId);
+	emit("change-tab", tabId);
 };
 
 const getBadgeCount = (tabId) => {
-  if (tabId === "events") return props.liveCount;
-  if (tabId === "favorites") return props.favoritesCount;
-  return 0;
+	if (tabId === "events") return props.liveCount;
+	if (tabId === "favorites") return props.favoritesCount;
+	return 0;
 };
 </script>
 

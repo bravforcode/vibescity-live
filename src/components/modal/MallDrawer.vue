@@ -1,60 +1,60 @@
 // --- C:\vibecity.live\src\components\modal\MallDrawer.vue ---
 
 <script setup>
-import { ref, computed, watch, nextTick } from "vue";
+import {
+	Building2,
+	Car,
+	Heart,
+	MapPin,
+	Search,
+	Share2,
+	X,
+} from "lucide-vue-next";
+import { computed, nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { Z } from "../../constants/zIndex";
-import {
-  X,
-  Building2,
-  Heart,
-  Share2,
-  Search,
-  MapPin,
-  Car,
-} from "lucide-vue-next";
 
 const { t } = useI18n();
 
 // import ShopCard from "../panel/ShopCard.vue"; // Optional: Reuse if needed, but custom list item is better for this view
 
 const props = defineProps({
-  isOpen: {
-    type: Boolean,
-    default: false,
-  },
-  building: {
-    type: Object,
-    default: null,
-  },
-  shops: {
-    type: Array,
-    default: () => [],
-  },
-  // If true, data is treated as an Event
-  isEventMode: {
-    type: Boolean,
-    default: true,
-  },
-  isDarkMode: {
-    type: Boolean,
-    default: true,
-  },
-  favorites: {
-    type: Array,
-    default: () => [],
-  },
-  selectedShopId: {
-    type: [String, Number],
-    default: null,
-  },
+	isOpen: {
+		type: Boolean,
+		default: false,
+	},
+	building: {
+		type: Object,
+		default: null,
+	},
+	shops: {
+		type: Array,
+		default: () => [],
+	},
+	// If true, data is treated as an Event
+	isEventMode: {
+		type: Boolean,
+		default: true,
+	},
+	isDarkMode: {
+		type: Boolean,
+		default: true,
+	},
+	favorites: {
+		type: Array,
+		default: () => [],
+	},
+	selectedShopId: {
+		type: [String, Number],
+		default: null,
+	},
 });
 
 const emit = defineEmits([
-  "close",
-  "select-shop",
-  "open-ride-modal",
-  "toggle-favorite",
+	"close",
+	"select-shop",
+	"open-ride-modal",
+	"toggle-favorite",
 ]);
 
 const activeTab = ref("ALL"); // ALL, Food, Fashion, Beauty, Tech, Cinema
@@ -68,197 +68,197 @@ const shopRefs = ref({});
 
 // ✅ Check if building is currently open
 const isBuildingOpen = computed(() => {
-  if (!props.building?.openTime || !props.building?.closeTime) return true;
-  const now = new Date();
-  const time = now.getHours() * 100 + now.getMinutes();
-  const open = parseInt(props.building.openTime.replace(":", ""));
-  const close = parseInt(props.building.closeTime.replace(":", ""));
-  return time >= open && time <= close;
+	if (!props.building?.openTime || !props.building?.closeTime) return true;
+	const now = new Date();
+	const time = now.getHours() * 100 + now.getMinutes();
+	const open = parseInt(props.building.openTime.replace(":", ""));
+	const close = parseInt(props.building.closeTime.replace(":", ""));
+	return time >= open && time <= close;
 });
 
 // Reset state when building changes or drawer opens
 const resetDrawerState = () => {
-  activeTab.value = "ALL";
-  searchQuery.value = "";
-  isSearchExpanded.value = false;
+	activeTab.value = "ALL";
+	searchQuery.value = "";
+	isSearchExpanded.value = false;
 
-  // Initialize floor for Mall mode
-  if (props.building?.floors?.length) {
-    // Default to first floor if none selected
-    if (!activeFloor.value) {
-      activeFloor.value = props.building.floors[0];
-    }
-  } else {
-    activeFloor.value = null;
-  }
+	// Initialize floor for Mall mode
+	if (props.building?.floors?.length) {
+		// Default to first floor if none selected
+		if (!activeFloor.value) {
+			activeFloor.value = props.building.floors[0];
+		}
+	} else {
+		activeFloor.value = null;
+	}
 
-  // Auto-scroll to selected shop if provided
-  if (props.selectedShopId) {
-    // Find shop info to auto-select its floor
-    const shop = props.shops.find(
-      (s) => Number(s.id) === Number(props.selectedShopId),
-    );
-    if (shop && shop.Floor) {
-      activeFloor.value = shop.Floor;
-    }
+	// Auto-scroll to selected shop if provided
+	if (props.selectedShopId) {
+		// Find shop info to auto-select its floor
+		const shop = props.shops.find(
+			(s) => Number(s.id) === Number(props.selectedShopId),
+		);
+		if (shop && shop.Floor) {
+			activeFloor.value = shop.Floor;
+		}
 
-    nextTick(() => {
-      setTimeout(() => {
-        const el = shopRefs.value[props.selectedShopId];
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-      }, 300); // Wait for transition
-    });
-  }
+		nextTick(() => {
+			setTimeout(() => {
+				const el = shopRefs.value[props.selectedShopId];
+				if (el) {
+					el.scrollIntoView({ behavior: "smooth", block: "center" });
+				}
+			}, 300); // Wait for transition
+		});
+	}
 };
 
 watch(
-  () => props.isOpen,
-  (val) => {
-    if (val) resetDrawerState();
-  },
+	() => props.isOpen,
+	(val) => {
+		if (val) resetDrawerState();
+	},
 );
 
 watch(
-  () => props.building?.id,
-  () => {
-    if (props.isOpen) resetDrawerState();
-  },
+	() => props.building?.id,
+	() => {
+		if (props.isOpen) resetDrawerState();
+	},
 );
 
 const handleExpandSearch = () => {
-  isSearchExpanded.value = true;
-  nextTick(() => {
-    searchInputRef.value?.focus();
-  });
+	isSearchExpanded.value = true;
+	nextTick(() => {
+		searchInputRef.value?.focus();
+	});
 };
 
 const handleClearSearch = () => {
-  searchQuery.value = "";
-  isSearchExpanded.value = false;
+	searchQuery.value = "";
+	isSearchExpanded.value = false;
 };
 
 // Derived Categories based on data or static list
 const categories = [
-  { id: "ALL", label: t("categories.all") },
-  { id: "Food", label: t("categories.food") },
-  { id: "Fashion", label: t("categories.fashion") },
-  { id: "Beauty", label: t("categories.beauty") },
-  { id: "Tech", label: t("categories.tech") },
-  { id: "Cinema", label: t("categories.cinema") },
+	{ id: "ALL", label: t("categories.all") },
+	{ id: "Food", label: t("categories.food") },
+	{ id: "Fashion", label: t("categories.fashion") },
+	{ id: "Beauty", label: t("categories.beauty") },
+	{ id: "Tech", label: t("categories.tech") },
+	{ id: "Cinema", label: t("categories.cinema") },
 ];
 
 // Computed Filtered Shops
 const filteredShops = computed(() => {
-  let result = props.shops;
-  // 1. Filter by Floor if in Mall mode (Priority)
-  if (activeFloor.value) {
-    result = result.filter((s) => {
-      if (!s.Floor) return true; // Show shops with no floor? Or maybe hide? Let's show for now to be safe
-      return (
-        String(s.Floor).trim().toUpperCase() ===
-        String(activeFloor.value).trim().toUpperCase()
-      );
-    });
-  }
+	let result = props.shops;
+	// 1. Filter by Floor if in Mall mode (Priority)
+	if (activeFloor.value) {
+		result = result.filter((s) => {
+			if (!s.Floor) return true; // Show shops with no floor? Or maybe hide? Let's show for now to be safe
+			return (
+				String(s.Floor).trim().toUpperCase() ===
+				String(activeFloor.value).trim().toUpperCase()
+			);
+		});
+	}
 
-  // 2. Filter by Tab
-  if (activeTab.value !== "ALL") {
-    const tab = activeTab.value;
-    result = result.filter((s) => {
-      const cat = (s.category || "").toLowerCase();
-      if (tab === "Food")
-        return (
-          cat.includes("food") ||
-          cat.includes("restaurant") ||
-          cat.includes("cafe") ||
-          cat.includes("bar") ||
-          cat.includes("กิน")
-        );
-      if (tab === "Fashion")
-        return (
-          cat.includes("fashion") ||
-          cat.includes("clothing") ||
-          cat.includes("bag") ||
-          cat.includes("แต่งตัว")
-        );
-      if (tab === "Beauty")
-        return (
-          cat.includes("beauty") ||
-          cat.includes("jewelry") ||
-          cat.includes("cosmetic") ||
-          cat.includes("ความงาม")
-        );
-      if (tab === "Tech")
-        return (
-          cat.includes("tech") ||
-          cat.includes("gadget") ||
-          cat.includes("mobile") ||
-          cat.includes("ไอที")
-        );
-      if (tab === "Cinema")
-        return (
-          cat.includes("cinema") ||
-          cat.includes("movie") ||
-          cat.includes("game") ||
-          cat.includes("บันเทิง")
-        );
-      return true;
-    });
-  }
+	// 2. Filter by Tab
+	if (activeTab.value !== "ALL") {
+		const tab = activeTab.value;
+		result = result.filter((s) => {
+			const cat = (s.category || "").toLowerCase();
+			if (tab === "Food")
+				return (
+					cat.includes("food") ||
+					cat.includes("restaurant") ||
+					cat.includes("cafe") ||
+					cat.includes("bar") ||
+					cat.includes("กิน")
+				);
+			if (tab === "Fashion")
+				return (
+					cat.includes("fashion") ||
+					cat.includes("clothing") ||
+					cat.includes("bag") ||
+					cat.includes("แต่งตัว")
+				);
+			if (tab === "Beauty")
+				return (
+					cat.includes("beauty") ||
+					cat.includes("jewelry") ||
+					cat.includes("cosmetic") ||
+					cat.includes("ความงาม")
+				);
+			if (tab === "Tech")
+				return (
+					cat.includes("tech") ||
+					cat.includes("gadget") ||
+					cat.includes("mobile") ||
+					cat.includes("ไอที")
+				);
+			if (tab === "Cinema")
+				return (
+					cat.includes("cinema") ||
+					cat.includes("movie") ||
+					cat.includes("game") ||
+					cat.includes("บันเทิง")
+				);
+			return true;
+		});
+	}
 
-  // 2. Filter by Search
-  if (searchQuery.value) {
-    const q = searchQuery.value.toLowerCase();
-    result = result.filter(
-      (s) =>
-        (s.name || "").toLowerCase().includes(q) ||
-        (s.category || "").toLowerCase().includes(q),
-    );
-    return result; // ถ้า search ให้โชว์ผลลัพธ์เลย (ไม่ Random)
-  }
+	// 2. Filter by Search
+	if (searchQuery.value) {
+		const q = searchQuery.value.toLowerCase();
+		result = result.filter(
+			(s) =>
+				(s.name || "").toLowerCase().includes(q) ||
+				(s.category || "").toLowerCase().includes(q),
+		);
+		return result; // ถ้า search ให้โชว์ผลลัพธ์เลย (ไม่ Random)
+	}
 
-  // 3. Highlight/Random View (When Tab is ALL and No Search)
-  if (activeTab.value === "ALL" && !searchQuery.value) {
-    // Logic: Pick LIVE shops first, then Randomly pick some others to look "Full" but not overwhelming
-    const liveShops = result.filter((s) => s.status === "LIVE");
-    const otherShops = result.filter((s) => s.status !== "LIVE");
+	// 3. Highlight/Random View (When Tab is ALL and No Search)
+	if (activeTab.value === "ALL" && !searchQuery.value) {
+		// Logic: Pick LIVE shops first, then Randomly pick some others to look "Full" but not overwhelming
+		const liveShops = result.filter((s) => s.status === "LIVE");
+		const otherShops = result.filter((s) => s.status !== "LIVE");
 
-    // Shuffle others (Simple randomize for "Discovery" feel)
-    const shuffled = otherShops.sort(() => 0.5 - Math.random());
+		// Shuffle others (Simple randomize for "Discovery" feel)
+		const shuffled = otherShops.sort(() => 0.5 - Math.random());
 
-    return [...liveShops, ...shuffled];
-  }
+		return [...liveShops, ...shuffled];
+	}
 
-  // 4. Sort: Live first, then by Floor (For Tab Views)
-  return result.sort((a, b) => {
-    // Live priority
-    const aLive = a.status === "LIVE" ? 1 : 0;
-    const bLive = b.status === "LIVE" ? 1 : 0;
-    if (aLive !== bLive) return bLive - aLive;
+	// 4. Sort: Live first, then by Floor (For Tab Views)
+	return result.sort((a, b) => {
+		// Live priority
+		const aLive = a.status === "LIVE" ? 1 : 0;
+		const bLive = b.status === "LIVE" ? 1 : 0;
+		if (aLive !== bLive) return bLive - aLive;
 
-    // Then Floor
-    return (a.Floor || "").localeCompare(b.Floor || "");
-  });
+		// Then Floor
+		return (a.Floor || "").localeCompare(b.Floor || "");
+	});
 });
 
 const handleShare = (item) => {
-  const name = item.name || item.EventName || "Amazing Vibe";
-  const url = window.location.href + `?shop=${item.id}`;
+	const name = item.name || item.EventName || "Amazing Vibe";
+	const url = window.location.href + `?shop=${item.id}`;
 
-  if (navigator.share) {
-    navigator
-      .share({
-        title: `Check out ${name} on VibeCity!`,
-        text: `Hey! found this cool place on VibeCity.live`,
-        url: url,
-      })
-      .catch(console.error);
-  } else {
-    navigator.clipboard.writeText(url);
-    alert("Link copied to clipboard!");
-  }
+	if (navigator.share) {
+		navigator
+			.share({
+				title: `Check out ${name} on VibeCity!`,
+				text: `Hey! found this cool place on VibeCity.live`,
+				url: url,
+			})
+			.catch(console.error);
+	} else {
+		navigator.clipboard.writeText(url);
+		alert("Link copied to clipboard!");
+	}
 };
 </script>
 

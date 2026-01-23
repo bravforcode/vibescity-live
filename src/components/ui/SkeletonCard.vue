@@ -4,14 +4,14 @@
  * Feature #3: Skeleton Loading States
  */
 defineProps({
-  isDarkMode: {
-    type: Boolean,
-    default: true,
-  },
-  variant: {
-    type: String,
-    default: "card", // 'card' | 'carousel' | 'list'
-  },
+	isDarkMode: {
+		type: Boolean,
+		default: true,
+	},
+	variant: {
+		type: String,
+		default: "card", // 'card' | 'carousel' | 'list'
+	},
 });
 </script>
 

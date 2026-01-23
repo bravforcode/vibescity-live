@@ -1,50 +1,52 @@
 // --- C:\vibecity.live\src\components\modal\VibeModal.vue ---
 
 <script setup>
-import {
-  computed,
-  ref,
-  onMounted,
-  onUnmounted,
-  defineAsyncComponent,
-  watchEffect,
-} from "vue";
 import { useMotion } from "@vueuse/motion";
-import { getMediaDetails } from "../../utils/linkHelper";
+import {
+	computed,
+	defineAsyncComponent,
+	onMounted,
+	onUnmounted,
+	ref,
+	watchEffect,
+} from "vue";
 import { Z } from "../../constants/zIndex";
+import { getMediaDetails } from "../../utils/linkHelper";
+
 const VisitorCount = defineAsyncComponent(
-  () => import("../ui/VisitorCount.vue"),
+	() => import("../ui/VisitorCount.vue"),
 );
+
+import {
+	Car,
+	Facebook,
+	Instagram,
+	Navigation,
+	Share2,
+	X,
+} from "lucide-vue-next";
+import { useI18n } from "vue-i18n";
 import { useShopStore } from "../../store/shopStore";
 // --- REFACTOR: ใช้ browserUtils และ shopUtils ---
 import {
-  copyToClipboard,
-  openGoogleMapsDir,
-  openGrabApp,
-  openBoltApp,
-  openLinemanApp,
-  shareLocation,
-  isMobileDevice,
+	copyToClipboard,
+	isMobileDevice,
+	openBoltApp,
+	openGoogleMapsDir,
+	openGrabApp,
+	openLinemanApp,
+	shareLocation,
 } from "../../utils/browserUtils";
 import { getStatusColorClass } from "../../utils/shopUtils";
-import { useI18n } from "vue-i18n";
 import ReviewSystem from "../ui/ReviewSystem.vue";
-import {
-  Share2,
-  Navigation,
-  Car,
-  X,
-  Instagram,
-  Facebook,
-} from "lucide-vue-next";
 
 const { t } = useI18n();
 
 const props = defineProps({
-  shop: {
-    type: Object,
-    required: true,
-  },
+	shop: {
+		type: Object,
+		required: true,
+	},
 });
 
 const emit = defineEmits(["close"]);
@@ -52,31 +54,31 @@ const emit = defineEmits(["close"]);
 // --- Cinematic Motion Logic ---
 const modalCard = ref(null);
 const { apply } = useMotion(modalCard, {
-  initial: {
-    y: 600,
-    opacity: 0,
-    scale: 0.9,
-  },
-  enter: {
-    y: 0,
-    opacity: 1,
-    scale: 1,
-    transition: {
-      type: "spring",
-      stiffness: 300,
-      damping: 25,
-      mass: 0.5,
-    },
-  },
-  leave: {
-    y: 600,
-    opacity: 0,
-    scale: 0.95,
-    transition: {
-      duration: 200,
-      ease: "easeIn",
-    },
-  },
+	initial: {
+		y: 600,
+		opacity: 0,
+		scale: 0.9,
+	},
+	enter: {
+		y: 0,
+		opacity: 1,
+		scale: 1,
+		transition: {
+			type: "spring",
+			stiffness: 300,
+			damping: 25,
+			mass: 0.5,
+		},
+	},
+	leave: {
+		y: 600,
+		opacity: 0,
+		scale: 0.95,
+		transition: {
+			duration: 200,
+			ease: "easeIn",
+		},
+	},
 });
 
 // Gesture Variables
@@ -84,49 +86,49 @@ const touchStart = ref({ y: 0, t: 0 });
 const isDragging = ref(false);
 
 const handleTouchStart = (e) => {
-  touchStart.value = { y: e.touches[0].clientY, t: Date.now() };
-  isDragging.value = true;
+	touchStart.value = { y: e.touches[0].clientY, t: Date.now() };
+	isDragging.value = true;
 };
 
 const handleTouchMove = (e) => {
-  if (!isDragging.value) return;
-  const deltaY = e.touches[0].clientY - touchStart.value.y;
+	if (!isDragging.value) return;
+	const deltaY = e.touches[0].clientY - touchStart.value.y;
 
-  // Apply visual transform immediately (1:1 follow or resistance)
-  if (deltaY > 0) {
-    // Dragging down (closing) - 1:1
-    apply({ y: deltaY, scale: 1 - deltaY / 2000 });
-  } else {
-    // Dragging up (overshoot) - Rubber Banding
-    const resistance = Math.sqrt(Math.abs(deltaY)) * 2; // Square root resistance
-    apply({ y: -resistance });
-  }
+	// Apply visual transform immediately (1:1 follow or resistance)
+	if (deltaY > 0) {
+		// Dragging down (closing) - 1:1
+		apply({ y: deltaY, scale: 1 - deltaY / 2000 });
+	} else {
+		// Dragging up (overshoot) - Rubber Banding
+		const resistance = Math.sqrt(Math.abs(deltaY)) * 2; // Square root resistance
+		apply({ y: -resistance });
+	}
 };
 
 const handleTouchEnd = (e) => {
-  if (!isDragging.value) return;
-  isDragging.value = false;
+	if (!isDragging.value) return;
+	isDragging.value = false;
 
-  const deltaY = e.changedTouches[0].clientY - touchStart.value.y;
-  const time = Date.now() - touchStart.value.t;
-  const velocity = deltaY / time; // px/ms
+	const deltaY = e.changedTouches[0].clientY - touchStart.value.y;
+	const time = Date.now() - touchStart.value.t;
+	const velocity = deltaY / time; // px/ms
 
-  // Haptic Feedback
-  if (navigator.vibrate) navigator.vibrate(10);
+	// Haptic Feedback
+	if (navigator.vibrate) navigator.vibrate(10);
 
-  // Close Condition: Dragged down > 150px OR fast flick down
-  if (deltaY > 150 || (deltaY > 50 && velocity > 0.5)) {
-    emit("close");
-  } else {
-    // Snap back to open
-    apply("enter");
-  }
+	// Close Condition: Dragged down > 150px OR fast flick down
+	if (deltaY > 150 || (deltaY > 50 && velocity > 0.5)) {
+		emit("close");
+	} else {
+		// Snap back to open
+		apply("enter");
+	}
 };
 
 const media = computed(() => getMediaDetails(props.shop.videoUrl));
 
 const processedImages = computed(() => {
-  return (props.shop.images || []).map((imgUrl) => getMediaDetails(imgUrl).url);
+	return (props.shop.images || []).map((imgUrl) => getMediaDetails(imgUrl).url);
 });
 
 const zoomedImage = ref(null);
@@ -141,136 +143,136 @@ const isPromoActive = ref(false);
 let timerInterval = null;
 
 const updateCountdown = () => {
-  if (!props.shop.promotionEndtime || !props.shop.promotionInfo) {
-    isPromoActive.value = false;
-    return;
-  }
+	if (!props.shop.promotionEndtime || !props.shop.promotionInfo) {
+		isPromoActive.value = false;
+		return;
+	}
 
-  const now = new Date();
-  const [hours, minutes] = props.shop.promotionEndtime.split(":");
+	const now = new Date();
+	const [hours, minutes] = props.shop.promotionEndtime.split(":");
 
-  const target = new Date();
-  target.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+	const target = new Date();
+	target.setHours(parseInt(hours), parseInt(minutes), 0, 0);
 
-  const diff = target - now;
-  const maxFlashWindow = 1200000; // 20 นาที
+	const diff = target - now;
+	const maxFlashWindow = 1200000; // 20 นาที
 
-  if (diff <= 0 || diff > maxFlashWindow) {
-    isPromoActive.value = false;
-    return;
-  }
+	if (diff <= 0 || diff > maxFlashWindow) {
+		isPromoActive.value = false;
+		return;
+	}
 
-  const totalSeconds = Math.floor(diff / 1000);
-  const mins = Math.floor(totalSeconds / 60);
-  const secs = totalSeconds % 60;
+	const totalSeconds = Math.floor(diff / 1000);
+	const mins = Math.floor(totalSeconds / 60);
+	const secs = totalSeconds % 60;
 
-  timeLeft.value = `${mins}:${secs.toString().padStart(2, "0")}`;
-  isPromoActive.value = true;
+	timeLeft.value = `${mins}:${secs.toString().padStart(2, "0")}`;
+	isPromoActive.value = true;
 };
 
 onMounted(() => {
-  isMobile.value = isMobileDevice();
-  updateCountdown();
-  timerInterval = setInterval(updateCountdown, 1000);
+	isMobile.value = isMobileDevice();
+	updateCountdown();
+	timerInterval = setInterval(updateCountdown, 1000);
 });
 
 // --- Media Sync ---
 const videoPlayer = ref(null);
 watchEffect(() => {
-  if (videoPlayer.value && props.shop.initialTime) {
-    videoPlayer.value.currentTime = props.shop.initialTime;
-  }
+	if (videoPlayer.value && props.shop.initialTime) {
+		videoPlayer.value.currentTime = props.shop.initialTime;
+	}
 });
 
 onUnmounted(() => {
-  if (timerInterval) clearInterval(timerInterval);
+	if (timerInterval) clearInterval(timerInterval);
 });
 
 // --- REFACTOR: เรียกใช้ Utils Function ---
 const handleCopy = async (text) => {
-  const success = await copyToClipboard(text);
-  if (success) {
-    copyStatus.value = "Copied!";
-    setTimeout(() => (copyStatus.value = ""), 3000);
-  } else {
-    copyStatus.value = "Manual search required";
-  }
+	const success = await copyToClipboard(text);
+	if (success) {
+		copyStatus.value = "Copied!";
+		setTimeout(() => (copyStatus.value = ""), 3000);
+	} else {
+		copyStatus.value = "Manual search required";
+	}
 };
 
 const openGoogleMaps = () => {
-  openGoogleMapsDir(props.shop.lat, props.shop.lng);
+	openGoogleMapsDir(props.shop.lat, props.shop.lng);
 };
 
 // เปิดแอพ Grab พร้อม feedback
 const openGrab = () => {
-  rideLoading.value = "grab";
+	rideLoading.value = "grab";
 
-  // Fire-and-forget copy (don't await) to prevent blocking deep link
-  copyToClipboard(props.shop.name).then(() => {
-    copyStatus.value = "Copied!";
-  });
+	// Fire-and-forget copy (don't await) to prevent blocking deep link
+	copyToClipboard(props.shop.name).then(() => {
+		copyStatus.value = "Copied!";
+	});
 
-  // Call immediately to satisfy browser security (Synchronous-like intent)
-  const success = openGrabApp(props.shop);
+	// Call immediately to satisfy browser security (Synchronous-like intent)
+	const success = openGrabApp(props.shop);
 
-  if (success) {
-    copyStatus.value = "กำลังเปิด Grab...";
-  } else {
-    copyStatus.value = "ไม่พบ Grab";
-  }
+	if (success) {
+		copyStatus.value = "กำลังเปิด Grab...";
+	} else {
+		copyStatus.value = "ไม่พบ Grab";
+	}
 
-  // ปิด popup หลังจาก 1.5 วินาที
-  setTimeout(() => {
-    showRidePopup.value = false;
-    rideLoading.value = "";
-    setTimeout(() => (copyStatus.value = ""), 1000);
-  }, 1500);
+	// ปิด popup หลังจาก 1.5 วินาที
+	setTimeout(() => {
+		showRidePopup.value = false;
+		rideLoading.value = "";
+		setTimeout(() => (copyStatus.value = ""), 1000);
+	}, 1500);
 };
 
 // เปิดแอพ Bolt พร้อม feedback
 const openBolt = () => {
-  rideLoading.value = "bolt";
+	rideLoading.value = "bolt";
 
-  copyToClipboard(props.shop.name).then(() => {
-    copyStatus.value = "Copied!";
-  });
+	copyToClipboard(props.shop.name).then(() => {
+		copyStatus.value = "Copied!";
+	});
 
-  const success = openBoltApp(props.shop);
+	const success = openBoltApp(props.shop);
 
-  if (success) {
-    copyStatus.value = "กำลังเปิด Bolt...";
-  } else {
-    copyStatus.value = "ไม่พบ Bolt";
-  }
+	if (success) {
+		copyStatus.value = "กำลังเปิด Bolt...";
+	} else {
+		copyStatus.value = "ไม่พบ Bolt";
+	}
 
-  setTimeout(() => {
-    showRidePopup.value = false;
-    rideLoading.value = "";
-    setTimeout(() => (copyStatus.value = ""), 1000);
-  }, 1500);
+	setTimeout(() => {
+		showRidePopup.value = false;
+		rideLoading.value = "";
+		setTimeout(() => (copyStatus.value = ""), 1000);
+	}, 1500);
 };
 
 // เปิดแอพ Lineman
 const openLineman = () => {
-  rideLoading.value = "lineman";
+	rideLoading.value = "lineman";
 
-  copyToClipboard(props.shop.name).then(() => {
-    copyStatus.value = "Copied!";
-  });
+	copyToClipboard(props.shop.name).then(() => {
+		copyStatus.value = "Copied!";
+	});
 
-  const success = openLinemanApp(props.shop);
+	const success = openLinemanApp(props.shop);
 
-  if (success) {
-    copyStatus.value = "กำลังเปิด Lineman...";
-  } else {
-    copyStatus.value = "ตไม่พบ Lineman";
-  }
+	if (success) {
+		copyStatus.value = "กำลังเปิด Lineman...";
+	} else {
+		copyStatus.value = "ตไม่พบ Lineman";
+	}
 
-  setTimeout(() => {
-    showRidePopup.value = false;
-    rideLoading.value = "";
-    setTimeout(() => (copyStatus.value = ""), 1000);
-  }, 1500);
+	setTimeout(() => {
+		showRidePopup.value = false;
+		rideLoading.value = "";
+		setTimeout(() => (copyStatus.value = ""), 1000);
+	}, 1500);
 };
 </script>
 

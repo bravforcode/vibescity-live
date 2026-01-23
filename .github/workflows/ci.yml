@@ -1,0 +1,34 @@
+name: VibeCity CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Bun
+      uses: oven-sh/setup-bun@v1
+      with:
+        bun-version: latest
+    
+    - name: Install Dependencies
+      run: bun install
+      
+    - name: Lint Check (Biome)
+      run: bun run check
+      
+    - name: Build Project (Rspack)
+      run: bun run build
+      
+    - name: Install Playwright Browsers
+      run: bun x playwright install --with-deps
+      
+    - name: Run E2E Tests
+      run: bun x playwright test

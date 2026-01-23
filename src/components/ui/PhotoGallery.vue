@@ -3,21 +3,21 @@
  * PhotoGallery.vue - Lightbox photo gallery
  * Feature #22: Photo Gallery Light Box
  */
-import { ref, computed, watch } from "vue";
+import { computed, ref, watch } from "vue";
 
 const props = defineProps({
-  images: {
-    type: Array,
-    default: () => [],
-  },
-  initialIndex: {
-    type: Number,
-    default: 0,
-  },
-  isOpen: {
-    type: Boolean,
-    default: false,
-  },
+	images: {
+		type: Array,
+		default: () => [],
+	},
+	initialIndex: {
+		type: Number,
+		default: 0,
+	},
+	isOpen: {
+		type: Boolean,
+		default: false,
+	},
 });
 
 const emit = defineEmits(["close", "update:isOpen"]);
@@ -25,62 +25,63 @@ const emit = defineEmits(["close", "update:isOpen"]);
 const currentIndex = ref(props.initialIndex);
 
 watch(
-  () => props.initialIndex,
-  (val) => {
-    currentIndex.value = val;
-  },
+	() => props.initialIndex,
+	(val) => {
+		currentIndex.value = val;
+	},
 );
 
 const currentImage = computed(() => props.images[currentIndex.value] || null);
 
 const next = () => {
-  if (currentIndex.value < props.images.length - 1) {
-    currentIndex.value++;
-  } else {
-    currentIndex.value = 0; // Loop
-  }
+	if (currentIndex.value < props.images.length - 1) {
+		currentIndex.value++;
+	} else {
+		currentIndex.value = 0; // Loop
+	}
 };
 
 const prev = () => {
-  if (currentIndex.value > 0) {
-    currentIndex.value--;
-  } else {
-    currentIndex.value = props.images.length - 1; // Loop
-  }
+	if (currentIndex.value > 0) {
+		currentIndex.value--;
+	} else {
+		currentIndex.value = props.images.length - 1; // Loop
+	}
 };
 
 const close = () => {
-  emit("close");
-  emit("update:isOpen", false);
+	emit("close");
+	emit("update:isOpen", false);
 };
 
 // Keyboard navigation
 const handleKeydown = (e) => {
-  if (!props.isOpen) return;
-  if (e.key === "ArrowRight") next();
-  if (e.key === "ArrowLeft") prev();
-  if (e.key === "Escape") close();
+	if (!props.isOpen) return;
+	if (e.key === "ArrowRight") next();
+	if (e.key === "ArrowLeft") prev();
+	if (e.key === "Escape") close();
 };
 
 // Touch swipe support
 const touchStart = ref(0);
 const handleTouchStart = (e) => {
-  touchStart.value = e.touches[0].clientX;
+	touchStart.value = e.touches[0].clientX;
 };
 const handleTouchEnd = (e) => {
-  const diff = e.changedTouches[0].clientX - touchStart.value;
-  if (Math.abs(diff) > 50) {
-    if (diff > 0) prev();
-    else next();
-  }
+	const diff = e.changedTouches[0].clientX - touchStart.value;
+	if (Math.abs(diff) > 50) {
+		if (diff > 0) prev();
+		else next();
+	}
 };
 
 import { onMounted, onUnmounted } from "vue";
+
 onMounted(() => {
-  window.addEventListener("keydown", handleKeydown);
+	window.addEventListener("keydown", handleKeydown);
 });
 onUnmounted(() => {
-  window.removeEventListener("keydown", handleKeydown);
+	window.removeEventListener("keydown", handleKeydown);
 });
 </script>
 

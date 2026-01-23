@@ -3,45 +3,45 @@
  * Leaderboard.vue - Top coin collectors leaderboard
  * Feature #31: Leaderboard UI
  */
-import { ref, computed } from "vue";
+import { computed, ref } from "vue";
 
 const props = defineProps({
-  isDarkMode: {
-    type: Boolean,
-    default: true,
-  },
-  currentUser: {
-    type: Object,
-    default: () => ({ name: "You", coins: 0, rank: 99 }),
-  },
+	isDarkMode: {
+		type: Boolean,
+		default: true,
+	},
+	currentUser: {
+		type: Object,
+		default: () => ({ name: "You", coins: 0, rank: 99 }),
+	},
 });
 
 // Mock leaderboard data
 const leaders = ref([
-  { rank: 1, name: "NightOwl_CM", coins: 2450, avatar: "🦉" },
-  { rank: 2, name: "PartyKing", coins: 2120, avatar: "👑" },
-  { rank: 3, name: "VibeHunter", coins: 1890, avatar: "🎯" },
-  { rank: 4, name: "ChiangMaiPro", coins: 1650, avatar: "🏔️" },
-  { rank: 5, name: "ClubMaster", coins: 1520, avatar: "🎧" },
-  { rank: 6, name: "NeonRider", coins: 1380, avatar: "🌙" },
-  { rank: 7, name: "BarHopper", coins: 1250, avatar: "🍻" },
-  { rank: 8, name: "DanceFloor", coins: 1100, avatar: "💃" },
-  { rank: 9, name: "MidnightWalker", coins: 980, avatar: "🌃" },
-  { rank: 10, name: "VibeSeeker", coins: 850, avatar: "✨" },
+	{ rank: 1, name: "NightOwl_CM", coins: 2450, avatar: "🦉" },
+	{ rank: 2, name: "PartyKing", coins: 2120, avatar: "👑" },
+	{ rank: 3, name: "VibeHunter", coins: 1890, avatar: "🎯" },
+	{ rank: 4, name: "ChiangMaiPro", coins: 1650, avatar: "🏔️" },
+	{ rank: 5, name: "ClubMaster", coins: 1520, avatar: "🎧" },
+	{ rank: 6, name: "NeonRider", coins: 1380, avatar: "🌙" },
+	{ rank: 7, name: "BarHopper", coins: 1250, avatar: "🍻" },
+	{ rank: 8, name: "DanceFloor", coins: 1100, avatar: "💃" },
+	{ rank: 9, name: "MidnightWalker", coins: 980, avatar: "🌃" },
+	{ rank: 10, name: "VibeSeeker", coins: 850, avatar: "✨" },
 ]);
 
 const getRankColor = (rank) => {
-  if (rank === 1) return "from-yellow-400 to-amber-500";
-  if (rank === 2) return "from-gray-300 to-gray-400";
-  if (rank === 3) return "from-amber-600 to-amber-700";
-  return "";
+	if (rank === 1) return "from-yellow-400 to-amber-500";
+	if (rank === 2) return "from-gray-300 to-gray-400";
+	if (rank === 3) return "from-amber-600 to-amber-700";
+	return "";
 };
 
 const getRankIcon = (rank) => {
-  if (rank === 1) return "🥇";
-  if (rank === 2) return "🥈";
-  if (rank === 3) return "🥉";
-  return rank;
+	if (rank === 1) return "🥇";
+	if (rank === 2) return "🥈";
+	if (rank === 3) return "🥉";
+	return rank;
 };
 </script>
 

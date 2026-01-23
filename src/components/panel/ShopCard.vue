@@ -2,57 +2,57 @@
 
 <script setup>
 import { computed } from "vue";
-import { getStatusColorClass, isFlashActive } from "../../utils/shopUtils";
 import { useI18n } from "vue-i18n";
+import { getStatusColorClass, isFlashActive } from "../../utils/shopUtils";
 
 const { t } = useI18n();
 
 const props = defineProps({
-  shop: {
-    type: Object,
-    required: true,
-  },
-  isActive: {
-    type: Boolean,
-    default: false,
-  },
-  isDarkMode: {
-    type: Boolean,
-    default: true,
-  },
-  favorites: {
-    type: Array,
-    default: () => [],
-  },
+	shop: {
+		type: Object,
+		required: true,
+	},
+	isActive: {
+		type: Boolean,
+		default: false,
+	},
+	isDarkMode: {
+		type: Boolean,
+		default: true,
+	},
+	favorites: {
+		type: Array,
+		default: () => [],
+	},
 });
 
 const emit = defineEmits(["click", "open-detail", "hover", "toggle-favorite"]);
 
 // Open Google Maps for directions
 const openGoogleMaps = (e) => {
-  e.stopPropagation();
-  const url = `https://www.google.com/maps/dir/?api=1&destination=${props.shop.lat},${props.shop.lng}`;
-  window.open(url, "_blank");
+	e.stopPropagation();
+	const url = `https://www.google.com/maps/dir/?api=1&destination=${props.shop.lat},${props.shop.lng}`;
+	window.open(url, "_blank");
 };
 
 // Status display
 const statusLabel = computed(() => {
-  const s = props.shop.status || "OFF";
-  return t(`status.${s.toLowerCase()}`) || s;
+	const s = props.shop.status || "OFF";
+	return t(`status.${s.toLowerCase()}`) || s;
 });
 
 // Status glow class for LIVE shops only
 const statusGlowClass = computed(() => {
-  const s = props.shop.status?.toUpperCase();
-  if (s === "LIVE")
-    return "shadow-[0_0_15px_rgba(239,68,68,0.3)] border-red-500/40";
-  if (s === "TONIGHT") return "border-orange-500/30";
-  return props.isDarkMode ? "border-white/10" : "border-gray-200";
+	const s = props.shop.status?.toUpperCase();
+	if (s === "LIVE")
+		return "shadow-[0_0_15px_rgba(239,68,68,0.3)] border-red-500/40";
+	if (s === "TONIGHT") return "border-orange-500/30";
+	return props.isDarkMode ? "border-white/10" : "border-gray-200";
 });
 
 // Handle mouse enter for hover sync
 const handleMouseEnter = () => {
-  emit("hover", props.shop);
+	emit("hover", props.shop);
 };
 </script>
 

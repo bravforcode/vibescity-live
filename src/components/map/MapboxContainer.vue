@@ -2,18 +2,21 @@
 
 <script setup>
 import {
-  ref,
   computed,
-  watch,
+  nextTick,
   onMounted,
   onUnmounted,
+  ref,
   shallowRef,
-  nextTick,
+  watch,
 } from "vue";
-import { calculateDistance } from "../../utils/shopUtils";
-import { useShopStore } from "../../store/shopStore";
 import { useI18n } from "vue-i18n";
+import { useShopStore } from "../../store/shopStore";
+import { calculateDistance } from "../../utils/shopUtils";
 import "mapbox-gl/dist/mapbox-gl.css";
+
+const DARK_STYLE = "mapbox://styles/mapbox/dark-v11";
+const LIGHT_STYLE = "mapbox://styles/mapbox/light-v11";
 
 const { t, te, locale } = useI18n();
 const tt = (key, fallback) => (te(key) ? t(key) : fallback);
@@ -465,36 +468,6 @@ const activeEvents = computed(() => {
     return now >= start && now <= end;
   });
 });
-
-// ✅ แก้ไข: ให้ดึงค่าจาก .env ก่อน ถ้าไม่มีค่อยใช้ค่า Default
-const DARK_STYLE = import.meta.env.VITE_MAPBOX_STYLE || "mapbox://styles/mapbox/dark-v11";
-
-const LIGHT_STYLE = {
-  version: 8,
-  name: "VibeCIty Entertainment Light",
-  sources: {
-    "carto-light": {
-      type: "raster",
-      tiles: [
-        "https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png",
-        "https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png",
-        "https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png",
-      ],
-      tileSize: 256,
-      attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
-    },
-  },
-  layers: [
-    {
-      id: "carto-tiles",
-      type: "raster",
-      source: "carto-light",
-      minzoom: 0,
-      maxzoom: 22,
-    },
-  ],
-  glyphs: "mapbox://fonts/mapbox/{fontstack}/{range}.pbf",
-};
 
 // ✅ Day/Night Cycle
 const currentHour = ref(new Date().getHours());
@@ -1306,20 +1279,15 @@ const getSmartYOffset = (popupPx = 0) => {
   const top = Number(props.uiTopOffset || 64);
   const bottom =
     Number(props.uiBottomOffset || 0) + Number(props.legendHeight || 0);
-
   const viewportH = window.innerHeight;
-  // If mobile, the popup/drawer is at the bottom, so push the marker HIGHER (top 30%)
   const isMobile = viewportH < 768;
-  const visualCenter = isMobile
-    ? viewportH * 0.35 // Higher up on mobile
-    : (viewportH - bottom + top) / 2;
 
+  if (isMobile) return 0;
+
+  const visualCenter = (viewportH - bottom + top) / 2;
   const mapCenter = viewportH / 2;
-
-  let y = Math.round(mapCenter - visualCenter);
-  if (popupPx > 0) y += Math.round(popupPx / 4);
-
-  return Math.max(-100, Math.min(600, y));
+  let y = Math.round((mapCenter - visualCenter) * 2);
+  return Math.max(0, Math.min(viewportH * 0.8, y));
 };
 
 // ✅ Focus Location (Fly To) - Smooth & Precise Centering
@@ -1333,7 +1301,7 @@ const focusLocation = (latlng, targetZoom = 17, popupPx = 280) => {
     center: [lng, lat],
     zoom: targetZoom,
     duration: 1500,
-    padding: { bottom: yOffset },
+    padding: { top: 0, bottom: yOffset, left: 0, right: 0 },
     essential: true,
     curve: 1.42,
     speed: 1.2,

@@ -3,13 +3,13 @@
  * LuckyWheel.vue - Spin to win rewards
  * Feature #33: Lucky Spin Wheel
  */
-import { ref, computed } from "vue";
+import { computed, ref } from "vue";
 
 const props = defineProps({
-  isDarkMode: {
-    type: Boolean,
-    default: true,
-  },
+	isDarkMode: {
+		type: Boolean,
+		default: true,
+	},
 });
 
 const emit = defineEmits(["spin-complete", "close"]);
@@ -20,46 +20,46 @@ const rotation = ref(0);
 const selectedPrize = ref(null);
 
 const prizes = [
-  { id: 1, label: "10 Coins", value: 10, color: "#8B5CF6", icon: "🪙" },
-  { id: 2, label: "20 Coins", value: 20, color: "#EC4899", icon: "🪙" },
-  { id: 3, label: "50 Coins", value: 50, color: "#10B981", icon: "💰" },
-  { id: 4, label: "Try Again", value: 0, color: "#6B7280", icon: "🔄" },
-  { id: 5, label: "5 Coins", value: 5, color: "#F59E0B", icon: "🪙" },
-  { id: 6, label: "100 Coins", value: 100, color: "#EF4444", icon: "🎁" },
-  { id: 7, label: "15 Coins", value: 15, color: "#3B82F6", icon: "🪙" },
-  { id: 8, label: "VIP Badge", value: "badge", color: "#8B5CF6", icon: "⭐" },
+	{ id: 1, label: "10 Coins", value: 10, color: "#8B5CF6", icon: "🪙" },
+	{ id: 2, label: "20 Coins", value: 20, color: "#EC4899", icon: "🪙" },
+	{ id: 3, label: "50 Coins", value: 50, color: "#10B981", icon: "💰" },
+	{ id: 4, label: "Try Again", value: 0, color: "#6B7280", icon: "🔄" },
+	{ id: 5, label: "5 Coins", value: 5, color: "#F59E0B", icon: "🪙" },
+	{ id: 6, label: "100 Coins", value: 100, color: "#EF4444", icon: "🎁" },
+	{ id: 7, label: "15 Coins", value: 15, color: "#3B82F6", icon: "🪙" },
+	{ id: 8, label: "VIP Badge", value: "badge", color: "#8B5CF6", icon: "⭐" },
 ];
 
 const segmentAngle = computed(() => 360 / prizes.length);
 
 const spin = () => {
-  if (isSpinning.value) return;
+	if (isSpinning.value) return;
 
-  isSpinning.value = true;
-  selectedPrize.value = null;
+	isSpinning.value = true;
+	selectedPrize.value = null;
 
-  // Random prize selection (weighted)
-  const randomIndex = Math.floor(Math.random() * prizes.length);
-  const targetRotation =
-    360 * 5 + randomIndex * segmentAngle.value + segmentAngle.value / 2;
+	// Random prize selection (weighted)
+	const randomIndex = Math.floor(Math.random() * prizes.length);
+	const targetRotation =
+		360 * 5 + randomIndex * segmentAngle.value + segmentAngle.value / 2;
 
-  rotation.value = targetRotation;
+	rotation.value = targetRotation;
 
-  setTimeout(() => {
-    isSpinning.value = false;
-    selectedPrize.value = prizes[randomIndex];
-    emit("spin-complete", selectedPrize.value);
-  }, 4000);
+	setTimeout(() => {
+		isSpinning.value = false;
+		selectedPrize.value = prizes[randomIndex];
+		emit("spin-complete", selectedPrize.value);
+	}, 4000);
 };
 
 const show = () => {
-  isVisible.value = true;
+	isVisible.value = true;
 };
 const hide = () => {
-  isVisible.value = false;
-  rotation.value = 0;
-  selectedPrize.value = null;
-  emit("close");
+	isVisible.value = false;
+	rotation.value = 0;
+	selectedPrize.value = null;
+	emit("close");
 };
 
 defineExpose({ show, hide });

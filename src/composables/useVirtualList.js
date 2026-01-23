@@ -1,139 +1,131 @@
 /**
  * useVirtualList.js - Virtual scrolling for large lists
  * Feature #27: Virtual List for Carousel
- * 
+ *
  * Provides efficient rendering for lists with many items
  */
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from "vue";
 
 export function useVirtualList(options = {}) {
-  const {
-    itemHeight = 180,
-    overscan = 3,
-    containerRef = null
-  } = options;
+	const { itemHeight = 180, overscan = 3, containerRef = null } = options;
 
-  const scrollTop = ref(0);
-  const containerHeight = ref(0);
-  const items = ref([]);
+	const scrollTop = ref(0);
+	const containerHeight = ref(0);
+	const items = ref([]);
 
-  const visibleRange = computed(() => {
-    const start = Math.floor(scrollTop.value / itemHeight);
-    const visibleCount = Math.ceil(containerHeight.value / itemHeight);
-    
-    return {
-      start: Math.max(0, start - overscan),
-      end: Math.min(items.value.length, start + visibleCount + overscan)
-    };
-  });
+	const visibleRange = computed(() => {
+		const start = Math.floor(scrollTop.value / itemHeight);
+		const visibleCount = Math.ceil(containerHeight.value / itemHeight);
 
-  const visibleItems = computed(() => {
-    const { start, end } = visibleRange.value;
-    return items.value.slice(start, end).map((item, index) => ({
-      ...item,
-      _virtualIndex: start + index,
-      _style: {
-        position: 'absolute',
-        top: `${(start + index) * itemHeight}px`,
-        height: `${itemHeight}px`,
-        width: '100%'
-      }
-    }));
-  });
+		return {
+			start: Math.max(0, start - overscan),
+			end: Math.min(items.value.length, start + visibleCount + overscan),
+		};
+	});
 
-  const totalHeight = computed(() => items.value.length * itemHeight);
+	const visibleItems = computed(() => {
+		const { start, end } = visibleRange.value;
+		return items.value.slice(start, end).map((item, index) => ({
+			...item,
+			_virtualIndex: start + index,
+			_style: {
+				position: "absolute",
+				top: `${(start + index) * itemHeight}px`,
+				height: `${itemHeight}px`,
+				width: "100%",
+			},
+		}));
+	});
 
-  const handleScroll = (e) => {
-    scrollTop.value = e.target.scrollTop;
-  };
+	const totalHeight = computed(() => items.value.length * itemHeight);
 
-  const setItems = (newItems) => {
-    items.value = newItems;
-  };
+	const handleScroll = (e) => {
+		scrollTop.value = e.target.scrollTop;
+	};
 
-  const scrollToIndex = (index) => {
-    if (containerRef?.value) {
-      containerRef.value.scrollTop = index * itemHeight;
-    }
-  };
+	const setItems = (newItems) => {
+		items.value = newItems;
+	};
 
-  onMounted(() => {
-    if (containerRef?.value) {
-      containerHeight.value = containerRef.value.clientHeight;
-      
-      const resizeObserver = new ResizeObserver((entries) => {
-        containerHeight.value = entries[0].contentRect.height;
-      });
-      resizeObserver.observe(containerRef.value);
-      
-      return () => resizeObserver.disconnect();
-    }
-  });
+	const scrollToIndex = (index) => {
+		if (containerRef?.value) {
+			containerRef.value.scrollTop = index * itemHeight;
+		}
+	};
 
-  return {
-    visibleItems,
-    totalHeight,
-    handleScroll,
-    setItems,
-    scrollToIndex,
-    visibleRange
-  };
+	onMounted(() => {
+		if (containerRef?.value) {
+			containerHeight.value = containerRef.value.clientHeight;
+
+			const resizeObserver = new ResizeObserver((entries) => {
+				containerHeight.value = entries[0].contentRect.height;
+			});
+			resizeObserver.observe(containerRef.value);
+
+			return () => resizeObserver.disconnect();
+		}
+	});
+
+	return {
+		visibleItems,
+		totalHeight,
+		handleScroll,
+		setItems,
+		scrollToIndex,
+		visibleRange,
+	};
 }
 
 /**
  * Horizontal virtual list for carousels
  */
 export function useHorizontalVirtualList(options = {}) {
-  const {
-    itemWidth = 160,
-    overscan = 2,
-    containerRef = null
-  } = options;
+	const { itemWidth = 160, overscan = 2, containerRef = null } = options;
 
-  const scrollLeft = ref(0);
-  const containerWidth = ref(0);
-  const items = ref([]);
+	const scrollLeft = ref(0);
+	const containerWidth = ref(0);
+	const items = ref([]);
 
-  const visibleRange = computed(() => {
-    const start = Math.floor(scrollLeft.value / itemWidth);
-    const visibleCount = Math.ceil(containerWidth.value / itemWidth);
-    
-    return {
-      start: Math.max(0, start - overscan),
-      end: Math.min(items.value.length, start + visibleCount + overscan)
-    };
-  });
+	const visibleRange = computed(() => {
+		const start = Math.floor(scrollLeft.value / itemWidth);
+		const visibleCount = Math.ceil(containerWidth.value / itemWidth);
 
-  const visibleItems = computed(() => {
-    const { start, end } = visibleRange.value;
-    return items.value.slice(start, end).map((item, index) => ({
-      ...item,
-      _virtualIndex: start + index,
-      _style: {
-        position: 'absolute',
-        left: `${(start + index) * itemWidth}px`,
-        width: `${itemWidth}px`
-      }
-    }));
-  });
+		return {
+			start: Math.max(0, start - overscan),
+			end: Math.min(items.value.length, start + visibleCount + overscan),
+		};
+	});
 
-  const totalWidth = computed(() => items.value.length * itemWidth);
+	const visibleItems = computed(() => {
+		const { start, end } = visibleRange.value;
+		return items.value.slice(start, end).map((item, index) => ({
+			...item,
+			_virtualIndex: start + index,
+			_style: {
+				position: "absolute",
+				left: `${(start + index) * itemWidth}px`,
+				width: `${itemWidth}px`,
+			},
+		}));
+	});
 
-  const handleScroll = (e) => {
-    scrollLeft.value = e.target.scrollLeft;
-  };
+	const totalWidth = computed(() => items.value.length * itemWidth);
 
-  const setItems = (newItems) => {
-    items.value = newItems;
-  };
+	const handleScroll = (e) => {
+		scrollLeft.value = e.target.scrollLeft;
+	};
 
-  return {
-    visibleItems,
-    totalWidth,
-    handleScroll,
-    setItems,
-    visibleRange
-  };
+	const setItems = (newItems) => {
+		items.value = newItems;
+	};
+
+	return {
+		visibleItems,
+		totalWidth,
+		handleScroll,
+		setItems,
+		visibleRange,
+	};
 }
 
 export default useVirtualList;

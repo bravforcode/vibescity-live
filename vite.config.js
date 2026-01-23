@@ -1,7 +1,7 @@
 import { sentryVitePlugin } from "@sentry/vite-plugin";
-import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import { visualizer } from "rollup-plugin-visualizer";
+import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [
@@ -9,8 +9,8 @@ export default defineConfig({
     visualizer({ open: true, filename: "dist/stats.html", gzipSize: true }),
     sentryVitePlugin({
       org: "rawivforcode",
-      project: "javascript-vue"
-    })
+      project: "javascript-vue",
+    }),
   ],
 
   build: {
@@ -58,6 +58,6 @@ export default defineConfig({
       },
     },
 
-    sourcemap: true
+    sourcemap: true,
   },
 });

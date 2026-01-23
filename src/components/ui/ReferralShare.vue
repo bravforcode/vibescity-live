@@ -3,21 +3,21 @@
  * ReferralShare.vue - Referral and social sharing
  * Feature #32: Referral System UI
  */
-import { ref, computed } from "vue";
+import { computed, ref } from "vue";
 
 const props = defineProps({
-  isDarkMode: {
-    type: Boolean,
-    default: true,
-  },
-  referralCode: {
-    type: String,
-    default: "VIBE2024",
-  },
-  referralCount: {
-    type: Number,
-    default: 0,
-  },
+	isDarkMode: {
+		type: Boolean,
+		default: true,
+	},
+	referralCode: {
+		type: String,
+		default: "VIBE2024",
+	},
+	referralCount: {
+		type: Number,
+		default: 0,
+	},
 });
 
 const emit = defineEmits(["share", "copy"]);
@@ -25,52 +25,52 @@ const emit = defineEmits(["share", "copy"]);
 const isCopied = ref(false);
 
 const shareUrl = computed(() => {
-  return `https://vibecity.live/?ref=${props.referralCode}`;
+	return `https://vibecity.live/?ref=${props.referralCode}`;
 });
 
 const copyCode = async () => {
-  try {
-    await navigator.clipboard.writeText(shareUrl.value);
-    isCopied.value = true;
-    emit("copy", shareUrl.value);
-    setTimeout(() => {
-      isCopied.value = false;
-    }, 2000);
-  } catch (e) {
-    console.error("Failed to copy:", e);
-  }
+	try {
+		await navigator.clipboard.writeText(shareUrl.value);
+		isCopied.value = true;
+		emit("copy", shareUrl.value);
+		setTimeout(() => {
+			isCopied.value = false;
+		}, 2000);
+	} catch (e) {
+		console.error("Failed to copy:", e);
+	}
 };
 
 const shareNative = async () => {
-  if (navigator.share) {
-    try {
-      await navigator.share({
-        title: "Join VibeCity!",
-        text: "Discover the best nightlife in Chiang Mai 🎉",
-        url: shareUrl.value,
-      });
-      emit("share", "native");
-    } catch (e) {
-      // User cancelled
-    }
-  }
+	if (navigator.share) {
+		try {
+			await navigator.share({
+				title: "Join VibeCity!",
+				text: "Discover the best nightlife in Chiang Mai 🎉",
+				url: shareUrl.value,
+			});
+			emit("share", "native");
+		} catch (e) {
+			// User cancelled
+		}
+	}
 };
 
 const shareToApp = (app) => {
-  const text = encodeURIComponent(
-    "Discover the best nightlife in Chiang Mai! 🎉",
-  );
-  const url = encodeURIComponent(shareUrl.value);
+	const text = encodeURIComponent(
+		"Discover the best nightlife in Chiang Mai! 🎉",
+	);
+	const url = encodeURIComponent(shareUrl.value);
 
-  const urls = {
-    facebook: `https://www.facebook.com/sharer/sharer.php?u=${url}`,
-    twitter: `https://twitter.com/intent/tweet?text=${text}&url=${url}`,
-    line: `https://social-plugins.line.me/lineit/share?url=${url}`,
-    whatsapp: `https://wa.me/?text=${text}%20${url}`,
-  };
+	const urls = {
+		facebook: `https://www.facebook.com/sharer/sharer.php?u=${url}`,
+		twitter: `https://twitter.com/intent/tweet?text=${text}&url=${url}`,
+		line: `https://social-plugins.line.me/lineit/share?url=${url}`,
+		whatsapp: `https://wa.me/?text=${text}%20${url}`,
+	};
 
-  window.open(urls[app], "_blank", "width=600,height=400");
-  emit("share", app);
+	window.open(urls[app], "_blank", "width=600,height=400");
+	emit("share", app);
 };
 </script>
 
