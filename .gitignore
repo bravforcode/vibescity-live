@@ -1,34 +1,121 @@
-# Logs
-logs
+# ----------------------------------------
+# 1. Logs & Diagnostics
+# ----------------------------------------
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+*.tgz
 
-node_modules
-dist
-dist-ssr
-*.local
+# ----------------------------------------
+# 2. Dependencies
+# ----------------------------------------
+node_modules/
+.pnpm-store/
 
-# Editor directories and files
+# ----------------------------------------
+# 3. Build Output
+# ----------------------------------------
+dist/
+dist-ssr/
+coverage/
+*.tsbuildinfo
+*.d.ts
+
+# ----------------------------------------
+# 4. Environment Variables (CRITICAL SECURITY)
+# ----------------------------------------
+# Block all .env files to prevent token leaks
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+# Allow example env files
+!.env.example
+
+# Sentry Config Auth Token
+.env.sentry-build-plugin
+
+# ----------------------------------------
+# 5. Editor & OS Files
+# ----------------------------------------
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
 
-# Generated Data (Large Files)
+# ----------------------------------------
+# 6. Platform Specific (Vercel/Cloud)
+# ----------------------------------------
+.vercel/
+*.local
+*.vercel
+
+# ----------------------------------------
+# 7. Project Specific (Large Assets)
+# ----------------------------------------
+# Prevent large GeoJSON files from being uploaded to Git
 public/data/chiangmai-main-roads-lanes.geojson
 public/data/chiangmai-main-roads.geojson
 
-.vercel
-.env*.local
+# ----------------------------------------
+# 8. Testing
+# ----------------------------------------
+# End-to-end testing reports and screenshots
+/test/e2e/reports/
+tests/e2e/reports/
+test/e2e/screenshots/
+tests/e2e/screenshots/
 
-# Sentry Config File
-.env.sentry-build-plugin
+# ----------------------------------------
+# 9. Temporary & Cache Files
+# ----------------------------------------
+# Temporary and system files that are not needed in version control
+*.bak
+*.swp
+*.swo
+*.tmp
+*.temp
+*.pid
+*.seed
+*.orig
+
+# ----------------------------------------
+# 10. Build tools & IDE generated files
+# ----------------------------------------
+# Ignore IDE generated files
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# Ignore build artifacts from common build tools
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Ignore additional generated files
+*.log*
+*.csv
+
+# ----------------------------------------
+# 11. Docker and container files
+# ----------------------------------------
+# Ignore Docker-related files
+.docker/
+docker-compose.override.yml
+*.dockerfile
+docker-compose.yml
