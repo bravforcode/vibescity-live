@@ -1,5 +1,21 @@
+// --- C:\vibecity.live\src\components\modal\MallDrawer.vue ---
+
 <script setup>
 import { ref, computed, watch, nextTick } from "vue";
+import { useI18n } from "vue-i18n";
+import { Z } from "../../constants/zIndex";
+import {
+  X,
+  Building2,
+  Heart,
+  Share2,
+  Search,
+  MapPin,
+  Car,
+} from "lucide-vue-next";
+
+const { t } = useI18n();
+
 // import ShopCard from "../panel/ShopCard.vue"; // Optional: Reuse if needed, but custom list item is better for this view
 
 const props = defineProps({
@@ -28,6 +44,10 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  selectedShopId: {
+    type: [String, Number],
+    default: null,
+  },
 });
 
 const emit = defineEmits([
@@ -38,20 +58,73 @@ const emit = defineEmits([
 ]);
 
 const activeTab = ref("ALL"); // ALL, Food, Fashion, Beauty, Tech, Cinema
+const activeFloor = ref(null); // Selected floor for Mall mode
 const searchQuery = ref("");
 const isSearchExpanded = ref(false); // New state for compact search
 const searchInputRef = ref(null);
 
+const scrollContainerRef = ref(null);
+const shopRefs = ref({});
+
+// ✅ Check if building is currently open
+const isBuildingOpen = computed(() => {
+  if (!props.building?.openTime || !props.building?.closeTime) return true;
+  const now = new Date();
+  const time = now.getHours() * 100 + now.getMinutes();
+  const open = parseInt(props.building.openTime.replace(":", ""));
+  const close = parseInt(props.building.closeTime.replace(":", ""));
+  return time >= open && time <= close;
+});
+
 // Reset state when building changes or drawer opens
+const resetDrawerState = () => {
+  activeTab.value = "ALL";
+  searchQuery.value = "";
+  isSearchExpanded.value = false;
+
+  // Initialize floor for Mall mode
+  if (props.building?.floors?.length) {
+    // Default to first floor if none selected
+    if (!activeFloor.value) {
+      activeFloor.value = props.building.floors[0];
+    }
+  } else {
+    activeFloor.value = null;
+  }
+
+  // Auto-scroll to selected shop if provided
+  if (props.selectedShopId) {
+    // Find shop info to auto-select its floor
+    const shop = props.shops.find(
+      (s) => Number(s.id) === Number(props.selectedShopId),
+    );
+    if (shop && shop.Floor) {
+      activeFloor.value = shop.Floor;
+    }
+
+    nextTick(() => {
+      setTimeout(() => {
+        const el = shopRefs.value[props.selectedShopId];
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 300); // Wait for transition
+    });
+  }
+};
+
 watch(
   () => props.isOpen,
   (val) => {
-    if (val) {
-      activeTab.value = "ALL";
-      searchQuery.value = "";
-      isSearchExpanded.value = false;
-    }
-  }
+    if (val) resetDrawerState();
+  },
+);
+
+watch(
+  () => props.building?.id,
+  () => {
+    if (props.isOpen) resetDrawerState();
+  },
 );
 
 const handleExpandSearch = () => {
@@ -68,21 +141,30 @@ const handleClearSearch = () => {
 
 // Derived Categories based on data or static list
 const categories = [
-  { id: "ALL", label: "ทั้งหมด" },
-  { id: "Food", label: "อาหาร" },
-  { id: "Fashion", label: "แฟชั่น" },
-  { id: "Beauty", label: "เครื่องประดับ" },
-  { id: "Tech", label: "ไอที" },
-  { id: "Cinema", label: "บันเทิง" },
+  { id: "ALL", label: t("categories.all") },
+  { id: "Food", label: t("categories.food") },
+  { id: "Fashion", label: t("categories.fashion") },
+  { id: "Beauty", label: t("categories.beauty") },
+  { id: "Tech", label: t("categories.tech") },
+  { id: "Cinema", label: t("categories.cinema") },
 ];
 
 // Computed Filtered Shops
 const filteredShops = computed(() => {
   let result = props.shops;
+  // 1. Filter by Floor if in Mall mode (Priority)
+  if (activeFloor.value) {
+    result = result.filter((s) => {
+      if (!s.Floor) return true; // Show shops with no floor? Or maybe hide? Let's show for now to be safe
+      return (
+        String(s.Floor).trim().toUpperCase() ===
+        String(activeFloor.value).trim().toUpperCase()
+      );
+    });
+  }
 
-  // 1. Filter by Tab
+  // 2. Filter by Tab
   if (activeTab.value !== "ALL") {
-    // Simple mapping logic - adjust based on actual CSV categories
     const tab = activeTab.value;
     result = result.filter((s) => {
       const cat = (s.category || "").toLowerCase();
@@ -91,31 +173,36 @@ const filteredShops = computed(() => {
           cat.includes("food") ||
           cat.includes("restaurant") ||
           cat.includes("cafe") ||
-          cat.includes("bar")
+          cat.includes("bar") ||
+          cat.includes("กิน")
         );
       if (tab === "Fashion")
         return (
           cat.includes("fashion") ||
           cat.includes("clothing") ||
-          cat.includes("bag")
+          cat.includes("bag") ||
+          cat.includes("แต่งตัว")
         );
       if (tab === "Beauty")
         return (
           cat.includes("beauty") ||
           cat.includes("jewelry") ||
-          cat.includes("cosmetic")
+          cat.includes("cosmetic") ||
+          cat.includes("ความงาม")
         );
       if (tab === "Tech")
         return (
           cat.includes("tech") ||
           cat.includes("gadget") ||
-          cat.includes("mobile")
+          cat.includes("mobile") ||
+          cat.includes("ไอที")
         );
       if (tab === "Cinema")
         return (
           cat.includes("cinema") ||
           cat.includes("movie") ||
-          cat.includes("game")
+          cat.includes("game") ||
+          cat.includes("บันเทิง")
         );
       return true;
     });
@@ -127,7 +214,7 @@ const filteredShops = computed(() => {
     result = result.filter(
       (s) =>
         (s.name || "").toLowerCase().includes(q) ||
-        (s.category || "").toLowerCase().includes(q)
+        (s.category || "").toLowerCase().includes(q),
     );
     return result; // ถ้า search ให้โชว์ผลลัพธ์เลย (ไม่ Random)
   }
@@ -179,12 +266,12 @@ const handleShare = (item) => {
   <transition name="drawer-slide">
     <div
       v-if="isOpen"
-      class="fixed inset-x-0 bottom-0 h-[85%] z-[7000] flex flex-col rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)] overflow-hidden"
+      class="fixed inset-x-0 bottom-0 h-[85%] flex flex-col rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)] overflow-hidden"
+      :style="{ zIndex: Z.DRAWER }"
       :class="isDarkMode ? 'bg-zinc-900' : 'bg-white'"
     >
       <!-- Header Image Area -->
-      <div class="relative h-48 flex-shrink-0">
-        <!-- Background Image -->
+      <div class="relative h-40 sm:h-48 flex-shrink-0">
         <div class="absolute inset-0">
           <img
             v-if="building?.Image_URL || building?.image"
@@ -195,21 +282,62 @@ const handleShare = (item) => {
             v-else
             class="w-full h-full bg-gradient-to-br from-indigo-900 via-purple-900 to-black"
           ></div>
-          <!-- Gradient Overlay -->
           <div
             class="absolute inset-0 bg-gradient-to-t from-zinc-900 via-zinc-900/60 to-transparent"
           ></div>
         </div>
-
         <!-- Close Button -->
         <button
           @click="emit('close')"
-          class="absolute top-4 right-4 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center backdrop-blur-md hover:bg-black/60 transition-all z-20"
+          class="absolute top-4 right-4 w-12 h-12 rounded-full bg-black/40 text-white flex items-center justify-center backdrop-blur-md hover:bg-black/60 transition-all z-20"
+        >
+          <X class="w-5 h-5" />
+        </button>
+      </div>
+
+      <!-- Title Info -->
+      <div class="absolute bottom-4 left-6 right-6">
+        <div class="flex items-center gap-3 mb-1">
+          <div
+            class="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-lg"
+          >
+            <Building2 class="text-white w-6 h-6" />
+          </div>
+          <div>
+            <h2
+              class="text-xl sm:text-2xl font-bold text-white leading-tight shadow-black drop-shadow-md"
+            >
+              {{ building?.name || "Shopping Mall" }}
+            </h2>
+            <p class="text-white/70 text-sm">
+              {{ building?.zone || "Chiang Mai" }}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="absolute bottom-4 right-6 flex gap-2 z-20">
+        <button
+          @click.stop="
+            building && emit('toggle-favorite', building.id || building.key)
+          "
+          class="w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md transition-all active:scale-90 border"
+          :class="[
+            building && favorites.includes(Number(building.id || building.key))
+              ? 'bg-pink-500 border-pink-400 text-white'
+              : 'bg-white/10 border-white/20 text-white hover:bg-white/20',
+          ]"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             class="w-5 h-5"
-            fill="none"
+            :fill="
+              building &&
+              favorites.includes(Number(building.id || building.key))
+                ? 'currentColor'
+                : 'none'
+            "
             viewBox="0 0 24 24"
             stroke="currentColor"
           >
@@ -217,222 +345,45 @@ const handleShare = (item) => {
               stroke-linecap="round"
               stroke-linejoin="round"
               stroke-width="2"
-              d="M6 18L18 6M6 6l12 12"
+              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
             />
           </svg>
         </button>
-
-        <!-- Title Info -->
-        <div class="absolute bottom-4 left-6 right-6">
-          <div class="flex items-center gap-3 mb-1">
-            <div
-              class="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-lg"
-            >
-              <span class="text-2xl">🏢</span>
-            </div>
-            <div>
-              <h2
-                class="text-2xl font-bold text-white leading-tight shadow-black drop-shadow-md"
-              >
-                {{ building?.name || "Shopping Mall" }}
-              </h2>
-              <p class="text-white/70 text-sm">
-                {{ building?.zone || "Chiang Mai" }}
-              </p>
-            </div>
-          </div>
-
-          <div class="flex gap-2 mt-2">
-            <span
-              class="px-2 py-0.5 rounded-full bg-green-500 text-white text-[10px] font-bold"
-            >
-              OPEN NOW
-            </span>
-            <span
-              class="px-2 py-0.5 rounded-full bg-white/20 text-white text-[10px]"
-            >
-              10:00 - 22:00
-            </span>
-          </div>
-        </div>
-
-        <!-- Action Buttons (Favorite & Share) -->
-        <div class="absolute bottom-4 right-6 flex gap-2 z-20">
-          <button
-            @click.stop="emit('toggle-favorite', building.id || building.key)"
-            class="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md transition-all active:scale-90 border"
-            :class="[
-              favorites.includes(Number(building.id || building.key))
-                ? 'bg-pink-500 border-pink-400 text-white'
-                : 'bg-white/10 border-white/20 text-white hover:bg-white/20',
-            ]"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="w-5 h-5"
-              :fill="
-                favorites.includes(Number(building.id || building.key))
-                  ? 'currentColor'
-                  : 'none'
-              "
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-              />
-            </svg>
-          </button>
-          <button
-            @click.stop="handleShare(building)"
-            class="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all active:scale-90"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
-              />
-            </svg>
-          </button>
-        </div>
+        <button
+          @click.stop="handleShare(building)"
+          class="w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all active:scale-90"
+        >
+          <Share2 class="w-5 h-5 text-white" />
+        </button>
       </div>
 
-      <!-- ✅ EVENT CONTENT (Scrollable) -->
-      <div
-        v-if="building?.isEvent"
-        class="flex-1 overflow-y-auto pb-safe-offset"
-      >
-        <!-- 1. Highlights Section -->
-        <div class="px-4 py-4">
-          <h3
-            class="text-lg font-bold mb-3"
-            :class="isDarkMode ? 'text-white' : 'text-gray-900'"
-          >
-            🔥 Highlights
-          </h3>
-          <div class="flex gap-3 overflow-x-auto no-scrollbar pb-2">
-            <!-- Video/Image Cards -->
-            <div
-              v-for="(hl, idx) in building.highlights || []"
-              :key="idx"
-              class="flex-shrink-0 w-64 h-36 rounded-xl overflow-hidden relative shadow-md bg-gray-800"
-            >
-              <img :src="hl.src" class="w-full h-full object-cover" />
-            </div>
-            <!-- Mock if empty -->
-            <div
-              v-if="!building.highlights?.length"
-              class="w-full h-36 bg-gray-800 rounded-xl flex items-center justify-center text-white/30"
-            >
-              No Highlights
-            </div>
-          </div>
-          <p
-            class="text-sm opacity-80 mt-2 leading-relaxed"
-            :class="isDarkMode ? 'text-gray-300' : 'text-gray-600'"
-          >
-            {{ building.description }}
-          </p>
-        </div>
-
-        <!-- 2. Food Zones -->
-        <div class="px-4 py-2">
-          <h3
-            class="text-lg font-bold mb-3"
-            :class="isDarkMode ? 'text-white' : 'text-gray-900'"
-          >
-            🍽️ โซนอาหาร (Food)
-          </h3>
-          <div class="space-y-3">
-            <div
-              v-for="(zone, idx) in building.zones || []"
-              :key="idx"
-              class="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/5"
-            >
-              <div
-                class="w-20 h-20 rounded-xl bg-gray-700 overflow-hidden flex-shrink-0"
-              >
-                <img :src="zone.image" class="w-full h-full object-cover" />
-              </div>
-              <div>
-                <h4
-                  class="font-bold text-base"
-                  :class="isDarkMode ? 'text-white' : 'text-gray-900'"
-                >
-                  {{ zone.title }}
-                </h4>
-                <p class="text-xs opacity-60">{{ zone.description }}</p>
-                <span
-                  class="inline-block mt-2 px-2 py-0.5 rounded-md bg-orange-500/20 text-orange-400 text-[10px] font-bold"
-                  >Recommended</span
-                >
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 3. Music & Activities -->
-        <div class="px-4 py-4">
-          <h3
-            class="text-lg font-bold mb-3"
-            :class="isDarkMode ? 'text-white' : 'text-gray-900'"
-          >
-            🎵 กิจกรรม & ดนตรี
-          </h3>
-          <div class="relative pl-4 border-l-2 border-white/10 space-y-6">
-            <div
-              v-for="(act, idx) in building.timeline || []"
-              :key="idx"
-              class="relative"
-            >
-              <div
-                class="absolute -left-[21px] top-1 w-3 h-3 rounded-full bg-blue-500 ring-4 ring-black"
-              ></div>
-              <div class="text-xs font-bold text-blue-400 mb-0.5">
-                {{ act.time }}
-              </div>
-              <div
-                class="text-sm font-medium"
-                :class="isDarkMode ? 'text-white' : 'text-gray-800'"
-              >
-                {{ act.activity }}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 4. CTA Buttons -->
-        <div class="px-4 py-6 flex flex-col gap-3">
-          <button
-            class="w-full py-3 rounded-xl bg-blue-600 text-white font-bold shadow-lg shadow-blue-600/30 active:scale-95 transition-transform flex items-center justify-center gap-2"
-          >
-            <span>📍</span> นำทางไปงาน
-          </button>
-          <button
-            @click="emit('open-ride-modal', building)"
-            class="w-full py-3 rounded-xl bg-white/10 text-white font-bold hover:bg-white/20 active:scale-95 transition-transform flex items-center justify-center gap-2"
-          >
-            <span>🚕</span> เรียกรถไปงาน
-          </button>
-        </div>
-      </div>
-
-      <!-- ✅ FALLBACK: OLD SHOP LIST (If not event) -->
-      <div v-else class="flex flex-col flex-1 h-full overflow-hidden">
-        <!-- Tools: Tabs & Search (Compact Mode) -->
+      <!-- Main Body -->
+      <div class="flex-1 flex flex-col overflow-hidden bg-black/5">
+        <!-- TOP STATUS ALERT (Phase 6 Enhancement) -->
         <div
-          class="flex-shrink-0 px-4 py-3 border-b flex items-center gap-2"
+          class="flex-shrink-0 px-4 py-2 flex items-center justify-center gap-3 border-b border-white/5"
+          :class="isDarkMode ? 'bg-zinc-800' : 'bg-gray-50'"
+        >
+          <span
+            class="px-3 py-1 rounded-full text-white text-[11px] font-black uppercase tracking-widest shadow-lg"
+            :class="
+              isBuildingOpen ? 'bg-green-600 animate-pulse' : 'bg-red-600'
+            "
+          >
+            {{ isBuildingOpen ? t("status.open") : t("status.closed") }}
+          </span>
+          <span
+            class="text-[11px] font-black opacity-60 uppercase"
+            :class="isDarkMode ? 'text-white' : 'text-black'"
+          >
+            {{ building?.openTime || "10:00" }} -
+            {{ building?.closeTime || "22:00" }}
+          </span>
+        </div>
+
+        <!-- Sticky Tools: Tabs & Search (Topmost below Status) -->
+        <div
+          class="flex-shrink-0 px-4 py-3 border-b flex items-center gap-2 z-30"
           :class="
             isDarkMode
               ? 'border-white/5 bg-zinc-900'
@@ -450,13 +401,13 @@ const handleShare = (item) => {
                 v-for="cat in categories"
                 :key="cat.id"
                 @click="activeTab = cat.id"
-                class="px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all"
                 :class="[
+                  'px-4 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap active:scale-95 border-2',
                   activeTab === cat.id
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
+                    ? 'bg-blue-600 text-white border-blue-400 shadow-lg shadow-blue-500/20'
                     : isDarkMode
-                    ? 'bg-white/5 text-white/70 hover:bg-white/10'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+                      ? 'bg-zinc-800 border-white/20 text-white'
+                      : 'bg-white border-gray-300 text-black',
                 ]"
               >
                 {{ cat.label }}
@@ -473,20 +424,7 @@ const handleShare = (item) => {
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               "
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
+              <Search class="w-4 h-4" />
             </button>
           </div>
 
@@ -497,7 +435,7 @@ const handleShare = (item) => {
                 ref="searchInputRef"
                 v-model="searchQuery"
                 type="text"
-                placeholder="ค้นหาร้านในห้าง..."
+                :placeholder="t('mall.search')"
                 class="w-full pl-10 pr-4 py-2 rounded-xl text-sm transition-all outline-none"
                 :class="
                   isDarkMode
@@ -506,20 +444,9 @@ const handleShare = (item) => {
                 "
                 @blur="!searchQuery && (isSearchExpanded = false)"
               />
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
+              <Search
                 class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
+              />
             </div>
             <!-- Cancel Button -->
             <button
@@ -527,7 +454,7 @@ const handleShare = (item) => {
               class="text-xs font-bold"
               :class="
                 isDarkMode
-                  ? 'text-white/60 hover:text-white'
+                  ? 'text-white font-black hover:text-white'
                   : 'text-gray-500 hover:text-gray-900'
               "
             >
@@ -536,134 +463,243 @@ const handleShare = (item) => {
           </div>
         </div>
 
-        <!-- Content List -->
-        <div class="flex-1 overflow-y-auto px-4 py-2 space-y-3 pb-safe-offset">
-          <!-- Loading State (Optional) -->
+        <div class="flex-1 overflow-y-auto no-scrollbar relative">
+          <!-- 🏢 MALL MODE: Floor Plan & Floor Selector -->
           <div
-            v-if="filteredShops.length === 0"
-            class="py-10 text-center opacity-50"
+            v-if="building?.floors?.length"
+            class="px-4 py-6 border-b border-white/5 space-y-6"
           >
-            <p>ไม่พบร้านค้าในหมวดนี้</p>
-          </div>
+            <!-- Floor Selector -->
+            <div>
+              <h3
+                class="text-xs font-black text-white/40 uppercase tracking-widest mb-3 px-1"
+              >
+                {{ t("mall.select_floor") }}
+              </h3>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="fl in building.floors"
+                  :key="fl"
+                  @click="activeFloor = fl"
+                  class="px-4 py-2 rounded-xl text-sm font-black transition-all active:scale-90 border"
+                  :class="[
+                    activeFloor === fl
+                      ? 'bg-blue-600 border-blue-500 text-white shadow-lg'
+                      : isDarkMode
+                        ? 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
+                        : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50',
+                  ]"
+                >
+                  {{ fl }}
+                </button>
+              </div>
+            </div>
 
-          <!-- Shop Items -->
-          <div
-            v-for="shop in filteredShops"
-            :key="shop.id"
-            @click="emit('select-shop', shop)"
-            class="flex items-center gap-3 p-3 rounded-2xl transition-all cursor-pointer group active:scale-[0.98]"
-            :class="
-              isDarkMode
-                ? 'bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10'
-                : 'bg-white hover:bg-gray-50 border border-gray-100 shadow-sm'
-            "
-          >
-            <!-- Image -->
+            <!-- Floor Name & Description -->
             <div
-              class="w-16 h-16 rounded-xl overflow-hidden relative flex-shrink-0 bg-gray-500"
+              v-if="activeFloor && building.floorNames?.[activeFloor]"
+              class="bg-blue-600/10 border border-blue-500/20 p-4 rounded-2xl"
+            >
+              <h4
+                class="text-blue-400 text-xs font-black uppercase tracking-tighter mb-1"
+              >
+                {{ t("mall.current_floor") }}
+              </h4>
+              <div class="text-white font-black text-xl leading-tight">
+                {{ activeFloor }}: {{ building.floorNames[activeFloor] }}
+              </div>
+            </div>
+
+            <!-- Floor Plan Image -->
+            <div
+              v-if="activeFloor && building.floorPlanUrls?.[activeFloor]"
+              class="relative rounded-2xl overflow-hidden bg-black/40 border border-white/10 shadow-2xl group"
             >
               <img
-                v-if="shop.Image_URL1"
-                :src="shop.Image_URL1"
-                class="w-full h-full object-cover"
-                loading="lazy"
+                :src="building.floorPlanUrls[activeFloor]"
+                class="w-full aspect-video object-contain p-4 transition-transform duration-700 group-hover:scale-110"
               />
-              <!-- Live Badge on Thumb -->
               <div
-                v-if="shop.status === 'LIVE'"
-                class="absolute bottom-0 inset-x-0 bg-red-600 text-white text-[8px] font-bold text-center py-0.5"
-              >
-                LIVE
+                class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent pointer-events-none"
+              ></div>
+              <div class="absolute bottom-4 left-4 flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                <span
+                  class="text-[10px] font-black text-white uppercase tracking-widest"
+                  >{{ t("mall.interactive_map") }}</span
+                >
               </div>
             </div>
+          </div>
 
-            <!-- Info -->
-            <div class="flex-1 min-w-0">
+          <!-- 🏮 EVENT CONTENT (Show only if isEvent or specific highlights exist) -->
+          <div
+            v-if="building?.isEvent || building?.highlights?.length"
+            class="px-4 py-6 space-y-8"
+          >
+            <!-- Highlights Section -->
+            <div>
               <h3
-                class="text-sm font-bold truncate leading-tight"
+                class="text-lg font-black mb-3 italic uppercase tracking-tighter"
                 :class="isDarkMode ? 'text-white' : 'text-gray-900'"
               >
-                {{ shop.name }}
+                {{ t("mall.highlights") }}
               </h3>
-              <p class="text-[11px] opacity-60 truncate">
-                {{ shop.category || "Shop" }}
-              </p>
-
-              <!-- Floor / Zone Badges -->
-              <div class="flex gap-2 mt-1.5">
-                <span
-                  class="text-[10px] font-medium opacity-80 flex items-center gap-1"
+              <div class="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+                <div
+                  v-for="(hl, idx) in building.highlights || []"
+                  :key="idx"
+                  class="flex-shrink-0 w-64 h-36 rounded-xl overflow-hidden relative shadow-md bg-gray-800"
                 >
-                  <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                  ชั้น {{ shop.Floor || "?" }}
-                </span>
-                <span v-if="shop.Zone" class="text-[10px] opacity-60">
-                  • {{ shop.Zone }}
-                </span>
+                  <img :src="hl.src" class="w-full h-full object-cover" />
+                </div>
               </div>
-              <p v-if="shop.openTime" class="text-[10px] opacity-50 mt-0.5">
-                เปิด {{ shop.openTime }} - {{ shop.closeTime }}
+              <p
+                class="text-sm opacity-80 mt-2 leading-relaxed font-medium"
+                :class="isDarkMode ? 'text-gray-300' : 'text-gray-600'"
+              >
+                {{ building.description }}
               </p>
             </div>
 
-            <!-- Action Buttons (Favorite & Share) -->
-            <div class="flex items-center gap-1">
-              <!-- Favorite -->
+            <!-- CTA Buttons -->
+            <div class="flex flex-col gap-3">
               <button
-                @click.stop="emit('toggle-favorite', shop.id)"
-                class="w-8 h-8 flex items-center justify-center rounded-lg transition-all active:scale-90"
-                :class="[
-                  favorites.includes(Number(shop.id))
-                    ? 'text-pink-500 bg-pink-500/10'
-                    : 'text-gray-400 hover:text-pink-400 hover:bg-pink-400/5',
-                ]"
+                class="w-full py-4 rounded-2xl bg-blue-600 text-white font-black uppercase shadow-lg shadow-blue-600/30 active:scale-95 transition-all flex items-center justify-center gap-2"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="w-4 h-4"
-                  :fill="
-                    favorites.includes(Number(shop.id))
-                      ? 'currentColor'
-                      : 'none'
-                  "
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                  />
-                </svg>
+                <span><MapPin class="w-4 h-4 inline-block" /></span>
+                {{ t("mall.navigate") }}
               </button>
-              <!-- Share -->
               <button
-                @click.stop="handleShare(shop)"
-                class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-blue-400 hover:bg-blue-400/5 transition-all active:scale-90"
+                @click="emit('open-ride-modal', building)"
+                class="w-full py-4 rounded-2xl bg-white/10 text-white font-black uppercase border border-white/10 hover:bg-white/20 active:scale-95 transition-all flex items-center justify-center gap-2"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="w-4 h-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
-                  />
-                </svg>
+                <span><Car class="w-4 h-4 inline-block" /></span>
+                {{ t("mall.taxi") }}
               </button>
             </div>
+          </div>
 
-            <!-- Live Status Indicator -->
+          <!-- Content List -->
+          <div
+            ref="scrollContainerRef"
+            class="flex-1 overflow-y-auto px-4 py-2 space-y-3 pb-safe-offset"
+          >
+            <!-- Loading State (Optional) -->
             <div
-              v-if="shop.status === 'LIVE'"
-              class="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)] animate-pulse ml-1"
-            ></div>
+              v-if="filteredShops.length === 0"
+              class="py-10 text-center opacity-50"
+            >
+              <p>ไม่พบร้านค้าในหมวดนี้</p>
+            </div>
+
+            <!-- Shop Items -->
+            <div
+              v-for="shop in filteredShops"
+              :key="shop.id"
+              :ref="
+                (el) => {
+                  if (el) shopRefs[shop.id] = el;
+                }
+              "
+              @click="emit('select-shop', shop)"
+              class="flex items-center gap-3 p-3 rounded-2xl transition-all cursor-pointer group active:scale-[0.98] border"
+              :class="[
+                isDarkMode
+                  ? 'bg-white/5 hover:bg-white/10 border-white/5 hover:border-white/10'
+                  : 'bg-white hover:bg-gray-50 border-gray-100 shadow-sm',
+                Number(selectedShopId) === Number(shop.id)
+                  ? 'ring-2 ring-blue-500 scale-[1.02] border-blue-500/50'
+                  : '',
+              ]"
+            >
+              <!-- Image -->
+              <div
+                class="w-16 h-16 rounded-xl overflow-hidden relative flex-shrink-0 bg-gray-500"
+              >
+                <img
+                  v-if="shop.Image_URL1"
+                  :src="shop.Image_URL1"
+                  class="w-full h-full object-cover"
+                  loading="lazy"
+                />
+                <!-- Live Badge on Thumb -->
+                <div
+                  v-if="shop.status === 'LIVE'"
+                  class="absolute bottom-0 inset-x-0 bg-red-600 text-white text-[8px] font-bold text-center py-0.5"
+                >
+                  LIVE
+                </div>
+              </div>
+
+              <!-- Info -->
+              <div class="flex-1 min-w-0">
+                <h3
+                  :class="[
+                    'text-sm font-black truncate uppercase',
+                    isDarkMode ? 'text-white' : 'text-black',
+                  ]"
+                >
+                  {{ shop.name }}
+                </h3>
+                <p
+                  :class="[
+                    'text-[10px] uppercase font-black tracking-tight',
+                    isDarkMode ? 'text-white' : 'text-black',
+                  ]"
+                >
+                  {{ shop.category || "Venue" }}
+                </p>
+                <div class="flex gap-2 mt-1.5">
+                  <span
+                    class="text-[10px] font-medium opacity-80 flex items-center gap-1"
+                  >
+                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                    ชั้น {{ shop.Floor || "?" }}
+                  </span>
+                  <span v-if="shop.Zone" class="text-[10px] opacity-60">
+                    • {{ shop.Zone }}
+                  </span>
+                </div>
+                <p v-if="shop.openTime" class="text-[10px] opacity-50 mt-0.5">
+                  เปิด {{ shop.openTime }} - {{ shop.closeTime }}
+                </p>
+              </div>
+
+              <!-- Action Buttons (Favorite & Share) -->
+              <div class="flex items-center gap-1">
+                <!-- Favorite -->
+                <button
+                  @click.stop="emit('toggle-favorite', shop.id)"
+                  class="w-8 h-8 flex items-center justify-center rounded-lg transition-all active:scale-90"
+                  :class="[
+                    favorites.includes(Number(shop.id))
+                      ? 'text-pink-500 bg-pink-500/10'
+                      : 'text-gray-400 hover:text-pink-400 hover:bg-pink-400/5',
+                  ]"
+                >
+                  <Heart
+                    class="w-4 h-4"
+                    :class="
+                      favorites.includes(Number(shop.id)) ? 'fill-current' : ''
+                    "
+                  />
+                </button>
+                <!-- Share -->
+                <button
+                  @click.stop="handleShare(shop)"
+                  class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-blue-400 hover:bg-blue-400/5 transition-all active:scale-90"
+                >
+                  <Share2 class="w-4 h-4" />
+                </button>
+              </div>
+
+              <!-- Live Status Indicator -->
+              <div
+                v-if="shop.status === 'LIVE'"
+                class="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)] animate-pulse ml-1"
+              ></div>
+            </div>
           </div>
         </div>
       </div>
@@ -674,7 +710,8 @@ const handleShare = (item) => {
   <transition name="fade">
     <div
       v-if="isOpen"
-      class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[6999]"
+      class="fixed inset-0 bg-black/60 backdrop-blur-sm"
+      :style="{ zIndex: Z.DRAWER_BACKDROP }"
       @click="emit('close')"
     ></div>
   </transition>

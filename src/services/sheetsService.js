@@ -66,8 +66,15 @@ export const fetchShopData = async (sheetUrl) => {
 
           images: [img1, img2].filter(url => url && url.length > 5),
           Image_URL1: img1,
-          Image_URL2: img2
+          Image_URL2: img2,
+
+          // --- Social & High Fidelity Data ---
+          IG_URL: getVal(item, 'IG_URL'),
+          FB_URL: getVal(item, 'FB_URL'),
+          TikTok_URL: getVal(item, 'TikTok_URL'),
+          isPromoted: getVal(item, 'IsPromoted').toUpperCase() === 'TRUE'
         };
+
       });
   } catch (error) {
     console.error("Error fetching Sheets data:", error);

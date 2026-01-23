@@ -1,0 +1,18 @@
+{
+  "status": {
+    "vibe_5": "Packed",
+    "vibe_4": "Busy",
+    "vibe_3": "Moderate",
+    "vibe_2": "Quiet",
+    "vibe_1": "Chill"
+  },
+  "categories": {
+    "cafe_desc": "☕ Sip premium coffee in a cozy, chill vibe",
+    "bar_desc": "🍸 A hidden bar in the city with craft drinks",
+    "club_desc": "🪩 Turn up the night with top DJs and big energy",
+    "food_desc": "🍽️ Taste bold flavors with a feel-good atmosphere",
+    "music_desc": "🎸 Live music nights with awesome bands",
+    "nightlife_desc": "🌃 The go-to nightlife zone for late-night fun",
+    "shopping_desc": "🛍️ Trendy shopping spots with cool finds"
+  }
+}

@@ -5,11 +5,14 @@ import { getShopPriority } from '../utils/shopUtils';
  * useShopFilters
  * จัดการ Logic การ Filter และ Sort ร้านค้า
  */
-export function useShopFilters(shops, activeCategories, activeStatus) {
+export function useShopFilters(shops, activeCategories, activeStatus, activeShopId = { value: null }) {
   
   // 1. Logic การ Filter (Category & Status)
   const filteredShops = computed(() => {
     return shops.value.filter(s => {
+      // ✅ Always include the active (selected) shop even if it doesn't match filters
+      if (activeShopId.value != null && s.id == activeShopId.value) return true;
+
       // เช็ค Category (ถ้าไม่มีเลือกเลย หรือ อยู่ในตัวที่เลือก)
       const categoryMatch = activeCategories.value.length === 0 || activeCategories.value.includes(s.category);
       // เช็ค Status

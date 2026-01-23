@@ -1,6 +1,11 @@
+// --- C:\vibecity.live\src\components\panel\ShopCard.vue ---  
+
 <script setup>
 import { computed } from "vue";
 import { getStatusColorClass, isFlashActive } from "../../utils/shopUtils";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const props = defineProps({
   shop: {
@@ -32,7 +37,8 @@ const openGoogleMaps = (e) => {
 
 // Status display
 const statusLabel = computed(() => {
-  return props.shop.status || "OFF";
+  const s = props.shop.status || "OFF";
+  return t(`status.${s.toLowerCase()}`) || s;
 });
 
 // Status glow class for LIVE shops only

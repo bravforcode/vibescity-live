@@ -1,6 +1,21 @@
+// --- C:\vibecity.live\src\components\modal\VibeModal.vue ---
+
 <script setup>
-import { computed, ref, onMounted, onUnmounted } from "vue";
+import {
+  computed,
+  ref,
+  onMounted,
+  onUnmounted,
+  defineAsyncComponent,
+  watchEffect,
+} from "vue";
+import { useMotion } from "@vueuse/motion";
 import { getMediaDetails } from "../../utils/linkHelper";
+import { Z } from "../../constants/zIndex";
+const VisitorCount = defineAsyncComponent(
+  () => import("../ui/VisitorCount.vue"),
+);
+import { useShopStore } from "../../store/shopStore";
 // --- REFACTOR: ใช้ browserUtils และ shopUtils ---
 import {
   copyToClipboard,
@@ -12,6 +27,18 @@ import {
   isMobileDevice,
 } from "../../utils/browserUtils";
 import { getStatusColorClass } from "../../utils/shopUtils";
+import { useI18n } from "vue-i18n";
+import ReviewSystem from "../ui/ReviewSystem.vue";
+import {
+  Share2,
+  Navigation,
+  Car,
+  X,
+  Instagram,
+  Facebook,
+} from "lucide-vue-next";
+
+const { t } = useI18n();
 
 const props = defineProps({
   shop: {
@@ -21,6 +48,80 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["close"]);
+
+// --- Cinematic Motion Logic ---
+const modalCard = ref(null);
+const { apply } = useMotion(modalCard, {
+  initial: {
+    y: 600,
+    opacity: 0,
+    scale: 0.9,
+  },
+  enter: {
+    y: 0,
+    opacity: 1,
+    scale: 1,
+    transition: {
+      type: "spring",
+      stiffness: 300,
+      damping: 25,
+      mass: 0.5,
+    },
+  },
+  leave: {
+    y: 600,
+    opacity: 0,
+    scale: 0.95,
+    transition: {
+      duration: 200,
+      ease: "easeIn",
+    },
+  },
+});
+
+// Gesture Variables
+const touchStart = ref({ y: 0, t: 0 });
+const isDragging = ref(false);
+
+const handleTouchStart = (e) => {
+  touchStart.value = { y: e.touches[0].clientY, t: Date.now() };
+  isDragging.value = true;
+};
+
+const handleTouchMove = (e) => {
+  if (!isDragging.value) return;
+  const deltaY = e.touches[0].clientY - touchStart.value.y;
+
+  // Apply visual transform immediately (1:1 follow or resistance)
+  if (deltaY > 0) {
+    // Dragging down (closing) - 1:1
+    apply({ y: deltaY, scale: 1 - deltaY / 2000 });
+  } else {
+    // Dragging up (overshoot) - Rubber Banding
+    const resistance = Math.sqrt(Math.abs(deltaY)) * 2; // Square root resistance
+    apply({ y: -resistance });
+  }
+};
+
+const handleTouchEnd = (e) => {
+  if (!isDragging.value) return;
+  isDragging.value = false;
+
+  const deltaY = e.changedTouches[0].clientY - touchStart.value.y;
+  const time = Date.now() - touchStart.value.t;
+  const velocity = deltaY / time; // px/ms
+
+  // Haptic Feedback
+  if (navigator.vibrate) navigator.vibrate(10);
+
+  // Close Condition: Dragged down > 150px OR fast flick down
+  if (deltaY > 150 || (deltaY > 50 && velocity > 0.5)) {
+    emit("close");
+  } else {
+    // Snap back to open
+    apply("enter");
+  }
+};
 
 const media = computed(() => getMediaDetails(props.shop.videoUrl));
 
@@ -71,6 +172,14 @@ onMounted(() => {
   isMobile.value = isMobileDevice();
   updateCountdown();
   timerInterval = setInterval(updateCountdown, 1000);
+});
+
+// --- Media Sync ---
+const videoPlayer = ref(null);
+watchEffect(() => {
+  if (videoPlayer.value && props.shop.initialTime) {
+    videoPlayer.value.currentTime = props.shop.initialTime;
+  }
 });
 
 onUnmounted(() => {
@@ -167,7 +276,8 @@ const openLineman = () => {
 
 <template>
   <div
-    class="fixed inset-0 z-[3000] flex items-center justify-center p-4 pointer-events-auto font-sans overflow-hidden"
+    class="fixed inset-0 flex items-center justify-center p-4 pointer-events-auto font-sans overflow-hidden"
+    :style="{ zIndex: Z.MODAL }"
   >
     <!-- Backdrop -->
     <div
@@ -175,34 +285,33 @@ const openLineman = () => {
       @click="emit('close')"
     ></div>
 
-    <!-- Main Modal -->
-    <div class="relative w-full max-w-[340px] sm:max-w-[520px] animate-pop">
-      <button
+    <!-- Main Modal / Bottom Sheet -->
+    <div
+      ref="modalCard"
+      @touchstart.stop="handleTouchStart"
+      @touchmove.stop="handleTouchMove"
+      @touchend.stop="handleTouchEnd"
+      class="relative w-full max-w-2xl mt-auto bg-zinc-950/90 backdrop-blur-3xl rounded-t-[2rem] border-t border-white/10 flex flex-col shadow-[0_-20px_60px_-15px_rgba(0,0,0,0.8)] max-h-[92vh] pointer-events-auto overflow-hidden"
+      :style="{ zIndex: Z.MODAL }"
+    >
+      <!-- Draggable Handle (Gesture Area) -->
+      <div
         @click="emit('close')"
-        class="absolute -top-12 right-0 w-10 h-10 sm:w-11 sm:h-11 bg-white/15 hover:bg-white/25 backdrop-blur-xl border border-white/30 rounded-full flex items-center justify-center text-white transition-all active:scale-90 shadow-2xl z-[3010]"
+        class="w-full flex justify-center py-5 cursor-grab active:cursor-grabbing touch-none"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="w-5 h-5 sm:w-6 sm:h-6"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2.5"
-            d="M6 18L18 6M6 6l12 12"
-          />
-        </svg>
-      </button>
+        <div
+          class="w-16 h-1.5 bg-white/20 rounded-full hover:bg-white/40 transition-colors"
+        ></div>
+      </div>
 
       <div
         :class="[
-          'relative w-full bg-zinc-950/70 backdrop-blur-2xl rounded-xl overflow-hidden border flex flex-col shadow-2xl max-h-[85vh] pointer-events-auto transition-all duration-300',
-          shop.status === 'LIVE'
-            ? 'border-cyan-400/50 shadow-[0_0_40px_rgba(34,211,238,0.3)]'
-            : 'border-white/15',
+          'relative w-full flex flex-col overflow-hidden transition-all duration-300',
+          shop.isPromoted || shop.IsPromoted === 'TRUE'
+            ? 'shadow-[0_0_40px_rgba(250,204,21,0.1)]'
+            : shop.status === 'LIVE'
+              ? 'shadow-[0_0_40px_rgba(34,211,238,0.1)]'
+              : '',
         ]"
       >
         <!-- Header -->
@@ -214,6 +323,12 @@ const openLineman = () => {
               >
                 {{ shop.name }}
               </h2>
+              <div class="mt-2 flex">
+                <VisitorCount
+                  :shopId="shop.id"
+                  :initialCount="Math.floor(Math.random() * 50) + 10"
+                />
+              </div>
             </div>
 
             <div class="flex flex-col items-end gap-1.5 shrink-0">
@@ -221,17 +336,29 @@ const openLineman = () => {
                 <transition name="fade">
                   <div
                     v-if="isPromoActive"
-                    class="promo-status-badge text-[10px] sm:text-[12px] px-2 py-1 sm:px-2.5 sm:py-1"
+                    class="promo-status-badge font-black rounded-md uppercase tracking-wider text-white shrink-0 text-[10px] sm:text-[12px] px-2 py-1 sm:px-2.5 sm:py-1"
                   >
                     FLASH SALE
                   </div>
                 </transition>
+                <transition name="fade">
+                  <div
+                    v-if="shop.isPromoted || shop.IsPromoted === 'TRUE'"
+                    class="px-2 py-1 text-[10px] sm:text-[11px] font-black rounded-md uppercase tracking-tighter bg-gradient-to-r from-yellow-400 to-amber-600 text-black shadow-[0_0_15px_rgba(250,204,21,0.4)]"
+                  >
+                    PROMOTED
+                  </div>
+                </transition>
                 <div
                   :class="[
-                    'px-2 py-1 sm:px-2.5 sm:py-1 text-[10px] sm:text-[12px] font-black rounded-md uppercase tracking-wider text-white shadow-lg shrink-0',
+                    'px-2 py-1 sm:px-2.5 sm:py-1 text-[10px] sm:text-[12px] font-black rounded-md uppercase tracking-wider text-white shadow-lg shrink-0 flex items-center gap-1.5',
                     getStatusColorClass(shop.status),
                   ]"
                 >
+                  <span
+                    v-if="shop.status === 'LIVE'"
+                    class="w-2 h-2 rounded-full bg-white animate-pulse"
+                  ></span>
                   {{ shop.status }}
                 </div>
               </div>
@@ -271,6 +398,7 @@ const openLineman = () => {
           </transition>
 
           <video
+            ref="videoPlayer"
             v-if="media.type === 'video'"
             :src="media.url"
             autoplay
@@ -346,6 +474,72 @@ const openLineman = () => {
               </div>
             </div>
           </div>
+
+          <!-- ✅ Social Presence (New for Entertainment Map Concept) -->
+          <div
+            v-if="shop.IG_URL || shop.FB_URL || shop.TikTok_URL"
+            class="border-t border-white/5 pt-4"
+          >
+            <h4
+              class="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] mb-4 text-left"
+            >
+              Explore Atmosphere
+            </h4>
+            <div class="flex gap-2.5">
+              <a
+                v-if="shop.IG_URL"
+                :href="shop.IG_URL"
+                target="_blank"
+                class="flex-1 py-3 px-2 rounded-2xl bg-gradient-to-tr from-[#f9ce34] via-[#ee2a7b] to-[#6228d7] flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl group"
+              >
+                <Instagram class="w-4 h-4 text-white" />
+                <span
+                  class="text-[10px] font-black text-white uppercase tracking-tighter"
+                  >IG</span
+                >
+              </a>
+              <a
+                v-if="shop.FB_URL"
+                :href="shop.FB_URL"
+                target="_blank"
+                class="flex-1 py-3 px-2 rounded-2xl bg-[#1877F2] flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl group"
+              >
+                <Facebook class="w-4 h-4 text-white" />
+                <span
+                  class="text-[10px] font-black text-white uppercase tracking-tighter"
+                  >FB</span
+                >
+              </a>
+              <a
+                v-if="shop.TikTok_URL"
+                :href="shop.TikTok_URL"
+                target="_blank"
+                class="flex-1 py-3 px-2 rounded-2xl bg-black border border-white/20 flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl group"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="w-4 h-4 text-white"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"></path>
+                </svg>
+                <span
+                  class="text-[10px] font-black text-white uppercase tracking-tighter"
+                  >TikTok</span
+                >
+              </a>
+            </div>
+          </div>
+
+          <!-- ✅ REVIEW SYSTEM (PHASE 3) -->
+          <div class="border-t border-white/5 pt-4">
+            <ReviewSystem :shop-id="shop.id" :shop-name="shop.name" />
+          </div>
         </div>
 
         <!-- Action Buttons - เปลี่ยนจาก 2 ปุ่มเป็น 3 ปุ่ม -->
@@ -360,20 +554,7 @@ const openLineman = () => {
             <div
               class="absolute inset-0 bg-white/10 group-hover:bg-white/20 transition-all duration-300"
             ></div>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="w-4 h-4 sm:w-5 sm:h-5 text-white relative z-10"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
-              />
-            </svg>
+            <Share2 class="w-4 h-4 sm:w-5 sm:h-5 text-white relative z-10" />
             <span
               class="text-[10px] sm:text-xs font-black text-white uppercase tracking-widest relative z-10"
             >
@@ -389,26 +570,9 @@ const openLineman = () => {
             <div
               class="absolute inset-0 bg-white/10 group-hover:bg-white/20 transition-all duration-300"
             ></div>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
+            <Navigation
               class="w-4 h-4 sm:w-5 sm:h-5 text-white relative z-10"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-              />
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-            </svg>
+            />
             <span
               class="text-[10px] sm:text-xs font-black text-white uppercase tracking-widest relative z-10"
             >
@@ -424,22 +588,7 @@ const openLineman = () => {
             <div
               class="absolute inset-0 bg-white/10 group-hover:bg-white/20 transition-all duration-300"
             ></div>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="w-4 h-4 sm:w-5 sm:h-5 text-white relative z-10"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2m2 0h10"
-              />
-              <circle cx="7" cy="17" r="2" />
-              <circle cx="17" cy="17" r="2" />
-            </svg>
+            <Car class="w-4 h-4 sm:w-5 sm:h-5 text-white relative z-10" />
             <span
               class="text-[10px] sm:text-xs font-black text-white uppercase tracking-widest relative z-10"
             >
@@ -454,7 +603,8 @@ const openLineman = () => {
     <transition name="fade">
       <div
         v-if="showRidePopup"
-        class="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl"
+        class="fixed inset-0 flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl"
+        :style="{ zIndex: Z.SUBMODAL }"
         @click.self="showRidePopup = false"
       >
         <div
@@ -465,20 +615,7 @@ const openLineman = () => {
             @click="showRidePopup = false"
             class="absolute top-4 right-4 text-white/50 hover:text-white transition-all bg-white/5 hover:bg-white/10 rounded-full p-2"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2.5"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+            <X class="w-5 h-5" />
           </button>
 
           <div class="mb-6 text-center">
@@ -602,7 +739,8 @@ const openLineman = () => {
     <transition name="fade">
       <div
         v-if="zoomedImage"
-        class="fixed inset-0 z-[6000] flex items-center justify-center p-6 bg-black/95 backdrop-blur-md cursor-pointer"
+        class="fixed inset-0 flex items-center justify-center p-6 bg-black/95 backdrop-blur-md cursor-pointer"
+        :style="{ zIndex: Z.SUBMODAL }"
         @click="zoomedImage = null"
       >
         <img
@@ -630,6 +768,20 @@ const openLineman = () => {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-slide-up {
+  animation: slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes pop {
@@ -661,7 +813,6 @@ const openLineman = () => {
 }
 
 .promo-status-badge {
-  @apply font-black rounded-md uppercase tracking-wider text-white shrink-0;
   background: linear-gradient(270deg, #ff4d4d, #f97316, #ff4d4d);
   background-size: 200% 200%;
   animation: wave-gradient 2s linear infinite;

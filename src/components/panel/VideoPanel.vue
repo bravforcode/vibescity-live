@@ -1,6 +1,9 @@
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from "vue";
 import ShopCard from "./ShopCard.vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const props = defineProps({
   shops: {
@@ -90,7 +93,7 @@ watch(
         });
       }
     });
-  }
+  },
 );
 
 // Handle scroll events
@@ -161,12 +164,12 @@ defineExpose({ scrollToShop });
             isDarkMode ? 'text-white' : 'text-gray-900',
           ]"
         >
-          Vibes Now
+          {{ t("nav.vibes_now") || "Vibes Now" }}
         </h2>
         <div class="flex items-center gap-2">
           <div class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
           <span class="text-xs text-red-500 font-medium">
-            {{ liveCount }} Live
+            {{ liveCount }} {{ t("status.live") }}
           </span>
         </div>
       </div>
@@ -204,7 +207,7 @@ defineExpose({ scrollToShop });
           isDarkMode ? 'text-white/30' : 'text-gray-400',
         ]"
       >
-        <p class="text-sm">ไม่พบร้านค้า</p>
+        <p class="text-sm">{{ t("status.no_shops") || "ไม่พบร้านค้า" }}</p>
       </div>
     </div>
 

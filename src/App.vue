@@ -1,9 +1,78 @@
+// --- C:\vibecity.live\src\App.vue ---
+
 <script setup>
-import { ref, onMounted, computed, onUnmounted, watch, shallowRef } from "vue";
-import MapContainer from "./components/map/MapContainer.vue";
-import VideoPanel from "./components/panel/VideoPanel.vue";
-import MallDrawer from "./components/modal/MallDrawer.vue";
+import {
+  ref,
+  onMounted,
+  computed,
+  onUnmounted,
+  watch,
+  shallowRef,
+  nextTick,
+} from "vue";
+import { defineAsyncComponent } from "vue";
+import PortalLayer from "./components/system/PortalLayer.vue";
+
+const MapContainer = defineAsyncComponent(
+  () => import("./components/map/MapboxContainer.vue"),
+);
+
+// ✅ Async load heavy components
+const VideoPanel = defineAsyncComponent(
+  () => import("./components/panel/VideoPanel.vue"),
+);
+const MallDrawer = defineAsyncComponent(
+  () => import("./components/modal/MallDrawer.vue"),
+);
+const ProfileDrawer = defineAsyncComponent(
+  () => import("./components/modal/ProfileDrawer.vue"),
+);
+const VibeModal = defineAsyncComponent(
+  () => import("./components/modal/VibeModal.vue"),
+);
+
+// ✅ Enterprise MVP UI Components (Lazy loaded)
+const BottomNav = defineAsyncComponent(
+  () => import("./components/ui/BottomNav.vue"),
+);
+const SkeletonCard = defineAsyncComponent(
+  () => import("./components/ui/SkeletonCard.vue"),
+);
+const ConfettiEffect = defineAsyncComponent(
+  () => import("./components/ui/ConfettiEffect.vue"),
+);
+const OnboardingTour = defineAsyncComponent(
+  () => import("./components/ui/OnboardingTour.vue"),
+);
+const PhotoGallery = defineAsyncComponent(
+  () => import("./components/ui/PhotoGallery.vue"),
+);
+const DailyCheckin = defineAsyncComponent(
+  () => import("./components/ui/DailyCheckin.vue"),
+);
+const LuckyWheel = defineAsyncComponent(
+  () => import("./components/ui/LuckyWheel.vue"),
+);
+const AchievementBadges = defineAsyncComponent(
+  () => import("./components/ui/AchievementBadges.vue"),
+);
+const Leaderboard = defineAsyncComponent(
+  () => import("./components/ui/Leaderboard.vue"),
+);
+const ReferralShare = defineAsyncComponent(
+  () => import("./components/ui/ReferralShare.vue"),
+);
+const SwipeCard = defineAsyncComponent(
+  () => import("./components/ui/SwipeCard.vue"),
+);
+const VisitorCount = defineAsyncComponent(
+  () => import("./components/ui/VisitorCount.vue"),
+);
+
+// ✅ Composables
+import { useHaptics } from "./composables/useHaptics";
 import { fetchShopData } from "./services/sheetsService";
+import { fetchRealTimeEvents } from "./services/eventService";
 import { useShopFilters } from "./composables/useShopFilters";
 import {
   calculateShopStatus,
@@ -11,38 +80,195 @@ import {
   calculateDistance,
 } from "./utils/shopUtils";
 
+import { useShopStore } from "./store/shopStore";
+import { useUserStore } from "./store/userStore";
+import { storeToRefs } from "pinia";
+import { useI18n } from "vue-i18n";
+
+const { t, locale } = useI18n();
+const userStore = useUserStore();
+
+const toggleLanguage = () => {
+  const newLang = locale.value === "th" ? "en" : "th";
+  locale.value = newLang;
+  userStore.setLanguage(newLang);
+  tapFeedback();
+};
+
+// ✅ Haptic feedback
+const { tapFeedback, selectFeedback, successFeedback } = useHaptics();
+
 // ใช้ CSV แบบ local ก่อน แล้วค่อยเปลี่ยนเป็น Google Sheets
 const SHEET_CSV_URL = "/data/shops.csv";
 
-// --- State ---
-const rawShops = shallowRef([]);
-const currentTime = ref(new Date());
+// --- State Management (Pinia) ---
+const shopStore = useShopStore();
+const {
+  rawShops,
+  currentTime,
+  activeShopId,
+  activeCategories,
+  activeStatus,
+  isDataLoading,
+  totalCoins,
+  userLevel,
+  nextLevelXP,
+  levelProgress,
+  rotationSeed,
+  userLocation,
+} = storeToRefs(shopStore);
+
+const showConfetti = ref(false);
+
+// ✅ userStore state (Centralized Preferences)
+const { preferences } = storeToRefs(userStore);
+const isDarkMode = computed(() => preferences.value.isDarkMode);
+
+// --- Local UI State ---
 const selectedShop = ref(null);
-const activeShopId = ref(null);
-const activeCategories = ref([]);
-const activeStatus = ref("ALL");
-const isDataLoading = ref(true);
 const mapRef = ref(null);
 const isMobileView = ref(false);
 const rideModalShop = ref(null);
 const showCategoryDropdown = ref(false);
 const favorites = ref([]); // ✅ Favorites list (ids)
+const isPanelOpen = ref(true);
 
-const carouselShops = computed(() => {
-  // ใช้ nearbyShops ที่คุณคำนวณไว้แล้ว (เสถียรกว่า filteredShops ที่อาจเปลี่ยนตาม zone/province)
-  return nearbyShops.value.slice(0, 30);
+// ✅ Enterprise MVP State
+const activeTab = ref("map"); // 'map' | 'events' | 'favorites' | 'profile'
+const realTimeEvents = ref([]); // ✅ Real-time events from API
+const timedEvents = ref([]); // ✅ Dynamic events from events.json
+const galleryImages = ref([]);
+const isGalleryOpen = ref(false);
+const dailyCheckinRef = ref(null);
+const luckyWheelRef = ref(null);
+const showProfileDrawer = ref(false);
+const errorMessage = ref(null); // ✅ Global error feedback for user
+
+import {
+  Search,
+  X,
+  Sun,
+  Moon,
+  Languages,
+  LocateFixed,
+  ChevronDown,
+  Guitar,
+  Martini,
+  Utensils,
+  Coffee,
+  ShoppingBag,
+  User,
+  CheckCircle,
+  Music,
+  Globe,
+} from "lucide-vue-next";
+
+let rotationInterval = null;
+
+// ✅ FIXED: Robust FlyTo Logic with Validation
+const smoothFlyTo = (targetCoords) => {
+  if (!mapRef.value || !targetCoords) return;
+  if (!Array.isArray(targetCoords) || targetCoords.length !== 2) return;
+
+  // Validate coordinates (basic check for valid lat/lng ranges)
+  const [lat, lng] = targetCoords;
+  if (isNaN(lat) || isNaN(lng)) return;
+  // Basic range check: Lat -90 to 90, Lng -180 to 180
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    console.warn("Invalid coordinates for flyTo:", targetCoords);
+    return;
+  }
+
+  // Pre-calculate visual offsets
+  const bottomPanelHeight = bottomUiRef.value?.offsetHeight || 0;
+
+  // Create fly options
+  const flyOptions = {
+    center: [lng, lat], // Mapbox uses [lng, lat]
+    zoom: 17.5,
+    pitch: 45, // Cinematic pitch
+    bearing: 0,
+    speed: 0.8, // Slower for smoother feel
+    curve: 1.2, // Cinematic curve
+    essential: true,
+    padding: {
+      bottom: isMobileView.value ? bottomPanelHeight + 50 : 50, // More bottom padding for mobile sheet
+      top: isMobileView.value ? 100 : 50, // Push center up slightly
+      left: isMobileView.value ? 20 : window.innerWidth * 0.35 + 20, // Avoid left panel on desktop
+      right: 20,
+    },
+  };
+
+  // Execute Fly
+  // Mapbox GL expects map.flyTo({center, zoom, ...})
+  if (mapRef.value.map && typeof mapRef.value.map.flyTo === "function") {
+    mapRef.value.map.flyTo(flyOptions);
+  } else if (typeof mapRef.value.flyTo === "function") {
+    // If MapContainer exposes a wrapper flyTo(options)
+    mapRef.value.flyTo(flyOptions);
+  }
+};
+
+onMounted(() => {
+  window.addEventListener("resize", checkMobileView);
+  window.addEventListener("resize", measureBottomUi);
+});
+
+onUnmounted(() => {
+  // ✅ remove listeners
+  window.removeEventListener("resize", checkMobileView);
+  window.removeEventListener("resize", measureBottomUi);
+
+  // ✅ clear intervals
+  if (timeInterval) clearInterval(timeInterval);
+  if (rotationInterval) clearInterval(rotationInterval);
+
+  // ✅ cleanup carousel listeners (only if handlers exist)
+  const el = mobileCardScrollRef.value;
+  if (el && typeof onScrollEnd === "function") {
+    el.removeEventListener("touchend", onScrollEnd);
+    el.removeEventListener("touchcancel", onScrollEnd);
+    el.removeEventListener("mouseup", onScrollEnd);
+    el.removeEventListener("mouseleave", onScrollEnd);
+  }
+});
+
+// --- Global Identifiers & State ---
+let timeInterval = null;
+
+const openModalOnCardClick = ref(true);
+
+const currentUserStats = ref({
+  name: "Explorer",
+  coins: 0,
+  rank: 99,
+  totalVisits: 0,
+  liveVenuesVisited: 0,
+  coinsCollected: 0,
+  checkInStreak: 0,
+  nightVisits: 0,
+});
+
+// ✅ Computeds
+
+const selectedShopCoords = computed(() => {
+  if (!activeShopId.value) return null;
+  const shop = shops.value.find(
+    (s) => Number(s.id) === Number(activeShopId.value),
+  );
+  return shop && shop.lat && shop.lng ? [shop.lat, shop.lng] : null;
 });
 
 // ✅ UI offsets for "visual center" (between top bar & bottom carousel)
 const mapUiTopOffset = computed(() => {
-  // if (showFloorSelector.value || isIndoorView.value) return 120;
-  // มี dropdown/filter ด้านบน
   return 64;
 });
 
+/**
+ * Computes the padding needed for the map based on the bottom carousel height on mobile.
+ */
 const mapUiBottomOffset = computed(() => {
-  // mobile มี bottom carousel สูงประมาณ 210-240
-  if (isMobileView.value) return 230;
+  if (isMobileView.value) return bottomUiHeight.value;
   return 0;
 });
 
@@ -51,6 +277,21 @@ const isVibeNowCollapsed = ref(false);
 const toggleVibeNow = () => {
   isVibeNowCollapsed.value = !isVibeNowCollapsed.value;
 };
+
+const bottomUiRef = ref(null);
+const bottomUiHeight = ref(0);
+
+const measureBottomUi = () => {
+  bottomUiHeight.value = bottomUiRef.value?.offsetHeight || 0;
+};
+
+// ✅ Mobile: VIBE NOW collapse state
+
+const showMallDrawer = ref(false);
+// เมื่อ UI ล่างเปลี่ยน (เช่น collapse/expand, modal ขึ้น)
+watch([isVibeNowCollapsed, showMallDrawer, rideModalShop], () => {
+  nextTick(measureBottomUi);
+});
 
 // ✅ Navigation Legend height tracking
 const legendHeight = ref(0);
@@ -121,38 +362,144 @@ const mockEvents = {
   // Others have no events -> No Giant Pin
 };
 
+// ✅ SEO & Metadata Management
+/**
+ * Updates the page title and meta description reactively.
+ */
+const updateMetadata = () => {
+  const baseTitle = "VibeCity.live | Local Entertainment Map";
+  const selectedShopName = selectedShop.value?.name;
+  const activeCat = activeCategories.value[0];
+
+  if (selectedShopName) {
+    document.title = `${selectedShopName} - VibeCity.live`;
+  } else if (activeCat) {
+    document.title = `${activeCat} in Chiang Mai - VibeCity.live`;
+  } else {
+    document.title = baseTitle;
+  }
+
+  // Update OG/Meta description (simulated tag update)
+  const metaDesc = document.querySelector('meta[name="description"]');
+  if (metaDesc) {
+    metaDesc.setAttribute(
+      "content",
+      selectedShopName
+        ? `Check out ${selectedShopName} on VibeCity.live - Your Chiang Mai entertainment guide.`
+        : "Explore Chiang Mai's best cafes, bars, and clubs with real-time vibe updates.",
+    );
+  }
+};
+
+watch(() => [activeShopId.value, activeCategories.value], updateMetadata, {
+  immediate: true,
+});
+
+/**
+ * Fetches real-time events from the API and local sources.
+ */
+const updateEventsData = async () => {
+  try {
+    const events = await fetchRealTimeEvents();
+    realTimeEvents.value = events;
+  } catch (err) {
+    console.warn("Real-time events sync failed:", err.message);
+    // Fallback logic handled by service returning empty list
+  }
+};
+
 // ✅ Computed: Active Events
 // Returns buildings object but decorated with event data IF event is active
 const activeEvents = computed(() => {
   const result = [];
   if (!buildingsData.value) return [];
 
+  const now = currentTime.value;
+
+  // 1. Process mockEvents (Fixed buildings with events)
   Object.keys(mockEvents).forEach((key) => {
     const building = buildingsData.value[key];
     const event = mockEvents[key];
     if (building && event) {
-      result.push({
-        ...building,
-        ...event,
-        key: key,
-        isEvent: true,
-      });
+      const start = new Date(event.startTime);
+      const end = new Date(event.endTime);
+      if (now >= start && now <= end) {
+        result.push({
+          ...building,
+          ...event,
+          key: key,
+          isEvent: true,
+        });
+      }
     }
   });
+
+  // 2. Process timedEvents (from events.json)
+  if (Array.isArray(timedEvents.value)) {
+    timedEvents.value.forEach((event) => {
+      const start = new Date(event.startTime || event.date);
+      const end = new Date(
+        event.endTime || new Date(new Date(event.date).getTime() + 86400000),
+      );
+      if (now >= start && now <= end) {
+        result.push({
+          ...event,
+          key: event.id,
+          isEvent: true,
+        });
+      }
+    });
+  }
+
+  // 3. Process realTimeEvents (from API)
+  if (Array.isArray(realTimeEvents.value)) {
+    realTimeEvents.value.forEach((event) => {
+      const start = new Date(event.startTime);
+      const end = new Date(event.endTime);
+      if (now >= start && now <= end) {
+        result.push({
+          ...event,
+          key: event.id,
+          isEvent: true,
+        });
+      }
+    });
+  }
+
   return result;
 });
-// const activeFloor = ref(null); // REMOVED: Indoor Map
-// const showFloorSelector = ref(false); // REMOVED: Indoor Map
-// const isIndoorView = ref(false); // REMOVED: Indoor Map
+
+// Indoor/Mall Navigation State (Simplified/Legacy)
+const activeFloor = ref("GF");
+const showFloorSelector = ref(false);
+const isIndoorView = ref(false);
+
+/**
+ * Handles entering indoor mode for a building.
+ * @param {Object} building - The building data object.
+ */
+const handleEnterIndoor = (building) => {
+  isIndoorView.value = true;
+  activeBuilding.value = building;
+  showFloorSelector.value = true;
+  activeFloor.value = "GF";
+};
 
 // ✅ Mall Drawer State
-const showMallDrawer = ref(false);
 const activeMall = computed(() => activeBuilding.value);
 const mallShops = computed(() => {
   if (!activeMall.value) return [];
   // Filter shops that belong to this building
-  // Ensure comparsion allows for string/number differences if any
-  return shops.value.filter((s) => s.Building == activeMall.value.key);
+  // Ensure comparsion is robust (string/number, trimmed, case-insensitive)
+  const targetKey = String(activeMall.value.key || "")
+    .trim()
+    .toLowerCase();
+  return shops.value.filter((s) => {
+    const shopBuilding = String(s.Building || "")
+      .trim()
+      .toLowerCase();
+    return shopBuilding === targetKey;
+  });
 });
 
 // ✅ Watch activeBuilding to open drawer (User Request: Click Giant Pin -> Drawer)
@@ -199,21 +546,20 @@ const globalSearchResults = computed(() => {
   const matches = shops.value.filter(
     (s) =>
       (s.name || "").toLowerCase().includes(q) ||
-      (s.category || "").toLowerCase().includes(q)
+      (s.category || "").toLowerCase().includes(q),
   );
 
-  // Sort by Distance
+  // Sort by Distance (avoid mutating original reactive objects)
   if (userLocation.value) {
     const [uLat, uLng] = userLocation.value;
-    matches.forEach((s) => {
-      if (s.lat && s.lng) {
-        s.distance = calculateDistance(uLat, uLng, s.lat, s.lng);
-      } else {
-        s.distance = Infinity;
-      }
-    });
-
     return matches
+      .map((s) => ({
+        ...s,
+        distance:
+          s.lat && s.lng
+            ? calculateDistance(uLat, uLng, s.lat, s.lng)
+            : Infinity,
+      }))
       .sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity))
       .slice(0, 10);
   }
@@ -230,52 +576,62 @@ const handleGlobalSearchSelect = (shop) => {
 // ✅ NEW: Province focus state
 const activeProvince = ref(null);
 
-// ✅ Geolocation State
-const userLocation = ref(null);
+// ✅ Geolocation settings
 const locationPermissionDenied = ref(false);
 const maxNearbyDistance = 5; // km (reverted from 3km)
 const maxNearbyMarkers = 30;
-const rotationSeed = ref(0); // For rotating markers
-
-// ✅ Update rotation seed every 30 minutes
-setInterval(() => {
-  rotationSeed.value = Math.floor(Date.now() / (30 * 60 * 1000));
-}, 60000); // Check every minute
 
 // ✅ calculateDistance moved to utils/shopUtils.js
 
-// ✅ Request user's geolocation
 const requestGeolocation = () => {
-  if (!navigator.geolocation) {
-    console.warn("Geolocation not supported");
-    return;
-  }
-
+  if (!navigator.geolocation) return;
   navigator.geolocation.getCurrentPosition(
-    (position) => {
-      userLocation.value = [
-        position.coords.latitude,
-        position.coords.longitude,
-      ];
-      console.log("📍 User location:", userLocation.value);
-    },
-    (error) => {
-      console.warn("Geolocation error:", error.message);
+    (pos) => (userLocation.value = [pos.coords.latitude, pos.coords.longitude]),
+    () => {
       locationPermissionDenied.value = true;
-      // Default to Chiang Mai center if denied
-      userLocation.value = [18.7883, 98.9853];
+      userLocation.value = [18.7883, 98.9853]; // Fallback
     },
-    { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+    { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 },
   );
 };
 
-// Open ride service modal
+// ✅ Open Ride App Selection Modal
 const openRideModal = (shop) => {
   rideModalShop.value = shop;
 };
 
-// Theme State - ใช้ reactive ref ให้ถูกต้อง
-const isDarkMode = ref(true);
+const closeRideModal = () => {
+  rideModalShop.value = null;
+};
+
+const openRideApp = (appName) => {
+  if (!rideModalShop.value) return;
+  const { lat, lng, name } = rideModalShop.value;
+
+  let url = "";
+  switch (appName) {
+    case "grab":
+      url = `https://grab.onelink.me/2695613898?af_dp=grab%3A%2F%2Fopen%3FdropOffLatitude%3D${lat}%26dropOffLongitude%3D${lng}%26dropOffName%3D${encodeURIComponent(name)}`;
+      break;
+    case "lineman":
+      url = `https://lineman.page.link/?link=https://lineman.page.link/ride?dropoff_lat%3D${lat}%26dropoff_lng%3D${lng}&apn=th.co.lineman&isi=1080952492&ibi=th.co.lineman`;
+      break;
+    case "bolt":
+      url = `https://bolt.eu/en/order/?destination=${lat},${lng}`;
+      break;
+    default:
+      url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+  }
+
+  window.open(url, "_blank");
+  closeRideModal();
+};
+
+// Theme State - Managed by userStore
+const toggleTheme = () => {
+  userStore.toggleDarkMode();
+  tapFeedback();
+};
 
 // --- Real-time Logic: แปลงข้อมูลดิบตามเวลาปัจจุบัน ---
 const shops = computed(() => {
@@ -290,10 +646,15 @@ const shops = computed(() => {
   });
 });
 
-const { filteredShops } = useShopFilters(shops, activeCategories, activeStatus);
+const { filteredShops } = useShopFilters(
+  shops,
+  activeCategories,
+  activeStatus,
+  activeShopId,
+);
 
 // ✅ Smart Rotation Logic: 30 Random Shops every 30 mins
-const nearbyShops = computed(() => {
+const localNearbyShops = computed(() => {
   if (!filteredShops.value) return [];
   if (!userLocation.value) return filteredShops.value; // Fallback: show all if no location
 
@@ -314,10 +675,10 @@ const nearbyShops = computed(() => {
   if (isDefaultView) {
     // Separate LIVE/Important shops to ensuring they appear
     const liveShops = candidates.filter(
-      (s) => s.status === "LIVE" || s.Status === "LIVE"
+      (s) => s.status === "LIVE" || s.Status === "LIVE",
     );
     const normalShops = candidates.filter(
-      (s) => s.status !== "LIVE" && s.Status !== "LIVE"
+      (s) => s.status !== "LIVE" && s.Status !== "LIVE",
     );
 
     // Sort normal shops randomly using seed
@@ -334,87 +695,149 @@ const nearbyShops = computed(() => {
     const bIsLive = b.status === "LIVE" || b.Status === "LIVE";
     if (aIsLive && !bIsLive) return -1;
     if (!aIsLive && bIsLive) return 1;
-    return a.distance - b.distance;
+
+    // Stable distance sort with null fallback
+    const distA = a.distance ?? 9999;
+    const distB = b.distance ?? 9999;
+    return distA - distB;
   });
 
   return candidates;
 });
 
-// --- Time Loop ---
-let timeInterval = null;
+const carouselShops = computed(() => {
+  const nearby = localNearbyShops.value || [];
+  const activeId = Number(activeShopId.value);
 
-// Debug watcher for floor selector
+  if (activeId) {
+    const activeShop = (shops.value || []).find(
+      (s) => Number(s.id) === activeId,
+    );
+    if (activeShop && !nearby.some((s) => Number(s.id) === activeId)) {
+      return [...nearby.slice(0, 29), activeShop];
+    }
+  }
+  return nearby.slice(0, 30);
+});
 
+// ✅ Phase 5 Refine: Suggested Venues for empty state
+const suggestedShops = computed(() => {
+  // Recommend 3 LIVE or popular shops
+  return shops.value.filter((s) => s.status === "LIVE").slice(0, 3);
+});
+
+// --- Selective Integration Actions ---
+const handleSwipe = (direction, shop) => {
+  if (direction === "left") {
+    handleMarkerClick(shop);
+  } else if (direction === "right") {
+    openRideModal(shop);
+  }
+};
+
+const triggerConfetti = () => {
+  showConfetti.value = true;
+  successFeedback();
+  setTimeout(() => {
+    showConfetti.value = false;
+  }, 3000);
+};
+
+// --- Computed Properties ---
+/**
+ * Bootstraps the application data and state.
+ * Handles theme coordination, favorite persistence, and multi-source data sync.
+ */
 onMounted(async () => {
+  isDataLoading.value = true;
+  errorMessage.value = null;
+
   try {
-    // Check mobile view
     checkMobileView();
     window.addEventListener("resize", checkMobileView);
 
-    // Load saved theme
-    const savedTheme = localStorage.getItem("vibecity-theme");
-    if (savedTheme !== null) {
-      isDarkMode.value = savedTheme === "dark";
-    }
+    // Sync persistent user settings
+    locale.value = userStore.preferences.language;
 
-    // Load favorites
     const savedFavorites = localStorage.getItem("vibecity-favorites");
-    if (savedFavorites) {
-      favorites.value = JSON.parse(savedFavorites);
-    }
+    if (savedFavorites) favorites.value = JSON.parse(savedFavorites);
 
-    // Load shop data
-    rawShops.value = await fetchShopData(SHEET_CSV_URL);
-    console.log("Loaded shops:", rawShops.value.length);
+    // Initial measurement
+    nextTick(measureBottomUi);
+    window.addEventListener("resize", measureBottomUi);
 
-    // ✅ Request geolocation on mount
-    requestGeolocation();
-
-    // Load buildings data
-    try {
-      const buildingsResponse = await fetch("/data/buildings.json");
-      buildingsData.value = await buildingsResponse.json();
-      console.log("Loaded buildings:", Object.keys(buildingsData.value).length);
-    } catch (e) {
-      console.warn("Buildings data not found, continuing without it");
-    }
-
-    // Start Clock Loop (Update every 1 minute)
+    // ✅ Start Intervals (Unified)
     timeInterval = setInterval(() => {
       currentTime.value = new Date();
+      // Every 30 mins, refresh data
+      if (currentTime.value.getMinutes() % 30 === 0) {
+        updateEventsData();
+        fetchShopData(SHEET_CSV_URL)
+          .then((d) => (rawShops.value = d))
+          .catch(() => {});
+      }
     }, 60000);
 
-    // Listen for window custom event from Leaflet marker (bypasses Vue emit limitation)
-    window.addEventListener("vibe-open-detail", handleVibeOpenDetail);
-  } catch (err) {
-    console.error("Initialization Error:", err.message);
-  } finally {
-    isDataLoading.value = false;
-  }
-});
+    rotationInterval = setInterval(() => {
+      shopStore.refreshRotation();
+    }, 60000);
 
-onUnmounted(() => {
-  if (timeInterval) clearInterval(timeInterval);
-  window.removeEventListener("resize", checkMobileView);
-  window.removeEventListener("vibe-open-detail", handleVibeOpenDetail);
+    // ✅ Load user stats
+    const savedCoins = localStorage.getItem("vibecity_total_coins");
+    if (savedCoins) {
+      currentUserStats.value.coinsCollected = parseInt(savedCoins) || 0;
+      currentUserStats.value.coins = parseInt(savedCoins) || 0;
+    }
+
+    // Concurrent Data Fetching
+    const [shopsData] = await Promise.all([
+      fetchShopData(SHEET_CSV_URL),
+      updateEventsData(),
+      fetch("/data/buildings.json")
+        .then((r) => r.json())
+        .then((d) => (buildingsData.value = d))
+        .catch(() => {}),
+      fetch("/data/events.json")
+        .then((r) => r.json())
+        .then((d) => (timedEvents.value = d))
+        .catch(() => {}),
+    ]);
+
+    rawShops.value = shopsData;
+    requestGeolocation();
+
+    // ✅ Deep Link Support: Check for ?shop=ID in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const shopIdParam = urlParams.get("shop");
+    if (shopIdParam) {
+      // Small delay to ensure everything is rendered
+      setTimeout(() => {
+        applyShopSelection(Number(shopIdParam));
+      }, 1500);
+    }
+  } catch (err) {
+    console.error("Critical app initialization failure:", err);
+    errorMessage.value =
+      "Unable to connect to VibeCity services. Please check your internet connection.";
+  } finally {
+    setTimeout(() => {
+      isDataLoading.value = false;
+    }, 800);
+  }
 });
 
 const checkMobileView = () => {
   isMobileView.value = window.innerWidth < 768;
 };
 
-// Toggle theme - แก้ไขให้ทำงานถูกต้อง
-const toggleTheme = () => {
-  console.log("Toggle theme clicked, current:", isDarkMode.value);
-  isDarkMode.value = !isDarkMode.value;
-  console.log("New theme:", isDarkMode.value);
-  localStorage.setItem("vibecity-theme", isDarkMode.value ? "dark" : "light");
-};
+/* const toggleTheme = () => {
+  ... moved to userStore ...
+}; */
 
 const handleLocateMe = () => {
   // ถ้าอยู่ indoor แล้วอยาก “ออก indoor” ก่อน locate (REMOVED logic)
   /* if (isIndoorView.value) {
-    handleCloseFloorSelector(); 
+    handleCloseFloorSelector();
   } */
 
   if (mapRef.value && userLocation.value) {
@@ -457,326 +880,287 @@ const handlePanelScroll = (shop) => {
 
 // Map → Card: When clicking marker, set active and focus
 const handleMarkerClick = (shop) => {
-  // ✅ ปิด popup
   if (!shop) {
     activeShopId.value = null;
     return;
   }
 
-  // ✅ Toggle: กดซ้ำที่ร้านเดิม = ปิด
-  if (activeShopId.value === shop.id) {
+  // Toggle: clicking same marker closes it
+  if (activeShopId.value == shop.id) {
     activeShopId.value = null;
     return;
   }
 
-  activeShopId.value = shop.id;
-
-  // ✅ Check if shop is in a building -> JUST set activeBuilding for Drawer (No floor selector)
-  const buildingKey = shop.Building;
-  const buildingRaw = buildingKey ? buildingsData.value[buildingKey] : null;
-
-  if (buildingRaw) {
-    // Shop is inside a building -> set activeBuilding so Drawer can open
-    activeBuilding.value = { ...buildingRaw, key: buildingKey };
-    // No activeFloor or isIndoorView anymore
-  } else {
-    // No building
-    activeBuilding.value = null;
-  }
-
-  if (mapRef.value && shop.lat && shop.lng) {
-    mapRef.value.focusLocation([shop.lat, shop.lng], 17);
-  }
-
-  // ✅ ถ้ากดจากหมุด อยากให้การ์ดเลื่อนมาอยู่กลางด้วย
-  if (isMobileView.value) {
-    centerCardToMiddle(shop.id);
-  }
+  // Trigger unified selection logic (map fly + carousel sync + building detect)
+  applyShopSelection(shop.id);
 };
 
 // Close floor selector - exit indoor view but keep selected shop (DEPRECATED but keeping simplified)
+/**
+ * Logic to close floor selectors or building-specific drawers.
+ * Refocuses the map on the currently active shop if it exists.
+ */
 const handleCloseFloorSelector = () => {
-  // Just clear building usually, but we might want to close drawer?
-  // activeBuilding.value = null; // Maybe? Or let drawer handle it.
-
-  // For now, this function is mostly unused if we remove UI calls to it.
-  // But let's act as "Clear Selection"
+  isIndoorView.value = false;
+  showFloorSelector.value = false;
+  activeBuilding.value = null;
 
   // ✅ Focus back on the currently active shop if exists
-  const currentShop = shops.value.find((s) => s.id === activeShopId.value);
+  const currentShop = shops.value.find((s) => s.id == activeShopId.value);
   if (currentShop && mapRef.value) {
     mapRef.value.focusLocation([currentShop.lat, currentShop.lng], 17);
   }
 };
 
-// Handle floor selection (REMOVED)
 const handleFloorSelect = (floor) => {
   console.log("Floor selection deprecated");
 };
 
-// Shop card click - pan to shop first
-const openModalOnCardClick = ref(true); // ✅ อยากให้คลิกการ์ดเปิด modal ไหม
+// ... existing code ...
 
-const handleCardClick = (shop) => {
+/**
+ * Detects if a shop belongs to a building and triggers the building-specific UI (Mall Drawer).
+ * Standardizes centering, map focus, and state updates for a unified selected shop experience.
+ */
+const applyShopSelection = (shopId) => {
+  if (!shopId) return;
+
+  activeShopId.value = shopId;
+  const shop = shops.value.find((s) => Number(s.id) === Number(shopId));
   if (!shop) return;
 
-  // ✅ toggle active
-  if (activeShopId.value === shop.id) {
-    activeShopId.value = null;
-    if (openModalOnCardClick.value) selectedShop.value = null;
-    return;
-  }
-
-  activeShopId.value = shop.id;
-
-  // ✅ เลื่อนการ์ดไปกลางแบบนุ่ม
-  if (isMobileView.value) centerCardToMiddle(shop.id);
-
-  // ✅ fly map
-  if (mapRef.value && shop.lat && shop.lng) {
-    mapRef.value.focusLocation([shop.lat, shop.lng], 17);
-  }
-
-  // ✅ เปิด modal เฉพาะตอนคลิก (ไม่ใช่ตอนเลื่อนด้วยนิ้ว)
-  if (openModalOnCardClick.value) {
-    selectedShop.value = shop;
-  }
-};
-
-// Hover on card - pan map to location
-const handleCardHover = (shop) => {
-  activeShopId.value = shop.id;
-  activeProvince.value = "เชียงใหม่";
+  // Update context
+  activeProvince.value = shop.Province || "เชียงใหม่";
   activeZone.value = shop.Zone || null;
 
-  // hover แล้วถ้าไม่ใช่ตึก ให้ปิด tabs (Simplified)
-  const buildingKey = shop.Building;
-  const building = buildingKey ? buildingsData.value[buildingKey] : null;
-  if (!building) {
-    // showFloorSelector.value = false;
-    // isIndoorView.value = false;
-    activeBuilding.value = null;
-    // activeFloor.value = null;
-  }
-
+  // 1. Focus Map with optimized center offset
   if (mapRef.value && shop.lat && shop.lng) {
-    mapRef.value.focusLocation([shop.lat, shop.lng], 16);
-  }
-};
-
-// Handler for window event from Leaflet marker (bypasses Vue emit)
-const handleVibeOpenDetail = (event) => {
-  const shop = event.detail;
-  if (shop) {
-    selectedShop.value = shop; // Open modal directly
-  }
-};
-
-// Open detail modal DIRECTLY
-const handleOpenDetail = (shop) => {
-  selectedShop.value = shop; // Open modal
-};
-
-// ✅ Horizontal Scroll Handler - iOS picker magnet snap (touchend/mouseup) + auto active + map fly (NO modal)
-const mobileCardScrollRef = ref(null);
-
-const isAutoSnapping = ref(false);
-let rafMomentum = 0;
-let lastScrollLeft = 0;
-let stillFrames = 0;
-
-const getActiveListForCarousel = () => {
-  return carouselShops.value; // Always use carousel, no indoor list
-};
-
-const getClosestCenteredShopId = () => {
-  const container = mobileCardScrollRef.value;
-  if (!container) return null;
-
-  const cards = container.querySelectorAll("[data-shop-id]");
-  if (!cards.length) return null;
-
-  const containerRect = container.getBoundingClientRect();
-  const containerCenter = containerRect.left + containerRect.width / 2;
-
-  let closestEl = null;
-  let minDiff = Infinity;
-
-  cards.forEach((el) => {
-    const rect = el.getBoundingClientRect();
-    const cardCenter = rect.left + rect.width / 2;
-    const diff = Math.abs(containerCenter - cardCenter);
-
-    if (diff < minDiff) {
-      minDiff = diff;
-      closestEl = el;
-    }
-  });
-
-  if (!closestEl) return null;
-  return Number(closestEl.getAttribute("data-shop-id")) || null;
-};
-
-// ✅ smooth snap by scrollTo target (ใช้ offsetLeft ไม่พึ่ง getBoundingClientRect -> ลดสะดุ้ง)
-const snapShopIdToCenter = (shopId) => {
-  const container = mobileCardScrollRef.value;
-  if (!container) return;
-
-  const card = container.querySelector(`[data-shop-id="${shopId}"]`);
-  if (!card) return;
-
-  isAutoSnapping.value = true;
-
-  const containerWidth = container.clientWidth;
-  const target = card.offsetLeft - containerWidth / 2 + card.offsetWidth / 2;
-
-  // clamp กัน overscroll/elastic บางเครื่อง
-  const maxLeft = container.scrollWidth - containerWidth;
-  const clamped = Math.max(0, Math.min(target, maxLeft));
-
-  // ✅ Fix Stutter: Cancel any pending momentum snap from mouseup/touchend
-  // because we are now snapping programmatically via click.
-  if (typeof rafMomentum !== "undefined") {
-    cancelAnimationFrame(rafMomentum);
+    smoothFlyTo([shop.lat, shop.lng]);
   }
 
-  container.scrollTo({ left: clamped, behavior: "smooth" });
-
-  // กัน loop จาก programmatic scroll
-  window.clearTimeout(snapShopIdToCenter._t);
-  snapShopIdToCenter._t = window.setTimeout(() => {
-    isAutoSnapping.value = false;
-  }, 260);
-};
-
-const centerCardToMiddle = (shopId) => {
-  if (!shopId) return;
-  snapShopIdToCenter(shopId);
-};
-
-// ✅ apply effects: active + fly map + floor selector (NO modal)
-const applyShopFocus = (shopId) => {
-  if (!shopId) return;
-
-  // Reverting check to allow re-centering if user panned away.
-  // Stutter is fixed by cancelling rafMomentum in snapShopIdToCenter.
-  activeShopId.value = shopId;
-  selectedShop.value = null; // 🔥 Prevent duplicate modal opening
-
-  const list = getActiveListForCarousel();
-  const shop = list.find((s) => Number(s.id) === Number(shopId));
-
-  if (shop && mapRef.value && shop.lat && shop.lng) {
-    // Pass manual Y offset = 0 for exact visual center (Screen Center)
-    // using '0' explicitly overrides the automatic UI balancing
-    mapRef.value.focusLocation([shop.lat, shop.lng], 16, 0);
+  // 2. Sync Carousel scroll (เรียกใช้ฟังก์ชันใหม่ scrollToCard)
+  if (isMobileView.value) {
+    scrollToCard(shopId);
   }
 
-  const buildingKey = shop?.Building;
+  // 3. Detect Building/Mall context
+  const buildingKey = shop.Building;
   const buildingRaw = buildingKey ? buildingsData.value[buildingKey] : null;
 
   if (buildingRaw) {
     activeBuilding.value = { ...buildingRaw, key: buildingKey };
-    // activeFloor.value = shop.Floor || buildingRaw.floors?.[0] || null;
-    // showFloorSelector.value = true;
+    showMallDrawer.value = true;
   } else {
-    // showFloorSelector.value = false;
     activeBuilding.value = null;
-    // activeFloor.value = null;
-    // isIndoorView.value = false;
   }
 };
 
-// ✅ รอ momentum หยุดจริง ๆ แล้วค่อย snap (เฟรมคงที่หลายเฟรม)
-const waitMomentumThenSnap = () => {
+const handleCardHover = (shop) => {
+  applyShopSelection(shop.id);
+};
+
+// ==========================================
+// ✅ UNIFIED SCROLL ENGINE (Clean & Fix Duplicates)
+// ==========================================
+
+// --- ⚙️ SCROLL & STATE MANAGEMENT (Enterprise Grade) ---
+
+const mobileCardScrollRef = ref(null);
+const isUserScrolling = ref(false); // เช็คว่า User กำลังเอานิ้วไถอยู่ไหม
+const isProgrammaticScroll = ref(false); // เช็คว่า App กำลังเลื่อนให้เองไหม (เช่น กดจาก Map)
+
+let scrollTimeout = null; // สำหรับจับว่า User หยุดเลื่อนหรือยัง
+let ticking = false; // สำหรับ rAF Throttle (Performance)
+
+const handleSearchBlur = () => {
+  setTimeout(() => {
+    showSearchResults.value = false;
+  }, 200);
+};
+
+// Debug-only helper (keep in component, but only render the button in DEV)
+const triggerError = () => {
+  throw new Error("Sentry test error");
+};
+
+// Optional: carousel drag start/end hooks referenced in template
+const onScrollStart = () => {
+  isUserScrolling.value = true;
+};
+const onScrollEnd = () => {
+  // Let debounce in handleHorizontalScroll settle; just mark as not actively dragging
+  isUserScrolling.value = false;
+};
+
+const handleOpenDetail = (shop) => {
+  selectedShop.value = shop;
+};
+
+// 1. 🎯 ฟังก์ชันหา ID การ์ดที่อยู่ตรงกลางจอ (Precision Logic)
+const getCenteredCardId = () => {
   const container = mobileCardScrollRef.value;
-  if (!container) return;
+  if (!container) return null;
 
-  cancelAnimationFrame(rafMomentum);
+  const containerRect = container.getBoundingClientRect();
+  const containerCenter = containerRect.left + containerRect.width / 2;
 
-  const tick = () => {
-    const now = container.scrollLeft;
+  // ค้นหาเฉพาะการ์ดที่มี data-shop-id
+  const cards = container.querySelectorAll("[data-shop-id]");
+  let closestCard = null;
+  let minDiff = Infinity;
 
-    if (Math.abs(now - lastScrollLeft) < 0.5) {
-      stillFrames += 1;
-    } else {
-      stillFrames = 0;
+  // Loop หาการ์ดที่ใกล้เส้นกลางที่สุด
+  cards.forEach((card) => {
+    const cardRect = card.getBoundingClientRect();
+    const cardCenter = cardRect.left + cardRect.width / 2;
+    const diff = Math.abs(containerCenter - cardCenter);
+
+    // Threshold: ต้องใกล้กว่า 100px ถึงจะนับ (ลดความผิดพลาด)
+    if (diff < minDiff && diff < 100) {
+      minDiff = diff;
+      closestCard = card;
     }
+  });
 
-    lastScrollLeft = now;
-
-    // ✅ หยุดนิ่งติดกัน ~6 เฟรม (ประมาณ 100ms) -> ถือว่าหยุดจริง
-    if (stillFrames >= 4) {
-      const shopId = getClosestCenteredShopId();
-      if (shopId) {
-        snapShopIdToCenter(shopId);
-        applyShopFocus(shopId);
-      }
-      return;
-    }
-
-    rafMomentum = requestAnimationFrame(tick);
-  };
-
-  rafMomentum = requestAnimationFrame(tick);
+  return closestCard ? Number(closestCard.getAttribute("data-shop-id")) : null;
 };
 
-// ✅ ใช้แค่ update active แบบเบา ๆ ระหว่างเลื่อน (optional)
-// ถ้าอยาก “ไม่ fly ระหว่างลาก” ให้ไม่ทำอะไรใน onScroll เลยก็ได้
+// 2. 🤖 ฟังก์ชันสั่งเลื่อนการ์ดไปตรงกลาง (Programmatic Scroll)
+const scrollToCard = (shopId) => {
+  const container = mobileCardScrollRef.value;
+  if (!container || !shopId) return;
+
+  const card = container.querySelector(`[data-shop-id="${shopId}"]`);
+  if (!card) return;
+
+  // ✅ Check 1: ถ้าการ์ดอยู่ตรงกลางอยู่แล้ว ไม่ต้องเลื่อน (กันกระตุก)
+  const currentCenterId = getCenteredCardId();
+  if (currentCenterId === Number(shopId)) return;
+
+  // ✅ Lock System: บอกว่า "ระบบกำลังทำงาน User ห้ามยุ่ง"
+  isProgrammaticScroll.value = true;
+
+  // Clear Timeout เก่าทิ้ง
+  if (scrollTimeout) clearTimeout(scrollTimeout);
+
+  const containerWidth = container.clientWidth;
+  const cardLeft = card.offsetLeft;
+  const cardWidth = card.offsetWidth;
+
+  // สูตรคำนวณตำแหน่งกึ่งกลางเป๊ะๆ
+  const targetScroll = cardLeft - containerWidth / 2 + cardWidth / 2;
+
+  container.scrollTo({
+    left: targetScroll,
+    behavior: "smooth",
+  });
+
+  // ✅ Unlock: ปลดล็อคเมื่อ Animation น่าจะจบแล้ว (800ms)
+  scrollTimeout = setTimeout(() => {
+    isProgrammaticScroll.value = false;
+  }, 800);
+};
+
+// 3. 🖐️ Main Scroll Listener (ทำงานตอน User ไถหน้าจอ)
 const handleHorizontalScroll = () => {
-  if (isAutoSnapping.value) return;
-  // ปล่อยให้ snap ตอนปล่อยนิ้วจริง ๆ แทน (กันสะดุ้ง)
-};
+  // ⛔️ ถ้าโปรแกรมสั่งเลื่อนอยู่ ห้ามคำนวณแทรก (สำคัญมาก)
+  if (isProgrammaticScroll.value) return;
 
-// ✅ hook: ปล่อยนิ้ว = snap
-const onCarouselRelease = () => {
-  if (isAutoSnapping.value) return;
-  stillFrames = 0;
-  lastScrollLeft = mobileCardScrollRef.value?.scrollLeft || 0;
-  waitMomentumThenSnap();
-};
+  // บอกว่า User กำลังเลื่อน
+  isUserScrolling.value = true;
 
-// ✅ Use watch to attach event listeners when element becomes available
-watch(
-  mobileCardScrollRef,
-  (newEl, oldEl) => {
-    // Remove from old element
-    if (oldEl) {
-      oldEl.removeEventListener("touchend", onCarouselRelease);
-      oldEl.removeEventListener("touchcancel", onCarouselRelease);
-      oldEl.removeEventListener("mouseup", onCarouselRelease);
-      oldEl.removeEventListener("mouseleave", onCarouselRelease);
-    }
+  // Debounce: จับว่า User หยุดเลื่อนหรือยัง
+  if (scrollTimeout) clearTimeout(scrollTimeout);
+  scrollTimeout = setTimeout(() => {
+    isUserScrolling.value = false;
+  }, 150); // 150ms หลังหยุดไถ ถือว่าหยุดจริง
 
-    // Add to new element
-    if (newEl) {
-      console.log("✅ Carousel element attached, adding event listeners");
-      newEl.addEventListener("touchend", onCarouselRelease, { passive: true });
-      newEl.addEventListener("touchcancel", onCarouselRelease, {
-        passive: true,
-      });
-      newEl.addEventListener("mouseup", onCarouselRelease);
-      newEl.addEventListener("mouseleave", onCarouselRelease);
-    }
-  },
-  { immediate: true }
-);
+  // ⚡️ Performance: ใช้ requestAnimationFrame ลดภาระ CPU
+  if (!ticking) {
+    window.requestAnimationFrame(() => {
+      const centerId = getCenteredCardId();
 
-onUnmounted(() => {
-  const el = mobileCardScrollRef.value;
-  if (el) {
-    el.removeEventListener("touchend", onCarouselRelease);
-    el.removeEventListener("touchcancel", onCarouselRelease);
-    el.removeEventListener("mouseup", onCarouselRelease);
-    el.removeEventListener("mouseleave", onCarouselRelease);
+      // ถ้าเจอ ID ใหม่ และไม่ใช่ ID ปัจจุบัน
+      if (centerId && centerId !== Number(activeShopId.value)) {
+        // อัปเดตค่า (แต่ Watcher จะไม่สั่ง Scroll กลับ เพราะติดเงื่อนไข isUserScrolling)
+        activeShopId.value = centerId;
+
+        // Sync กับ Map (แต่ไม่ต้อง Focus รุนแรง แค่ Pan ไปหา)
+        const shop = shops.value.find((s) => Number(s.id) === Number(centerId));
+        if (shop && mapRef.value) {
+          smoothFlyTo([shop.lat, shop.lng]);
+          // selectFeedback(); // (Optional) สั่นเมื่อเลื่อนผ่านการ์ด
+        }
+      }
+      ticking = false;
+    });
+    ticking = true;
   }
-  cancelAnimationFrame(rafMomentum);
+};
+
+// 4. 👀 Watcher: คอยดูการเปลี่ยนแปลง ID (เช่น กดจาก Map / Search / หรือเลื่อนเสร็จแล้ว)
+watch(activeShopId, (newId) => {
+  // ✅ Update URL (ย้ายมาตรงนี้เพื่อให้ URL เปลี่ยนเสมอไม่ว่าจะเกิดจากอะไร)
+  if (newId) {
+    const url = new URL(window.location);
+    url.searchParams.set("shop", newId);
+    window.history.replaceState({}, "", url);
+  }
+
+  // ⛔️ ถ้า User กำลังไถมืออยู่ ห้ามสั่ง Scroll สวนทาง
+  if (isUserScrolling.value) return;
+
+  // ⛔️ ถ้าโปรแกรมสั่ง Scroll อยู่แล้ว ก็ไม่ต้องสั่งซ้ำ
+  if (isProgrammaticScroll.value) return;
+
+  if (newId) {
+    nextTick(() => {
+      // เช็คอีกรอบว่าต้องเลื่อนไหม (Double Check)
+      const currentCenter = getCenteredCardId();
+      if (currentCenter !== Number(newId)) {
+        scrollToCard(newId);
+      }
+    });
+  }
 });
+
+// 5. 👆 Handle Click บนการ์ด
+const handleCardClick = (shop) => {
+  if (!shop) return;
+
+  // Force Stop User Interaction Flag
+  isUserScrolling.value = false;
+
+  // 1. อัปเดต ID
+  activeShopId.value = shop.id;
+
+  // 2. สั่งเลื่อนการ์ดทันที (Programmatic)
+  scrollToCard(shop.id);
+
+  // 3. Sync Map
+  if (mapRef.value && shop.lat && shop.lng) {
+    smoothFlyTo([shop.lat, shop.lng]);
+  }
+
+  // 3.5 Capture Video Time (Cinematic Sync)
+  // Try to find the video element in the active card
+  const videoEl = document.querySelector(
+    `div[data-shop-id="${shop.id}"] video`,
+  );
+  if (videoEl) {
+    shop.initialTime = videoEl.currentTime;
+  }
+
+  // 4. เปิด Modal รายละเอียด
+  selectedShop.value = shop;
+};
 
 // Live count
 const liveCount = computed(() => {
   return shops.value.filter((s) => s.status === "LIVE").length;
 });
+
+const isDev = import.meta.env.DEV;
 </script>
 
 <template>
@@ -786,122 +1170,60 @@ const liveCount = computed(() => {
       isDarkMode ? 'bg-[#0b0d11]' : 'bg-gray-100',
     ]"
   >
-    <!-- ✅ TOP NAVIGATION BAR (Unified Desktop/Mobile) -->
     <div
-      class="fixed top-4 left-4 right-4 z-[6000] flex items-start gap-3 pointer-events-none"
+      class="fixed top-4 left-4 right-4 z-[5000] flex gap-3 items-start pointer-events-none"
     >
-      <!-- Theme Toggle (Pill style) -->
-      <button
-        @click="toggleTheme"
-        class="pointer-events-auto h-12 w-12 flex items-center justify-center rounded-2xl backdrop-blur-xl border border-white/20 shadow-2xl transition-all duration-500 active:scale-90"
-        :class="
-          isDarkMode
-            ? 'bg-zinc-900/40 text-yellow-400'
-            : 'bg-white/60 text-gray-700 border-gray-200'
-        "
-      >
-        <transition name="fade" mode="out-in">
-          <svg
-            v-if="isDarkMode"
-            key="sun"
-            xmlns="http://www.w3.org/2000/svg"
-            class="w-6 h-6"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
-            />
-          </svg>
-          <svg
-            v-else
-            key="moon"
-            xmlns="http://www.w3.org/2000/svg"
-            class="w-6 h-6"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
-            />
-          </svg>
-        </transition>
-      </button>
-
-      <!-- Search Bar (Expanded Flex) -->
-      <div class="relative flex-1 max-w-xl pointer-events-auto group">
+      <div class="flex-1 min-w-0 pointer-events-auto flex flex-col gap-2">
         <div
-          class="flex items-center backdrop-blur-2xl rounded-2xl shadow-2xl border transition-all duration-500 focus-within:ring-2 focus-within:ring-blue-500/30"
+          class="flex items-center backdrop-blur-xl rounded-2xl shadow-xl border transition-all duration-300 group focus-within:ring-2 focus-within:ring-blue-500/50"
           :class="
             isDarkMode
-              ? 'bg-zinc-900/40 border-white/10'
-              : 'bg-white/60 border-gray-200'
+              ? 'bg-zinc-900/80 border-white/10'
+              : 'bg-white/90 border-gray-200'
           "
         >
           <div
-            class="pl-4 text-gray-400 group-focus-within:text-blue-500 transition-colors"
+            class="pl-3 text-gray-400 group-focus-within:text-blue-500 transition-colors"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
+            <Search class="w-5 h-5" />
           </div>
           <input
             v-model="globalSearchQuery"
             @focus="showSearchResults = true"
-            @blur="setTimeout(() => (showSearchResults = false), 200)"
+            @blur="handleSearchBlur"
             type="text"
-            placeholder="Search vibes, events, shops..."
-            class="w-full px-3 py-3.5 bg-transparent outline-none text-sm font-medium placeholder-gray-500"
+            :placeholder="t('nav.search')"
+            class="w-full px-3 py-3 bg-transparent outline-none text-sm font-bold placeholder-gray-500/80"
             :class="isDarkMode ? 'text-white' : 'text-gray-900'"
           />
           <button
             v-if="globalSearchQuery"
             @click="globalSearchQuery = ''"
-            class="pr-4 text-gray-400 hover:text-red-500 transition-colors"
+            class="pr-3 text-gray-400 hover:text-red-500 transition-colors"
           >
-            ✕
+            <X class="w-4 h-4" />
           </button>
         </div>
 
-        <!-- Search Results Dropdown -->
         <transition name="dropdown-fade">
           <div
             v-if="showSearchResults && globalSearchResults.length > 0"
-            class="absolute top-full mt-2 w-full rounded-2xl shadow-2xl border overflow-hidden max-h-[60vh] overflow-y-auto backdrop-blur-3xl animate-in fade-in slide-in-from-top-2 duration-300"
+            class="w-full rounded-2xl shadow-2xl border overflow-hidden max-h-[60vh] overflow-y-auto backdrop-blur-3xl animate-in fade-in slide-in-from-top-2 duration-300 pointer-events-auto"
             :class="
               isDarkMode
-                ? 'bg-zinc-950/80 border-white/10'
-                : 'bg-white/90 border-gray-100'
+                ? 'bg-zinc-950/90 border-white/10'
+                : 'bg-white/95 border-gray-100'
             "
           >
             <div
               v-for="shop in globalSearchResults"
               :key="shop.id"
               @click="handleGlobalSearchSelect(shop)"
-              class="flex items-center gap-3 p-4 cursor-pointer border-b last:border-0 hover:bg-blue-500/10 transition-colors"
+              class="flex items-center gap-3 p-3 cursor-pointer border-b last:border-0 hover:bg-blue-500/10 transition-colors"
               :class="isDarkMode ? 'border-white/5' : 'border-gray-50'"
             >
               <div
-                class="w-12 h-12 rounded-xl bg-gray-200 overflow-hidden flex-shrink-0 shadow-inner"
+                class="w-10 h-10 rounded-lg bg-gray-200 overflow-hidden flex-shrink-0"
               >
                 <img
                   v-if="shop.Image_URL1"
@@ -911,199 +1233,186 @@ const liveCount = computed(() => {
               </div>
               <div class="flex-1 min-w-0">
                 <h4
-                  class="text-sm font-bold truncate"
+                  class="text-xs font-bold truncate"
                   :class="isDarkMode ? 'text-white' : 'text-gray-900'"
                 >
                   {{ shop.name }}
                 </h4>
-                <div
-                  class="flex items-center gap-2 text-[11px] font-medium opacity-50"
-                >
-                  <span>{{ shop.category }}</span>
-                  <span v-if="shop.distance"
-                    >• {{ shop.distance.toFixed(1) }} km</span
-                  >
-                </div>
+                <span class="text-[10px] opacity-60">{{ shop.category }}</span>
               </div>
             </div>
           </div>
         </transition>
-      </div>
 
-      <!-- Locate Me (Right) -->
-      <button
-        @click="handleLocateMe"
-        class="pointer-events-auto h-12 w-12 flex items-center justify-center rounded-2xl backdrop-blur-xl border border-white/20 shadow-2xl transition-all duration-500 active:scale-90"
-        :class="
-          isDarkMode
-            ? 'bg-zinc-900/40 text-blue-400'
-            : 'bg-white/60 text-blue-600 border-gray-200'
-        "
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="w-6 h-6"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
+        <div
+          class="flex items-center gap-2 overflow-x-auto no-scrollbar pointer-events-auto pt-1"
         >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-          />
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-          />
-        </svg>
-      </button>
-    </div>
-
-    <!-- ✅ CATEGORY DROPDOWN (Premium Glassmorphism - Centered) -->
-    <div
-      class="fixed top-20 left-0 right-0 z-[5900] flex justify-center pointer-events-none"
-    >
-      <div class="pointer-events-auto">
-        <!-- Dropdown Trigger Button -->
-        <button
-          @click="showCategoryDropdown = !showCategoryDropdown"
-          class="flex items-center gap-2 px-4 py-2.5 rounded-2xl backdrop-blur-2xl border shadow-2xl transition-all duration-300 active:scale-95"
-          :class="[
-            isDarkMode
-              ? 'bg-zinc-900/60 border-white/10 text-white hover:bg-zinc-800/80'
-              : 'bg-white/80 border-gray-200 text-gray-800 hover:bg-white',
-            activeCategories.length > 0
-              ? 'ring-2 ring-blue-500/50 shadow-blue-500/20'
-              : '',
-          ]"
-        >
-          <span class="text-sm font-bold">
-            {{
-              activeCategories.length === 0
-                ? "🎯 ทุกประเภท"
-                : activeCategories.length === 1
-                ? `🎯 ${activeCategories[0]}`
-                : `🎯 ${activeCategories.length} ประเภท`
-            }}
-          </span>
-          <svg
+          <button
+            @click="showCategoryDropdown = !showCategoryDropdown"
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl backdrop-blur-md border shadow-sm transition-all active:scale-95 whitespace-nowrap"
             :class="[
-              'w-4 h-4 transition-transform duration-300',
-              showCategoryDropdown ? 'rotate-180' : '',
+              isDarkMode
+                ? 'bg-zinc-800/80 border-white/10 text-white'
+                : 'bg-white/90 border-gray-200 text-black',
+              activeCategories.length > 0 ? 'ring-1 ring-blue-500' : '',
             ]"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M19 9l-7 7-7-7"
-            />
-          </svg>
-        </button>
+            <span class="text-[10px] font-bold">Categories</span>
+            <svg
+              class="w-3 h-3 opacity-50"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                d="M19 9l-7 7-7-7"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
 
-        <!-- Dropdown Panel -->
+          <div
+            v-for="catId in activeCategories"
+            :key="catId"
+            class="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-blue-600 text-white text-[10px] font-bold shrink-0 shadow-lg shadow-blue-500/30"
+          >
+            {{ catId }}
+            <span
+              @click.stop="
+                activeCategories = activeCategories.filter((c) => c !== catId)
+              "
+              class="ml-1 opacity-70 cursor-pointer"
+              ><X class="w-3 h-3"
+            /></span>
+          </div>
+        </div>
+
         <transition name="dropdown-slide">
           <div
             v-if="showCategoryDropdown"
-            class="absolute top-full mt-2 w-56 rounded-2xl backdrop-blur-2xl border shadow-2xl overflow-hidden z-[6000]"
+            class="absolute top-[110px] left-0 w-[200px] rounded-2xl backdrop-blur-3xl border shadow-2xl overflow-hidden pointer-events-auto"
             :class="
               isDarkMode
-                ? 'bg-zinc-900/90 border-white/10'
-                : 'bg-white/95 border-gray-200'
+                ? 'bg-zinc-900 border-white/10'
+                : 'bg-white border-gray-200'
             "
           >
-            <!-- Clear All -->
-            <button
-              @click="
-                activeCategories = [];
-                activeStatus = 'ALL';
-              "
-              class="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold border-b transition-colors"
-              :class="[
-                isDarkMode
-                  ? 'border-white/5 hover:bg-white/5'
-                  : 'border-gray-100 hover:bg-gray-50',
-                activeCategories.length === 0
-                  ? isDarkMode
-                    ? 'text-blue-400'
-                    : 'text-blue-600'
-                  : isDarkMode
-                  ? 'text-white/70'
-                  : 'text-gray-600',
-              ]"
-            >
-              <span>🌟 ทุกประเภท</span>
-              <svg
-                v-if="activeCategories.length === 0"
-                class="w-4 h-4 text-blue-500"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fill-rule="evenodd"
-                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                  clip-rule="evenodd"
-                />
-              </svg>
-            </button>
-
-            <!-- Category Options -->
-            <div class="max-h-64 overflow-y-auto">
+            <div class="p-2 grid grid-cols-1 gap-1">
               <button
                 v-for="cat in [
-                  { id: 'Live Music', icon: '🎸', label: 'Live Music' },
-                  { id: 'Club', icon: '🪩', label: 'Club' },
-                  { id: 'Bar', icon: '🍸', label: 'Bar' },
-                  { id: 'Restaurant', icon: '🍽️', label: 'Restaurant' },
-                  { id: 'Cafe', icon: '☕', label: 'Cafe' },
+                  {
+                    id: 'Live Music',
+                    comp: Guitar,
+                    label: t('categories.music'),
+                  },
+                  { id: 'Bar', comp: Martini, label: t('categories.bar') },
+                  {
+                    id: 'Restaurant',
+                    comp: Utensils,
+                    label: t('categories.food'),
+                  },
+                  { id: 'Cafe', comp: Coffee, label: t('categories.cafe') },
+                  { id: 'Fashion', comp: ShoppingBag, label: 'Fashion' },
                 ]"
                 :key="cat.id"
                 @click="
                   activeCategories.includes(cat.id)
                     ? (activeCategories = activeCategories.filter(
-                        (c) => c !== cat.id
+                        (c) => c !== cat.id,
                       ))
                     : (activeCategories = [...activeCategories, cat.id])
                 "
-                class="w-full flex items-center justify-between px-4 py-3 text-sm transition-colors"
-                :class="[
-                  isDarkMode ? 'hover:bg-white/5' : 'hover:bg-gray-50',
+                class="flex items-center gap-2 p-2 rounded-lg text-xs font-bold transition-all"
+                :class="
                   activeCategories.includes(cat.id)
-                    ? isDarkMode
-                      ? 'text-blue-400 bg-blue-500/10'
-                      : 'text-blue-600 bg-blue-50'
+                    ? 'bg-blue-600 text-white'
                     : isDarkMode
-                    ? 'text-white/80'
-                    : 'text-gray-700',
-                ]"
+                      ? 'text-white/80 hover:bg-white/10'
+                      : 'text-gray-700 hover:bg-gray-100'
+                "
               >
-                <span class="flex items-center gap-2">
-                  <span>{{ cat.icon }}</span>
-                  <span class="font-medium">{{ cat.label }}</span>
-                </span>
-                <svg
-                  v-if="activeCategories.includes(cat.id)"
-                  class="w-4 h-4 text-blue-500"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fill-rule="evenodd"
-                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                    clip-rule="evenodd"
-                  />
-                </svg>
+                <component :is="cat.comp" class="w-4 h-4" /> {{ cat.label }}
               </button>
             </div>
           </div>
         </transition>
+      </div>
+
+      <div class="flex flex-col gap-2 pointer-events-auto items-end">
+        <div
+          @click="
+            showProfileDrawer = true;
+            tapFeedback();
+          "
+          class="h-10 px-2 flex items-center gap-2 rounded-xl backdrop-blur-xl border shadow-lg cursor-pointer active:scale-95 transition-all"
+          :class="
+            isDarkMode
+              ? 'bg-zinc-900/80 border-white/20 text-white'
+              : 'bg-white/90 border-white text-gray-800'
+          "
+        >
+          <div
+            class="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-[9px] font-black border border-white/20 shadow-[0_0_8px_rgba(37,99,235,0.5)]"
+          >
+            {{ userLevel }}
+          </div>
+          <div class="flex flex-col">
+            <span
+              class="text-[8px] font-black opacity-60 uppercase tracking-wider"
+              >LEVEL</span
+            >
+            <div
+              class="w-8 h-1 bg-gray-500/30 rounded-full overflow-hidden mt-0.5"
+            >
+              <div
+                class="h-full bg-blue-500"
+                :style="{ width: levelProgress + '%' }"
+              ></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex gap-2">
+          <button
+            @click="toggleTheme"
+            class="w-10 h-10 flex items-center justify-center rounded-xl backdrop-blur-xl border shadow-lg active:scale-90 transition-all"
+            :class="
+              isDarkMode
+                ? 'bg-zinc-900/80 border-white/20 text-yellow-400'
+                : 'bg-white/90 border-white text-gray-600'
+            "
+          >
+            <Sun v-if="isDarkMode" class="w-5 h-5" />
+            <Moon v-else class="w-5 h-5" />
+          </button>
+
+          <button
+            @click="toggleLanguage"
+            class="w-10 h-10 flex items-center justify-center rounded-xl backdrop-blur-xl border shadow-lg active:scale-90 transition-all text-[10px] font-black tracking-widest gap-1"
+            :class="
+              isDarkMode
+                ? 'bg-zinc-900/80 border-white/20 text-white'
+                : 'bg-white/90 border-white text-gray-700'
+            "
+          >
+            <Globe class="w-3 h-3" />
+            {{ locale.toUpperCase() }}
+          </button>
+        </div>
+
+        <button
+          @click="handleLocateMe"
+          class="w-10 h-10 flex items-center justify-center rounded-xl backdrop-blur-xl border shadow-lg active:scale-90 transition-all"
+          :class="
+            isDarkMode
+              ? 'bg-zinc-900/80 border-white/20 text-blue-400'
+              : 'bg-white/90 border-white text-blue-600'
+          "
+        >
+          <LocateFixed class="w-5 h-5" />
+        </button>
       </div>
     </div>
 
@@ -1115,15 +1424,16 @@ const liveCount = computed(() => {
           ref="mapRef"
           :uiTopOffset="mapUiTopOffset"
           :uiBottomOffset="mapUiBottomOffset"
-          :shops="nearbyShops"
+          :shops="filteredShops"
           :userLocation="userLocation"
           :currentTime="currentTime"
           :highlightedShopId="activeShopId"
           :isDarkMode="isDarkMode"
           :activeZone="activeZone"
           :activeProvince="activeProvince"
-          :buildings="{}"
+          :buildings="activeEvents"
           :is-sidebar-open="isPanelOpen"
+          :selectedShopCoords="selectedShopCoords"
           @select-shop="handleMarkerClick"
           @open-detail="handleOpenDetail"
           @open-ride-modal="openRideModal"
@@ -1131,12 +1441,77 @@ const liveCount = computed(() => {
           @open-building="handleBuildingOpen"
         />
 
+        <!-- Navigation Legend (Desktop) -->
+        <div
+          v-if="!isMobileView"
+          class="absolute top-4 right-4 z-[2000] flex flex-col gap-2"
+        >
+          <div
+            class="bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl p-3 shadow-2xl"
+          >
+            <h4
+              class="text-[10px] font-black text-white/40 uppercase tracking-widest mb-2"
+            >
+              {{ t("legend.title") }}
+            </h4>
+            <div class="space-y-2">
+              <div class="flex items-center gap-2">
+                <div
+                  class="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]"
+                ></div>
+                <span class="text-[11px] font-bold text-white">{{
+                  t("legend.live_now")
+                }}</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full bg-yellow-400"></div>
+                <span class="text-[11px] font-bold text-white">{{
+                  t("legend.coin_reward")
+                }}</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full bg-blue-500"></div>
+                <span class="text-[11px] font-bold text-white">{{
+                  t("legend.selected")
+                }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Floor Selector Popup - Moved outside for better z-index control -->
+        <transition name="fade">
+          <div
+            v-if="showFloorSelector"
+            class="absolute bottom-6 inset-x-0 mx-auto w-fit z-[3000]"
+          >
+            <div
+              class="bg-zinc-900/90 backdrop-blur-2xl border border-white/20 rounded-2xl p-1.5 flex items-center gap-1.5 shadow-2xl ring-1 ring-black/50"
+            >
+              <button
+                v-for="fl in ['4F', '3F', '2F', '1F', 'GF', 'B1']"
+                :key="fl"
+                @click="activeFloor = fl"
+                :class="[
+                  'px-4 py-2 rounded-xl text-xs font-black transition-all active:scale-90',
+                  activeFloor === fl
+                    ? 'bg-blue-600 text-white shadow-lg'
+                    : 'text-white/40 hover:text-white hover:bg-white/5',
+                ]"
+              >
+                {{ fl }}
+              </button>
+              <div class="w-px h-6 bg-white/10 mx-1"></div>
+              <button
+                @click="handleCloseFloorSelector"
+                class="w-10 h-10 rounded-xl bg-white/5 text-white/60 hover:text-white flex items-center justify-center transition-all"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </transition>
       </div>
-
-      <!-- Navigation Legend desktop REMOVED -->
-
-      <!-- Floor Selector Tabs Bar REMOVED -->
 
       <!-- Video Panel -->
       <VideoPanel
@@ -1160,15 +1535,16 @@ const liveCount = computed(() => {
         ref="mapRef"
         :uiTopOffset="mapUiTopOffset"
         :uiBottomOffset="mapUiBottomOffset"
-        :shops="nearbyShops"
+        :shops="filteredShops"
         :userLocation="userLocation"
         :currentTime="currentTime"
         :highlightedShopId="activeShopId"
         :isDarkMode="isDarkMode"
         :activeZone="activeZone"
         :activeProvince="activeProvince"
-        :buildings="{}"
+        :buildings="activeEvents"
         :isSidebarOpen="!isVibeNowCollapsed"
+        :selectedShopCoords="selectedShopCoords"
         :legendHeight="legendHeight"
         @select-shop="handleMarkerClick"
         @open-detail="handleOpenDetail"
@@ -1181,9 +1557,12 @@ const liveCount = computed(() => {
       <!-- Navigation Legend & Floor Selector REMOVED -->
 
       <!-- ✅ VIBE NOW / INDOOR POI - Horizontal Carousel (Bottom) -->
-      <div class="absolute bottom-0 left-0 right-0 z-[1200] pb-3">
+      <div
+        ref="bottomUiRef"
+        class="absolute bottom-0 left-0 right-0 z-[1200] pb-10 pointer-events-none"
+      >
         <!-- Header Bar - Centered (closer to cards) -->
-        <div class="flex items-center justify-center gap-2 py-1 mb-0">
+        <div class="flex items-center justify-center gap-2 py-2 mb-1">
           <span
             :class="[
               'text-xs font-bold tracking-widest uppercase',
@@ -1205,164 +1584,324 @@ const liveCount = computed(() => {
         </div>
 
         <!-- Horizontal Cards Carousel -->
-        <div
-          ref="mobileCardScrollRef"
-          class="flex overflow-x-auto overflow-y-visible px-6 py-4 gap-4 no-scrollbar items-end mb-0 snap-x snap-mandatory"
-          style="-webkit-overflow-scrolling: touch; scroll-behavior: smooth"
-          @scroll="handleHorizontalScroll"
-        >
-          <!-- Spacer to center first item -->
-          <div class="flex-shrink-0 w-[calc(50vw-90px)]"></div>
+        <div class="relative min-h-[100px]">
+          <!-- ✅ Case 1: Loading State -->
+          <div
+            v-if="isDataLoading"
+            class="flex items-end px-[calc(50vw-90px)] py-4 gap-4 no-scrollbar mb-0 h-[300px] overflow-x-hidden"
+          >
+            <SkeletonCard
+              v-for="i in 5"
+              :key="`skel-${i}`"
+              variant="carousel"
+              :isDarkMode="isDarkMode"
+              class="pointer-events-auto"
+              style="width: 180px; height: 260px"
+            />
+          </div>
 
-          <!-- ✅ INDOOR MODE Removed: All logic stripped -->
-
-          <!-- ✅ NORMAL MODE: Show random 30 shops -->
-          <template v-if="true">
+          <!-- ✅ Case 2: Empty Result / Search Not Found -->
+          <div
+            v-else-if="carouselShops.length === 0"
+            class="flex flex-col items-center justify-center py-10 text-center px-10 animate-fade-in"
+          >
             <div
-              v-for="shop in carouselShops"
-              :key="shop.id"
-              class="flex-shrink-0 w-[180px] h-[170px] cursor-pointer transition-all duration-300 rounded-xl overflow-hidden shadow-lg border relative flex flex-col snap-center"
-              :data-shop-id="shop.id"
-              :class="[
-                activeShopId === shop.id
-                  ? 'scale-105 ring-2 ring-blue-500 z-20 shadow-2xl shadow-blue-500/40'
-                  : 'scale-100 hover:scale-102',
-                isDarkMode
-                  ? 'bg-zinc-900/90 border-white/10'
-                  : 'bg-white/95 border-gray-200',
-              ]"
-              @click="handleCardClick(shop)"
+              class="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4 border border-white/10"
             >
-              <!-- Top: Image/Video Area -->
-              <div
-                class="h-[110px] w-full flex-shrink-0 relative bg-gradient-to-br from-purple-700 via-pink-600 to-red-600 overflow-hidden"
-              >
-                <!-- Video Placeholder (will autoplay when active) -->
-                <video
-                  v-if="shop.Video_URL && activeShopId === shop.id"
-                  :src="shop.Video_URL"
-                  autoplay
-                  muted
-                  loop
-                  playsinline
-                  class="absolute inset-0 w-full h-full object-cover"
-                />
-                <!-- Fallback to image when video not available -->
-                <img
-                  v-else-if="shop.Image_URL1"
-                  :src="shop.Image_URL1"
-                  class="w-full h-full object-cover"
-                  loading="lazy"
-                />
-                <!-- Gradient background naturally shows if no media -->
-                <!-- LIVE Badge -->
-                <div
-                  v-if="shop.status === 'LIVE'"
-                  class="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-red-600 text-white text-[8px] font-bold animate-pulse"
-                >
-                  LIVE
-                </div>
-                <!-- Favorite Button (Top Right) -->
-                <button
-                  @click.stop="toggleFavorite(shop.id)"
-                  class="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full backdrop-blur-md transition-all active:scale-90"
-                  :class="[
-                    favorites.includes(Number(shop.id))
-                      ? 'bg-pink-500 text-white shadow-lg'
-                      : 'bg-black/20 text-white/80 hover:bg-black/40',
-                  ]"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="w-4 h-4"
-                    :fill="
-                      favorites.includes(Number(shop.id))
-                        ? 'currentColor'
-                        : 'none'
-                    "
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                    />
-                  </svg>
-                </button>
-              </div>
+              <span class="text-3xl">🔍</span>
+            </div>
+            <p
+              :class="[
+                'text-sm font-black uppercase tracking-[0.2em]',
+                isDarkMode ? 'text-white' : 'text-gray-900',
+              ]"
+            >
+              ไม่พบสถานที่ในพื้นที่นี้
+            </p>
+            <p
+              class="text-[10px] font-bold text-white/40 mt-1 mb-6 uppercase tracking-widest"
+            >
+              เราได้คัดมาให้คุณแล้ว
+            </p>
 
-              <!-- Bottom: Content -->
-              <div class="flex-1 p-2 flex flex-col justify-center min-w-0">
-                <h3
-                  :class="[
-                    'text-[11px] font-bold leading-tight truncate',
-                    isDarkMode ? 'text-white' : 'text-gray-900',
-                  ]"
-                >
-                  {{ shop.name }}
-                </h3>
-                <p
-                  :class="[
-                    'text-[9px] mt-0.5 truncate',
-                    isDarkMode ? 'text-white/50' : 'text-gray-500',
-                  ]"
-                >
-                  {{ shop.category || "Bar" }}
-                  <span v-if="shop.distance !== undefined">
-                    • {{ shop.distance.toFixed(1) }}km</span
-                  >
-                </p>
+            <div class="flex gap-3 mb-8">
+              <div
+                v-for="s in suggestedShops"
+                :key="s.id"
+                @click="handleCardClick(s)"
+                class="w-14 h-14 rounded-2xl overflow-hidden border border-white/20 active:scale-90 transition-all cursor-pointer shadow-xl"
+              >
+                <img
+                  v-if="s.Image_URL1"
+                  :src="s.Image_URL1"
+                  class="w-full h-full object-cover"
+                />
+                <div
+                  class="absolute inset-0 bg-gradient-to-t from-red-600/60 to-transparent"
+                ></div>
               </div>
             </div>
-          </template>
 
-          <!-- Spacer to center last item -->
-          <div class="flex-shrink-0 w-[calc(50vw-90px)]"></div>
-        </div>
-      </div>
-
-      <!-- Ride Service Modal Popup -->
-    </template>
-
-    <!-- Detail Modal REMOVED as per request -->
-
-    <!-- Loading Overlay -->
-    <transition name="fade">
-      <div
-        v-if="isDataLoading"
-        :class="[
-          'absolute inset-0 z-[7000] flex items-center justify-center',
-          isDarkMode ? 'bg-[#0b0d11]' : 'bg-gray-100',
-        ]"
-      >
-        <div class="flex flex-col items-center">
-          <div class="relative w-14 h-14 mb-6">
-            <div
-              :class="[
-                'absolute inset-0 border-[3px] rounded-full',
-                isDarkMode ? 'border-white/5' : 'border-gray-200',
-              ]"
-            ></div>
-            <div
-              class="absolute inset-0 border-[3px] border-red-600 rounded-full border-t-transparent animate-spin"
-            ></div>
+            <button
+              @click="
+                activeCategories = [];
+                activeStatus = 'ALL';
+              "
+              class="px-6 py-3 rounded-full bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest active:scale-95 shadow-[0_0_20px_rgba(37,99,235,0.4)]"
+            >
+              ดูสถานที่อื่นๆ ทั้งหมด
+            </button>
           </div>
-          <p
-            :class="[
-              'font-black tracking-[0.4em] uppercase text-[10px] animate-pulse',
-              isDarkMode ? 'text-white' : 'text-gray-700',
-            ]"
+
+          <div
+            v-else
+            ref="mobileCardScrollRef"
+            class="flex overflow-x-auto overflow-y-visible px-0 py-4 gap-4 no-scrollbar items-end mb-0 snap-x snap-mandatory h-[300px] pointer-events-auto touch-pan-x"
+            style="-webkit-overflow-scrolling: touch; scroll-behavior: smooth"
+            @scroll="handleHorizontalScroll"
+            @touchstart="onScrollStart"
+            @touchend="onScrollEnd"
+            @mousedown="onScrollStart"
+            @mouseup="onScrollEnd"
           >
-            Loading Vibes
-          </p>
+            <div class="flex-shrink-0 w-[calc(50vw-90px)]"></div>
+
+            <template v-if="isIndoorView">
+              <div
+                v-for="shop in mallShops.filter((s) => s.Floor === activeFloor)"
+                :key="`indoor-${shop.id}`"
+                :data-shop-id="shop.id"
+                v-memo="[
+                  shop.id,
+                  shop.status,
+                  activeShopId === shop.id,
+                  isDarkMode,
+                  favorites.includes(Number(shop.id)),
+                ]"
+                class="flex-shrink-0 w-[320px] h-[380px] cursor-pointer transition-all duration-300 rounded-xl overflow-hidden shadow-lg border relative flex flex-col snap-center"
+                :class="[
+                  activeShopId === shop.id
+                    ? 'scale-105 ring-4 ring-blue-500 z-20 shadow-2xl shadow-blue-500/60'
+                    : 'scale-100',
+                  isDarkMode
+                    ? 'bg-zinc-900 border-white/30'
+                    : 'bg-white border-gray-400',
+                ]"
+                @click="handleCardClick(shop)"
+              >
+                <div
+                  class="h-[110px] w-full flex-shrink-0 relative bg-gradient-to-br from-purple-700 via-pink-600 to-red-600 overflow-hidden"
+                >
+                  <video
+                    v-if="shop.Video_URL && activeShopId === shop.id"
+                    :src="shop.Video_URL"
+                    autoplay
+                    muted
+                    loop
+                    playsinline
+                    class="absolute inset-0 w-full h-full object-cover"
+                  />
+                  <img
+                    v-else-if="shop.Image_URL1"
+                    :src="shop.Image_URL1"
+                    class="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  <div
+                    v-if="shop.status === 'LIVE'"
+                    class="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-red-600 text-white text-[8px] font-bold animate-pulse"
+                  >
+                    LIVE
+                  </div>
+                  <div
+                    v-if="shop.isPromoted || shop.IsPromoted === 'TRUE'"
+                    class="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-gradient-to-r from-yellow-400 to-amber-600 text-black text-[8px] font-black shadow-lg z-10"
+                  >
+                    PROMOTED
+                  </div>
+                </div>
+                <div class="flex-1 p-2 flex flex-col justify-between min-w-0">
+                  <div>
+                    <h3
+                      :class="[
+                        'text-[11px] font-black leading-tight truncate uppercase',
+                        isDarkMode ? 'text-white' : 'text-black',
+                      ]"
+                    >
+                      {{ shop.name }}
+                    </h3>
+                    <p
+                      :class="[
+                        'text-[10px] mt-0.5 truncate font-black',
+                        isDarkMode ? 'text-white' : 'text-black',
+                      ]"
+                    >
+                      {{ shop.category || "Shop" }}
+                    </p>
+                  </div>
+                  <button
+                    @click.stop="openRideModal(shop)"
+                    class="mt-1 w-full py-1.5 rounded-lg bg-blue-600/20 border border-blue-500/30 text-blue-400 text-[9px] font-bold active:scale-95 transition-all"
+                  >
+                    เรียกรถ
+                  </button>
+                </div>
+              </div>
+            </template>
+
+            <template v-else>
+              <SwipeCard
+                v-for="shop in carouselShops"
+                :key="shop.id"
+                v-memo="[
+                  shop.id,
+                  shop.status,
+                  activeShopId === shop.id,
+                  isDarkMode,
+                  favorites.includes(Number(shop.id)),
+                ]"
+                @swipe-left="handleSwipe('left', shop)"
+                @swipe-right="handleSwipe('right', shop)"
+                @expand="handleCardClick(shop)"
+                class="snap-center transition-all duration-500 ease-out py-4"
+                :class="[
+                  activeShopId === shop.id
+                    ? 'scale-105 z-20'
+                    : 'scale-95 opacity-90 blur-[0.5px] grayscale-[0.2]',
+                ]"
+              >
+                <div
+                  :data-shop-id="shop.id"
+                  class="flex-shrink-0 w-[200px] h-[240px] cursor-pointer rounded-2xl overflow-hidden border relative flex flex-col group/card transition-shadow duration-300"
+                  :class="[
+                    activeShopId === shop.id
+                      ? 'ring-2 ring-blue-500 ' +
+                        (isDarkMode
+                          ? 'shadow-[0_0_30px_rgba(59,130,246,0.4)] border-blue-400/50'
+                          : 'shadow-2xl shadow-blue-500/40 border-blue-500/50')
+                      : 'shadow-md ' +
+                        (isDarkMode
+                          ? 'bg-zinc-950 border-white/10'
+                          : 'bg-white border-gray-200'),
+                  ]"
+                  @click="handleCardClick(shop)"
+                >
+                  <div class="absolute inset-0 z-0 bg-gray-800/20">
+                    <video
+                      v-if="shop.Video_URL && activeShopId === shop.id"
+                      :src="shop.Video_URL"
+                      autoplay
+                      muted
+                      loop
+                      playsinline
+                      class="w-full h-full object-cover brightness-[0.9] transition-all duration-700"
+                    />
+                    <img
+                      v-else-if="shop.Image_URL1"
+                      :src="shop.Image_URL1"
+                      class="w-full h-full object-cover brightness-[0.85] transition-all duration-700"
+                      loading="lazy"
+                    />
+                    <div
+                      class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"
+                    ></div>
+                  </div>
+
+                  <div
+                    class="absolute top-2 left-2 right-2 flex justify-between z-10"
+                  >
+                    <div class="flex gap-1">
+                      <div
+                        v-if="shop.status === 'LIVE'"
+                        class="px-1.5 py-0.5 rounded-md bg-red-600 text-white text-[8px] font-black animate-pulse shadow-lg backdrop-blur-sm"
+                      >
+                        LIVE
+                      </div>
+                      <div
+                        v-if="shop.isPromoted || shop.IsPromoted === 'TRUE'"
+                        class="px-1.5 py-0.5 rounded-md bg-gradient-to-r from-yellow-400 to-amber-600 text-black text-[8px] font-black shadow-lg"
+                      >
+                        PROMOTED
+                      </div>
+                    </div>
+                    <button
+                      @click.stop="toggleFavorite(shop.id)"
+                      class="w-7 h-7 flex items-center justify-center rounded-full backdrop-blur-md bg-black/20 border border-white/10 text-white/80 active:scale-75 transition-all hover:bg-black/40"
+                    >
+                      <svg
+                        class="w-3.5 h-3.5"
+                        :fill="
+                          favorites.includes(Number(shop.id))
+                            ? '#ec4899'
+                            : 'none'
+                        "
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        stroke-width="2.5"
+                      >
+                        <path
+                          d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div class="mt-auto relative z-10 p-3 pb-3">
+                    <h3
+                      class="text-xs font-black text-white leading-tight drop-shadow-md truncate"
+                    >
+                      {{ shop.name }}
+                    </h3>
+                    <div class="flex items-center justify-between mt-1">
+                      <span
+                        class="text-[9px] font-bold text-white/70 uppercase tracking-wider"
+                      >
+                        {{ shop.category || "Bar" }}
+                      </span>
+                      <span
+                        v-if="shop.distance !== undefined"
+                        class="text-[9px] font-black text-blue-400 drop-shadow-sm"
+                      >
+                        {{ shop.distance.toFixed(1) }}km
+                      </span>
+                    </div>
+
+                    <div class="mt-2 scale-[0.85] origin-left opacity-90">
+                      <VisitorCount :shopId="shop.id" :isDarkMode="true" />
+                    </div>
+
+                    <button
+                      @click.stop="openRideModal(shop)"
+                      class="mt-2 w-full py-2 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-white text-[10px] font-black active:scale-95 transition-all hover:bg-white/20 shadow-lg flex items-center justify-center gap-1"
+                    >
+                      <span>🚗</span> เรียกรถ
+                    </button>
+                  </div>
+                </div>
+              </SwipeCard>
+            </template>
+
+            <!-- Spacer to center last item -->
+            <div class="flex-shrink-0 w-[calc(50vw-100px)]"></div>
+          </div>
         </div>
       </div>
+    </template>
+  </main>
+
+  <!-- ✅ PORTAL: ย้ายทุก Modal/Drawer/Overlay มาอยู่บนสุดของ DOM -->
+  <PortalLayer>
+    <!-- ✅ VIBE MODAL (รายละเอียดร้าน) -->
+    <transition name="modal-fade">
+      <VibeModal
+        v-if="selectedShop"
+        :shop="selectedShop"
+        @close="selectedShop = null"
+      />
     </transition>
 
-    <!-- ✅ GLOBAL RIDE MODAL (Desktop & Mobile) -->
-    <transition name="modal-fade">
+    <!-- ✅ Ride Service Modal Popup (ของเดิมคุณ) -->
+    <transition name="fade">
       <div
         v-if="rideModalShop"
         class="fixed inset-0 z-[9000] flex items-center justify-center p-4"
@@ -1381,7 +1920,8 @@ const liveCount = computed(() => {
               isDarkMode ? 'bg-zinc-900 border border-white/10' : 'bg-white',
             ]"
           >
-            <!-- Header -->
+            <!-- ✅ === เอาของเดิมทั้งหมดใน Ride Modal (Header + 3 ปุ่ม Grab/Bolt/Lineman) มาวางตรงนี้แบบเดิมเป๊ะ === -->
+            <!-- ⚠️ ห้ามแก้อะไรข้างใน แค่ย้ายที่ render -->
             <div
               :class="[
                 'px-4 py-3 border-b',
@@ -1434,15 +1974,9 @@ const liveCount = computed(() => {
               </div>
             </div>
 
-            <!-- Ride Options -->
             <div class="p-3 space-y-2">
-              <!-- Grab -->
               <a
-                :href="`https://grab.onelink.me/2695613898?af_dp=grab://open?screenType=BOOKING&dropOffLatitude=${
-                  rideModalShop.lat
-                }&dropOffLongitude=${
-                  rideModalShop.lng
-                }&dropOffName=${encodeURIComponent(rideModalShop.name)}`"
+                :href="`https://grab.onelink.me/2695613898?af_dp=grab://open?screenType=BOOKING&dropOffLatitude=${rideModalShop.lat}&dropOffLongitude=${rideModalShop.lng}&dropOffName=${encodeURIComponent(rideModalShop.name)}`"
                 target="_blank"
                 @click="rideModalShop = null"
                 :class="[
@@ -1477,7 +2011,6 @@ const liveCount = computed(() => {
                 </div>
               </a>
 
-              <!-- Bolt -->
               <a
                 :href="`bolt://google/navigate?q=${rideModalShop.lat},${rideModalShop.lng}`"
                 target="_blank"
@@ -1514,7 +2047,6 @@ const liveCount = computed(() => {
                 </div>
               </a>
 
-              <!-- Lineman -->
               <a
                 :href="`https://lineman.asia/taxi?dropoff_lat=${rideModalShop.lat}&dropoff_lng=${rideModalShop.lng}`"
                 target="_blank"
@@ -1556,21 +2088,13 @@ const liveCount = computed(() => {
       </div>
     </transition>
 
-    <!-- Debug info -->
-    <div
-      v-if="false"
-      class="fixed top-20 left-4 z-[9999] bg-black/80 text-white p-2 text-xs"
-    >
-      Theme: {{ isDarkMode ? "Dark" : "Light" }}<br />
-      Shops: {{ shops.length }}<br />
-      Live: {{ liveCount }}
-    </div>
     <!-- ✅ MALL DRAWER -->
     <MallDrawer
       :is-open="showMallDrawer"
       :building="activeMall"
       :shops="mallShops"
       :is-dark-mode="isDarkMode"
+      :selected-shop-id="activeShopId"
       @close="showMallDrawer = false"
       @select-shop="
         (shop) => {
@@ -1582,8 +2106,103 @@ const liveCount = computed(() => {
       @toggle-favorite="toggleFavorite"
       :favorites="favorites"
     />
-  </main>
+
+    <!-- ✅ PROFILE DRAWER -->
+    <ProfileDrawer
+      :is-open="showProfileDrawer"
+      :is-dark-mode="isDarkMode"
+      @close="showProfileDrawer = false"
+      @toggle-language="toggleLanguage"
+    />
+
+    <!-- ✅ Global Loading State -->
+    <Transition
+      enter-active-class="transition duration-500 ease-out"
+      enter-from-class="opacity-0 scale-95"
+      enter-to-class="opacity-100 scale-100"
+      leave-active-class="transition duration-300 ease-in"
+      leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-105"
+    >
+      <div
+        v-if="isDataLoading"
+        class="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#09090b]"
+      >
+        <div class="relative w-24 h-24">
+          <div
+            class="absolute inset-0 rounded-full border-4 border-white/5"
+          ></div>
+          <div
+            class="absolute inset-0 rounded-full border-4 border-pink-500 border-t-transparent animate-spin"
+          ></div>
+          <div
+            class="absolute inset-4 rounded-full border-4 border-blue-500 border-b-transparent animate-spin-slow"
+          ></div>
+        </div>
+        <h2
+          class="mt-8 text-xl font-black text-white tracking-[0.2em] animate-pulse"
+        >
+          VIBECITY
+        </h2>
+        <p
+          class="mt-2 text-zinc-500 text-xs uppercase tracking-widest font-bold"
+        >
+          Synchronizing Vibe Engine...
+        </p>
+      </div>
+    </Transition>
+
+    <!-- ✅ Global Error Feedback -->
+    <Transition
+      enter-active-class="transition duration-500 ease-out"
+      enter-from-class="opacity-0 translate-y-10"
+      enter-to-class="opacity-100 translate-y-0"
+    >
+      <div
+        v-if="errorMessage"
+        class="fixed top-20 left-1/2 -translate-x-1/2 z-[8000] w-[90%] max-w-md"
+      >
+        <div
+          class="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 backdrop-blur-xl flex items-center gap-4 shadow-2xl"
+        >
+          <div
+            class="w-10 h-10 rounded-xl bg-red-500 flex items-center justify-center text-xl shrink-0"
+          >
+            ⚠️
+          </div>
+          <div class="flex-1">
+            <h4 class="text-white font-bold text-sm">System Alert</h4>
+            <p class="text-white/60 text-xs">{{ errorMessage }}</p>
+          </div>
+          <button
+            @click="errorMessage = null"
+            class="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-white/40"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- ✅ Confetti -->
+    <ConfettiEffect v-if="showConfetti" />
+  </PortalLayer>
 </template>
+
+<style scoped>
+.animate-spin-slow {
+  animation: spin 3s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+</style>
 
 <style>
 .fade-enter-active,

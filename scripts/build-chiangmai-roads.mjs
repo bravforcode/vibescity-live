@@ -7,10 +7,10 @@ const OUT_PATH = path.resolve("public/data/chiangmai-main-roads.geojson");
 // ✅ ใช้ bbox ตามที่โปรเจกต์คุณใช้ (chiangMaiBounds) + buffer นิดหน่อย
 // format: south, west, north, east
 const BBOX = {
-  s: 17.9,
-  w: 97.5,
-  n: 20.7,
-  e: 100.4,
+  s: 18.7, // South
+  w: 98.8, // West
+  n: 18.9, // North
+  e: 99.1, // East
 };
 
 // ✅ Overpass หลายเจ้า (ตัวแรกชอบ 504 ให้สลับอัตโนมัติ)
