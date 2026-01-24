@@ -2,6 +2,8 @@ import * as Sentry from "@sentry/vue";
 import { VueQueryPlugin } from "@tanstack/vue-query";
 import { createPinia } from "pinia";
 import { createApp } from "vue";
+import { vTestId } from "./directives/testid.js";
+
 
 import "./assets/css/main.postcss";
 import App from "./App.vue";
@@ -9,6 +11,13 @@ import i18n from "./i18n";
 import { vueQueryOptions } from "./plugins/queryClient";
 
 const app = createApp(App);
+
+// ✅ Microsoft Clarity
+import Clarity from "@microsoft/clarity";
+const clarityId = import.meta.env.VITE_CLARITY_PROJECT_ID;
+if (clarityId) {
+	Clarity.init(clarityId);
+}
 
 // ✅ Initialize Sentry only when configured
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
@@ -67,9 +76,11 @@ if (sentryDsn) {
 	});
 }
 
+
 app.use(createPinia());
 app.use(i18n);
 app.use(VueQueryPlugin, vueQueryOptions);
+app.directive("testid", vTestId);
 app.mount("#app");
 
 // ✅ Register Service Worker for PWA

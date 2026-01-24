@@ -3,39 +3,43 @@
 <script setup>
 import { useMotion } from "@vueuse/motion";
 import {
-	computed,
-	defineAsyncComponent,
-	onMounted,
-	onUnmounted,
-	ref,
-	watchEffect,
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  ref,
+  watchEffect,
 } from "vue";
+import { useHaptics } from "../../composables/useHaptics";
+const { selectFeedback, successFeedback } = useHaptics();
 import { Z } from "../../constants/zIndex";
 import { getMediaDetails } from "../../utils/linkHelper";
 
 const VisitorCount = defineAsyncComponent(
-	() => import("../ui/VisitorCount.vue"),
+  () => import("../ui/VisitorCount.vue"),
 );
 
 import {
-	Car,
-	Facebook,
-	Instagram,
-	Navigation,
-	Share2,
-	X,
+  Car,
+  Facebook,
+  Heart,
+  Instagram,
+  Navigation,
+  Share2,
+  X,
 } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
 import { useShopStore } from "../../store/shopStore";
 // --- REFACTOR: ใช้ browserUtils และ shopUtils ---
 import {
-	copyToClipboard,
-	isMobileDevice,
-	openBoltApp,
-	openGoogleMapsDir,
-	openGrabApp,
-	openLinemanApp,
-	shareLocation,
+  copyToClipboard,
+  isMobileDevice,
+  openBoltApp,
+  openGoogleMapsDir,
+  openGrabApp,
+  openLinemanApp,
+  shareLocation,
 } from "../../utils/browserUtils";
 import { getStatusColorClass } from "../../utils/shopUtils";
 import ReviewSystem from "../ui/ReviewSystem.vue";
@@ -43,42 +47,49 @@ import ReviewSystem from "../ui/ReviewSystem.vue";
 const { t } = useI18n();
 
 const props = defineProps({
-	shop: {
-		type: Object,
-		required: true,
-	},
+  shop: {
+    type: Object,
+    required: true,
+  },
+  initialIndex: {
+    type: Number,
+    default: 0,
+  },
 });
+
+const FALLBACK_IMAGE =
+  "https://images.unsplash.com/photo-1534531173927-aeb928d54385?w=800&q=80";
 
 const emit = defineEmits(["close"]);
 
 // --- Cinematic Motion Logic ---
 const modalCard = ref(null);
 const { apply } = useMotion(modalCard, {
-	initial: {
-		y: 600,
-		opacity: 0,
-		scale: 0.9,
-	},
-	enter: {
-		y: 0,
-		opacity: 1,
-		scale: 1,
-		transition: {
-			type: "spring",
-			stiffness: 300,
-			damping: 25,
-			mass: 0.5,
-		},
-	},
-	leave: {
-		y: 600,
-		opacity: 0,
-		scale: 0.95,
-		transition: {
-			duration: 200,
-			ease: "easeIn",
-		},
-	},
+  initial: {
+    y: 0,
+    opacity: 0,
+    scale: 0.8,
+  },
+  enter: {
+    y: 0,
+    opacity: 1,
+    scale: 1,
+    transition: {
+      type: "spring",
+      stiffness: 300,
+      damping: 25,
+      mass: 0.5,
+    },
+  },
+  leave: {
+    y: 0,
+    opacity: 0,
+    scale: 0.8,
+    transition: {
+      duration: 200,
+      ease: "easeIn",
+    },
+  },
 });
 
 // Gesture Variables
@@ -86,50 +97,74 @@ const touchStart = ref({ y: 0, t: 0 });
 const isDragging = ref(false);
 
 const handleTouchStart = (e) => {
-	touchStart.value = { y: e.touches[0].clientY, t: Date.now() };
-	isDragging.value = true;
+  touchStart.value = { y: e.touches[0].clientY, t: Date.now() };
+  isDragging.value = true;
 };
 
 const handleTouchMove = (e) => {
-	if (!isDragging.value) return;
-	const deltaY = e.touches[0].clientY - touchStart.value.y;
+  if (!isDragging.value) return;
+  const deltaY = e.touches[0].clientY - touchStart.value.y;
 
-	// Apply visual transform immediately (1:1 follow or resistance)
-	if (deltaY > 0) {
-		// Dragging down (closing) - 1:1
-		apply({ y: deltaY, scale: 1 - deltaY / 2000 });
-	} else {
-		// Dragging up (overshoot) - Rubber Banding
-		const resistance = Math.sqrt(Math.abs(deltaY)) * 2; // Square root resistance
-		apply({ y: -resistance });
-	}
+  // Apply visual transform immediately (1:1 follow or resistance)
+  if (deltaY > 0) {
+    // Dragging down (closing) - 1:1
+    apply({ y: deltaY, scale: 1 - deltaY / 2000 });
+  } else {
+    // Dragging up (overshoot) - Rubber Banding
+    const resistance = Math.sqrt(Math.abs(deltaY)) * 2; // Square root resistance
+    apply({ y: -resistance });
+  }
 };
 
 const handleTouchEnd = (e) => {
-	if (!isDragging.value) return;
-	isDragging.value = false;
+  if (!isDragging.value) return;
+  isDragging.value = false;
 
-	const deltaY = e.changedTouches[0].clientY - touchStart.value.y;
-	const time = Date.now() - touchStart.value.t;
-	const velocity = deltaY / time; // px/ms
+  const deltaY = e.changedTouches[0].clientY - touchStart.value.y;
+  const time = Date.now() - touchStart.value.t;
+  const velocity = deltaY / time; // px/ms
 
-	// Haptic Feedback
-	if (navigator.vibrate) navigator.vibrate(10);
+  // Haptic Feedback
+  selectFeedback();
 
-	// Close Condition: Dragged down > 150px OR fast flick down
-	if (deltaY > 150 || (deltaY > 50 && velocity > 0.5)) {
-		emit("close");
-	} else {
-		// Snap back to open
-		apply("enter");
-	}
+  // Close Condition: Dragged down > 150px OR fast flick down
+  if (deltaY > 150 || (deltaY > 50 && velocity > 0.5)) {
+    emit("close");
+  } else {
+    // Snap back to open
+    apply("enter");
+  }
 };
 
 const media = computed(() => getMediaDetails(props.shop.videoUrl));
 
 const processedImages = computed(() => {
-	return (props.shop.images || []).map((imgUrl) => getMediaDetails(imgUrl).url);
+  return (props.shop.images || []).map((imgUrl) => getMediaDetails(imgUrl).url);
 });
+
+// ✅ Double Tap Logic
+const lastTap = ref(0);
+const showHeartAnim = ref(false);
+
+const handleDoubleTap = (_e) => {
+  const now = Date.now();
+  const DOUBLE_TAP_DELAY = 300;
+
+  if (now - lastTap.value < DOUBLE_TAP_DELAY) {
+    // Action: Save / Like
+    emit("toggle-favorite", props.shop.id);
+
+    // Show Animation
+    showHeartAnim.value = true;
+    setTimeout(() => { copyStatus.value = ""; }, 1000);
+
+
+    // Haptic
+    successFeedback();
+  }
+
+  lastTap.value = now;
+};
 
 const zoomedImage = ref(null);
 const showRidePopup = ref(false);
@@ -143,141 +178,152 @@ const isPromoActive = ref(false);
 let timerInterval = null;
 
 const updateCountdown = () => {
-	if (!props.shop.promotionEndtime || !props.shop.promotionInfo) {
-		isPromoActive.value = false;
-		return;
-	}
+  if (!props.shop.promotionEndtime || !props.shop.promotionInfo) {
+    isPromoActive.value = false;
+    return;
+  }
 
-	const now = new Date();
-	const [hours, minutes] = props.shop.promotionEndtime.split(":");
+  const now = new Date();
+  const [hours, minutes] = props.shop.promotionEndtime.split(":");
 
-	const target = new Date();
-	target.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+  const target = new Date();
+  target.setHours(parseInt(hours), parseInt(minutes), 0, 0);
 
-	const diff = target - now;
-	const maxFlashWindow = 1200000; // 20 นาที
+  const diff = target - now;
+  const maxFlashWindow = 1200000; // 20 นาที
 
-	if (diff <= 0 || diff > maxFlashWindow) {
-		isPromoActive.value = false;
-		return;
-	}
+  if (diff <= 0 || diff > maxFlashWindow) {
+    isPromoActive.value = false;
+    return;
+  }
 
-	const totalSeconds = Math.floor(diff / 1000);
-	const mins = Math.floor(totalSeconds / 60);
-	const secs = totalSeconds % 60;
+  const totalSeconds = Math.floor(diff / 1000);
+  const mins = Math.floor(totalSeconds / 60);
+  const secs = totalSeconds % 60;
 
-	timeLeft.value = `${mins}:${secs.toString().padStart(2, "0")}`;
-	isPromoActive.value = true;
+  timeLeft.value = `${mins}:${secs.toString().padStart(2, "0")}`;
+  isPromoActive.value = true;
 };
 
 onMounted(() => {
-	isMobile.value = isMobileDevice();
-	updateCountdown();
-	timerInterval = setInterval(updateCountdown, 1000);
+  isMobile.value = isMobileDevice();
+  updateCountdown();
+  timerInterval = setInterval(updateCountdown, 1000);
+
+  // If opened via swipe and initialIndex is set, show specific image
+  if (props.initialIndex > 0 && processedImages.value[props.initialIndex]) {
+    handleZoom(processedImages.value[props.initialIndex]);
+  }
 });
+
+const handleZoom = (img) => {
+  zoomedImage.value = img;
+};
 
 // --- Media Sync ---
 const videoPlayer = ref(null);
 watchEffect(() => {
-	if (videoPlayer.value && props.shop.initialTime) {
-		videoPlayer.value.currentTime = props.shop.initialTime;
-	}
+  if (videoPlayer.value && props.shop.initialTime) {
+    videoPlayer.value.currentTime = props.shop.initialTime;
+  }
 });
 
 onUnmounted(() => {
-	if (timerInterval) clearInterval(timerInterval);
+  if (timerInterval) clearInterval(timerInterval);
 });
 
 // --- REFACTOR: เรียกใช้ Utils Function ---
 const handleCopy = async (text) => {
-	const success = await copyToClipboard(text);
-	if (success) {
-		copyStatus.value = "Copied!";
-		setTimeout(() => (copyStatus.value = ""), 3000);
-	} else {
-		copyStatus.value = "Manual search required";
-	}
+  const success = await copyToClipboard(text);
+  if (success) {
+    copyStatus.value = "Copied!";
+    setTimeout(() => { copyStatus.value = ""; }, 1000);
+
+  } else {
+    copyStatus.value = "Manual search required";
+  }
 };
 
 const openGoogleMaps = () => {
-	openGoogleMapsDir(props.shop.lat, props.shop.lng);
+  openGoogleMapsDir(props.shop.lat, props.shop.lng);
 };
 
 // เปิดแอพ Grab พร้อม feedback
 const openGrab = () => {
-	rideLoading.value = "grab";
+  rideLoading.value = "grab";
 
-	// Fire-and-forget copy (don't await) to prevent blocking deep link
-	copyToClipboard(props.shop.name).then(() => {
-		copyStatus.value = "Copied!";
-	});
+  // Fire-and-forget copy (don't await) to prevent blocking deep link
+  copyToClipboard(props.shop.name).then(() => {
+    copyStatus.value = "Copied!";
+  });
 
-	// Call immediately to satisfy browser security (Synchronous-like intent)
-	const success = openGrabApp(props.shop);
+  // Call immediately to satisfy browser security (Synchronous-like intent)
+  const success = openGrabApp(props.shop);
 
-	if (success) {
-		copyStatus.value = "กำลังเปิด Grab...";
-	} else {
-		copyStatus.value = "ไม่พบ Grab";
-	}
+  if (success) {
+    copyStatus.value = "กำลังเปิด Grab...";
+  } else {
+    copyStatus.value = "ไม่พบ Grab";
+  }
 
-	// ปิด popup หลังจาก 1.5 วินาที
-	setTimeout(() => {
-		showRidePopup.value = false;
-		rideLoading.value = "";
-		setTimeout(() => (copyStatus.value = ""), 1000);
-	}, 1500);
+  // ปิด popup หลังจาก 1.5 วินาที
+  setTimeout(() => {
+    showRidePopup.value = false;
+    rideLoading.value = "";
+    setTimeout(() => (copyStatus.value = ""), 1000);
+  }, 1500);
 };
 
 // เปิดแอพ Bolt พร้อม feedback
 const openBolt = () => {
-	rideLoading.value = "bolt";
+  rideLoading.value = "bolt";
 
-	copyToClipboard(props.shop.name).then(() => {
-		copyStatus.value = "Copied!";
-	});
+  copyToClipboard(props.shop.name).then(() => {
+    copyStatus.value = "Copied!";
+  });
 
-	const success = openBoltApp(props.shop);
+  const success = openBoltApp(props.shop);
 
-	if (success) {
-		copyStatus.value = "กำลังเปิด Bolt...";
-	} else {
-		copyStatus.value = "ไม่พบ Bolt";
-	}
+  if (success) {
+    copyStatus.value = "กำลังเปิด Bolt...";
+  } else {
+    copyStatus.value = "ไม่พบ Bolt";
+  }
 
-	setTimeout(() => {
-		showRidePopup.value = false;
-		rideLoading.value = "";
-		setTimeout(() => (copyStatus.value = ""), 1000);
-	}, 1500);
+  setTimeout(() => {
+    showRidePopup.value = false;
+    rideLoading.value = "";
+    setTimeout(() => (copyStatus.value = ""), 1000);
+  }, 1500);
 };
 
 // เปิดแอพ Lineman
 const openLineman = () => {
-	rideLoading.value = "lineman";
+  rideLoading.value = "lineman";
 
-	copyToClipboard(props.shop.name).then(() => {
-		copyStatus.value = "Copied!";
-	});
+  copyToClipboard(props.shop.name).then(() => {
+    copyStatus.value = "Copied!";
+  });
 
-	const success = openLinemanApp(props.shop);
+  const success = openLinemanApp(props.shop);
 
-	if (success) {
-		copyStatus.value = "กำลังเปิด Lineman...";
-	} else {
-		copyStatus.value = "ตไม่พบ Lineman";
-	}
+  if (success) {
+    copyStatus.value = "กำลังเปิด Lineman...";
+  } else {
+    copyStatus.value = "ตไม่พบ Lineman";
+  }
 
-	setTimeout(() => {
-		showRidePopup.value = false;
-		rideLoading.value = "";
-		setTimeout(() => (copyStatus.value = ""), 1000);
-	}, 1500);
+  setTimeout(() => {
+    showRidePopup.value = false;
+    rideLoading.value = "";
+    setTimeout(() => (copyStatus.value = ""), 1000);
+  }, 1500);
 };
 </script>
 
 <template>
   <div
+    data-testid="vibe-modal"
     class="fixed inset-0 flex items-center justify-center p-4 pointer-events-auto font-sans overflow-hidden"
     :style="{ zIndex: Z.MODAL }"
   >
@@ -293,17 +339,23 @@ const openLineman = () => {
       @touchstart.stop="handleTouchStart"
       @touchmove.stop="handleTouchMove"
       @touchend.stop="handleTouchEnd"
-      class="relative w-full max-w-2xl mt-auto bg-zinc-950/90 backdrop-blur-3xl rounded-t-[2rem] border-t border-white/10 flex flex-col shadow-[0_-20px_60px_-15px_rgba(0,0,0,0.8)] max-h-[92vh] pointer-events-auto overflow-hidden"
+      class="relative w-full max-w-5xl m-auto bg-zinc-950/90 backdrop-blur-3xl rounded-[2.5rem] border border-white/10 flex flex-col md:flex-row shadow-[0_20px_100px_rgba(0,0,0,0.8)] h-[92vh] max-h-[92vh] md:h-[90vh] pointer-events-auto overflow-hidden"
       :style="{ zIndex: Z.MODAL }"
     >
-      <!-- Draggable Handle (Gesture Area) -->
+      <!-- Top Interaction Area (Close Shortcut) -->
       <div
-        @click="emit('close')"
-        class="w-full flex justify-center py-5 cursor-grab active:cursor-grabbing touch-none"
+        @click="
+          emit('close');
+          selectFeedback();
+        "
+        class="absolute top-4 right-4 z-[4000] p-2 bg-white/10 backdrop-blur-xl rounded-full border border-white/20 active:scale-90 transition-all pointer-events-auto cursor-pointer"
       >
-        <div
-          class="w-16 h-1.5 bg-white/20 rounded-full hover:bg-white/40 transition-colors"
-        ></div>
+        <X class="w-6 h-6 text-white" />
+      </div>
+
+      <!-- Drag Handle (Visual only now, or for vertical dismiss resistance) -->
+      <div class="w-full flex justify-center py-4 pointer-events-none">
+        <div class="w-12 h-1.5 bg-white/10 rounded-full"></div>
       </div>
 
       <div
@@ -368,10 +420,33 @@ const openLineman = () => {
           </div>
         </div>
 
-        <!-- Media Section -->
+        <!-- Media Section (Updated for Double Tap & Landscape) -->
         <div
-          class="relative w-full aspect-video bg-zinc-900 overflow-hidden flex-shrink-0"
+          class="relative w-full aspect-video md:aspect-auto md:w-[70%] md:h-full bg-zinc-900 overflow-hidden flex-shrink-0 group"
+          @touchstart.stop="handleDoubleTap"
+          @click.stop="handleDoubleTap"
         >
+          <!-- Heart Animation -->
+          <transition name="pop">
+            <div
+              v-if="showHeartAnim"
+              class="absolute inset-0 flex items-center justify-center pointer-events-none z-50"
+            >
+              <Heart
+                class="w-32 h-32 text-pink-500 fill-current drop-shadow-2xl animate-ping"
+              />
+            </div>
+          </transition>
+
+          <div
+            class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-40"
+          >
+            <span
+              class="bg-black/50 text-white text-xs px-3 py-1 rounded-full backdrop-blur"
+              >Double tap to save ❤️</span
+            >
+          </div>
+
           <transition name="fade">
             <div
               v-if="isPromoActive"
@@ -401,7 +476,7 @@ const openLineman = () => {
 
           <video
             ref="videoPlayer"
-            v-if="media.type === 'video'"
+            v-if="!zoomedImage && media.type === 'video'"
             :src="media.url"
             autoplay
             loop
@@ -410,7 +485,7 @@ const openLineman = () => {
             class="w-full h-full object-cover"
           ></video>
           <iframe
-            v-else-if="media.type === 'youtube'"
+            v-else-if="!zoomedImage && media.type === 'youtube'"
             :src="media.url"
             class="w-full h-full scale-[1]"
             frameborder="0"
@@ -418,8 +493,8 @@ const openLineman = () => {
             allowfullscreen
           ></iframe>
           <img
-            v-else-if="media.type === 'image'"
-            :src="media.url"
+            v-else
+            :src="zoomedImage || media.url || FALLBACK_IMAGE"
             class="w-full h-full object-cover"
           />
         </div>
@@ -459,14 +534,14 @@ const openLineman = () => {
             </div>
 
             <div
-              class="flex flex-row gap-2 shrink-0"
+              class="flex flex-row gap-2 shrink-0 overflow-x-auto no-scrollbar pb-1"
               v-if="processedImages.length > 0"
             >
               <div
-                v-for="(img, idx) in processedImages.slice(0, 2)"
+                v-for="(img, idx) in processedImages"
                 :key="idx"
                 @click="handleZoom(img)"
-                class="w-12 h-12 sm:w-16 sm:h-16 rounded-lg sm:rounded-xl overflow-hidden border border-white/10 cursor-pointer active:scale-95 transition-all shadow-lg bg-zinc-900"
+                class="w-12 h-12 sm:w-16 sm:h-16 rounded-lg sm:rounded-xl overflow-hidden border border-white/10 cursor-pointer active:scale-95 transition-all shadow-lg bg-zinc-900 flex-shrink-0"
               >
                 <img
                   :src="img"
@@ -544,7 +619,7 @@ const openLineman = () => {
           </div>
         </div>
 
-        <!-- Action Buttons - เปลี่ยนจาก 2 ปุ่มเป็น 3 ปุ่ม -->
+        <!-- Action Buttons -->
         <div
           class="p-5 sm:p-6 pt-0 grid grid-cols-3 gap-2 sm:gap-3 flex-shrink-0"
         >

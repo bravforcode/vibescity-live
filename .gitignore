@@ -119,3 +119,13 @@ yarn.lock
 docker-compose.override.yml
 *.dockerfile
 docker-compose.yml
+
+*storybook.log
+storybook-static
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/

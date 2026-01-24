@@ -1,46 +1,49 @@
 <script setup>
 /**
  * BottomNav.vue - Premium Animated Bottom Navigation
- * Feature #7: Animated Tab Bar
  */
-import { computed, ref } from "vue";
+import { Map as MapIcon, Zap, Heart, User } from "lucide-vue-next";
+import { useHaptics } from "../../composables/useHaptics";
+
+const { selectFeedback } = useHaptics();
 
 const props = defineProps({
-	activeTab: {
-		type: String,
-		default: "map",
-	},
-	isDarkMode: {
-		type: Boolean,
-		default: true,
-	},
-	liveCount: {
-		type: Number,
-		default: 0,
-	},
-	favoritesCount: {
-		type: Number,
-		default: 0,
-	},
+  activeTab: {
+    type: String,
+    default: "map",
+  },
+  isDarkMode: {
+    type: Boolean,
+    default: true,
+  },
+  liveCount: {
+    type: Number,
+    default: 0,
+  },
+  favoritesCount: {
+    type: Number,
+    default: 0,
+  },
 });
 
 const emit = defineEmits(["change-tab"]);
 
 const tabs = [
-	{ id: "map", label: "Map", icon: "🗺️", activeIcon: "🗺️" },
-	{ id: "events", label: "Events", icon: "🎪", activeIcon: "🎉" },
-	{ id: "favorites", label: "Saved", icon: "🤍", activeIcon: "❤️" },
-	{ id: "profile", label: "Profile", icon: "👤", activeIcon: "😎" },
+  { id: "map", label: "Map", icon: MapIcon },
+  { id: "events", label: "Events", icon: Zap },
+  { id: "favorites", label: "Saved", icon: Heart },
+  { id: "profile", label: "Profile", icon: User },
 ];
 
 const handleTabClick = (tabId) => {
-	emit("change-tab", tabId);
+  selectFeedback();
+  emit("change-tab", tabId);
 };
 
 const getBadgeCount = (tabId) => {
-	if (tabId === "events") return props.liveCount;
-	if (tabId === "favorites") return props.favoritesCount;
-	return 0;
+  if (tabId === "events") return props.liveCount;
+  if (tabId === "favorites") return props.favoritesCount;
+  return 0;
 };
 </script>
 
@@ -72,14 +75,15 @@ const getBadgeCount = (tabId) => {
         />
 
         <!-- Icon with animation -->
-        <span
+        <component
+          :is="tab.icon"
           :class="[
-            'text-2xl transition-transform duration-300',
-            activeTab === tab.id ? 'animate-bounce-once' : '',
+            'w-6 h-6 transition-transform duration-300',
+            activeTab === tab.id
+              ? 'animate-bounce-once text-blue-400'
+              : 'text-zinc-500',
           ]"
-        >
-          {{ activeTab === tab.id ? tab.activeIcon : tab.icon }}
-        </span>
+        />
 
         <!-- Label -->
         <span

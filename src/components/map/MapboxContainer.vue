@@ -199,12 +199,14 @@ const flyTo = (lngLat, zoom = 17) => {
 const animateAtmosphere = (time) => {
   if (!map.value || !isMapReady.value) return;
   // ✅ ถ้า tab ไม่ active: ข้ามงานหนัก แต่ "ยังวนต่อ" เพื่อกลับมาได้เอง
-  if (document.hidden)
-    return (atmosphericAnimationRequest =
-      requestAnimationFrame(animateAtmosphere));
-  if (map.value.getZoom() < 12)
-    return (atmosphericAnimationRequest =
-      requestAnimationFrame(animateAtmosphere));
+  if (document.hidden) {
+    atmosphericAnimationRequest = requestAnimationFrame(animateAtmosphere);
+    return;
+  }
+  if (map.value.getZoom() < 12) {
+    atmosphericAnimationRequest = requestAnimationFrame(animateAtmosphere);
+    return;
+  }
 
   // 1. Neon Road Pulse
   const pulse = (Math.sin(time / 1000) + 1) / 2;
@@ -549,7 +551,7 @@ const initializeMap = async () => {
   if (!mapContainer.value) return;
 
   const ok = await ensureMapboxLoaded();
-  if (!ok) return;
+  if (!ok || !mapContainer.value) return;
 
   map.value = new mapboxgl.Map({
     container: mapContainer.value,
@@ -1178,7 +1180,9 @@ const updateMarkers = () => {
 
   // Check coin collection for all shops when user location changes
   if (props.userLocation) {
-    visibleShops.forEach((shop) => checkCoinCollection(shop));
+    visibleShops.forEach((shop) => {
+      checkCoinCollection(shop);
+    });
   }
 };
 
@@ -1280,32 +1284,38 @@ const getSmartYOffset = (popupPx = 0) => {
   const bottom =
     Number(props.uiBottomOffset || 0) + Number(props.legendHeight || 0);
   const viewportH = window.innerHeight;
-  const isMobile = viewportH < 768;
+  const isMobile = window.innerWidth < 768;
 
   if (isMobile) return 0;
 
   const visualCenter = (viewportH - bottom + top) / 2;
   const mapCenter = viewportH / 2;
-  let y = Math.round((mapCenter - visualCenter) * 2);
+  const y = Math.round((mapCenter - visualCenter) * 2);
   return Math.max(0, Math.min(viewportH * 0.8, y));
 };
 
 // ✅ Focus Location (Fly To) - Smooth & Precise Centering
-const focusLocation = (latlng, targetZoom = 17, popupPx = 280) => {
-  if (!map.value || !latlng) return;
+const focusLocation = (coords, targetZoom = 17) => {
+  if (!map.value || !coords) return;
 
-  const [lat, lng] = latlng;
-  const yOffset = getSmartYOffset(popupPx);
+  // Calculate dynamic padding based on UI offsets
+  // "Pin must be in the visual center"
+  const padding = {
+    top: props.uiTopOffset + 50,
+    bottom: props.uiBottomOffset + (props.isSidebarOpen ? 20 : 180), // Extra buffer for card
+    left: props.isSidebarOpen ? 300 : 20,
+    right: 20,
+  };
 
   map.value.flyTo({
-    center: [lng, lat],
+    center: coords,
     zoom: targetZoom,
-    duration: 1500,
-    padding: { top: 0, bottom: yOffset, left: 0, right: 0 },
+    pitch: 50, // Cinematic pitch
+    bearing: 0,
+    padding,
+    speed: 0.6, // Slow & Smooth (iOS feel)
+    curve: 1.1, // Gentle curve
     essential: true,
-    curve: 1.42,
-    speed: 1.2,
-    pitch: 45,
   });
 };
 
@@ -1374,7 +1384,9 @@ watch(
   () => {
     updateMapSources();
     if (props.userLocation) {
-      props.shops?.forEach((shop) => checkCoinCollection(shop));
+      props.shops?.forEach((shop) => {
+        checkCoinCollection(shop);
+      });
     }
   },
   { immediate: true },
@@ -1390,6 +1402,13 @@ watch(
 
 // ✅ Lifecycle
 onMounted(async () => {
+  // ⚡ SKIP HEAVY MAP INIT IN E2E
+  if (import.meta.env.VITE_E2E === "true") {
+    console.log("E2E Mode: Skipping Mapbox Initialization");
+    isMapReady.value = true;
+    return;
+  }
+
   await initializeMap();
 
   hourInterval = setInterval(() => {
@@ -1412,8 +1431,12 @@ onUnmounted(() => {
 
   closeActivePopup();
 
-  markersMap.value.forEach((m) => m.remove());
-  eventMarkersMap.value.forEach((m) => m.remove());
+  markersMap.value.forEach((m) => {
+    m.remove();
+  });
+  eventMarkersMap.value.forEach((m) => {
+    m.remove();
+  });
 
   if (map.value) {
     map.value.remove();
@@ -1421,11 +1444,11 @@ onUnmounted(() => {
   }
 });
 
-// ✅ Expose methods
 defineExpose({
+  map,
   focusLocation,
   centerOnUser,
-  map,
+  resize: () => map.value?.resize(),
   flyTo: (coords, zoom) =>
     map.value?.flyTo({
       center: coords,
@@ -1439,13 +1462,19 @@ defineExpose({
 
 <template>
   <div
+    data-testid="map-shell"
+    :data-map-ready="isMapReady ? 'true' : 'false'"
     :class="[
       'relative w-full h-full z-0 transition-colors duration-500',
       isDarkMode ? 'bg-[#09090b]' : 'bg-gray-200',
     ]"
   >
-    <!-- Mapbox Container -->
-    <div ref="mapContainer" class="w-full h-full min-h-[100dvh]"></div>
+    <div
+      ref="mapContainer"
+      data-testid="map-canvas"
+      id="map"
+      class="w-full h-full min-h-[100dvh]"
+    ></div>
 
     <!-- Zeppelin removed for cleaner UI -->
 

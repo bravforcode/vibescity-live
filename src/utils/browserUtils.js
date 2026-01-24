@@ -303,6 +303,7 @@ export const openLinemanApp = (shop) => {
 			const appOpened = new Promise((resolve) => {
 				const timer = setTimeout(() => {
 					if (document.visibilityState === "visible") {
+						// แอพไม่เปิด - เปิดเว็บแทน
 						window.open(linemanWebUrl, "_blank", "noopener,noreferrer");
 					}
 					resolve(true);

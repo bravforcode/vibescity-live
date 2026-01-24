@@ -1,266 +1,308 @@
 // --- C:\vibecity.live\src\components\modal\ProfileDrawer.vue ---
 
 <script setup>
-import { computed, defineAsyncComponent } from "vue";
-
+/**
+ * ProfileDrawer.vue - Premium Sidebar Hub Redesign
+ * Featuring Glassmorphism and Tile Iconography
+ */
+import { computed, defineAsyncComponent, ref } from "vue";
 const AchievementBadges = defineAsyncComponent(
-	() => import("../ui/AchievementBadges.vue"),
+  () => import("../ui/AchievementBadges.vue"),
 );
 
 import { storeToRefs } from "pinia";
 import { useI18n } from "vue-i18n";
 import { Z } from "../../constants/zIndex";
 import { useShopStore } from "../../store/shopStore";
+import { useHaptics } from "../../composables/useHaptics";
+import {
+  User,
+  Settings,
+  Gift,
+  HelpCircle,
+  LogOut,
+  ChevronRight,
+  Zap,
+  Star,
+  Trophy,
+  History,
+} from "lucide-vue-next";
 
 const props = defineProps({
-	isOpen: Boolean,
-	isDarkMode: Boolean,
+  isOpen: Boolean,
+  isDarkMode: Boolean,
 });
 
 const emit = defineEmits(["close", "toggle-language"]);
 
 const { t, locale } = useI18n();
+const { selectFeedback } = useHaptics();
 const shopStore = useShopStore();
-const { userLevel, totalCoins, nextLevelXP, levelProgress } =
-	storeToRefs(shopStore);
+const { userLevel, totalCoins, levelProgress } = storeToRefs(shopStore);
 
-const currentXP = computed(() =>
-	Math.floor(levelProgress.value * nextLevelXP.value),
-);
-
-const handleBackdropClick = () => {
-	emit("close");
+const handleClose = () => {
+  selectFeedback();
+  emit("close");
 };
+
+const menuSections = [
+  {
+    title: "Vibe Discovery",
+    items: [
+      {
+        id: "events",
+        label: "Nearby Events",
+        icon: Zap,
+        color: "text-amber-400",
+      },
+      {
+        id: "quests",
+        label: "Vibe Quests",
+        icon: Trophy,
+        color: "text-purple-400",
+      },
+      {
+        id: "history",
+        label: "Visit History",
+        icon: History,
+        color: "text-blue-400",
+      },
+    ],
+  },
+  {
+    title: "Account",
+    items: [
+      {
+        id: "profile",
+        label: "Edit Profile",
+        icon: User,
+        color: "text-zinc-400",
+      },
+      {
+        id: "settings",
+        label: "Preferences",
+        icon: Settings,
+        color: "text-zinc-400",
+      },
+      {
+        id: "support",
+        label: "Help & Support",
+        icon: HelpCircle,
+        color: "text-zinc-400",
+      },
+    ],
+  },
+];
 </script>
 
 <template>
   <transition name="drawer-slide">
     <div
       v-if="isOpen"
-      class="fixed inset-y-0 right-0 w-full max-w-sm flex flex-col"
+      class="fixed inset-y-0 right-0 w-[85%] max-w-[320px] flex flex-col"
       :style="{ zIndex: Z.DRAWER }"
-
     >
       <div
         :class="[
-          'h-full flex flex-col shadow-2xl overflow-hidden',
+          'h-full flex flex-col shadow-2xl overflow-hidden backdrop-blur-3xl',
           isDarkMode
-            ? 'bg-zinc-950 border-l border-white/10'
-            : 'bg-white border-l border-gray-100',
+            ? 'bg-zinc-950/90 border-l border-white/10'
+            : 'bg-white/95 border-l border-gray-100',
         ]"
       >
-        <!-- Header -->
-        <div class="px-6 pt-8 pb-6 flex items-center justify-between">
-          <h2
-            :class="[
-              'text-2xl font-black uppercase tracking-tighter',
-              isDarkMode ? 'text-white' : 'text-black',
-            ]"
-          >
-            Profile
-          </h2>
-          <button
-            @click="emit('close')"
-            class="w-10 h-10 rounded-full flex items-center justify-center bg-black/5 hover:bg-black/10 transition-colors"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="w-6 h-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+        <!-- ✅ 1. Glass Stats Card (The "Wow" Factor) -->
+        <div class="relative px-5 pt-12 pb-8 overflow-hidden">
+          <!-- Background Glows -->
+          <div
+            class="absolute -top-10 -right-10 w-40 h-40 bg-blue-600/20 blur-[60px] rounded-full"
+          ></div>
+          <div
+            class="absolute top-20 -left-10 w-24 h-24 bg-purple-600/10 blur-[40px] rounded-full"
+          ></div>
+
+          <div class="relative z-10 flex flex-col items-center">
+            <!-- Avatar Ring -->
+            <div
+              class="relative mb-4 group cursor-pointer active:scale-95 transition-transform"
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
+              <div
+                class="w-24 h-24 rounded-[2rem] bg-gradient-to-br from-blue-500 to-purple-600 p-1 shadow-2xl rotate-3 group-hover:rotate-0 transition-all duration-500"
+              >
+                <div
+                  class="w-full h-full rounded-[1.8rem] bg-zinc-900 overflow-hidden border-2 border-white/20"
+                >
+                  <img
+                    src="https://api.dicebear.com/7.x/avataaars/svg?seed=Vibicity"
+                    alt="Avatar"
+                    class="w-full h-full scale-110"
+                  />
+                </div>
+              </div>
+              <div
+                class="absolute -bottom-1 -right-1 w-8 h-8 rounded-xl bg-zinc-950 border border-white/20 flex items-center justify-center shadow-xl"
+              >
+                <Star class="w-4 h-4 text-yellow-400 fill-current" />
+              </div>
+            </div>
+
+            <!-- User Info -->
+            <h2 class="text-xl font-black text-white tracking-tight uppercase">
+              Master LV.{{ userLevel }}
+            </h2>
+            <p
+              class="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em] mt-1"
+            >
+              Vibecity Explorer
+            </p>
+
+            <!-- Stats Row -->
+            <div class="flex gap-2 mt-6 w-full">
+              <div
+                class="flex-1 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-3 flex flex-col items-center shadow-inner"
+              >
+                <span
+                  class="text-[8px] font-black text-white/30 uppercase tracking-widest mb-1"
+                  >Total Coins</span
+                >
+                <span class="text-lg font-black text-yellow-500"
+                  >🪙 {{ totalCoins }}</span
+                >
+              </div>
+              <div
+                class="flex-1 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-3 flex flex-col items-center shadow-inner"
+              >
+                <span
+                  class="text-[8px] font-black text-white/30 uppercase tracking-widest mb-1"
+                  >Mastery</span
+                >
+                <span class="text-lg font-black text-blue-400"
+                  >{{ Math.floor(levelProgress * 100) }}%</span
+                >
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- Scrollable Content -->
-        <div class="flex-1 overflow-y-auto px-6 space-y-8 pb-32">
-          <!-- Level Stats Card -->
+        <!-- ✅ 2. Scrollable Sections (Tiled Iconography) -->
+        <div class="flex-1 overflow-y-auto px-5 py-4 no-scrollbar space-y-8">
+          <!-- Badges Section -->
+          <div class="space-y-4">
+            <div class="flex items-center justify-between">
+              <h3
+                class="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]"
+              >
+                Achievements
+              </h3>
+              <span
+                class="text-[9px] font-bold text-blue-400 px-2 py-0.5 rounded-full bg-blue-400/10 border border-blue-400/20"
+                >View All</span
+              >
+            </div>
+            <AchievementBadges class="scale-90 origin-left" />
+          </div>
+
+          <!-- Dynamic Menu Sections -->
           <div
-            :class="[
-              'p-6 rounded-3xl border shadow-xl relative overflow-hidden',
-              isDarkMode
-                ? 'bg-zinc-900 border-white/10'
-                : 'bg-gray-50 border-gray-200',
-            ]"
+            v-for="section in menuSections"
+            :key="section.title"
+            class="space-y-3"
           >
-            <div class="relative z-10">
-              <div class="flex items-center justify-between mb-4">
-                <span
-                  class="text-xs font-black uppercase tracking-widest opacity-40"
-                  >Rank & Level</span
-                >
-                <div
-                  class="px-3 py-1 rounded-full bg-blue-600/20 text-blue-500 text-[10px] font-black uppercase"
-                >
-                  Explorer
-                </div>
-              </div>
-
-              <div class="flex items-end gap-3 mb-6">
-                <span
-                  class="text-5xl font-black italic tracking-tighter text-blue-600"
-                  >LV{{ userLevel }}</span
-                >
-                <span class="text-sm font-bold opacity-40 pb-1">Mastery</span>
-              </div>
-
-              <!-- XP Progress -->
-              <div class="space-y-2">
-                <div
-                  class="flex justify-between text-[10px] font-black uppercase opacity-60"
-                >
-                  <span>{{
-                    t("nav.xp", { current: currentXP, next: nextLevelXP })
-                  }}</span>
-                  <span>{{ Math.floor(levelProgress * 100) }}%</span>
-                </div>
-                <div
-                  class="h-3 w-full bg-black/10 rounded-full overflow-hidden"
-                >
-                  <div
-                    class="h-full bg-gradient-to-r from-blue-600 to-indigo-600 transition-all duration-1000"
-                    :style="{ width: `${levelProgress * 100}%` }"
-                  ></div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Decoration -->
-            <div
-              class="absolute -right-4 -bottom-4 w-32 h-32 bg-blue-600/5 blur-3xl rounded-full"
-            ></div>
-          </div>
-
-          <!-- Achievements Section (Phase 5 Integrated) -->
-          <div class="space-y-4">
             <h3
-              :class="[
-                'text-xs font-black uppercase tracking-widest opacity-40',
-                isDarkMode ? 'text-white' : 'text-black',
-              ]"
+              class="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]"
             >
-              Unlocked Badges
+              {{ section.title }}
             </h3>
-            <AchievementBadges />
-          </div>
-
-          <!-- Currency Section -->
-          <div class="grid grid-cols-2 gap-4">
-            <div
-              :class="[
-                'p-5 rounded-3xl border',
-                isDarkMode
-                  ? 'bg-zinc-900 border-white/10'
-                  : 'bg-gray-100 border-gray-200',
-              ]"
-            >
-              <div class="text-xs font-black uppercase opacity-40 mb-1">
-                Total Coins
-              </div>
-              <div class="text-2xl font-black text-yellow-500">
-                {{ totalCoins }}
-              </div>
-            </div>
-            <div
-              :class="[
-                'p-5 rounded-3xl border',
-                isDarkMode
-                  ? 'bg-zinc-900 border-white/10'
-                  : 'bg-gray-100 border-gray-200',
-              ]"
-            >
-              <div class="text-xs font-black uppercase opacity-40 mb-1">
-                Coupons
-              </div>
-              <div class="text-2xl font-black text-emerald-500">0</div>
+            <div class="grid grid-cols-1 gap-2">
+              <button
+                v-for="item in section.items"
+                :key="item.id"
+                @click="selectFeedback"
+                class="group flex items-center gap-3 p-3 rounded-2xl bg-white/[0.03] hover:bg-white/[0.08] active:scale-[0.98] border border-white/[0.05] transition-all duration-300"
+              >
+                <div
+                  :class="[
+                    'w-10 h-10 rounded-xl bg-white/[0.05] flex items-center justify-center transition-all group-hover:scale-110 group-active:scale-95',
+                    item.color,
+                  ]"
+                >
+                  <component :is="item.icon" class="w-5 h-5 shadow-sm" />
+                </div>
+                <div class="flex-1 text-left">
+                  <div class="text-xs font-bold text-white">
+                    {{ item.label }}
+                  </div>
+                </div>
+                <ChevronRight
+                  class="w-4 h-4 text-white/10 group-hover:text-white/40 transition-colors"
+                />
+              </button>
             </div>
           </div>
 
-          <!-- Settings Section -->
-          <div class="space-y-4">
+          <!-- Language Toggle Tile -->
+          <div class="space-y-3">
             <h3
-              :class="[
-                'text-xs font-black uppercase tracking-widest opacity-40',
-                isDarkMode ? 'text-white' : 'text-black',
-              ]"
+              class="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]"
             >
-              Settings & Account
+              Regional
             </h3>
-
-            <!-- Language Toggle Button -->
             <button
-              @click="emit('toggle-language')"
-              :class="[
-                'w-full flex items-center justify-between p-4 rounded-2xl border transition-all active:scale-[0.98]',
-                isDarkMode
-                  ? 'bg-white/5 border-white/10'
-                  : 'bg-black/5 border-black/5',
-              ]"
+              @click="
+                emit('toggle-language');
+                selectFeedback();
+              "
+              class="w-full flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 active:scale-95 transition-all"
             >
               <div class="flex items-center gap-3">
-                <span class="text-lg">🌐</span>
-                <span class="text-sm font-bold">Language / ภาษา</span>
+                <div
+                  class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center"
+                >
+                  <span class="text-sm">🌐</span>
+                </div>
+                <span class="text-xs font-bold text-white"
+                  >Language / ภาษา</span
+                >
               </div>
               <span
-                class="text-xs font-black bg-blue-600 text-white px-2 py-1 rounded-lg uppercase"
+                class="text-[9px] font-black bg-blue-600 text-white px-2 py-1 rounded-lg uppercase"
               >
-                {{ locale === "th" ? "Thai" : "English" }}
+                {{ locale === "th" ? "TH" : "EN" }}
               </span>
             </button>
-
-            <!-- Placeholder for other settings -->
-            <div
-              :class="[
-                'w-full flex items-center gap-3 p-4 rounded-2xl border opacity-50',
-                isDarkMode
-                  ? 'bg-white/5 border-white/10'
-                  : 'bg-black/5 border-black/5',
-              ]"
-            >
-              <span class="text-lg">🔔</span>
-              <span class="text-sm font-bold">Notifications</span>
-            </div>
-            <div
-              :class="[
-                'w-full flex items-center gap-3 p-4 rounded-2xl border opacity-50',
-                isDarkMode
-                  ? 'bg-white/5 border-white/10'
-                  : 'bg-black/5 border-black/5',
-              ]"
-            >
-              <span class="text-lg">👤</span>
-              <span class="text-sm font-bold">Account Details</span>
-            </div>
           </div>
         </div>
 
-        <!-- Footer -->
-        <div class="p-6 border-t border-black/5">
-          <p
-            class="text-[10px] text-center font-black uppercase opacity-30 italic"
+        <!-- ✅ 3. Footer with Premium Brand -->
+        <div class="p-6 border-t border-white/5 bg-black/20 backdrop-blur-xl">
+          <button
+            @click="handleClose"
+            class="w-full py-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-black uppercase tracking-widest active:scale-95 transition-all mb-4 flex items-center justify-center gap-2"
           >
-            VibeCity v1.0.0 Enterprise MVP
-          </p>
+            <LogOut class="w-4 h-4" />
+            Sign Out
+          </button>
+          <div class="flex flex-col items-center gap-1">
+            <h4
+              class="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]"
+            >
+              VibeCity Live
+            </h4>
+            <p class="text-[7px] text-white/10 font-bold uppercase">
+              Enterprise Version 2.0.428-A
+            </p>
+          </div>
         </div>
       </div>
     </div>
   </transition>
 
-  <!-- Backdrop -->
+  <!-- Backdrop with better blur -->
   <transition name="fade">
     <div
       v-if="isOpen"
-      class="fixed inset-0 bg-black/60 backdrop-blur-sm"
+      class="fixed inset-0 bg-black/80 backdrop-blur-md"
       :style="{ zIndex: Z.DRAWER_BACKDROP }"
-      @click="handleBackdropClick"
+      @click="handleClose"
     ></div>
   </transition>
 </template>
@@ -268,19 +310,28 @@ const handleBackdropClick = () => {
 <style scoped>
 .drawer-slide-enter-active,
 .drawer-slide-leave-active {
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .drawer-slide-enter-from,
 .drawer-slide-leave-to {
   transform: translateX(100%);
+  opacity: 0;
 }
 
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.3s ease;
+  transition: opacity 0.4s ease;
 }
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 </style>

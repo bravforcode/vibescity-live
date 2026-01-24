@@ -3,6 +3,7 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { calculateDistance } from "../utils/shopUtils";
+import { getReviews, postReview } from "../services/shopService";
 
 export const useShopStore = defineStore("shop", () => {
 	// Core State
@@ -186,6 +187,31 @@ export const useShopStore = defineStore("shop", () => {
 		return reviews.value[String(shopId)] || [];
 	};
 
+	const fetchShopReviews = async (shopId) => {
+		const data = await getReviews(shopId);
+		reviews.value[String(shopId)] = data.map((r) => ({
+			id: r.id,
+			timestamp: r.created_at,
+			rating: r.rating,
+			comment: r.comment,
+			userName: r.user_name,
+		}));
+	};
+
+	const addReviewToDB = async (shopId, review) => {
+		const newReview = await postReview(shopId, review);
+		// Local update for instant feedback
+		if (!reviews.value[String(shopId)]) reviews.value[String(shopId)] = [];
+		reviews.value[String(shopId)].unshift({
+			id: newReview.id,
+			timestamp: newReview.created_at,
+			rating: newReview.rating,
+			comment: newReview.comment,
+			userName: newReview.user_name,
+		});
+		return newReview;
+	};
+
 	return {
 		rawShops,
 		currentTime,
@@ -210,6 +236,8 @@ export const useShopStore = defineStore("shop", () => {
 		rotationSeed,
 		addReview,
 		getShopReviews,
+		fetchShopReviews,
+		addReviewToDB,
 		reviews,
 	};
 });

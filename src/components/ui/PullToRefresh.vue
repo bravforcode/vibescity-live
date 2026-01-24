@@ -1,129 +1,189 @@
 <script setup>
 /**
- * PullToRefresh.vue - Pull-to-refresh gesture handler
- * Feature #4: Pull-to-Refresh
+ * PullToRefresh.vue - Custom iOS-grade Rubber Banding
+ * Features:
+ * - Logarithmic Decay Scaling (Apple-style resistance)
+ * - Cubic-bezier Spring Snap-back
+ * - Glassmorphic Pill UI
+ * - Haptic Thresholds (Light -> Medium -> Heavy)
  */
-import { onMounted, onUnmounted, ref } from "vue";
+import { ref } from "vue";
+import { Loader2, ArrowDown } from "lucide-vue-next";
+import { useHaptics } from "@/composables/useHaptics";
 
 const props = defineProps({
-	disabled: {
-		type: Boolean,
-		default: false,
-	},
-	threshold: {
-		type: Number,
-		default: 80,
-	},
-	isDarkMode: {
-		type: Boolean,
-		default: true,
-	},
+  threshold: {
+    type: Number,
+    default: 100, // Distance to trigger refresh
+  },
 });
 
 const emit = defineEmits(["refresh"]);
 
-const isPulling = ref(false);
-const isRefreshing = ref(false);
-const pullDistance = ref(0);
+const { selectFeedback, successFeedback, toggleFeedback } = useHaptics();
+
+// State
+const el = ref(null);
 const startY = ref(0);
+const pullDistance = ref(0);
+const isDragging = ref(false);
+const isRefreshing = ref(false);
+const hasTriggeredHaptic = ref(false);
+
+// Physics: Apple Logarithmic Decay
+// f(x) = (1 - 1 / ((x * k / d) + 1)) * d
+const applyRubberBandPhysics = (diff) => {
+  const dimension = window.innerHeight;
+  const constant = 0.55; // Apple's friction constant
+  return (1.0 - 1.0 / ((diff * constant) / dimension + 1.0)) * dimension;
+};
 
 const handleTouchStart = (e) => {
-	if (props.disabled || isRefreshing.value) return;
-
-	// Only trigger if at top of scroll
-	const scrollTop = e.currentTarget.scrollTop || 0;
-	if (scrollTop > 5) return;
-
-	startY.value = e.touches[0].clientY;
-	isPulling.value = true;
+  // Only activate if at top of scroll
+  if (window.scrollY <= 0 && !isRefreshing.value) {
+    startY.value = e.touches[0].clientY;
+    isDragging.value = true;
+    hasTriggeredHaptic.value = false;
+  }
 };
 
 const handleTouchMove = (e) => {
-	if (!isPulling.value || isRefreshing.value) return;
+  if (!isDragging.value || isRefreshing.value) return;
 
-	const currentY = e.touches[0].clientY;
-	const diff = currentY - startY.value;
+  const currentY = e.touches[0].clientY;
+  const diff = currentY - startY.value;
 
-	if (diff > 0) {
-		// Apply resistance
-		pullDistance.value = Math.min(diff * 0.5, props.threshold * 1.5);
-	}
+  // Logic: Dragging DOWN at the top
+  if (diff > 0 && window.scrollY <= 0) {
+    if (e.cancelable && !isRefreshing.value) e.preventDefault(); // Stop native refresh
+
+    // Physics: 1:1 Linear until threshold, then Logarithmic Friction ("Sticky" feel)
+    if (diff < props.threshold) {
+      pullDistance.value = diff; // 1:1
+    } else {
+      const extra = diff - props.threshold;
+      const friction = 0.55; // Apple constant
+      const resistive =
+        (1.0 - 1.0 / ((extra * friction) / window.innerHeight + 1.0)) *
+        window.innerHeight;
+      pullDistance.value = props.threshold + resistive;
+    }
+
+    // Haptic Thresholds
+    if (pullDistance.value >= props.threshold && !hasTriggeredHaptic.value) {
+      selectFeedback(); // Use select (medium-ish) for threshold
+      hasTriggeredHaptic.value = true;
+    } else if (
+      pullDistance.value < props.threshold &&
+      hasTriggeredHaptic.value
+    ) {
+      hasTriggeredHaptic.value = false;
+      toggleFeedback(); // Tiny tick on cancel
+    }
+  } else {
+    // Dragging up or not at top
+    pullDistance.value = 0;
+  }
 };
 
 const handleTouchEnd = () => {
-	if (!isPulling.value) return;
+  isDragging.value = false;
+  startY.value = 0;
 
-	if (pullDistance.value >= props.threshold) {
-		isRefreshing.value = true;
-		emit("refresh");
+  if (pullDistance.value >= props.threshold) {
+    // TRIGGER REFRESH
+    isRefreshing.value = true;
+    pullDistance.value = props.threshold; // Hold at threshold
+    successFeedback(); // Heavy success click
+    emit("refresh");
 
-		// Auto-reset after timeout (parent should call reset)
-		setTimeout(() => {
-			reset();
-		}, 3000);
-	} else {
-		pullDistance.value = 0;
-	}
-
-	isPulling.value = false;
+    // Failsafe timeout (parent should call finishRefresh)
+    setTimeout(() => {
+      if (isRefreshing.value) finishRefresh();
+    }, 5000);
+  } else {
+    // CANCEL
+    pullDistance.value = 0;
+  }
 };
 
-const reset = () => {
-	isRefreshing.value = false;
-	pullDistance.value = 0;
-	isPulling.value = false;
+// Exposed Method: Call this ref to close the spinner
+const finishRefresh = () => {
+  if (isRefreshing.value) {
+    isRefreshing.value = false;
+    pullDistance.value = 0;
+    // Optional: Play a "done" sound or haptic
+  }
 };
 
-defineExpose({ reset });
+defineExpose({ finishRefresh });
 </script>
 
 <template>
   <div
-    class="pull-to-refresh-container"
+    ref="el"
+    data-testid="scroll-root"
+    class="relative w-full min-h-screen overscroll-contain"
     @touchstart.passive="handleTouchStart"
-    @touchmove.passive="handleTouchMove"
+    @touchmove="handleTouchMove"
     @touchend="handleTouchEnd"
   >
-    <!-- Pull indicator -->
+    <!-- Indicator Layer (Absolute Top) -->
     <div
-      class="pull-indicator"
-      :class="{ 'is-refreshing': isRefreshing }"
+      data-testid="refresh-indicator"
+      class="absolute left-0 top-0 z-40 flex w-full justify-center pointer-events-none"
       :style="{
-        transform: `translateY(${pullDistance - 60}px)`,
-        opacity: Math.min(pullDistance / props.threshold, 1),
+        transform: `translate3d(0, ${pullDistance - 50}px, 0)`,
+        opacity: Math.min(pullDistance / (props.threshold * 0.8), 1),
+        transition: isDragging
+          ? 'none'
+          : 'transform 0.5s cubic-bezier(0.19, 1, 0.22, 1)',
       }"
     >
-      <div v-if="isRefreshing" class="refresh-spinner" />
-      <svg
-        v-else
-        class="pull-arrow"
-        :style="{
-          transform: `rotate(${pullDistance >= props.threshold ? 180 : 0}deg)`,
+      <!-- Glassmorphic Pill -->
+      <div
+        class="flex items-center gap-3 px-4 py-2 rounded-full border border-white/20 bg-white/20 shadow-[0_4px_16px_rgba(0,0,0,0.1)] backdrop-blur-xl transition-all duration-300 transform scale-95"
+        :class="{
+          'scale-105 bg-white/30 shadow-[0_8px_32px_rgba(37,99,235,0.2)]':
+            hasTriggeredHaptic,
         }"
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
       >
-        <path d="M12 5v14M5 12l7-7 7 7" />
-      </svg>
-      <span class="pull-text">
-        {{
-          isRefreshing
-            ? "Refreshing..."
-            : pullDistance >= props.threshold
-              ? "Release"
-              : "Pull down"
-        }}
-      </span>
+        <div class="relative w-5 h-5 flex items-center justify-center">
+          <Loader2
+            v-if="isRefreshing"
+            class="w-4 h-4 text-white animate-spin"
+          />
+          <ArrowDown
+            v-else
+            class="w-4 h-4 text-white transition-transform duration-300"
+            :style="{ transform: `rotate(${hasTriggeredHaptic ? 180 : 0}deg)` }"
+          />
+        </div>
+
+        <span
+          class="text-[10px] font-bold text-white uppercase tracking-widest drop-shadow-sm"
+        >
+          {{
+            isRefreshing
+              ? "Updating..."
+              : hasTriggeredHaptic
+                ? "Release"
+                : "Pull Down"
+          }}
+        </span>
+      </div>
     </div>
 
-    <!-- Content -->
+    <!-- Content Slot (Pushed Down) -->
     <div
-      class="pull-content"
-      :style="{ transform: `translateY(${pullDistance}px)` }"
+      class="relative h-full w-full bg-neutral-50 dark:bg-[#0b0d11] transition-transform"
+      :style="{
+        transform: `translate3d(0, ${pullDistance}px, 0)`,
+        transition: isDragging
+          ? 'none'
+          : 'transform 0.6s cubic-bezier(0.19, 1, 0.22, 1)',
+        willChange: 'transform',
+      }"
     >
       <slot />
     </div>
@@ -131,57 +191,8 @@ defineExpose({ reset });
 </template>
 
 <style scoped>
-.pull-to-refresh-container {
-  position: relative;
-  overflow: hidden;
-}
-
-.pull-indicator {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  height: 60px;
-  color: rgba(255, 255, 255, 0.6);
-  transition: opacity 0.2s;
-}
-
-.pull-arrow {
-  transition: transform 0.3s ease;
-}
-
-.pull-text {
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.refresh-spinner {
-  width: 24px;
-  height: 24px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #8b5cf6;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.pull-content {
-  transition: transform 0.2s ease-out;
-}
-
-.is-refreshing .pull-content {
-  transition: transform 0.3s ease;
+/* Prevent Chrome/Safari bounce to allow our custom physics */
+.overscroll-contain {
+  overscroll-behavior-y: none;
 }
 </style>

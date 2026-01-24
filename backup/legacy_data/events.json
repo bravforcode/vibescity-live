@@ -1,0 +1,38 @@
+[
+  {
+    "id": "event-bkk-01",
+    "name": "Songkran Water Festival 2026",
+    "location": "Khao San Road, Bangkok",
+    "date": "2026-04-13T10:00:00",
+    "category": "Festival",
+    "description": "World-famous water fight and street parties across Thailand.",
+    "isLive": false
+  },
+  {
+    "id": "event-hkt-01",
+    "name": "Full Moon Party Paradise",
+    "location": "Patong Beach, Phuket",
+    "date": "2026-01-21T21:00:00",
+    "category": "Beach Party",
+    "description": "Neon lights, fire shows, and multiple music stages on Patong Beach.",
+    "isLive": true
+  },
+  {
+    "id": "event-cnx-01",
+    "name": "Chiang Mai Flower Festival",
+    "location": "Nong Buak Haad Park",
+    "date": "2026-02-06T09:00:00",
+    "category": "Culture",
+    "description": "Beautiful garden displays and parades in the heart of the old city.",
+    "isLive": false
+  },
+  {
+    "id": "event-pty-01",
+    "name": "Pattaya Music Festival",
+    "location": "Pattaya Beach",
+    "date": "2026-03-20T18:00:00",
+    "category": "Music",
+    "description": "Multi-stage music event featuring top Thai and international artists.",
+    "isLive": false
+  }
+]

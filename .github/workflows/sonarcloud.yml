@@ -1,0 +1,38 @@
+name: SonarCloud
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  sonarcloud:
+    name: SonarCloud Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # ✅ สำคัญ: Sonar ชอบ full history สำหรับ blame/PR decoration
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install
+        run: npm ci
+
+      # ✅ รัน unit + สร้าง coverage/lcov.info
+      - name: Unit tests + coverage (Vitest)
+        run: npm run test:unit:coverage
+
+      # ✅ ส่งผลให้ SonarCloud (รวม coverage)
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # PR decoration
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

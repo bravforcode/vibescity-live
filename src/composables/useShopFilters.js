@@ -10,12 +10,18 @@ export function useShopFilters(
 	activeCategories,
 	activeStatus,
 	activeShopId = { value: null },
+	selectedProvince = { value: "ทุกจังหวัด" },
 ) {
-	// 1. Logic การ Filter (Category & Status)
+	// 1. Logic การ Filter (Category & Status & Province)
 	const filteredShops = computed(() => {
 		return shops.value.filter((s) => {
 			// ✅ Always include the active (selected) shop even if it doesn't match filters
 			if (activeShopId.value != null && s.id == activeShopId.value) return true;
+
+			// Provincial Match
+			const provinceMatch =
+				selectedProvince.value === "ทุกจังหวัด" ||
+				s.Province === selectedProvince.value;
 
 			// เช็ค Category (ถ้าไม่มีเลือกเลย หรือ อยู่ในตัวที่เลือก)
 			const categoryMatch =
@@ -25,7 +31,7 @@ export function useShopFilters(
 			const statusMatch =
 				activeStatus.value === "ALL" || s.status === activeStatus.value;
 
-			return categoryMatch && statusMatch;
+			return provinceMatch && categoryMatch && statusMatch;
 		});
 	});
 

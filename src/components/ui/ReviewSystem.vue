@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import { useHaptics } from "../../composables/useHaptics";
 import { useShopStore } from "../../store/shopStore";
 import { useUserStore } from "../../store/userStore";
+import { onMounted } from "vue";
 
 const props = defineProps({
 	shopId: {
@@ -54,6 +55,10 @@ const averageRating = computed(() => {
 	return (sum / shopReviews.value.length).toFixed(1);
 });
 
+onMounted(() => {
+	shopStore.fetchShopReviews(props.shopId);
+});
+
 const submitReview = async () => {
 	if (rating.value === 0 || isSubmitting.value) return;
 
@@ -69,11 +74,10 @@ const submitReview = async () => {
 			? `${selectedTags.value.map((t) => `#${t.replace(/\s+/g, "")}`).join(" ")}\n${comment.value}`
 			: comment.value;
 
-	shopStore.addReview(props.shopId, {
+	await shopStore.addReviewToDB(props.shopId, {
 		rating: rating.value,
 		comment: finalComment,
 		userName: userStore.userProfile?.name || "Vibe Explorer",
-		isVerified: true, // Groundwork for future verification logic
 	});
 
 	successFeedback();
