@@ -129,6 +129,9 @@ const uiOpacity = computed(() =>
     @touchstart="handleTouchStart"
     @touchmove="handleTouchMove"
     @touchend="handleTouchEnd"
+    role="region"
+    aria-label="Shop Detail Card"
+    :aria-expanded="isSelected"
   >
     <!-- Content Wrapper -->
     <div

@@ -2,20 +2,29 @@ name: SonarCloud
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
     types: [opened, synchronize, reopened]
 
+permissions:
+  contents: read
+  pull-requests: write # ให้ Sonar ทำ PR decoration ได้
+
+concurrency:
+  group: sonar-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   sonarcloud:
-    name: SonarCloud Scan
+    name: SonarCloud Scan (Unit + E2E + Quality Gate)
     runs-on: ubuntu-latest
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # ✅ สำคัญ: Sonar ชอบ full history สำหรับ blame/PR decoration
+          fetch-depth: 0 # Sonar ต้องการ full history
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -23,16 +32,71 @@ jobs:
           node-version: "20"
           cache: "npm"
 
-      - name: Install
+      - name: Install dependencies
         run: npm ci
 
-      # ✅ รัน unit + สร้าง coverage/lcov.info
+      # =========================
+      # 🧪 UNIT TESTS + COVERAGE
+      # =========================
       - name: Unit tests + coverage (Vitest)
         run: npm run test:unit:coverage
 
-      # ✅ ส่งผลให้ SonarCloud (รวม coverage)
-      - name: SonarCloud Scan
+      # เก็บ coverage/html ไว้ดูใน Actions
+      - name: Upload Unit Coverage Artifact (HTML + lcov)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-coverage
+          path: |
+            coverage/**
+          retention-days: 14
+
+      # =========================
+      # 🎭 PLAYWRIGHT E2E + REPORTS
+      # =========================
+
+      # แคช Playwright browsers (ทำให้เร็วขึ้นมาก)
+      - name: Cache Playwright Browsers
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+
+      # รัน E2E (ควรทำให้ generate JUnit + HTML report)
+      - name: Run Playwright E2E
+        env:
+          # ป้องกัน map token / third-party calls ทำให้เทสสะดุด
+          VITE_E2E: "true"
+          VITE_MAPBOX_TOKEN: ${{ secrets.VITE_MAPBOX_TOKEN }}
+        run: npm run test:e2e
+
+      # เก็บ playwright report ไว้ debug
+      - name: Upload Playwright Report Artifact (HTML)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/**
+            test-results/**
+            reports/e2e/**
+          retention-days: 14
+
+      # =========================
+      # 🔒 SONARCLOUD + QUALITY GATE
+      # =========================
+      - name: SonarCloud Scan (with Quality Gate)
         uses: SonarSource/sonarcloud-github-action@v3
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # PR decoration
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # PR decoration
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+            -Dsonar.testExecutionReportPaths=reports/e2e/junit.xml

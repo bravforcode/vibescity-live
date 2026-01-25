@@ -22,3 +22,12 @@ src/
 ├── services/       # API Service เชื่อมต่อ Google Sheets
 ├── utils/          # Business Logic (คำนวณเวลา, Golden Time, Status)
 public/  	# เก็บไฟล์รูปภาพ
+
+## Quality
+
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=bravforcode_vibescity-live&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=bravforcode_vibescity-live)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=bravforcode_vibescity-live&metric=coverage)](https://sonarcloud.io/summary/new_code?id=bravforcode_vibescity-live)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=bravforcode_vibescity-live&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=bravforcode_vibescity-live)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=bravforcode_vibescity-live&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=bravforcode_vibescity-live)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=bravforcode_vibescity-live&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=bravforcode_vibescity-live)
+[![Duplicated Lines (%)](https://sonarcloud.io/api/project_badges/measure?project=bravforcode_vibescity-live&metric=duplicated_lines_density)](https://sonarcloud.io/summary/new_code?id=bravforcode_vibescity-live)

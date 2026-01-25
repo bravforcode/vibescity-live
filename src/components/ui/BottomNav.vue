@@ -67,6 +67,9 @@ const getBadgeCount = (tabId) => {
           'transition-all duration-300 ease-out',
           activeTab === tab.id ? 'scale-110' : 'scale-100 opacity-60',
         ]"
+        :aria-label="tab.label"
+        :aria-current="activeTab === tab.id ? 'page' : undefined"
+        role="tab"
       >
         <!-- Active indicator -->
         <div

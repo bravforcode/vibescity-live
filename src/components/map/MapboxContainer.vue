@@ -38,6 +38,7 @@ const props = defineProps({
   isSidebarOpen: { type: Boolean, default: false },
   legendHeight: { type: Number, default: 0 },
   selectedShopCoords: { type: Array, default: null },
+  isLowPowerMode: { type: Boolean, default: false },
 });
 
 const emit = defineEmits([

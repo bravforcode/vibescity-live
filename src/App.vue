@@ -1,3 +1,5 @@
+// --- C:\vibecity.live\src\App.vue ---
+
 <script setup>
 import {
   computed,
@@ -63,6 +65,12 @@ const ReferralShare = defineAsyncComponent(
 const SwipeCard = defineAsyncComponent(
   () => import("./components/ui/SwipeCard.vue"),
 );
+const VibeSkeleton = defineAsyncComponent(
+  () => import("./components/ui/VibeSkeleton.vue"),
+);
+const VibeError = defineAsyncComponent(
+  () => import("./components/ui/VibeError.vue"),
+);
 const VisitorCount = defineAsyncComponent(
   () => import("./components/ui/VisitorCount.vue"),
 );
@@ -76,7 +84,9 @@ import { useI18n } from "vue-i18n";
 import { useHaptics } from "./composables/useHaptics";
 import { useShopFilters } from "./composables/useShopFilters";
 import { fetchRealTimeEvents } from "./services/eventService";
+import { fetchRealTimeEvents } from "./services/eventService";
 import { fetchShopData } from "./services/sheetsService";
+import { usePerformance } from "./composables/usePerformance"; // ✅ Performance
 import { useShopStore } from "./store/shopStore";
 import { useUserStore } from "./store/userStore";
 import {
@@ -194,6 +204,12 @@ onMounted(() => {
 });
 onUnmounted(() => {
   window.removeEventListener("resize", checkOrientation);
+});
+
+// ✅ Performance Monitoring
+const { initPerformanceMonitoring, isLowPowerMode } = usePerformance();
+onMounted(() => {
+    initPerformanceMonitoring();
 });
 
 let rotationInterval = null;
@@ -1229,8 +1245,26 @@ const isDev = import.meta.env.DEV;
     :class="[
       'relative w-full h-[100dvh] overflow-hidden font-sans transition-colors duration-500',
       isDarkMode ? 'bg-[#0b0d11]' : 'bg-gray-100',
+      { 'low-power': isLowPowerMode },
     ]"
   >
+    <!-- ✅ Global Error State -->
+    <VibeError
+      v-if="errorMessage"
+      :message="errorMessage"
+      @retry="() => window.location.reload()"
+    />
+
+    <!-- ✅ Loading State (Initial) -->
+    <div
+      v-if="isDataLoading && !realTimeEvents.length"
+      class="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xl"
+    >
+      <div class="flex flex-col items-center gap-4">
+        <VibeSkeleton variant="circle" height="60px" width="60px" />
+        <VibeSkeleton variant="text" height="20px" width="150px" />
+      </div>
+    </div>
     <!-- ✅ Sidebar Drawer Overlay -->
     <div v-testid="'drawer-shell'">
       <SidebarDrawer
@@ -1406,6 +1440,7 @@ const isDev = import.meta.env.DEV;
             :userLocation="userLocation"
             :currentTime="currentTime"
             :highlightedShopId="activeShopId"
+            :is-low-power-mode="isLowPowerMode"
             :isDarkMode="isDarkMode"
             :activeZone="activeZone"
             :activeProvince="activeProvince"
@@ -1561,6 +1596,7 @@ const isDev = import.meta.env.DEV;
             :userLocation="userLocation"
             :currentTime="currentTime"
             :highlightedShopId="activeShopId"
+            :is-low-power-mode="isLowPowerMode"
             :isDarkMode="isDarkMode"
             :activeZone="activeZone"
             :activeProvince="activeProvince"

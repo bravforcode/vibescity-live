@@ -6,11 +6,11 @@ export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
   test: {
-    environment: "jsdom",
+    environment: "happy-dom",
     globals: true,
 
     // ✅ ให้ Vitest หาเทสของคุณ
@@ -38,11 +38,11 @@ export default defineConfig({
         "**/dist/**",
         "**/public/**",
         "**/coverage/**",
-        "**/tests/**", // ไม่เอา tests ไปนับ coverage
+        "**/tests/**",
         "**/*.d.ts",
-        "src/main.{js,ts}", // (ถ้าไม่อยากนับ entry)
-        "src/**/router/**", // (ถ้ามี)
-        "src/**/i18n/**",   // (ถ้ามี)
+        "src/main.{js,ts}",
+        "src/**/router/**",
+        "src/**/i18n/**",
       ],
 
       // ✅ ช่วยให้ CI อ่านง่าย (optional)

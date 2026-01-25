@@ -15,8 +15,9 @@
     "build:roads:cm:lanes": "node scripts/road-lanes.mjs",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
+    "test:unit:coverage": "vitest run --coverage",
         "test:unit": "vitest",
-    "test:unit:coverage": "vitest run --coverage"
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@mapbox/mapbox-gl-geocoder": "^5.1.2",
@@ -56,6 +57,7 @@
     "@vue/test-utils": "^2.4.6",
     "autoprefixer": "^10.4.23",
     "cross-env": "^10.1.0",
+    "happy-dom": "^20.3.7",
     "jsdom": "^27.4.0",
     "postcss": "^8.5.6",
     "rollup-plugin-visualizer": "^6.0.5",

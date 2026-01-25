@@ -5,7 +5,14 @@ export default defineConfig({
   fullyParallel: true,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: [["html"], ["list"]],
+
+  // ✅ แยก report ชัดเจน
+ reporter: [
+  ["html", { open: "never" }],
+  ["list"],
+  ["junit", { outputFile: "reports/e2e/junit.xml" }],
+],
+
 
   expect: {
     timeout: 30_000,
@@ -18,6 +25,7 @@ export default defineConfig({
     video: "retain-on-failure",
   },
 
+  // ✅ ให้ CI / local ใช้ server เดียวกัน
   webServer: {
     command: "npm run dev -- --host 0.0.0.0 --port 3000",
     url: "http://localhost:3000",
@@ -29,6 +37,7 @@ export default defineConfig({
   },
 
   projects: [
+    // 🍎 iOS-first (Safari-like)
     {
       name: "Mobile Safari (iOS)",
       use: {
@@ -37,6 +46,8 @@ export default defineConfig({
         hasTouch: true,
       },
     },
+
+    // 🤖 Android
     {
       name: "Mobile Chrome (Android)",
       use: {
@@ -45,6 +56,8 @@ export default defineConfig({
         hasTouch: true,
       },
     },
+
+    // 🖥 Desktop sanity
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
