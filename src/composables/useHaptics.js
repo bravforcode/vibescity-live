@@ -53,6 +53,22 @@ export const useHaptics = () => {
 		}
 	};
 
+	/**
+	 * Impact feedback with levels (light | medium | heavy)
+	 */
+	const impactFeedback = (level = "light") => {
+		if (!isSupported) return;
+
+		const patterns = {
+			light: 12,
+			medium: [14, 40],
+			heavy: [30, 60, 30],
+		};
+
+		const pattern = patterns[level] || patterns.light;
+		navigator.vibrate(pattern);
+	};
+
 	return {
 		isSupported,
 		tapFeedback,
@@ -60,6 +76,7 @@ export const useHaptics = () => {
 		successFeedback,
 		errorFeedback,
 		heavyFeedback,
+		impactFeedback,
 	};
 };
 

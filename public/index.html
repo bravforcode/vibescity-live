@@ -4,59 +4,103 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/Vlive.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>VibeCity.live - Entertainment Map</title>
+    <!-- PWA & Theme Color -->
+    <meta
+      name="theme-color"
+      content="#8B5CF6"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta
+      name="theme-color"
+      content="#0f0f1a"
+      media="(prefers-color-scheme: dark)"
+    />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/pwa-192x192.png" />
+    <title>Live City - Chiang Mai Entertainment</title>
     <!-- Microsoft Clarity -->
     <script type="text/javascript">
-      ((c,l,a,r,i,t,y)=> {
-          c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-          t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-          y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+      ((c, l, a, r, i, t, y) => {
+        c[a] =
+          c[a] ||
+          function () {
+            (c[a].q = c[a].q || []).push(arguments);
+          };
+        t = l.createElement(r);
+        t.async = 1;
+        t.src = "https://www.clarity.ms/tag/" + i;
+        y = l.getElementsByTagName(r)[0];
+        y.parentNode.insertBefore(t, y);
       })(window, document, "clarity", "script", "v6esho1lqx");
     </script>
     <!-- SEO & social media metadata -->
-    <meta name="description" content="VibeCity.live - Discover Chiang Mai's best nightlife, bars, and entertainment in real-time." />
-    <meta property="og:title" content="VibeCity.live | Local Entertainment Map" />
-    <meta property="og:description" content="Discover the hottest venues in Chiang Mai with real-time vibe updates and navigation." />
+    <meta
+      name="description"
+      content="VibeCity.live - Discover Chiang Mai's best nightlife, bars, and entertainment in real-time."
+    />
+    <meta
+      property="og:title"
+      content="VibeCity.live | Local Entertainment Map"
+    />
+    <meta
+      property="og:description"
+      content="Discover the hottest venues in Chiang Mai with real-time vibe updates and navigation."
+    />
     <meta property="og:image" content="/Vlive.svg" />
     <meta property="og:url" content="https://vibecity.live" />
     <meta name="twitter:card" content="summary_large_image" />
-    
-    <!-- PWA & Mobile Support -->
-    <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#8B5CF6" />
+
+    <!-- Mobile Web App Capable -->
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
     <meta name="apple-mobile-web-app-title" content="VibeCity" />
     <link rel="apple-touch-icon" href="/Vlive.svg" />
-    
+
     <!-- Accessibility Skip Link (for keyboard users) -->
     <style>
       .skip-link {
         position: absolute;
         top: -40px;
         left: 0;
-        background: #8B5CF6;
+        background: #8b5cf6;
         color: white;
         padding: 8px;
         z-index: 10000;
         transition: top 0.3s;
       }
-      .skip-link:focus { top: 0; }
+      .skip-link:focus {
+        top: 0;
+      }
     </style>
-    
+
     <!-- Preload critical assets -->
     <link rel="preconnect" href="https://api.mapbox.com" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;900&family=Inter:wght@400;500;600;700;900&family=Sarabun:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
     <style>
       * {
-        font-family: 'Inter', 'Sarabun', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-family:
+          "Outfit",
+          "Inter",
+          "Sarabun",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
       }
       /* Prevent FOUC */
-      html { background: #0f0f1a; }
+      html {
+        background: #0f0f1a;
+      }
     </style>
   </head>
   <body>

@@ -1,0 +1,125 @@
+*** Begin Patch
+*** Update File: src/App.vue
+@@
+   const {
+@@
+     activeCategories,
++    activeStatus,
+@@
+     realTimeEvents,
++    currentTime,
+@@
+     globalSearchQuery,
+     globalSearchResults,
+     legendHeight,
+     isLowPowerMode,
+@@
+     // Methods
+     t,
+     toggleLanguage,
+     handleMarkerClick,
+     handleCardClick,
++    handleCardHover,
+     handleOpenDetail,
+@@
+     handleLocateMe,
+     retryLoad,
+@@
+     // Scroll Engine
+     handleHorizontalScroll,
+     onScrollStart,
+     onScrollEnd,
+@@
+     // Haptics
+     tapFeedback,
+     selectFeedback,
+   } = useAppLogic();
+@@
+         <VideoPanel
+@@
+-          @hover-shop="(s) => handleMarkerClick(s)"
++          @hover-shop="handleCardHover"
+@@
+         <MapContainer
+@@
+-                :currentTime="null"
++                :currentTime="currentTime"
+@@
+-                :is-low-power-mode="false"
++                :is-low-power-mode="isLowPowerMode"
+@@
+         <MapContainer
+@@
+-                :currentTime="null"
++                :currentTime="currentTime"
+@@
+-                :is-low-power-mode="false"
++                :is-low-power-mode="isLowPowerMode"
+*** End Patch
+
+*** Update File: src/App.vue
+@@ <template>
+         <BottomFeed
+@@
+           @reset-filters="
+             () => {
+               activeCategories = [];
+-              // activeStatus might not be defined here; destructure it from useAppLogic
+-              activeStatus = 'ALL';
++              activeStatus = 'ALL';
+             }
+           "
+*** End Patch
+
+*** Update File: src/composables/useAppLogic.js
+@@
+-import { usePerformance } from "./usePerformance";
++import { usePerformance } from "./usePerformance";
++import { useEdgeSwipe } from "./useGestures";
+@@
+-    // ✅ Global Edge Swipe (Left) to Open Drawer
+-    // NOTE: Imported directly in function scope or at top? Using top import pattern as per strict rule.
+-    // import { useEdgeSwipe } from "./composables/useGestures"; -> Moved to top imports if possible, or assumed available via project structure.
+-    // Assuming useEdgeSwipe is available to import here. 
+-    // RE-IMPORTING useEdgeSwipe here to match logic flow, assuming file relative path is ./useGestures
+-    const { useEdgeSwipe } = require("./useGestures"); // Or standard import
+-
+-    // Since useEdgeSwipe is a composable, we should invoke it inside setup context.
+-    // However, the original code had: import { useEdgeSwipe } from "./composables/useGestures";
+-    // I will use standard ESM import at the top later, but for now let's just assume it's imported at top.
++    // ✅ Global Edge Swipe (Left) to Open Drawer
++    // Use edge swipe composable to open sidebar on swipe
++    useEdgeSwipe(() => {
++      showSidebar.value = true;
++    });
+*** End Patch
+
+*** Update File: src/composables/useAppLogic.js
+@@
+-    // Global onGlobalTouchStart/End (defined but empty in original script? Checking if used.)
+-    // They are referenced in onUnmounted but not onMounted or defined in snippet.
+-    // I shall define them to avoid reference errors, assuming they might have been intended or missed.
+-    // If they were missed in snippet, empty functions are safer than crashing.
+-    const onGlobalTouchStart = () => {};
+-    const onGlobalTouchEnd = () => {};
++    // Note: onGlobalTouchStart and onGlobalTouchEnd are no longer referenced; remove undefined listeners.
+*** End Patch
+
+*** Update File: src/composables/useAppLogic.js
+@@ return {
+-      isVibeNowCollapsed: ref(false), // keep if you wire collapse toggle later
++      isVibeNowCollapsed,
+@@
+       isDev,
+-      isLowPowerMode
++      isLowPowerMode,
++      activeStatus,
++      currentTime
+*** End Patch
+
+*** Update File: src/components/feed/BottomFeed.vue
+@@
+-import { computed, defineAsyncComponent } from "vue";
++import { defineAsyncComponent } from "vue";
+*** End Patch
+*** End Patch

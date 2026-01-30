@@ -125,11 +125,28 @@ export const getReviews = async (shopId) => {
 			.eq("shop_id", shopId)
 			.order("created_at", { ascending: false });
 
-		if (error) throw error;
+		if (error) {
+			// Suppress missing table error
+			if (
+				error.code === "PGRST205" ||
+				error.message.includes("find the table")
+			) {
+				console.warn("Reviews table not found, skipping.");
+				return [];
+			}
+			throw error;
+		}
 		return data;
 	} catch (error) {
-		console.error("Error fetching reviews:", error);
-		return [];
+		// Only suppress missing table errors, re-throw other errors
+		if (
+			error.code === "PGRST205" ||
+			error.message?.includes("find the table")
+		) {
+			console.warn("Review fetch skipped:", error.message);
+			return [];
+		}
+		throw error;
 	}
 };
 

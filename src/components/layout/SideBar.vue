@@ -4,17 +4,17 @@ import { useShopFilters } from "../../composables/useShopFilters";
 import { getStatusColorClass, isFlashActive } from "../../utils/shopUtils";
 
 const props = defineProps({
-  isOpen: Boolean,
-  shops: Array,
-  activeCategories: Array,
-  activeStatus: String,
+	isOpen: Boolean,
+	shops: Array,
+	activeCategories: Array,
+	activeStatus: String,
 });
 
 const emit = defineEmits([
-  "close",
-  "update:categories",
-  "update:status",
-  "select-shop",
+	"close",
+	"update:categories",
+	"update:status",
+	"select-shop",
 ]);
 
 const { shops, activeCategories, activeStatus } = toRefs(props);
@@ -22,31 +22,31 @@ const { shops, activeCategories, activeStatus } = toRefs(props);
 const isFiltersExpanded = ref(false);
 
 const { uniqueCategories, sortedShops } = useShopFilters(
-  shops,
-  activeCategories,
-  activeStatus,
+	shops,
+	activeCategories,
+	activeStatus,
 );
 const categories = uniqueCategories;
 
 const statuses = ["ALL", "LIVE", "TONIGHT", "OFF"];
 
 const toggleCategory = (cat) => {
-  const updated = [...props.activeCategories];
-  const idx = updated.indexOf(cat);
-  if (idx > -1) {
-    updated.splice(idx, 1);
-  } else {
-    updated.push(cat);
-  }
-  emit("update:categories", updated);
+	const updated = [...props.activeCategories];
+	const idx = updated.indexOf(cat);
+	if (idx > -1) {
+		updated.splice(idx, 1);
+	} else {
+		updated.push(cat);
+	}
+	emit("update:categories", updated);
 };
 
 const resetCategories = () => emit("update:categories", []);
 const selectStatus = (stat) => emit("update:status", stat);
 
 const handleShopClick = (shop) => {
-  emit("select-shop", shop);
-  emit("close");
+	emit("select-shop", shop);
+	emit("close");
 };
 </script>
 

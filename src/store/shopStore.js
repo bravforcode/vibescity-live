@@ -2,242 +2,367 @@
 
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
+import { supabase } from "../lib/supabase";
+import { getReviews, getShops, postReview } from "../services/shopService";
 import { calculateDistance } from "../utils/shopUtils";
-import { getReviews, postReview } from "../services/shopService";
 
-export const useShopStore = defineStore("shop", () => {
-	// Core State
-	const rawShops = ref([]);
-	const currentTime = ref(new Date());
-	const activeShopId = ref(null);
-	const activeCategories = ref([]);
-	const activeStatus = ref("ALL");
-	const isDataLoading = ref(true);
-	const userLocation = ref(null);
-	const rotationSeed = ref(Math.floor(Date.now() / 1800000)); // Changes every 30 min
+export const useShopStore = defineStore(
+	"shop",
+	() => {
+		// Core State
+		const rawShops = ref([]);
+		const currentTime = ref(new Date());
+		const activeShopId = ref(null);
+		const activeCategories = ref([]);
+		const activeStatus = ref("ALL");
+		const isDataLoading = ref(true);
+		const userLocation = ref(null);
+		const rotationSeed = ref(Math.floor(Date.now() / 1800000)); // Changes every 30 min
 
-	// ✅ Gamification State
-	const COINS_STORAGE_KEY = "vibecity_collected_coins";
-	const COINS_TOTAL_KEY = "vibecity_total_coins";
+		// ✅ Gamification & Review State (Persisted automatically)
+		const collectedCoins = ref(new Set());
+		const totalCoins = ref(0);
+		const reviews = ref({});
 
-	const collectedCoins = ref(
-		new Set(JSON.parse(localStorage.getItem(COINS_STORAGE_KEY) || "[]")),
-	);
-	const totalCoins = ref(
-		parseInt(localStorage.getItem(COINS_TOTAL_KEY) || "0"),
-	);
-
-	// ✅ Review System State
-	const REVIEWS_STORAGE_KEY = "vibecity_user_reviews";
-	const reviews = ref(
-		JSON.parse(localStorage.getItem(REVIEWS_STORAGE_KEY) || "{}"),
-	);
-
-	const userLevel = computed(() => {
-		const coins = totalCoins.value;
-		if (coins >= 1000) return 5;
-		if (coins >= 600) return 4;
-		if (coins >= 300) return 3;
-		if (coins >= 100) return 2;
-		return 1;
-	});
-
-	const nextLevelXP = computed(() => {
-		const current = userLevel.value;
-		if (current === 1) return 100;
-		if (current === 2) return 300;
-		if (current === 3) return 600;
-		if (current === 4) return 1000;
-		return 2000; // Cap for now
-	});
-
-	const levelProgress = computed(() => {
-		const currentXP = totalCoins.value;
-		const nextXP = nextLevelXP.value;
-		const prevXP =
-			userLevel.value === 1
-				? 0
-				: userLevel.value === 2
-					? 100
-					: userLevel.value === 3
-						? 300
-						: userLevel.value === 4
-							? 600
-							: 1000;
-
-		return Math.min(1.0, Math.max(0, (currentXP - prevXP) / (nextXP - prevXP)));
-	});
-
-	// Computed: Filtered Shops
-	const filteredShops = computed(() => {
-		if (!rawShops.value) return [];
-		let result = [...rawShops.value];
-
-		// Filter by category
-		if (activeCategories.value.length > 0) {
-			result = result.filter((s) =>
-				activeCategories.value.includes(s.category),
-			);
-		}
-
-		// Filter by status
-		if (activeStatus.value !== "ALL") {
-			result = result.filter((s) => s.status === activeStatus.value);
-		}
-
-		return result;
-	});
-
-	// Computed: Nearby Shops (with distance + randomization)
-	const nearbyShops = (userLoc) => {
-		if (!filteredShops.value) return [];
-		if (!userLoc) return filteredShops.value;
-
-		const [userLat, userLng] = userLoc;
-		let candidates = filteredShops.value.map((shop) => ({
-			...shop,
-			distance: calculateDistance(userLat, userLng, shop.lat, shop.lng),
-			randomKey: (shop.id + rotationSeed.value * 1103515245) % 12345,
-		}));
-
-		// Default view: limit to 30 random shops
-		const isDefaultView =
-			activeCategories.value.length === 0 && activeStatus.value === "ALL";
-		if (isDefaultView) {
-			const liveShops = candidates.filter(
-				(s) => s.status === "LIVE" || s.Status === "LIVE",
-			);
-			const normalShops = candidates.filter(
-				(s) => s.status !== "LIVE" && s.Status !== "LIVE",
-			);
-			normalShops.sort((a, b) => a.randomKey - b.randomKey);
-			candidates = [...liveShops, ...normalShops].slice(0, 30);
-		}
-
-		// Sort: Promoted first, then LIVE, then by distance
-		candidates.sort((a, b) => {
-			const aIsPromoted = a.isPromoted || a.IsPromoted === "TRUE";
-			const bIsPromoted = b.isPromoted || b.IsPromoted === "TRUE";
-			if (aIsPromoted && !bIsPromoted) return -1;
-			if (!aIsPromoted && bIsPromoted) return 1;
-
-			const aIsLive = a.status === "LIVE" || a.Status === "LIVE";
-			const bIsLive = b.status === "LIVE" || b.Status === "LIVE";
-			if (aIsLive && !bIsLive) return -1;
-			if (!aIsLive && bIsLive) return 1;
-			return a.distance - b.distance;
+		const userLevel = computed(() => {
+			const coins = totalCoins.value;
+			if (coins >= 1000) return 5;
+			if (coins >= 600) return 4;
+			if (coins >= 300) return 3;
+			if (coins >= 100) return 2;
+			return 1;
 		});
 
-		return candidates;
-	};
+		const nextLevelXP = computed(() => {
+			const current = userLevel.value;
+			if (current === 1) return 100;
+			if (current === 2) return 300;
+			if (current === 3) return 600;
+			if (current === 4) return 1000;
+			return 2000; // Cap for now
+		});
 
-	// Actions
-	const setShops = (shops) => {
-		rawShops.value = shops;
-	};
+		const levelProgress = computed(() => {
+			const currentXP = totalCoins.value;
+			const nextXP = nextLevelXP.value;
+			let prevXP = 0;
+			const level = userLevel.value;
 
-	const setActiveShop = (id) => {
-		activeShopId.value = id;
-	};
+			if (level === 2) prevXP = 100;
+			else if (level === 3) prevXP = 300;
+			else if (level === 4) prevXP = 600;
+			else if (level >= 5) prevXP = 1000;
 
-	const setUserLocation = (loc) => {
-		userLocation.value = loc;
-	};
+			return Math.min(
+				1.0,
+				Math.max(0, (currentXP - prevXP) / (nextXP - prevXP)),
+			);
+		});
 
-	const setLoading = (val) => {
-		isDataLoading.value = val;
-	};
+		// Computed: Filtered Shops
+		const filteredShops = computed(() => {
+			if (!rawShops.value) return [];
+			let result = [...rawShops.value];
 
-	const refreshRotation = () => {
-		rotationSeed.value = Math.floor(Date.now() / 1800000);
-	};
+			// Filter by category
+			if (activeCategories.value.length > 0) {
+				result = result.filter((s) =>
+					activeCategories.value.includes(s.category),
+				);
+			}
 
-	const saveCoins = () => {
-		localStorage.setItem(
-			COINS_STORAGE_KEY,
-			JSON.stringify([...collectedCoins.value]),
-		);
-		localStorage.setItem(COINS_TOTAL_KEY, totalCoins.value.toString());
-	};
+			// Filter by status
+			if (activeStatus.value !== "ALL") {
+				result = result.filter((s) => s.status === activeStatus.value);
+			}
 
-	const addCoin = (shopId, value = 10) => {
-		if (collectedCoins.value.has(shopId)) return false;
-		collectedCoins.value.add(shopId);
-		totalCoins.value += value;
-		saveCoins();
-		return true;
-	};
+			return result;
+		});
 
-	const addReview = (shopId, review) => {
-		const id = String(shopId);
-		if (!reviews.value[id]) reviews.value[id] = [];
+		// Computed: Visible Shops (Nearest 30 + Random Rotation)
+		// Refactored from nearbyShops function to be a reactive computed property
+		const visibleShops = computed(() => {
+			if (!filteredShops.value) return [];
 
-		const newReview = {
-			id: Date.now(),
-			timestamp: new Date().toISOString(),
-			...review,
+			// 1. Get User Location (or default)
+			const userLoc = userLocation.value;
+			let candidates = [...filteredShops.value];
+
+			if (userLoc) {
+				const [userLat, userLng] = userLoc;
+				candidates = candidates.map((shop) => ({
+					...shop,
+					// Ensure placeholder logic is efficient
+					Image_URL1:
+						shop.Image_URL1 ||
+						`https://placehold.co/600x400/0f0f1a/3b82f6?text=${encodeURIComponent(shop.name)}`,
+					distance: calculateDistance(userLat, userLng, shop.lat, shop.lng),
+					// Random Key for shuffling, dependent on rotationSeed
+					randomKey: (shop.id + rotationSeed.value * 1103515245) % 12345,
+				}));
+			} else {
+				candidates = candidates.map((shop) => ({
+					...shop,
+					Image_URL1:
+						shop.Image_URL1 ||
+						`https://placehold.co/600x400/0f0f1a/3b82f6?text=${encodeURIComponent(shop.name)}`,
+					distance: 0,
+					randomKey: (shop.id + rotationSeed.value * 1103515245) % 12345,
+				}));
+			}
+
+			// 2. Default View Logic (Nearest 30 Random)
+			const isDefaultView =
+				activeCategories.value.length === 0 && activeStatus.value === "ALL";
+
+			if (isDefaultView) {
+				// Prioritize LIVE shops, then mix the rest
+				const liveShops = candidates.filter(
+					(s) => s.status === "LIVE" || s.Status === "LIVE",
+				);
+				const normalShops = candidates.filter(
+					(s) => s.status !== "LIVE" && s.Status !== "LIVE",
+				);
+
+				// If user has location, we might want to prioritize distance even in "Random" mode
+				if (userLoc) {
+					// Take top 50 closest normal shops, then shuffle them
+					normalShops.sort((a, b) => a.distance - b.distance);
+					const top50 = normalShops.slice(0, 50);
+
+					// Shuffle the top 50
+					top50.sort((a, b) => a.randomKey - b.randomKey);
+
+					// Combine LIVE + Shuffled Top 50 -> Slice 30
+					return [...liveShops, ...top50].slice(0, 30);
+				} else {
+					// No location: pure random
+					normalShops.sort((a, b) => a.randomKey - b.randomKey);
+					return [...liveShops, ...normalShops].slice(0, 30);
+				}
+			}
+
+			// 3. Filtered View (Show all matching but sorted)
+			candidates.sort((a, b) => {
+				// Promoted First
+				const aIsPromoted = a.isPromoted || a.IsPromoted === "TRUE";
+				const bIsPromoted = b.isPromoted || b.IsPromoted === "TRUE";
+				if (aIsPromoted && !bIsPromoted) return -1;
+				if (!aIsPromoted && bIsPromoted) return 1;
+
+				// Live Second
+				const aIsLive = a.status === "LIVE" || a.Status === "LIVE";
+				const bIsLive = b.status === "LIVE" || b.Status === "LIVE";
+				if (aIsLive && !bIsLive) return -1;
+				if (!aIsLive && bIsLive) return 1;
+
+				// Distance Third
+				return a.distance - b.distance;
+			});
+
+			return candidates; // Return all if filtered (user wants specific results)
+		});
+
+		// Auto-update rotation seed every 1 minute (checks if 30 min block changed)
+		setInterval(() => {
+			const newSeed = Math.floor(Date.now() / 1800000);
+			if (newSeed !== rotationSeed.value) {
+				rotationSeed.value = newSeed;
+				console.log("🔄 Shop Rotation Updated!");
+			}
+		}, 60000);
+
+		// Actions
+		const setShops = (shops) => {
+			rawShops.value = shops;
 		};
 
-		reviews.value[id].unshift(newReview);
-		localStorage.setItem(REVIEWS_STORAGE_KEY, JSON.stringify(reviews.value));
-		return newReview;
-	};
+		const setActiveShop = (id) => {
+			activeShopId.value = id;
+		};
 
-	const getShopReviews = (shopId) => {
-		return reviews.value[String(shopId)] || [];
-	};
+		const setUserLocation = (loc) => {
+			userLocation.value = loc;
+		};
 
-	const fetchShopReviews = async (shopId) => {
-		const data = await getReviews(shopId);
-		reviews.value[String(shopId)] = data.map((r) => ({
-			id: r.id,
-			timestamp: r.created_at,
-			rating: r.rating,
-			comment: r.comment,
-			userName: r.user_name,
-		}));
-	};
+		const setLoading = (val) => {
+			isDataLoading.value = val;
+		};
 
-	const addReviewToDB = async (shopId, review) => {
-		const newReview = await postReview(shopId, review);
-		// Local update for instant feedback
-		if (!reviews.value[String(shopId)]) reviews.value[String(shopId)] = [];
-		reviews.value[String(shopId)].unshift({
-			id: newReview.id,
-			timestamp: newReview.created_at,
-			rating: newReview.rating,
-			comment: newReview.comment,
-			userName: newReview.user_name,
-		});
-		return newReview;
-	};
+		const refreshRotation = () => {
+			rotationSeed.value = Math.floor(Date.now() / 1800000);
+		};
 
-	return {
-		rawShops,
-		currentTime,
-		activeShopId,
-		activeCategories,
-		activeStatus,
-		isDataLoading,
-		userLocation,
-		filteredShops,
-		nearbyShops,
-		setShops,
-		setActiveShop,
-		setUserLocation,
-		setLoading,
-		refreshRotation,
-		totalCoins,
-		userLevel,
-		nextLevelXP,
-		levelProgress,
-		addCoin,
-		collectedCoins,
-		rotationSeed,
-		addReview,
-		getShopReviews,
-		fetchShopReviews,
-		addReviewToDB,
-		reviews,
-	};
-});
+		const addCoin = (shopId, value = 10) => {
+			if (collectedCoins.value.has(shopId)) return false;
+			collectedCoins.value.add(shopId);
+			totalCoins.value += value;
+			return true;
+		};
+
+		const addReview = (shopId, review) => {
+			const id = String(shopId);
+			if (!reviews.value[id]) reviews.value[id] = [];
+
+			const newReview = {
+				id: Date.now(),
+				timestamp: new Date().toISOString(),
+				...review,
+			};
+
+			reviews.value[id].unshift(newReview);
+			reviews.value[id].unshift(newReview);
+			return newReview;
+		};
+
+		const getShopReviews = (shopId) => {
+			return reviews.value[String(shopId)] || [];
+		};
+
+		const fetchShopReviews = async (shopId) => {
+			const data = await getReviews(shopId);
+			reviews.value[String(shopId)] = data.map((r) => ({
+				id: r.id,
+				timestamp: r.created_at,
+				rating: r.rating,
+				comment: r.comment,
+				userName: r.user_name,
+			}));
+		};
+
+		const addReviewToDB = async (shopId, review) => {
+			const newReview = await postReview(shopId, review);
+			// Local update for instant feedback
+			if (!reviews.value[String(shopId)]) reviews.value[String(shopId)] = [];
+			reviews.value[String(shopId)].unshift({
+				id: newReview.id,
+				timestamp: newReview.created_at,
+				rating: newReview.rating,
+				comment: newReview.comment,
+				userName: newReview.user_name,
+			});
+			return newReview;
+		};
+
+		// ✅ Real Data Fetching
+		const fetchShops = async () => {
+			isDataLoading.value = true;
+			try {
+				const data = await getShops();
+				rawShops.value = data;
+				// If no data, maybe fallback or show error?
+				if (data.length === 0) console.warn("No shops found in DB");
+			} catch (error) {
+				console.error("Failed to fetch shops:", error);
+			} finally {
+				isDataLoading.value = false;
+			}
+		};
+
+		// ✅ Analytics Actions (Real Data)
+		const incrementView = async (shopId) => {
+			try {
+				const { error } = await supabase.rpc("increment_shop_view", {
+					row_id: shopId,
+				});
+				if (error) console.error("Error incrementing view:", error);
+
+				// Optimistic Update
+				const shop = rawShops.value.find((s) => s.id === shopId);
+				if (shop) shop.total_views = (shop.total_views || 0) + 1;
+			} catch (e) {
+				console.error(e);
+			}
+		};
+
+		const incrementClick = async (shopId) => {
+			try {
+				const { error } = await supabase.rpc("increment_shop_click", {
+					shop_id_param: shopId,
+				});
+				if (error) console.error("Error incrementing click:", error);
+
+				// Optimistic Update
+				const shop = rawShops.value.find((s) => s.id === shopId);
+				if (shop) shop.pin_clicks = (shop.pin_clicks || 0) + 1;
+			} catch (e) {
+				console.error(e);
+			}
+		};
+
+		const updateProStatus = async (shopId, { isGlowing, pinDuration }) => {
+			try {
+				const updates = {};
+				if (isGlowing !== undefined) updates.is_glowing = isGlowing;
+				if (pinDuration !== undefined) {
+					const date = new Date();
+					date.setDate(date.getDate() + pinDuration);
+					updates.pin_expiration = date.toISOString();
+					updates.pro_status = "PRO";
+				}
+
+				const { error } = await supabase
+					.from("shops")
+					.update(updates)
+					.eq("id", shopId);
+
+				if (error) throw error;
+
+				// Optimistic Update
+				const shop = rawShops.value.find((s) => s.id === shopId);
+				if (shop) {
+					if (isGlowing !== undefined) shop.is_glowing = isGlowing;
+					if (updates.pro_status) shop.pro_status = updates.pro_status;
+				}
+				return true;
+			} catch (e) {
+				console.error("Error updating pro status:", e);
+				return false;
+			}
+		};
+
+		return {
+			rawShops,
+			currentTime,
+			activeShopId,
+			activeCategories,
+			activeStatus,
+			isDataLoading,
+			userLocation,
+			filteredShops,
+			setShops,
+			setActiveShop,
+			setUserLocation,
+			setLoading,
+			refreshRotation,
+			totalCoins,
+			userLevel,
+			nextLevelXP,
+			levelProgress,
+			addCoin,
+			collectedCoins,
+			rotationSeed,
+			addReview,
+			getShopReviews,
+			fetchShopReviews,
+			addReviewToDB,
+			fetchShops, // ✅ Export Action
+			reviews,
+			incrementView,
+			incrementClick,
+			updateProStatus,
+			visibleShops, // ✅ Expose Computed
+		};
+	},
+	{
+		persist: {
+			paths: ["collectedCoins", "totalCoins", "reviews"],
+			afterRestore: (ctx) => {
+				// Restore Set structure for collectedCoins
+				if (Array.isArray(ctx.store.collectedCoins)) {
+					ctx.store.collectedCoins = new Set(ctx.store.collectedCoins);
+				}
+			},
+		},
+	},
+);

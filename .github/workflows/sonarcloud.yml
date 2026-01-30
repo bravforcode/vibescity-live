@@ -2,13 +2,13 @@ name: SonarCloud
 
 on:
   push:
-    branches: ["main"]
+    branches: [main]
   pull_request:
     types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
-  pull-requests: write # ให้ Sonar ทำ PR decoration ได้
+  pull-requests: write
 
 concurrency:
   group: sonar-${{ github.ref }}
@@ -18,19 +18,25 @@ jobs:
   sonarcloud:
     name: SonarCloud Scan (Unit + E2E + Quality Gate)
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
 
     steps:
+      # =========================
+      # 📦 CHECKOUT
+      # =========================
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Sonar ต้องการ full history
+          fetch-depth: 0
 
+      # =========================
+      # 🟢 NODE
+      # =========================
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "npm"
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -41,41 +47,33 @@ jobs:
       - name: Unit tests + coverage (Vitest)
         run: npm run test:unit:coverage
 
-      # เก็บ coverage/html ไว้ดูใน Actions
-      - name: Upload Unit Coverage Artifact (HTML + lcov)
+      - name: Upload Unit Coverage Artifact
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: unit-coverage
-          path: |
-            coverage/**
+          path: coverage/**
           retention-days: 14
 
       # =========================
-      # 🎭 PLAYWRIGHT E2E + REPORTS
+      # 🎭 PLAYWRIGHT E2E
       # =========================
-
-      # แคช Playwright browsers (ทำให้เร็วขึ้นมาก)
       - name: Cache Playwright Browsers
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.cache/ms-playwright
+          path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
 
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
 
-      # รัน E2E (ควรทำให้ generate JUnit + HTML report)
       - name: Run Playwright E2E
         env:
-          # ป้องกัน map token / third-party calls ทำให้เทสสะดุด
           VITE_E2E: "true"
           VITE_MAPBOX_TOKEN: ${{ secrets.VITE_MAPBOX_TOKEN }}
         run: npm run test:e2e
 
-      # เก็บ playwright report ไว้ debug
-      - name: Upload Playwright Report Artifact (HTML)
+      - name: Upload Playwright Report Artifact
         uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -87,16 +85,40 @@ jobs:
           retention-days: 14
 
       # =========================
-      # 🔒 SONARCLOUD + QUALITY GATE
+      # 🔄 JUNIT → SONAR GENERIC
       # =========================
-      - name: SonarCloud Scan (with Quality Gate)
+      - name: Convert Playwright JUnit → Sonar Generic
+        run: |
+          node ./scripts/junit-to-sonar-generic.js \
+            reports/e2e/junit.xml \
+            reports/e2e/sonar-generic.xml
+
+      # =========================
+      # 🔒 SONARCLOUD
+      # =========================
+      - name: SonarCloud Scan (Quality Gate)
         uses: SonarSource/sonarcloud-github-action@v3
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # PR decoration
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           args: >
             -Dsonar.qualitygate.wait=true
             -Dsonar.qualitygate.timeout=300
             -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
-            -Dsonar.testExecutionReportPaths=reports/e2e/junit.xml
+            -Dsonar.testExecutionReportPaths=reports/e2e/sonar-generic.xml
+
+      # =========================
+      # 📝 PR SUMMARY (NO SPAM)
+      # =========================
+      - name: PR Summary (Artifacts)
+        if: always()
+        run: |
+          echo "## ✅ CI Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- 🧪 **Unit Coverage (Vitest)**" >> $GITHUB_STEP_SUMMARY
+          echo "  - 📦 Artifact: unit-coverage" >> $GITHUB_STEP_SUMMARY
+          echo "- 🎭 **E2E Report (Playwright)**" >> $GITHUB_STEP_SUMMARY
+          echo "  - 📦 Artifact: playwright-report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔒 **Quality Gate:** enforced by SonarCloud" >> $GITHUB_STEP_SUMMARY

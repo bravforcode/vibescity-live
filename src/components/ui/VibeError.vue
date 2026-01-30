@@ -3,22 +3,22 @@
  * VibeError.vue
  * A beautiful error state that maintains the premium feel of the app.
  */
-import { WifiOff, RefreshCw } from "lucide-vue-next";
+import { RefreshCw, WifiOff } from "lucide-vue-next";
 
 defineProps({
-  title: { type: String, default: "Connection Interrupted" },
-  message: {
-    type: String,
-    default:
-      "We couldn't load the vibe city data. Please check your connection.",
-  },
-  actionLabel: { type: String, default: "Retry" },
+	title: { type: String, default: "Connection Interrupted" },
+	message: {
+		type: String,
+		default:
+			"We couldn't load the vibe city data. Please check your connection.",
+	},
+	actionLabel: { type: String, default: "Retry" },
 });
 
 const emit = defineEmits(["retry"]);
 
 const handleRetry = () => {
-  emit("retry");
+	emit("retry");
 };
 </script>
 

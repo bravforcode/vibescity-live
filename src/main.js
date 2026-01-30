@@ -4,16 +4,30 @@ import { createPinia } from "pinia";
 import { createApp } from "vue";
 import { vTestId } from "./directives/testid.js";
 
-
-import "./assets/css/main.postcss";
 import App from "./App.vue";
+import "./assets/css/main.postcss";
+import "./assets/vibe-animations.css";
 import i18n from "./i18n";
 import { vueQueryOptions } from "./plugins/queryClient";
 
+import { headSymbol } from "@unhead/vue";
+import { createHead } from "@unhead/vue/client";
+
 const app = createApp(App);
+const head = createHead();
+
+// ✅ Patch: Shim install if missing (fixes unhead v2 issue)
+if (!head.install) {
+  head.install = (app) => {
+    app.provide(headSymbol, head);
+  };
+}
+
+app.use(head);
 
 // ✅ Microsoft Clarity
 import Clarity from "@microsoft/clarity";
+
 const clarityId = import.meta.env.VITE_CLARITY_PROJECT_ID;
 if (clarityId) {
 	Clarity.init(clarityId);
@@ -75,7 +89,6 @@ if (sentryDsn) {
 			: 0,
 	});
 }
-
 
 app.use(createPinia());
 app.use(i18n);

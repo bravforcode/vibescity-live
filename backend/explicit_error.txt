@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "C:\vibecity.live\backend\debug_main.py", line 14, in <module>
+    from app import main
+  File "C:\vibecity.live\backend\app\main.py", line 4, in <module>
+    from app.api.routers import vibes, rides, payments, shops, owner
+  File "C:\vibecity.live\backend\app\api\routers\shops.py", line 3, in <module>
+    from app.services.shop_service import shop_service
+  File "C:\vibecity.live\backend\app\services\shop_service.py", line 2, in <module>
+    from app.core.config import settings
+ImportError: cannot import name 'settings' from 'app.core.config' (C:\vibecity.live\backend\app\core\config.py)

@@ -2,7 +2,7 @@
 /**
  * BottomNav.vue - Premium Animated Bottom Navigation
  */
-import { Map as MapIcon, Zap, Heart, User } from "lucide-vue-next";
+import { Heart, Map as MapIcon, User, Zap } from "lucide-vue-next";
 import { useHaptics } from "../../composables/useHaptics";
 
 const { selectFeedback } = useHaptics();

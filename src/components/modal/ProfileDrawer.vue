@@ -6,31 +6,32 @@
  * Featuring Glassmorphism and Tile Iconography
  */
 import { computed, defineAsyncComponent, ref } from "vue";
+
 const AchievementBadges = defineAsyncComponent(
-  () => import("../ui/AchievementBadges.vue"),
+	() => import("../ui/AchievementBadges.vue"),
 );
 
+import {
+	ChevronRight,
+	Gift,
+	HelpCircle,
+	History,
+	LogOut,
+	Settings,
+	Star,
+	Trophy,
+	User,
+	Zap,
+} from "lucide-vue-next";
 import { storeToRefs } from "pinia";
 import { useI18n } from "vue-i18n";
+import { useHaptics } from "../../composables/useHaptics";
 import { Z } from "../../constants/zIndex";
 import { useShopStore } from "../../store/shopStore";
-import { useHaptics } from "../../composables/useHaptics";
-import {
-  User,
-  Settings,
-  Gift,
-  HelpCircle,
-  LogOut,
-  ChevronRight,
-  Zap,
-  Star,
-  Trophy,
-  History,
-} from "lucide-vue-next";
 
 const props = defineProps({
-  isOpen: Boolean,
-  isDarkMode: Boolean,
+	isOpen: Boolean,
+	isDarkMode: Boolean,
 });
 
 const emit = defineEmits(["close", "toggle-language"]);
@@ -41,57 +42,57 @@ const shopStore = useShopStore();
 const { userLevel, totalCoins, levelProgress } = storeToRefs(shopStore);
 
 const handleClose = () => {
-  selectFeedback();
-  emit("close");
+	selectFeedback();
+	emit("close");
 };
 
 const menuSections = [
-  {
-    title: "Vibe Discovery",
-    items: [
-      {
-        id: "events",
-        label: "Nearby Events",
-        icon: Zap,
-        color: "text-amber-400",
-      },
-      {
-        id: "quests",
-        label: "Vibe Quests",
-        icon: Trophy,
-        color: "text-purple-400",
-      },
-      {
-        id: "history",
-        label: "Visit History",
-        icon: History,
-        color: "text-blue-400",
-      },
-    ],
-  },
-  {
-    title: "Account",
-    items: [
-      {
-        id: "profile",
-        label: "Edit Profile",
-        icon: User,
-        color: "text-zinc-400",
-      },
-      {
-        id: "settings",
-        label: "Preferences",
-        icon: Settings,
-        color: "text-zinc-400",
-      },
-      {
-        id: "support",
-        label: "Help & Support",
-        icon: HelpCircle,
-        color: "text-zinc-400",
-      },
-    ],
-  },
+	{
+		title: "Vibe Discovery",
+		items: [
+			{
+				id: "events",
+				label: "Nearby Events",
+				icon: Zap,
+				color: "text-amber-400",
+			},
+			{
+				id: "quests",
+				label: "Vibe Quests",
+				icon: Trophy,
+				color: "text-purple-400",
+			},
+			{
+				id: "history",
+				label: "Visit History",
+				icon: History,
+				color: "text-blue-400",
+			},
+		],
+	},
+	{
+		title: "Account",
+		items: [
+			{
+				id: "profile",
+				label: "Edit Profile",
+				icon: User,
+				color: "text-zinc-400",
+			},
+			{
+				id: "settings",
+				label: "Preferences",
+				icon: Settings,
+				color: "text-zinc-400",
+			},
+			{
+				id: "support",
+				label: "Help & Support",
+				icon: HelpCircle,
+				color: "text-zinc-400",
+			},
+		],
+	},
 ];
 </script>
 

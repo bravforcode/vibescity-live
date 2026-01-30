@@ -1,45 +1,21 @@
 {
-  "name": "VibeCity.live",
+  "name": "VibeCity - Chiang Mai Entertainment",
   "short_name": "VibeCity",
-  "description": "Discover the hottest nightlife and entertainment venues in Chiang Mai",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f0f1a",
-  "theme_color": "#8B5CF6",
+  "background_color": "#000000",
+  "theme_color": "#000000",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/Vlive.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    }
-  ],
-  "categories": ["entertainment", "lifestyle", "navigation"],
-  "screenshots": [
-    {
-      "src": "/screenshots/map-dark.png",
-      "sizes": "1080x1920",
-      "type": "image/png",
-      "label": "Entertainment Map - Dark Mode"
-    }
-  ],
-  "shortcuts": [
-    {
-      "name": "View LIVE Venues",
-      "short_name": "LIVE",
-      "description": "See venues that are live right now",
-      "url": "/?filter=live",
-      "icons": [{ "src": "/icons/live-shortcut.png", "sizes": "96x96" }]
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
     },
     {
-      "name": "My Favorites",
-      "short_name": "Favorites",
-      "description": "View your saved venues",
-      "url": "/?tab=favorites",
-      "icons": [{ "src": "/icons/fav-shortcut.png", "sizes": "96x96" }]
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
     }
-  ],
-  "related_applications": [],
-  "prefer_related_applications": false
+  ]
 }

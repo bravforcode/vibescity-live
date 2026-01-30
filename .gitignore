@@ -129,3 +129,12 @@ storybook-static
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# ----------------------------------------
+# 12. Test Reports (Generated Artifacts)
+# ----------------------------------------
+# JUnit and other test reports should not be committed
+reports/
+junit.xml
+**/junit.xml
+sonar-report.xml

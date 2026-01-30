@@ -9,15 +9,20 @@
     "preview": "rsbuild preview",
     "check": "biome check --write src",
     "format": "biome format --write src",
-    "lint": "biome lint \"src/**/*.{js,jsx,ts,tsx,vue,json,mjs,cjs}\"",
-    "lint:fix": "biome lint --write \"src/**/*.{js,jsx,ts,tsx,vue,json,mjs,cjs}\"",
+    "lint": "biome lint src",
+    "lint:fix": "biome lint --write src",
     "build:roads:cm": "node scripts/build-chiangmai-roads.mjs",
     "build:roads:cm:lanes": "node scripts/road-lanes.mjs",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "test:unit:coverage": "vitest run --coverage",
-        "test:unit": "vitest",
-    "test:e2e": "playwright test"
+    "test:unit": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:smoke": "PW_GREP=@smoke playwright test",
+    "test:e2e:debug": "PW_SLOWMO=150 playwright test --debug",
+    "test:spike": "k6 run k6-tests/spike-test.js",
+  "test:chaos": "k6 run k6-tests/chaos-test.js"
   },
   "dependencies": {
     "@mapbox/mapbox-gl-geocoder": "^5.1.2",
@@ -33,6 +38,7 @@
     "aos": "^2.3.4",
     "axios": "^1.13.2",
     "csv-parser": "^3.2.0",
+    "dayjs": "^1.11.19",
     "dotenv": "^17.2.3",
     "lucide-vue-next": "^0.562.0",
     "mapbox-gl": "^3.18.0",
@@ -52,6 +58,7 @@
     "@storybook/addon-docs": "^10.2.0",
     "@storybook/addon-onboarding": "^10.2.0",
     "@types/node": "^25.0.10",
+    "@unhead/vue": "^2.1.2",
     "@vitejs/plugin-vue": "^6.0.3",
     "@vitest/coverage-v8": "^4.0.18",
     "@vue/test-utils": "^2.4.6",
@@ -59,12 +66,16 @@
     "cross-env": "^10.1.0",
     "happy-dom": "^20.3.7",
     "jsdom": "^27.4.0",
+    "pinia-plugin-persistedstate": "^4.7.1",
     "postcss": "^8.5.6",
     "rollup-plugin-visualizer": "^6.0.5",
     "storybook": "^10.2.0",
     "storybook-vue3-rsbuild": "^3.2.2",
     "tailwindcss": "^3.4.19",
     "vite": "^7.2.4",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "workbox-build": "^7.4.0",
+    "workbox-window": "^7.4.0",
+    "xml2js": "^0.6.2"
   }
 }

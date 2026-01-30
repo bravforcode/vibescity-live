@@ -6,96 +6,96 @@
 import { computed, onMounted } from "vue";
 
 const props = defineProps({
-  isDarkMode: {
-    type: Boolean,
-    default: true,
-  },
-  stats: {
-    type: Object,
-    default: () => ({
-      totalVisits: 0,
-      liveVenuesVisited: 0,
-      coinsCollected: 0,
-      checkInStreak: 0,
-      nightVisits: 0,
-    }),
-  },
+	isDarkMode: {
+		type: Boolean,
+		default: true,
+	},
+	stats: {
+		type: Object,
+		default: () => ({
+			totalVisits: 0,
+			liveVenuesVisited: 0,
+			coinsCollected: 0,
+			checkInStreak: 0,
+			nightVisits: 0,
+		}),
+	},
 });
 
 const emit = defineEmits(["badge-unlock"]);
 
 const badges = [
-  {
-    id: "first_visit",
-    name: "First Steps",
-    icon: "👣",
-    description: "Visit your first venue",
-    condition: (s) => s.totalVisits >= 1,
-    tier: "bronze",
-  },
-  {
-    id: "explorer",
-    name: "Explorer",
-    icon: "🧭",
-    description: "Visit 10 different venues",
-    condition: (s) => s.totalVisits >= 10,
-    tier: "silver",
-  },
-  {
-    id: "night_owl",
-    name: "Night Owl",
-    icon: "🦉",
-    description: "Visit 5 venues after midnight",
-    condition: (s) => s.nightVisits >= 5,
-    tier: "gold",
-  },
-  {
-    id: "live_hunter",
-    name: "Live Hunter",
-    icon: "🔴",
-    description: "Visit 5 venues while LIVE",
-    condition: (s) => s.liveVenuesVisited >= 5,
-    tier: "gold",
-  },
-  {
-    id: "coin_collector",
-    name: "Coin Collector",
-    icon: "💰",
-    description: "Collect 100 coins",
-    condition: (s) => s.coinsCollected >= 100,
-    tier: "silver",
-  },
-  {
-    id: "streak_master",
-    name: "Streak Master",
-    icon: "🔥",
-    description: "7-day check-in streak",
-    condition: (s) => s.checkInStreak >= 7,
-    tier: "gold",
-  },
-  {
-    id: "vip",
-    name: "VIP",
-    icon: "⭐",
-    description: "Unlock all other badges",
-    condition: (s) => false, // Special condition
-    tier: "platinum",
-  },
+	{
+		id: "first_visit",
+		name: "First Steps",
+		icon: "👣",
+		description: "Visit your first venue",
+		condition: (s) => s.totalVisits >= 1,
+		tier: "bronze",
+	},
+	{
+		id: "explorer",
+		name: "Explorer",
+		icon: "🧭",
+		description: "Visit 10 different venues",
+		condition: (s) => s.totalVisits >= 10,
+		tier: "silver",
+	},
+	{
+		id: "night_owl",
+		name: "Night Owl",
+		icon: "🦉",
+		description: "Visit 5 venues after midnight",
+		condition: (s) => s.nightVisits >= 5,
+		tier: "gold",
+	},
+	{
+		id: "live_hunter",
+		name: "Live Hunter",
+		icon: "🔴",
+		description: "Visit 5 venues while LIVE",
+		condition: (s) => s.liveVenuesVisited >= 5,
+		tier: "gold",
+	},
+	{
+		id: "coin_collector",
+		name: "Coin Collector",
+		icon: "💰",
+		description: "Collect 100 coins",
+		condition: (s) => s.coinsCollected >= 100,
+		tier: "silver",
+	},
+	{
+		id: "streak_master",
+		name: "Streak Master",
+		icon: "🔥",
+		description: "7-day check-in streak",
+		condition: (s) => s.checkInStreak >= 7,
+		tier: "gold",
+	},
+	{
+		id: "vip",
+		name: "VIP",
+		icon: "⭐",
+		description: "Unlock all other badges",
+		condition: () => false, // Special condition
+		tier: "platinum",
+	},
 ];
 
 const tierColors = {
-  bronze: "from-amber-700 to-amber-500",
-  silver: "from-gray-400 to-gray-300",
-  gold: "from-yellow-500 to-amber-400",
-  platinum: "from-purple-500 to-pink-500",
+	bronze: "from-amber-700 to-amber-500",
+	silver: "from-gray-400 to-gray-300",
+	gold: "from-yellow-500 to-amber-400",
+	platinum: "from-purple-500 to-pink-500",
 };
 
 const unlockedBadges = computed(() => {
-  return badges.filter((b) => b.condition(props.stats)).map((b) => b.id);
+	return badges.filter((b) => b.condition(props.stats)).map((b) => b.id);
 });
 
 const getBadgeStatus = (badge) => {
-  return unlockedBadges.value.includes(badge.id);
+	return unlockedBadges.value.includes(badge.id);
 };
 </script>
 

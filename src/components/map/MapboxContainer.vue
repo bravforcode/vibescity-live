@@ -1,6 +1,7 @@
 // --- C:\vibecity.live\src\components\map\MapboxContainer.vue ---
 
 <script setup>
+import "mapbox-gl/dist/mapbox-gl.css";
 import {
   computed,
   nextTick,
@@ -11,9 +12,14 @@ import {
   watch,
 } from "vue";
 import { useI18n } from "vue-i18n";
+import { useTimeTheme } from "../../composables/useTimeTheme";
 import { useShopStore } from "../../store/shopStore";
+import {
+  createGiantPinElement,
+  createMarkerElement,
+  createPopupHTML,
+} from "../../utils/mapRenderer";
 import { calculateDistance } from "../../utils/shopUtils";
-import "mapbox-gl/dist/mapbox-gl.css";
 
 const DARK_STYLE = "mapbox://styles/mapbox/dark-v11";
 const LIGHT_STYLE = "mapbox://styles/mapbox/light-v11";
@@ -22,6 +28,146 @@ const { t, te, locale } = useI18n();
 const tt = (key, fallback) => (te(key) ? t(key) : fallback);
 
 const shopStore = useShopStore();
+
+// ✅ Phase 2: Dynamic Vibe Shifting
+const { isNightMode, mapStyle, currentHour } = useTimeTheme();
+
+// ✅ Vibe Effects
+import { useVibeEffects } from "../../composables/useVibeEffects";
+import { socketService } from "../../services/socketService";
+const { activeVibeEffects, triggerVibeEffect } = useVibeEffects();
+
+// Socket Listener
+onMounted(() => {
+  socketService.addListener((data) => {
+    if (data.type === "vibe" && data.lat && data.lng) {
+      // Trigger effect on map
+      triggerVibeEffect(
+        { id: data.shopId, lat: data.lat, lng: data.lng },
+        data.content,
+      );
+    }
+  });
+
+  socketService.addListener((data) => {
+    // 1. Vibe Effects
+    if (data.type === "vibe" && data.lat && data.lng) {
+      triggerVibeEffect(
+        { id: data.shopId, lat: data.lat, lng: data.lng },
+        data.content,
+      );
+    }
+
+    // 2. Heatmap Update
+    if (data.type === "heatmap" && map.value) {
+      updateHeatmapData(data.data);
+    }
+  });
+});
+
+// ✅ Heatmap Logic
+const heatmapGeoJson = {
+  type: "FeatureCollection",
+  features: [],
+};
+
+const updateHeatmapData = (densityData) => {
+  // densityData: { shopId: count }
+  if (!props.shops) return;
+
+  const features = [];
+  Object.entries(densityData).forEach(([shopId, count]) => {
+    const shop = props.shops.find((s) => s.id == shopId);
+    if (shop && shop.lat && shop.lng) {
+      features.push({
+        type: "Feature",
+        geometry: {
+          type: "Point",
+          coordinates: [shop.lng, shop.lat],
+        },
+        properties: {
+          density: count,
+        },
+      });
+    }
+  });
+
+  heatmapGeoJson.features = features;
+
+  // Update Map Source
+  if (map.value && map.value.getSource("heatmap-source")) {
+    map.value.getSource("heatmap-source").setData(heatmapGeoJson);
+  }
+};
+
+// Add Heatmap Layer
+const addHeatmapLayer = () => {
+  if (!map.value) return;
+
+  // Source
+  if (!map.value.getSource("heatmap-source")) {
+    map.value.addSource("heatmap-source", {
+      type: "geojson",
+      data: heatmapGeoJson,
+    });
+  }
+
+  // Layer
+  if (!map.value.getLayer("heatmap-layer")) {
+    map.value.addLayer(
+      {
+        id: "heatmap-layer",
+        type: "heatmap",
+        source: "heatmap-source",
+        maxzoom: 15,
+        paint: {
+          // Increase weight based on density
+          "heatmap-weight": [
+            "interpolate",
+            ["linear"],
+            ["get", "density"],
+            0,
+            0,
+            10,
+            1,
+          ],
+          // Increase intensity as zoom level increases
+          "heatmap-intensity": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            0,
+            1,
+            15,
+            3,
+          ],
+          // Color ramp
+          "heatmap-color": [
+            "interpolate",
+            ["linear"],
+            ["heatmap-density"],
+            0,
+            "rgba(33,102,172,0)",
+            0.2,
+            "rgb(103,169,207)",
+            0.4,
+            "rgb(209,229,240)",
+            0.6,
+            "rgb(253,219,199)",
+            0.8,
+            "rgb(239,138,98)",
+            1,
+            "rgb(178,24,43)",
+          ],
+          // Radius
+          "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 0, 2, 15, 20],
+          "heatmap-opacity": 0.7,
+        },
+      },
+      "waterway-label",
+    ); // Place below labels
+  }
+};
 
 const props = defineProps({
   shops: Array,
@@ -39,6 +185,23 @@ const props = defineProps({
   legendHeight: { type: Number, default: 0 },
   selectedShopCoords: { type: Array, default: null },
   isLowPowerMode: { type: Boolean, default: false },
+  priorityShopIds: { type: Array, default: () => [] },
+  isImmersive: { type: Boolean, default: false },
+  isGiantPinView: { type: Boolean, default: false },
+});
+
+// Watch for Theme Changes and update Mapbox Style dynamically
+watch(mapStyle, (newStyle) => {
+  if (map.value && isMapReady.value) {
+    // Preserve layers before switching style (optional advanced logic, for MVP we reload style)
+    // Mapbox GL JS setStyle removes custom layers. We need to re-add them.
+    map.value.setStyle(newStyle);
+    map.value.once("style.load", () => {
+      setupMapLayers();
+      updateMapSources();
+      updateEventMarkers(); // Restore markers
+    });
+  }
 });
 
 const emit = defineEmits([
@@ -55,6 +218,7 @@ const map = shallowRef(null);
 const zoom = ref(15);
 const center = ref([98.968, 18.7985]); // Mapbox uses [lng, lat]
 const isMapReady = ref(false);
+const mapLoaded = ref(false); // ✅ Fade-in control
 const activePopup = shallowRef(null);
 const markersMap = shallowRef(new Map());
 const eventMarkersMap = shallowRef(new Map());
@@ -71,7 +235,24 @@ const roadDistance = ref(null);
 const roadDuration = ref(null);
 
 // ✅ Fetch Road-based Directions
+// ✅ Update Popup UI with new distance
+const updatePopupUi = (distance, duration) => {
+  if (activePopup.value?.isOpen()) {
+    const popupEl = activePopup.value.getElement();
+    const distLabel = popupEl.querySelector(".road-dist-label");
+    if (distLabel) {
+      const distTxt =
+        distance < 1000
+          ? `${Math.round(distance)} m`
+          : `${(distance / 1000).toFixed(1)} km`;
+      const timeTxt = `${Math.round(duration / 60)} min`;
+      distLabel.innerHTML = `📍 ${distTxt} (${timeTxt})`;
+    }
+  }
+};
+
 const updateRoadDirections = async () => {
+  // 1. Validate Inputs
   if (
     !props.userLocation ||
     props.userLocation.length < 2 ||
@@ -80,7 +261,7 @@ const updateRoadDirections = async () => {
   ) {
     roadDistance.value = null;
     roadDuration.value = null;
-    if (map.value && map.value.getSource("distance-line")) {
+    if (map.value?.getSource("distance-line")) {
       map.value.getSource("distance-line").setData({
         type: "FeatureCollection",
         features: [],
@@ -92,38 +273,47 @@ const updateRoadDirections = async () => {
   const [uLat, uLng] = props.userLocation;
   const [sLat, sLng] = props.selectedShopCoords;
 
+  if (!mapboxgl?.accessToken) return;
+  const coords = [uLat, uLng, sLat, sLng];
+
+  // 2. Validate Coordinates
+  if (!coords.every(Number.isFinite)) return;
+  if (
+    Math.abs(uLat) > 90 ||
+    Math.abs(sLat) > 90 ||
+    Math.abs(uLng) > 180 ||
+    Math.abs(sLng) > 180
+  )
+    return;
+
   try {
+    if (!navigator.onLine) return;
+
     const res = await fetch(
       `https://api.mapbox.com/directions/v5/mapbox/walking/${uLng},${uLat};${sLng},${sLat}?geometries=geojson&access_token=${mapboxgl.accessToken}`,
     );
+
+    if (!res.ok) return;
+
     const data = await res.json();
-    if (data.routes && data.routes[0]) {
+    if (data.routes?.[0]) {
       const route = data.routes[0].geometry;
-      if (map.value && map.value.getSource("distance-line")) {
+
+      // Update Map Source
+      if (map.value?.getSource("distance-line")) {
         map.value.getSource("distance-line").setData({
           type: "Feature",
           geometry: route,
         });
       }
+
+      // Update State & UI
       roadDistance.value = data.routes[0].distance;
       roadDuration.value = data.routes[0].duration;
-
-      // Update popup if open
-      if (activePopup.value && activePopup.value.isOpen()) {
-        const popupEl = activePopup.value.getElement();
-        const distLabel = popupEl.querySelector(".road-dist-label");
-        if (distLabel) {
-          const distTxt =
-            roadDistance.value < 1000
-              ? `${Math.round(roadDistance.value)} m`
-              : `${(roadDistance.value / 1000).toFixed(1)} km`;
-          const timeTxt = `${Math.round(roadDuration.value / 60)} min`;
-          distLabel.innerHTML = `📍 ${distTxt} (${timeTxt})`;
-        }
-      }
+      updatePopupUi(roadDistance.value, roadDuration.value);
     }
   } catch (err) {
-    console.error("Directions Error:", err);
+    // Silent catch: Network/API errors are expected occasionally and shouldn't disrupt UX
   }
 };
 
@@ -155,6 +345,99 @@ const requestUpdateMarkers = () => {
     });
   }
 };
+// ... (existing throttled marker update)
+
+// ✅ Vibe Effect Markers Sync
+const vibeMarkersMap = new Map(); // Track effect markers by effect ID
+
+watch(
+  activeVibeEffects,
+  (effects) => {
+    if (!map.value || !mapboxgl) return;
+
+    // 1. Remove markers not in list
+    for (const [id, marker] of vibeMarkersMap.entries()) {
+      if (!effects.find((e) => e.id === id)) {
+        marker.remove();
+        vibeMarkersMap.delete(id);
+      }
+    }
+
+    // 2. Add new markers
+    effects.forEach((effect) => {
+      if (!vibeMarkersMap.has(effect.id)) {
+        const el = document.createElement("div");
+        el.className = "vibe-float-marker";
+        el.innerHTML = effect.emoji;
+
+        const marker = new mapboxgl.Marker({
+          element: el,
+          anchor: "bottom",
+        })
+          .setLngLat([effect.lng, effect.lat])
+          .addTo(map.value);
+
+        vibeMarkersMap.set(effect.id, marker);
+      }
+    });
+  },
+  { deep: true },
+);
+
+// ✅ Visibility Logic (User Request)
+const pinsVisible = ref(true);
+
+watch(
+  [() => props.isImmersive, () => props.isGiantPinView],
+  ([immersive, giantView]) => {
+    const shouldHide = immersive || giantView;
+    pinsVisible.value = !shouldHide;
+
+    // Toggle DOM Markers
+    markersMap.value.forEach(({ marker }) => {
+      const el = marker.getElement();
+      if (el) el.style.opacity = shouldHide ? "0" : "1";
+    });
+
+    eventMarkersMap.value.forEach((marker) => {
+      const el = marker.getElement();
+      if (el) el.style.opacity = shouldHide ? "0" : "1";
+    });
+
+    // Toggle Mapbox Layers (Clusters & Points)
+    if (map.value && isMapReady.value) {
+      const opacity = shouldHide ? 0 : 1;
+      const textOpacity = shouldHide ? 0 : 1;
+
+      const layers = [
+        "clusters",
+        "unclustered-point",
+        "cluster-count",
+        "vibe-shops-regular",
+        "giant-pin-marker",
+      ];
+
+      layers.forEach((layerId) => {
+        if (map.value.getLayer(layerId)) {
+          // Check layer type to set correct property
+          const type = map.value.getLayer(layerId).type;
+          if (type === "circle") {
+            map.value.setPaintProperty(layerId, "circle-opacity", opacity);
+            map.value.setPaintProperty(
+              layerId,
+              "circle-stroke-opacity",
+              opacity,
+            );
+          } else if (type === "symbol") {
+            map.value.setPaintProperty(layerId, "text-opacity", textOpacity);
+            map.value.setPaintProperty(layerId, "icon-opacity", opacity);
+          }
+        }
+      });
+    }
+  },
+  { immediate: true },
+);
 
 // --- 🌈 Phase 4: Atmospheric Animations ---
 let atmosphericAnimationRequest = null;
@@ -193,8 +476,15 @@ const initFireflies = () => {
 };
 
 const flyTo = (lngLat, zoom = 17) => {
-  if (!map.value) return;
-  map.value.flyTo({ center: lngLat, zoom, essential: true });
+  if (!map.value) {
+    console.warn("flyTo called but map is not initialized");
+    return;
+  }
+  try {
+    map.value.flyTo({ center: lngLat, zoom, essential: true });
+  } catch (err) {
+    console.error("Mapbox internal flyTo error:", err);
+  }
 };
 
 const animateAtmosphere = (time) => {
@@ -387,15 +677,80 @@ const setupMapLayers = () => {
     });
   }
 
-  // 3. Shops Source with Clustering
-  if (!map.value.getSource("vibe-shops")) {
-    map.value.addSource("vibe-shops", {
+  // 3. Shops Source (Split Layers)
+
+  // A. Regular Shops (Clustered)
+  if (!map.value.getSource("vibe-shops-regular")) {
+    map.value.addSource("vibe-shops-regular", {
       type: "geojson",
       data: { type: "FeatureCollection", features: [] },
-      cluster: false, // ✅ Disable clustering as requested
+      cluster: true,
+      clusterMaxZoom: 14, // Stop clustering at zoom 14
+      clusterRadius: 50,
     });
 
-    // ❌ Cluster layers removed for "Lively" view
+    // Cluster Circles
+    map.value.addLayer({
+      id: "clusters",
+      type: "circle",
+      source: "vibe-shops-regular",
+      filter: ["has", "point_count"],
+      paint: {
+        "circle-color": [
+          "step",
+          ["get", "point_count"],
+          "#60a5fa", // Blue (< 10)
+          10,
+          "#a855f7", // Purple (< 30)
+          30,
+          "#ec4899", // Pink (> 30)
+        ],
+        "circle-radius": ["step", ["get", "point_count"], 20, 100, 30, 750, 40],
+        "circle-stroke-width": 2,
+        "circle-stroke-color": "#fff",
+        "circle-opacity": 0.8,
+      },
+    });
+
+    // Cluster Count Text
+    map.value.addLayer({
+      id: "cluster-count",
+      type: "symbol",
+      source: "vibe-shops-regular",
+      filter: ["has", "point_count"],
+      layout: {
+        "text-field": "{point_count_abbreviated}",
+        "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
+        "text-size": 12,
+      },
+      paint: {
+        "text-color": "#ffffff",
+      },
+    });
+
+    // Unclustered Point (Layer for interactions when zoomed in)
+    // Note: We don't render actual dots here because we use `updateMarkers` (HtmlMarker)
+    // But we need this layer to detect where "regular items" are for click logic if we wanted GL-based markers.
+    // However, our existing system uses DOM Markers.
+    // PROBLEM: Mapbox GL Clustering requires GL Layers to visualize clusters.
+    // DOM Markers *cannot* easily be clustered by Mapbox logic unless we manually query the cluster source.
+    // SOLUTION: We will keep DOM Markers for Zoom >= 14 (Individual) and handling updates.
+    // But for clusters (Zoom < 14), we use the GL layers above.
+    // We need to sync `updateMarkers` to ONLY show DOM markers that are NOT in a cluster. (? No, better: only show DOM markers when not clustered at all?)
+    // Actually, `updateMarkers` iterates `props.shops`.
+    // We need to modify `updateMarkers` to Check if map zoom < 14 and verify visibility?
+    // A simpler approach for "Hybrid":
+    // 1. Zoom < 14: Show Clusters (GL). Hide individual DOM markers for regular shops.
+    // 2. Zoom >= 14: Show individual DOM markers.
+  }
+
+  // B. Giant Shops (Unclustered / Always Visible)
+  if (!map.value.getSource("vibe-shops-giant")) {
+    map.value.addSource("vibe-shops-giant", {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: [] },
+      cluster: false,
+    });
   }
 };
 
@@ -415,41 +770,65 @@ const updateMapSources = () => {
     });
   }
 
-  // 2. Update shops source for clustering
-  const shopSource = map.value.getSource("vibe-shops");
-  if (shopSource && props.shops) {
-    shopSource.setData({
-      type: "FeatureCollection",
-      features: props.shops
-        .filter((shop) => {
-          const lng = Number(shop.lng);
-          const lat = Number(shop.lat);
-          return (
-            Number.isFinite(lng) &&
-            Number.isFinite(lat) &&
-            Math.abs(lng) <= 180 &&
-            Math.abs(lat) <= 90
-          );
-        })
-        .map((shop) => ({
-          type: "Feature",
-          geometry: {
-            type: "Point",
-            coordinates: [Number(shop.lng), Number(shop.lat)],
-          },
-          properties: {
-            id: shop.id,
-            name: shop.name,
-            category: shop.category,
-            status: shop.status,
-            has_coin: !shopStore.collectedCoins.has(shop.id),
-          },
-        })),
+  // 2. Shops Source - Split into Regular (Clustered) vs Giant/Promoted (Always Visible)
+  const regularSource = map.value.getSource("vibe-shops-regular");
+  const giantSource = map.value.getSource("vibe-shops-giant");
+
+  if (props.shops) {
+    const validShops = props.shops.filter((s) => {
+      const lng = Number(s.lng);
+      const lat = Number(s.lat);
+      return (
+        Number.isFinite(lng) &&
+        Number.isFinite(lat) &&
+        Math.abs(lng) <= 180 &&
+        Math.abs(lat) <= 90
+      );
     });
+
+    // Split Logic
+    const regularFeatures = [];
+    const giantFeatures = [];
+
+    validShops.forEach((shop) => {
+      const feature = {
+        type: "Feature",
+        geometry: {
+          type: "Point",
+          coordinates: [Number(shop.lng), Number(shop.lat)],
+        },
+        properties: {
+          id: shop.id,
+          name: shop.name,
+          category: shop.category,
+          status: shop.status,
+          is_giant: shop.is_giant_active,
+          has_coin: !shopStore.collectedCoins.has(shop.id),
+          is_glowing: shop.is_glowing || false,
+        },
+      };
+
+      if (shop.is_giant_active) {
+        giantFeatures.push(feature);
+      } else {
+        regularFeatures.push(feature);
+      }
+    });
+
+    if (regularSource)
+      regularSource.setData({
+        type: "FeatureCollection",
+        features: regularFeatures,
+      });
+    if (giantSource)
+      giantSource.setData({
+        type: "FeatureCollection",
+        features: giantFeatures,
+      });
   }
 };
-const COLLECT_DISTANCE_KM = 0.05; // 50 meters to collect
 
+const COLLECT_DISTANCE_KM = 0.05; // 50 meters to collect
 // Check if user is close enough to collect
 const checkCoinCollection = (shop) => {
   if (!props.userLocation || shopStore.collectedCoins.has(shop.id)) return;
@@ -472,8 +851,8 @@ const activeEvents = computed(() => {
   });
 });
 
-// ✅ Day/Night Cycle
-const currentHour = ref(new Date().getHours());
+// ✅ Legacy: Day/Night computed property removed or kept for overlay background logic.
+// We kept `useTimeTheme` for map style. The gradient overlay for map can still use `currentHour`.
 const dayNightStyle = computed(() => {
   const h = currentHour.value;
   if (h >= 5 && h < 7)
@@ -547,25 +926,99 @@ const ensureMapboxLoaded = async () => {
   return true;
 };
 
+// ✅ WebGL Support Detection - More robust check
+const checkWebGLSupport = () => {
+  try {
+    const canvas = document.createElement("canvas");
+    // Try WebGL2 first, then WebGL1
+    const gl =
+      canvas.getContext("webgl2") ||
+      canvas.getContext("webgl") ||
+      canvas.getContext("experimental-webgl");
+
+    if (!gl) {
+      console.error("❌ WebGL context could not be created");
+      return false;
+    }
+
+    // Check for required extensions
+    const debugInfo = gl.getExtension("WEBGL_debug_renderer_info");
+    if (debugInfo) {
+      const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+      const vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
+      console.log("🎮 GPU:", vendor, renderer);
+
+      // Some software renderers may cause issues
+      if (renderer?.toLowerCase().includes("swiftshader")) {
+        console.warn("⚠️ Software WebGL renderer detected, map may be slow");
+      }
+    }
+
+    console.log("✅ WebGL is supported");
+    return true;
+  } catch (e) {
+    console.error("❌ WebGL check failed:", e);
+    return false;
+  }
+};
+
+const webGLSupported = ref(true);
+const maplessMode = ref(false); // User chose to continue without map
+
 // ✅ Initialize Map (async)
 const initializeMap = async () => {
-  if (!mapContainer.value) return;
+  console.log("🗺️ Starting map initialization...");
+
+  if (!mapContainer.value) {
+    console.error("❌ Map container not found");
+    return;
+  }
+
+  // Check WebGL support first
+  if (!checkWebGLSupport()) {
+    console.error("❌ WebGL not supported");
+    webGLSupported.value = false;
+    isMapReady.value = true; // Allow UI to render fallback
+    return;
+  }
 
   const ok = await ensureMapboxLoaded();
-  if (!ok || !mapContainer.value) return;
+  if (!ok) {
+    console.error("❌ Mapbox GL JS failed to load");
+    return;
+  }
 
-  map.value = new mapboxgl.Map({
-    container: mapContainer.value,
-    style: props.isDarkMode ? DARK_STYLE : LIGHT_STYLE,
-    center: center.value,
-    zoom: zoom.value,
-    maxBounds: [
-      [97.6, 18.0],
-      [100.3, 20.6],
-    ],
-    attributionControl: false,
-    antialias: false,
-  });
+  if (!mapContainer.value) {
+    console.error("❌ Map container lost during Mapbox load");
+    return;
+  }
+
+  console.log("🗺️ Creating Mapbox map instance...");
+
+  try {
+    map.value = new mapboxgl.Map({
+      container: mapContainer.value,
+      style: props.isDarkMode ? DARK_STYLE : LIGHT_STYLE,
+      center: center.value,
+      zoom: zoom.value,
+      // ✅ Expanded to cover all of Thailand (not just Chiang Mai)
+      maxBounds: [
+        [97, 5.5], // Southwest: Myanmar border to Malaysia border
+        [106, 21], // Northeast: Laos/Cambodia to Northern Thailand
+      ],
+      attributionControl: false,
+      antialias: false,
+      failIfMajorPerformanceCaveat: false, // Allow software rendering
+      preserveDrawingBuffer: true,
+    });
+    console.log("✅ Mapbox map instance created");
+  } catch (err) {
+    console.error("❌ Map initialization failed:", err);
+    console.error("Error details:", err.message, err.stack);
+    webGLSupported.value = false;
+    isMapReady.value = true;
+    return;
+  }
 
   // Navigation controls removed (user prefers cleaner map)
 
@@ -573,17 +1026,51 @@ const initializeMap = async () => {
   map.value.scrollZoom.setWheelZoomRate(1 / 300);
   map.value.dragRotate.disable();
 
+  // Handle map errors gracefully
+  map.value.on("error", (e) => {
+    console.error("🗺️ Map error:", e.error?.message || e);
+    if (e.error?.message?.includes("WebGL")) {
+      webGLSupported.value = false;
+    }
+    // Still show map even with errors
+    if (!mapLoaded.value) {
+      console.warn("⚠️ Map error occurred, forcing visibility");
+      mapLoaded.value = true;
+      isMapReady.value = true;
+    }
+  });
+
+  // Style/source data events - no logging needed (too noisy)
+
   map.value.on("load", () => {
+    console.log("🗺️ Map load event fired");
     isMapReady.value = true;
     setupMapLayers();
+    setupMapInteractions(); // ✅ Setup click handlers for layers
     updateMapSources();
     requestUpdateMarkers();
     updateEventMarkers();
 
     // ✅ Start Atmospheric Animations
-    initFireflies();
-    atmosphericAnimationRequest = requestAnimationFrame(animateAtmosphere);
+    // ✅ Performance: Disabled atmospheric loops
+    // initFireflies();
+    // atmosphericAnimationRequest = requestAnimationFrame(animateAtmosphere);
+
+    // ✅ Fade In Map
+    setTimeout(() => {
+      mapLoaded.value = true;
+      console.log("✅ Map fully loaded and visible");
+    }, 100);
   });
+
+  // ✅ Fallback: If load event doesn't fire within 5 seconds, show map anyway
+  setTimeout(() => {
+    if (!mapLoaded.value) {
+      console.warn("⚠️ Map load timeout - forcing visibility");
+      mapLoaded.value = true;
+      isMapReady.value = true;
+    }
+  }, 5000);
 
   // Sync maps state on movement
   map.value.on("moveend", () => {
@@ -604,176 +1091,24 @@ const initializeMap = async () => {
   });
 };
 
-// MVP Unicorn Popup - Real-time vibe, distance, compact buttons
-const createPopupHTML = (item) => {
-  const isLive = item.status === "LIVE";
-  const bgClass = props.isDarkMode ? "bg-zinc-900/95" : "bg-white/95";
-  const textClass = props.isDarkMode ? "text-white" : "text-gray-900";
-  const hasCoins = !shopStore.collectedCoins.has(item.id);
-
-  // Real-time Vibe calculation based on hour and venue type
-  const currentHour = new Date().getHours();
-  const isNightVenue = ["Bar", "Club", "Live Music", "Nightlife"].includes(
-    item.category,
-  );
-  const isCafe = item.category === "Cafe";
-  const isRestaurant = item.category === "Restaurant";
-
-  let vibeLevel = 3;
-  if (isLive) {
-    vibeLevel = 5;
-  } else if (isNightVenue) {
-    if (currentHour >= 21 || currentHour < 2) vibeLevel = 5;
-    else if (currentHour >= 19) vibeLevel = 4;
-    else if (currentHour >= 17) vibeLevel = 3;
-    else vibeLevel = 1;
-  } else if (isCafe) {
-    if (currentHour >= 8 && currentHour <= 11) vibeLevel = 5;
-    else if (currentHour >= 14 && currentHour <= 17) vibeLevel = 4;
-    else if (currentHour >= 6 && currentHour <= 20) vibeLevel = 3;
-    else vibeLevel = 1;
-  } else if (isRestaurant) {
-    if (
-      (currentHour >= 11 && currentHour <= 13) ||
-      (currentHour >= 18 && currentHour <= 20)
-    )
-      vibeLevel = 5;
-    else vibeLevel = 3;
-  }
-
-  vibeLevel = item.vibe_level || item.VibeLevel || vibeLevel;
-
-  const vibeBars = Array(5)
-    .fill(0)
-    .map(
-      (_, i) =>
-        `<div class="h-4 w-2 rounded-sm ${i < vibeLevel ? "bg-gradient-to-t from-pink-500 to-purple-400" : "bg-white"}"></div>`,
-    )
-    .join("");
-
-  // Crowd emoji based on vibe
-  const crowdMap = {
-    5: tt("status.vibe_5", "คึกคัก"),
-    4: tt("status.vibe_4", "มาก"),
-    3: tt("status.vibe_3", "ปานกลาง"),
-    2: tt("status.vibe_2", "น้อย"),
-    1: tt("status.vibe_1", "เงียบ"),
-  };
-  const crowdEmoji = vibeLevel >= 4 ? "🔥" : vibeLevel >= 3 ? "👥" : "😌";
-  const crowdText = crowdMap[vibeLevel] || "ปานกลาง";
-
-  // Distance (Managed by Road API or fallback)
-  let distanceHtml = "";
-  if (roadDistance.value) {
-    const distTxt =
-      roadDistance.value < 1000
-        ? `${Math.round(roadDistance.value)} m`
-        : `${(roadDistance.value / 1000).toFixed(1)} km`;
-    const timeTxt = `${Math.round(roadDuration.value / 60)} min`;
-    distanceHtml = `<div class="road-dist-label absolute bottom-2 right-2 px-2 py-1 rounded-lg bg-black text-white text-[11px] font-black border border-white/30 shadow-xl">📍 ${distTxt} (${timeTxt})</div>`;
-  } else if (item.distance !== undefined) {
-    const fallbackTxt =
-      item.distance < 1
-        ? `${(item.distance * 1000).toFixed(0)} m`
-        : `${item.distance.toFixed(1)} km`;
-    distanceHtml = `<div class="road-dist-label absolute bottom-2 right-2 px-2 py-1 rounded-lg bg-black text-white text-[11px] font-black border border-white/30 shadow-xl">📍 ${fallbackTxt}</div>`;
-  }
-
-  // 🚀 HIGH-VIBE DESCRIPTIONS (Human-written style for MVP)
-  const defaultDescs = {
-    Cafe: tt(
-      "categories.cafe_desc",
-      "☕ ดื่มด่ำกับกาแฟพรีเมียมในบรรยากาศสุดชิลล์",
-    ),
-    Bar: tt(
-      "categories.bar_desc",
-      "🍸 บาร์ลับใจกลางเชียงใหม่ พร้อมเครื่องดื่มคราฟต์",
-    ),
-    Club: tt("categories.club_desc", "🪩 ปลดปล่อยความมันส์กับ DJ ชั้นนำ"),
-    Restaurant: tt("categories.food_desc", "🍽️ สัมผัสรสชาติอาหารเลิศรส"),
-    "Live Music": tt("categories.music_desc", "🎸 ฟังดนตรีสดจากวงชื่อดัง"),
-    Nightlife: tt(
-      "categories.nightlife_desc",
-      "🌃 แหล่งรวมความบันเทิงยามค่ำคืน",
-    ),
-    Shopping: tt("categories.shopping_desc", "🛍️ แหล่งรวมสินค้าแฟชั่น"),
-  };
-
-  const description =
-    item.description ||
-    item.Description ||
-    item.vibe_status ||
-    defaultDescs[item.category] ||
-    "✨ สถานที่ยอดนิยมที่คุณต้องมาสัมผัสด้วยตัวเองในยามค่ำคืนนี้";
-  const shortDesc =
-    description.length > 85
-      ? description.substring(0, 85) + "..."
-      : description;
-
-  const openHours = item.open_hours || item.Open || "";
-
-  return `
-    <div class="vibe-popup ${bgClass} rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] border-2 border-white/20 overflow-hidden w-[280px] backdrop-blur-3xl" data-shop-id="${item.id}">
-     <div class="relative w-full aspect-[9/16] max-h-[360px] overflow-hidden">
-
-
-        <div class="absolute inset-0 bg-gradient-to-br from-purple-700 via-pink-600 to-red-600"></div>
-        ${item.Image_URL1 ? `<img src="${item.Image_URL1}" class="absolute inset-0 w-full h-full object-cover" />` : ""}
-        <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
-
-        <div class="absolute top-2 left-2 flex flex-col gap-1">
-          ${isLive ? `<div class="px-1.5 py-0.5 rounded-full bg-red-600 text-white text-[9px] font-black animate-pulse">● LIVE</div>` : ""}
-          ${hasCoins ? `<div class="px-1.5 py-0.5 rounded-full bg-yellow-400 text-black text-[9px] font-black">🪙 +10</div>` : ""}
-        </div>
-
-        <button class="popup-close-btn absolute top-2 right-2 w-7 h-7 rounded-full bg-black text-white flex items-center justify-center text-sm font-black border-2 border-white/20 z-10">✕</button>
-
-        <!-- Info Overlay on Media -->
-        <div class="absolute bottom-3 left-3 right-3">
-          <h3 class="text-sm font-black leading-tight mb-0.5 truncate uppercase text-white drop-shadow-lg">${item.name}</h3>
-          <div class="text-[10px] font-black text-white/80 uppercase tracking-widest">${item.category || "Venue"}</div>
-        </div>
-
-        ${distanceHtml}
-      </div>
-
-      <div class="p-3 ${textClass}">
-        <div class="flex items-center justify-between mb-2 p-1.5 rounded-lg bg-white/10 border border-white/20 backdrop-blur-md">
-          <div class="flex items-center gap-1">
-            <span class="text-[10px] font-black">VIBE</span>
-            <div class="flex items-end gap-px">${vibeBars}</div>
-          </div>
-          <div class="flex items-center gap-1">
-            <span class="text-xs">${crowdEmoji}</span>
-            <span class="text-[10px] font-black">${crowdText}</span>
-          </div>
-        </div>
-
-        ${openHours ? `<div class="text-[10px] font-black mb-1.5">🕐 ${openHours}</div>` : ""}
-
-        <p class="text-[11px] font-bold leading-relaxed mb-2">${shortDesc}</p>
-
-        <div class="flex gap-2">
-          <button class="popup-nav-btn flex-1 flex items-center justify-center gap-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white active:scale-95 transition-all">
-            <span class="text-xs">🗺️</span>
-            <span class="text-[11px] font-bold">นำทาง</span>
-          </button>
-          <button class="popup-ride-btn flex-1 flex items-center justify-center gap-1 py-2 rounded-xl bg-zinc-700 hover:bg-zinc-600 text-white border border-white/10 active:scale-95 transition-all">
-            <span class="text-xs">🚗</span>
-            <span class="text-[11px] font-bold">เรียกรถ</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
+// MVP Unicorn Popup - Logic extracted to mapRenderer.js
+const getPopupHTML = (item) => {
+  return createPopupHTML({
+    item,
+    isDarkMode: props.isDarkMode,
+    hasCoins: !shopStore.collectedCoins.has(item.id),
+    roadDistance: roadDistance.value,
+    roadDuration: roadDuration.value,
+    tt, // translation function
+  });
 };
 
 // ✅ Close Active Popup
 const closeActivePopup = () => {
-  if (activePopup.value) {
+  if (activePopup.value && typeof activePopup.value.remove === "function") {
     activePopup.value.remove();
-    activePopup.value = null;
   }
+  activePopup.value = null;
 };
 
 // ✅ Show Popup for Item (Fixed button handling)
@@ -785,14 +1120,13 @@ const showPopup = (item) => {
   const popup = new mapboxgl.Popup({
     closeButton: false,
     closeOnClick: false,
-    container: document.body, // ✅ Portal to body to overlap ANY UI
     className: "vibe-mapbox-popup",
-    maxWidth: "320px",
-    offset: [0, -60],
+    maxWidth: "280px",
+    offset: [0, -10], // Standard pin offset
     anchor: "bottom",
   })
     .setLngLat([item.lng, item.lat])
-    .setHTML(createPopupHTML(item))
+    .setHTML(getPopupHTML(item))
     .addTo(map.value);
 
   activePopup.value = popup;
@@ -803,11 +1137,8 @@ const showPopup = (item) => {
       const popupEl = popup.getElement();
       const popupCard = popupEl?.querySelector(".vibe-popup");
       const popupH = popupCard?.getBoundingClientRect()?.height || 0;
-
-      // Focus with smart offset using popup height
-      focusLocation([item.lat, item.lng], 17, null, popupH);
     } catch (e) {
-      // ignore
+      // Ignore focus errors during animation
     }
   });
 
@@ -854,337 +1185,218 @@ const showPopup = (item) => {
   }, 100);
 };
 
-// ✅ Create Custom Marker Element (Premium Entertainment Style)
-const createMarkerElement = (item, isHighlighted, isLive) => {
-  const el = document.createElement("div");
-  el.className = `vibe-marker ${isLive ? "vibe-marker-live" : ""} ${isHighlighted ? "vibe-marker-active" : ""}`;
-  el.dataset.shopId = item.id;
-
-  // ✅ Size increases when highlighted
-  const size = isHighlighted ? 44 : 30;
-  const hasCoin = !shopStore.collectedCoins.has(item.id);
-
-  // ✅ FIXED: Keep original color based on status, don't override with blue
-  // LIVE = red, TONIGHT = orange, normal = gray, but highlighted normal = blue
-  const color = isLive
-    ? "#FF2D55" // Vibrant red for LIVE (always)
-    : item.status === "TONIGHT"
-      ? "#FF9500" // Orange for TONIGHT (always)
-      : isHighlighted
-        ? "#3B82F6" // Blue only for highlighted NORMAL shops
-        : "#8E8E93"; // Gray for normal
-
-  // ✅ Add highlight glow for ALL highlighted markers (including LIVE)
-  const highlightGlow = isHighlighted
-    ? `<filter id="highlightGlow-${item.id}" x="-50%" y="-50%" width="200%" height="200%">
-         <feGaussianBlur stdDeviation="3" result="blur" />
-         <feMerge>
-           <feMergeNode in="blur" />
-           <feMergeNode in="SourceGraphic" />
-         </feMerge>
-       </filter>`
-    : "";
-
-  // LIVE markers get special treatment - no inner circle, just glow
-  const innerCircle = isLive
-    ? ""
-    : `<circle cx="12" cy="10" r="4" fill="white" fill-opacity="0.9" />`;
-
-  // ✅ Determine which filter to use
-  const filterAttr = isHighlighted
-    ? `filter="url(#highlightGlow-${item.id})"`
-    : isLive
-      ? `filter="url(#liveGlow-${item.id})"`
-      : "";
-
-  el.innerHTML = `
-    <div class="marker-wrapper ${isHighlighted ? "highlighted-marker" : ""} ${isLive ? "live-marker" : ""}" style="width: ${size}px; height: ${size + 12}px; position: relative;">
-      ${
-        isLive
-          ? `
-        <div class="live-pulse-ring-outer"></div>
-        <div class="live-pulse-ring-inner"></div>
-        <div class="live-pulse-core"></div>
-      `
-          : ""
-      }
-      ${isHighlighted ? '<div class="highlight-pulse-ring"></div>' : ""}
-      <svg viewBox="0 0 24 32" class="marker-svg" style="filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4));">
-        <defs>
-          <linearGradient id="pinGrad-${item.id}" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stop-color="${color}" />
-            <stop offset="100%" stop-color="${isLive ? "#92001D" : color}" />
-          </linearGradient>
-          ${
-            isLive
-              ? `
-          <filter id="liveGlow-${item.id}" x="-100%" y="-100%" width="300%" height="300%">
-            <feGaussianBlur stdDeviation="3" result="blur" />
-            <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="glow" />
-            <feMerge>
-              <feMergeNode in="glow" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>`
-              : ""
-          }
-          ${highlightGlow}
-        </defs>
-        <path d="M12 0C5.4 0 0 5.4 0 12c0 8 12 20 12 20s12-12 12-20c0-6.6-5.4-12-12-12z"
-              fill="url(#pinGrad-${item.id})"
-              ${filterAttr} />
-        ${innerCircle}
-      </svg>
-      ${isLive ? '<div class="live-label">LIVE</div>' : ""}
-      ${hasCoin && !isLive ? '<div class="coin-badge">🪙</div>' : ""}
-    </div>
-  `;
-
-  el.style.cursor = "pointer";
-  return el;
+// ✅ Create Custom Marker Element - Logic extracted to mapRenderer.js
+const createMarkerElementWrapper = (item, isHighlighted, isLive) => {
+  return createMarkerElement({
+    item,
+    isHighlighted,
+    isLive,
+    hasCoins: !shopStore.collectedCoins.has(item.id),
+  });
 };
 
-// ✅ Create Giant Pin for Events (Premium SVG Design)
-const createGiantPinElement = (event) => {
-  const el = document.createElement("div");
-  el.className = "giant-pin-marker";
-  el.dataset.eventId = event.id;
-
-  // Premium SVG-based event marker
-  el.innerHTML = `
-    <div class="giant-pin-wrapper">
-      <svg class="giant-pin-svg" width="80" height="100" viewBox="0 0 80 100" fill="none">
-        <defs>
-          <!-- Premium gradient -->
-          <linearGradient id="eventGrad-${event.id}" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#8B5CF6"/>
-            <stop offset="50%" stop-color="#EC4899"/>
-            <stop offset="100%" stop-color="#F43F5E"/>
-          </linearGradient>
-          <!-- Glow filter -->
-          <filter id="eventGlow-${event.id}" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="4" result="blur"/>
-            <feMerge>
-              <feMergeNode in="blur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
-          <!-- Inner shadow -->
-          <filter id="eventInner-${event.id}">
-            <feOffset dx="0" dy="2"/>
-            <feGaussianBlur stdDeviation="2"/>
-            <feComposite operator="out" in="SourceGraphic"/>
-            <feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.3 0"/>
-            <feBlend in="SourceGraphic"/>
-          </filter>
-        </defs>
-
-        <!-- Outer glow ring (animated) -->
-        <circle cx="40" cy="35" r="30" fill="none" stroke="url(#eventGrad-${event.id})" stroke-width="2" opacity="0.5" class="pulse-ring"/>
-
-        <!-- Main body -->
-        <circle cx="40" cy="35" r="28" fill="url(#eventGrad-${event.id})" filter="url(#eventGlow-${event.id})"/>
-
-        <!-- Highlight -->
-        <ellipse cx="40" cy="28" rx="16" ry="10" fill="white" opacity="0.2"/>
-
-        <!-- Icon circle -->
-        <circle cx="40" cy="35" r="18" fill="rgba(255,255,255,0.15)"/>
-
-        <!-- Pointer/Pin tip -->
-        <path d="M30 55 L40 75 L50 55" fill="url(#eventGrad-${event.id})" filter="url(#eventGlow-${event.id})"/>
-      </svg>
-
-      <!-- Icon overlay -->
-      <div class="giant-pin-icon-overlay" style="display: flex; align-items: center; justify-center; height: 100%;">
-        ${
-          event.icon &&
-          (event.icon.includes("http") || event.icon.includes("/"))
-            ? `<img src="${event.icon}" class="w-7 h-7 object-contain" />`
-            : `<span style="font-size: 24px;">${event.icon || "🎪"}</span>`
-        }
-      </div>
-
-      <!-- Label -->
-      <div class="giant-pin-label-new">${event.shortName || event.name}</div>
-    </div>
-  `;
-
-  el.style.cursor = "pointer";
-  return el;
+// ✅ Create Giant Pin for Events - Logic extracted to mapRenderer.js
+const createGiantPinElementWrapper = (event) => {
+  return createGiantPinElement(event);
 };
 
 // ✅ Update Markers (Viewport-based filtering for performance)
 const MAX_VISIBLE_MARKERS = 120; // Increased to show more activity
 
+// ✅ Update Markers (Optimized Diffing)
 const updateMarkers = () => {
-  if (!map.value || !isMapReady.value) return;
+  if (!map.value || !isMapReady.value || !props.shops) return;
 
-  const currentMarkers = markersMap.value;
+  const newShops = props.shops; // This is the new list
+  const newShopIds = new Set(newShops.map((s) => String(s.id)));
 
-  // ✅ Get current viewport bounds
-  const bounds = map.value.getBounds();
-  const currentZoom = map.value.getZoom();
-
-  // ✅ Filter shops to only those in viewport + prioritize LIVE and highlighted
-  let visibleShops = (props.shops || []).filter((item) => {
-    if (
-      !item.lat ||
-      !item.lng ||
-      !Number.isFinite(item.lat) ||
-      !Number.isFinite(item.lng)
-    ) {
-      return false;
-    }
-    const id = Number(item.id);
-    const highlightedId =
-      props.highlightedShopId != null ? Number(props.highlightedShopId) : null;
-
-    // 1. Always include highlighted shop
-    if (id === highlightedId) return true;
-
-    // 2. Zoom threshold check: If extremely zoomed out, only show LIVE
-    // Pins start appearing from zoom 12 for a lively city feel
-    if (currentZoom < 12) {
-      if (item.status === "LIVE") return true;
-      return false;
-    }
-
-    // 3. Always include LIVE shops in viewport
-    if (item.status === "LIVE") return true;
-
-    // 4. Check if in viewport
-    return bounds.contains([item.lng, item.lat]);
-  });
-
-  // ✅ Limit markers to prevent WebGL overload
-  if (visibleShops.length > MAX_VISIBLE_MARKERS) {
-    // Sort: highlighted first, then LIVE, then by distance to center
-    const center = map.value.getCenter();
-    visibleShops.sort((a, b) => {
-      const aId = Number(a.id);
-      const bId = Number(b.id);
-      const highlightedId =
-        props.highlightedShopId != null
-          ? Number(props.highlightedShopId)
-          : null;
-
-      if (aId === highlightedId) return -1;
-      if (bId === highlightedId) return 1;
-      if (a.status === "LIVE" && b.status !== "LIVE") return -1;
-      if (a.status !== "LIVE" && b.status === "LIVE") return 1;
-      // Distance to viewport center
-      const distA = Math.hypot(a.lng - center.lng, a.lat - center.lat);
-      const distB = Math.hypot(b.lng - center.lng, b.lat - center.lat);
-      return distA - distB;
-    });
-    visibleShops = visibleShops.slice(0, MAX_VISIBLE_MARKERS);
-  }
-
-  const shopIds = new Set(visibleShops.map((s) => Number(s.id)));
-
-  // Remove markers not in current view (BUT NEVER remove the highlighted one!)
-  const highlightedId =
-    props.highlightedShopId != null ? Number(props.highlightedShopId) : null;
-  currentMarkers.forEach((marker, id) => {
-    const numId = Number(id);
-    // ✅ CRITICAL: Never delete the highlighted marker, even if temporarily not in props.shops
-    if (numId === highlightedId) return;
-    if (!shopIds.has(numId)) {
-      marker.remove();
-      currentMarkers.delete(id);
+  // 1. Remove markers that are no longer in the new list
+  markersMap.value.forEach((value, key) => {
+    if (!newShopIds.has(key)) {
+      value.marker.remove();
+      markersMap.value.delete(key);
     }
   });
 
-  // Add/update visible markers
-  visibleShops.forEach((item) => {
-    const itemId = Number(item.id);
-    const highlightedId =
-      props.highlightedShopId != null ? Number(props.highlightedShopId) : null;
-    const isHighlighted = itemId === highlightedId;
-    const isLive = item.status === "LIVE";
+  // 2. Add or Update markers
+  newShops.forEach((shop) => {
+    const idStr = String(shop.id);
+    const isGiant = shop.is_giant_active;
+    const isSelected = Number(shop.id) === Number(props.highlightedShopId);
 
-    let marker = currentMarkers.get(itemId);
+    // Check if marker already exists
+    if (markersMap.value.has(idStr)) {
+      const { marker: existingMarker, shop: existingShop } =
+        markersMap.value.get(idStr);
+      const el = existingMarker.getElement();
 
-    // ✅ CRITICAL: Check if marker is actually attached to the map
-    // Markers can become detached if the map style changes or other issues occur
-    const isMarkerAttached =
-      marker &&
-      marker._map &&
-      marker.getElement()?.classList.contains("mapboxgl-marker");
-
-    if (marker && isMarkerAttached) {
-      // ✅ Update only if state changed (saves GPU/CPU)
-      const el = marker.getElement();
-      const wasHighlighted = el.dataset.highlighted === "true";
-      const wasLive = el.dataset.live === "true";
-
-      if (wasHighlighted !== isHighlighted || wasLive !== isLive) {
-        const newEl = createMarkerElement(item, isHighlighted, isLive);
-        el.innerHTML = newEl.innerHTML;
-        el.className = newEl.className;
-        el.dataset.highlighted = isHighlighted;
-        el.dataset.live = isLive;
-      }
-
-      // ✅ Update z-index even if element didn't change (for layering)
-      if (isHighlighted || isLive) {
-        el.style.zIndex = "200"; // Give priority
+      // Update Highlight State
+      if (isSelected) {
+        el.setAttribute("data-highlighted", "true");
+        el.style.zIndex = "300";
       } else {
-        el.style.zIndex = "50";
+        el.removeAttribute("data-highlighted");
+        el.style.zIndex = isGiant ? "1000" : "50";
       }
+
+      // Update Live State if changed
+      // (Optional: deep check if needed, for performance we rely on CSS classes if we added them)
+
+      // Update stored shop data reference
+      markersMap.value.set(idStr, { marker: existingMarker, shop });
+      return;
+    }
+
+    // Create DOM Element
+    let el;
+    const isLive = shop.status === "LIVE";
+
+    // ✅ Optimization: ONLY create DOM markers for Giant/Active shops
+    // Regular shops are now rendered via WebGL layer ("unclustered-point")
+    if (!isGiant && !isSelected) {
+      return;
+    }
+
+    if (isGiant) {
+      el = document.createElement("div");
+      el.className = `marker-container transition-all duration-500 will-change-transform z-[1000]`;
+      el.innerHTML = `
+            <div class="relative group cursor-pointer w-12 h-12">
+                <div class="relative w-full h-full rounded-2xl bg-gradient-to-br from-red-600 via-pink-600 to-purple-600 border-2 border-white shadow-xl flex items-center justify-center transform group-hover:scale-110 transition-transform">
+                <span class="text-xl">🔥</span>
+                </div>
+                <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-black text-white text-[9px] font-black uppercase tracking-widest border border-white/20 whitespace-nowrap shadow-md">
+                GIANT
+                </div>
+            </div>
+        `;
     } else {
-      // Remove detached marker if it exists (silently recreate)
-      if (marker) {
-        try {
-          marker.remove();
-        } catch (e) {
-          /* ignore */
-        }
-        currentMarkers.delete(itemId);
-      }
-      // Create new marker
-      const el = createMarkerElement(item, isHighlighted, isLive);
-      el.dataset.highlighted = isHighlighted;
-      el.dataset.live = isLive;
-
-      // ✅ Extra safety for map.value to prevent "appendChild of undefined" crash
-      // Mapbox needs the canvas container to be ready to append markers
-      if (!map.value || !map.value.getCanvasContainer) return;
-
-      marker = new mapboxgl.Marker({
-        element: el,
-        anchor: "bottom",
-      })
-        .setLngLat([item.lng, item.lat])
-        .addTo(map.value);
-
-      // ✅ Click handler
-      el.addEventListener("click", (e) => {
-        e.stopPropagation();
-        handleMarkerClick(item);
-      });
-
-      // ✅ Set higher z-index for highlighted/live markers
-      if (isHighlighted || isLive) {
-        marker.getElement().style.zIndex = "250";
-      } else {
-        marker.getElement().style.zIndex = "50";
-      }
-
-      currentMarkers.set(itemId, marker);
+      el = createMarkerElementWrapper(shop, isSelected, isLive);
     }
+
+    const marker = new mapboxgl.Marker({
+      element: el,
+      anchor: "bottom",
+    })
+      .setLngLat([Number(shop.lng), Number(shop.lat)])
+      .addTo(map.value);
+
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      activePopup.value = shop;
+      shopStore.incrementClick(shop.id);
+      if (isGiant) {
+        emit("open-building", shop);
+      } else {
+        emit("select-shop", shop);
+        showPopup(shop);
+      }
+    });
+
+    // ✅ Respect visibility state
+    if (!pinsVisible.value) {
+      el.style.opacity = "0";
+    }
+
+    markersMap.value.set(idStr, { marker, shop });
+  });
+};
+
+// ✅ Interaction for GL Layers (Regular Shops)
+const setupMapInteractions = () => {
+  if (!map.value) return;
+
+  // Click on Unclustered Point Logic (Regular Shops)
+  // We need to add a layer for unclustered points first!
+  if (!map.value.getLayer("unclustered-point")) {
+    map.value.addLayer({
+      id: "unclustered-point",
+      type: "circle",
+      source: "vibe-shops-regular",
+      filter: ["!", ["has", "point_count"]],
+      paint: {
+        "circle-color": [
+          "match",
+          ["get", "status"],
+          "LIVE",
+          "#ef4444", // Red
+          "TONIGHT",
+          "#f97316", // Orange
+          "#3b82f6", // Default Blue
+        ],
+        "circle-radius": [
+          "case",
+          ["boolean", ["get", "is_glowing"], false],
+          9,
+          6,
+        ],
+        "circle-stroke-width": 2,
+        "circle-stroke-color": "#ffffff",
+        "circle-opacity": 0.9,
+      },
+    });
+
+    // Add text label for name? Maybe too cluttered.
+  }
+
+  // Click Event
+  map.value.on("click", "unclustered-point", (e) => {
+    const features = e.features;
+    if (!features.length) return;
+
+    const feature = features[0];
+    // Geometry to LatLng
+    const coordinates = feature.geometry.coordinates.slice();
+    const featureProps = feature.properties; // has id, name, etc.
+
+    // Fix logic for wrapped worlds
+    while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+      coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+    }
+
+    // Trigger Select
+    // Note: feature.properties values are serialised. ID might be number or string.
+    // We need to find the full shop object from props.shops usually,
+    // OR pass enough data in properties.
+    const fullShop = props.shops
+      ? props.shops.find((s) => String(s.id) === String(featureProps.id))
+      : { ...featureProps };
+
+    shopStore.incrementClick(fullShop.id); // ✅ Real Data Tracking
+    emit("select-shop", fullShop);
   });
 
-  // ✅ IMPORTANT: Reassign to trigger state update on shallowRef
-  markersMap.value = new Map(currentMarkers);
+  // Pointer Cursor
+  map.value.on("mouseenter", "unclustered-point", () => {
+    map.value.getCanvas().style.cursor = "pointer";
+  });
+  map.value.on("mouseleave", "unclustered-point", () => {
+    map.value.getCanvas().style.cursor = "";
+  });
 
-  // Check coin collection for all shops when user location changes
-  if (props.userLocation) {
-    visibleShops.forEach((shop) => {
-      checkCoinCollection(shop);
+  // Cluster Click -> Zoom
+  map.value.on("click", "clusters", (e) => {
+    const features = map.value.queryRenderedFeatures(e.point, {
+      layers: ["clusters"],
     });
-  }
+    const clusterId = features[0].properties.cluster_id;
+    map.value
+      .getSource("vibe-shops-regular")
+      .getClusterExpansionZoom(clusterId, (err, zoom) => {
+        if (err) return;
+        map.value.easeTo({
+          center: features[0].geometry.coordinates,
+          zoom: zoom,
+        });
+      });
+  });
+
+  map.value.on("mouseenter", "clusters", () => {
+    map.value.getCanvas().style.cursor = "pointer";
+  });
+  map.value.on("mouseleave", "clusters", () => {
+    map.value.getCanvas().style.cursor = "";
+  });
 };
 
 // ✅ Update Giant Pin Markers for Events
@@ -1219,6 +1431,11 @@ const updateEventMarkers = () => {
       e.stopPropagation();
       emit("open-building", event);
     });
+
+    // ✅ Respect visibility state
+    if (!pinsVisible.value) {
+      el.style.opacity = "0";
+    }
 
     currentMarkers.set(event.id, marker);
   });
@@ -1280,7 +1497,7 @@ const updateUserLocation = () => {
 };
 
 // ✅ Smart Focus Offset (visual center between top UI & bottom UI)
-const getSmartYOffset = (popupPx = 0) => {
+const getSmartYOffset = (_popupPx = 0) => {
   const top = Number(props.uiTopOffset || 64);
   const bottom =
     Number(props.uiBottomOffset || 0) + Number(props.legendHeight || 0);
@@ -1296,14 +1513,23 @@ const getSmartYOffset = (popupPx = 0) => {
 };
 
 // ✅ Focus Location (Fly To) - Smooth & Precise Centering
-const focusLocation = (coords, targetZoom = 17) => {
+// ✅ Focus Location (Fly To) - Smooth & Precise Centering
+const focusLocation = (
+  coords,
+  targetZoom = 17,
+  pitch = 50,
+  extraBottomOffset = 0,
+) => {
   if (!map.value || !coords) return;
 
   // Calculate dynamic padding based on UI offsets
   // "Pin must be in the visual center"
   const padding = {
     top: props.uiTopOffset + 50,
-    bottom: props.uiBottomOffset + (props.isSidebarOpen ? 20 : 180), // Extra buffer for card
+    bottom:
+      props.uiBottomOffset +
+      (props.isSidebarOpen ? 20 : 180) +
+      extraBottomOffset, // Extra buffer for card/popup
     left: props.isSidebarOpen ? 300 : 20,
     right: 20,
   };
@@ -1311,13 +1537,17 @@ const focusLocation = (coords, targetZoom = 17) => {
   map.value.flyTo({
     center: coords,
     zoom: targetZoom,
-    pitch: 50, // Cinematic pitch
+    pitch: pitch ?? 50, // Cinematic pitch
     bearing: 0,
     padding,
     speed: 0.6, // Slow & Smooth (iOS feel)
     curve: 1.1, // Gentle curve
     essential: true,
   });
+  // ✅ Add Layers
+  addHeatmapLayer(); // Heatmap First
+  add3DBuildings();
+  addPulsingDot();
 };
 
 // ✅ Center on User
@@ -1335,6 +1565,7 @@ watch(
       map.value.setStyle(newVal ? DARK_STYLE : LIGHT_STYLE);
       map.value.once("style.load", () => {
         setupMapLayers();
+        setupMapInteractions(); // ✅ Re-bind interactions after style change
         updateMapSources();
         updateMarkers();
         updateEventMarkers();
@@ -1348,6 +1579,15 @@ watch(
 watch(
   () => props.shops,
   (newShops, oldShops) => {
+    // ⚡ Smart Diffing: Only update if shops actually changed significantly
+    // This prevents "flicker" when dragging or small state updates occur
+
+    const isSameSet =
+      newShops.length === oldShops?.length &&
+      newShops.every((s, i) => s.id === oldShops[i].id);
+
+    if (isSameSet) return;
+
     if (props.highlightedShopId != null) {
       const highlightedId = Number(props.highlightedShopId);
       const shopInNewList = newShops?.some(
@@ -1376,7 +1616,18 @@ watch(
       return;
     }
     const shop = props.shops?.find((s) => Number(s.id) === Number(newId));
-    if (shop) showPopup(shop);
+    if (shop) {
+      showPopup(shop);
+      // ✅ Smooth Pan to Shop
+      map.value.flyTo({
+        center: [Number(shop.lng), Number(shop.lat)],
+        zoom: 16,
+        pitch: 45,
+        duration: 1000, // Slow & Smooth
+        essential: true,
+        offset: [0, 100], // Shift down slightly so pin isn't covered by card
+      });
+    }
   },
 );
 
@@ -1449,15 +1700,26 @@ defineExpose({
   map,
   focusLocation,
   centerOnUser,
+  webGLSupported,
+  maplessMode,
   resize: () => map.value?.resize(),
-  flyTo: (coords, zoom) =>
-    map.value?.flyTo({
-      center: coords,
-      zoom,
-      essential: true,
-      speed: 0.8,
-      curve: 1.4,
-    }),
+  // ✅ Robust flyTo: handles (options) object OR (coords, zoom) legacy
+  flyTo: (arg1, arg2) => {
+    if (!map.value) return;
+    if (typeof arg1 === "object" && !Array.isArray(arg1)) {
+      // It's a Mapbox options object { center, zoom, ... }
+      map.value.flyTo(arg1);
+    } else {
+      // Legacy args: coords, zoom
+      map.value.flyTo({
+        center: arg1,
+        zoom: arg2,
+        essential: true,
+        speed: 0.8,
+        curve: 1.4,
+      });
+    }
+  },
 });
 </script>
 
@@ -1473,25 +1735,89 @@ defineExpose({
     <div
       ref="mapContainer"
       data-testid="map-canvas"
-      id="map"
-      class="w-full h-full min-h-[100dvh]"
+      class="w-full h-full absolute inset-0 opacity-100"
     ></div>
 
     <!-- Zeppelin removed for cleaner UI -->
 
-    <!-- ✅ Coin Counter Display (moved to bottom-right, above cards) -->
+    <!-- ✅ WebGL Not Supported Fallback - HIGH Z-INDEX to cover all UI -->
     <div
-      class="absolute bottom-[260px] right-4 z-[50] flex items-center gap-2 px-3 py-1.5 rounded-full backdrop-blur-xl border shadow-lg transition-all duration-500"
-      :class="
-        isDarkMode
-          ? 'bg-zinc-900/80 border-yellow-500/30 text-yellow-400'
-          : 'bg-white/90 border-yellow-400/50 text-yellow-600'
-      "
+      v-if="!webGLSupported && !maplessMode"
+      class="fixed inset-0 z-[9999] flex items-center justify-center bg-gradient-to-br from-zinc-900 via-zinc-800 to-black"
     >
-      <span class="text-lg">🪙</span>
-      <span class="text-sm font-bold font-mono">{{
-        shopStore.totalCoins
-      }}</span>
+      <div
+        class="max-w-md mx-4 p-8 rounded-3xl bg-zinc-800/80 border border-white/10 text-center backdrop-blur-xl shadow-2xl"
+      >
+        <div
+          class="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-orange-500/30 to-red-500/30 flex items-center justify-center text-5xl animate-pulse"
+        >
+          🗺️
+        </div>
+        <h2 class="text-2xl font-black text-white mb-3">Map Not Available</h2>
+        <p class="text-sm text-zinc-300 mb-6 leading-relaxed">
+          WebGL is required to display the map but is currently disabled in your
+          browser.
+        </p>
+
+        <!-- Instructions -->
+        <div
+          class="text-left bg-black/30 rounded-xl p-4 mb-6 text-xs text-zinc-400"
+        >
+          <p class="font-bold text-white mb-2">🔧 How to fix (Chrome):</p>
+          <ol class="list-decimal list-inside space-y-1">
+            <li>
+              Open
+              <code class="bg-white/10 px-1 rounded">chrome://settings</code>
+            </li>
+            <li>Search for "Hardware acceleration"</li>
+            <li>Enable "Use graphics acceleration when available"</li>
+            <li>Restart your browser</li>
+          </ol>
+        </div>
+
+        <div class="space-y-3">
+          <button
+            @click="window.location.reload()"
+            class="w-full py-3.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/25 active:scale-95"
+          >
+            🔄 Reload Page
+          </button>
+          <button
+            @click="maplessMode = true"
+            class="w-full py-3.5 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white font-bold rounded-xl transition-all shadow-lg shadow-orange-500/25 active:scale-95"
+          >
+            📱 Continue Without Map
+          </button>
+          <a
+            href="https://get.webgl.org/"
+            target="_blank"
+            class="block w-full py-3.5 bg-white/10 text-white/80 font-bold rounded-xl hover:bg-white/20 transition-all"
+          >
+            🌐 Check WebGL Support
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- ✅ Mapless Mode Background -->
+    <div
+      v-if="!webGLSupported && maplessMode"
+      class="absolute inset-0 bg-gradient-to-br from-zinc-900 via-zinc-800 to-black"
+    >
+      <div class="absolute inset-0 opacity-20">
+        <div
+          class="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl"
+        ></div>
+        <div
+          class="absolute bottom-1/4 right-1/4 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl"
+        ></div>
+      </div>
+      <div
+        class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center text-white/20"
+      >
+        <div class="text-6xl mb-2">🗺️</div>
+        <p class="text-sm">Map unavailable</p>
+      </div>
     </div>
 
     <!-- ✅ Entertainment Atmosphere Effects (simplified) -->
@@ -1554,12 +1880,9 @@ defineExpose({
 </template>
 
 <style>
-.mapboxgl-popup {
-  position: relative;
-}
-
 /* Mapbox Popup Overrides */
 .mapboxgl-popup {
+  position: relative;
   z-index: 10000 !important;
 }
 
@@ -1577,6 +1900,37 @@ defineExpose({
 
 .vibe-mapbox-popup .mapboxgl-popup-content {
   overflow: visible;
+}
+
+/* Coin badge with bounce animation - canonical definition */
+.coin-badge {
+  position: absolute;
+  top: -10px;
+  right: -5px;
+  font-size: 14px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+  z-index: 300;
+  animation: bounce-slow 2s infinite ease-in-out;
+}
+
+@keyframes bounce-slow {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+/* Coin badge with spin animation - use .coin-badge-spin class where needed */
+.coin-badge-spin {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  font-size: 14px;
+  animation: coin-spin 3s ease-in-out infinite;
+  filter: drop-shadow(0 0 4px rgba(234, 179, 8, 0.8));
 }
 
 .vibe-mapbox-popup {
@@ -1617,9 +1971,6 @@ defineExpose({
 }
 
 /* Ensure markers clickable */
-.vibe-marker {
-  pointer-events: auto !important;
-}
 
 .marker-aura {
   position: absolute;
@@ -1885,15 +2236,6 @@ defineExpose({
   }
 }
 
-.coin-badge {
-  position: absolute;
-  top: -6px;
-  left: -6px;
-  font-size: 14px;
-  animation: coin-spin 3s ease-in-out infinite;
-  filter: drop-shadow(0 0 4px rgba(234, 179, 8, 0.8));
-}
-
 @keyframes coin-spin {
   0%,
   100% {
@@ -2056,19 +2398,7 @@ defineExpose({
   z-index: -1;
 }
 
-.highlight-pulse-ring {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: rgba(59, 130, 246, 0.3);
-  animation: marker-pulse-inner 1s infinite ease-out;
-  pointer-events: none;
-  z-index: -1;
-}
+/* CSS Cleaned up - Duplicates removed in previous steps */
 
 @keyframes marker-pulse-outer {
   0% {
@@ -2099,6 +2429,17 @@ defineExpose({
   }
   to {
     transform: translate(-50%, -50%) scale(1.3);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(100%) scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
     opacity: 1;
   }
 }

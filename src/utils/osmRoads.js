@@ -50,7 +50,7 @@ export const fetchRoadsFromOSM = async (bounds = null) => {
 		});
 
 		const routes = [];
-		if (response.data && response.data.elements) {
+		if (response.data?.elements) {
 			for (const el of response.data.elements) {
 				if (el.type === "way" && el.geometry) {
 					// Convert geometry objects {lat, lon} to [lat, lng] arrays

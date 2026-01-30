@@ -1,11 +1,10 @@
 <script setup>
 import { MessageSquare, Send, ShieldCheck, Star, User } from "lucide-vue-next";
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useHaptics } from "../../composables/useHaptics";
 import { useShopStore } from "../../store/shopStore";
 import { useUserStore } from "../../store/userStore";
-import { onMounted } from "vue";
 
 const props = defineProps({
 	shopId: {

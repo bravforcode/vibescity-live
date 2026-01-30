@@ -1,5 +1,3 @@
-// --- C:\vibecity.live\src\components\modal\VibeModal.vue ---
-
 <script setup>
 import { useMotion } from "@vueuse/motion";
 import {
@@ -12,37 +10,45 @@ import {
   watchEffect,
 } from "vue";
 import { useHaptics } from "../../composables/useHaptics";
-const { selectFeedback, successFeedback } = useHaptics();
 import { Z } from "../../constants/zIndex";
 import { getMediaDetails } from "../../utils/linkHelper";
 
+// ✅ Lazy Load Components
 const VisitorCount = defineAsyncComponent(
   () => import("../ui/VisitorCount.vue"),
+);
+const ReviewSystem = defineAsyncComponent(
+  () => import("../ui/ReviewSystem.vue"),
 );
 
 import {
   Car,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
   Facebook,
   Heart,
   Instagram,
+  MapPin,
   Navigation,
   Share2,
+  Sparkles,
+  Users,
   X,
 } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
-import { useShopStore } from "../../store/shopStore";
-// --- REFACTOR: ใช้ browserUtils และ shopUtils ---
+import {
+  openBoltApp,
+  openGrabApp,
+  openLinemanApp,
+} from "../../services/DeepLinkService";
 import {
   copyToClipboard,
   isMobileDevice,
-  openBoltApp,
   openGoogleMapsDir,
-  openGrabApp,
-  openLinemanApp,
   shareLocation,
 } from "../../utils/browserUtils";
 import { getStatusColorClass } from "../../utils/shopUtils";
-import ReviewSystem from "../ui/ReviewSystem.vue";
 
 const { t } = useI18n();
 
@@ -55,20 +61,46 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
+  userCount: {
+    type: Number,
+    default: null,
+  },
 });
 
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1534531173927-aeb928d54385?w=800&q=80";
 
-const emit = defineEmits(["close"]);
+const emit = defineEmits(["close", "toggle-favorite"]);
 
-// --- Cinematic Motion Logic ---
+// ✅ Initialize haptics within setup scope
+const { selectFeedback, successFeedback, impactFeedback } = useHaptics();
+
+// ✅ Stable random visitor count (generated once on mount, not inline)
+const initialVisitorCount = ref(null);
+
+// ✅ Smooth Exit Logic
+const handleClose = async () => {
+  impactFeedback("medium");
+
+  // Trigger animations
+  apply("leave");
+
+  // Wait for animation (350ms duration)
+  setTimeout(() => {
+    emit("close");
+  }, 300);
+};
+
+// ==========================================
+// ✅ iOS-STYLE MOTION SYSTEM
+// ==========================================
+
 const modalCard = ref(null);
 const { apply } = useMotion(modalCard, {
   initial: {
-    y: 0,
+    y: "100%",
     opacity: 0,
-    scale: 0.8,
+    scale: 0.95,
   },
   enter: {
     y: 0,
@@ -76,43 +108,75 @@ const { apply } = useMotion(modalCard, {
     scale: 1,
     transition: {
       type: "spring",
-      stiffness: 300,
-      damping: 25,
-      mass: 0.5,
+      stiffness: 260,
+      damping: 30,
+      mass: 0.8,
     },
   },
   leave: {
-    y: 0,
+    y: "100%",
     opacity: 0,
-    scale: 0.8,
+    scale: 0.95,
     transition: {
-      duration: 200,
-      ease: "easeIn",
+      duration: 350,
+      ease: [0.25, 0.1, 0.25, 1], // iOS default easing
     },
   },
 });
 
-// Gesture Variables
+// ==========================================
+// ✅ ENHANCED SWIPE GESTURE SYSTEM (S-TIER PHYSICS)
+// ==========================================
+
 const touchStart = ref({ y: 0, t: 0 });
 const isDragging = ref(false);
+const dragProgress = ref(0);
+const scrollContentRef = ref(null);
+const initialScrollTop = ref(0);
 
 const handleTouchStart = (e) => {
+  // Capture scroll position at start of touch
+  if (scrollContentRef.value) {
+    initialScrollTop.value = scrollContentRef.value.scrollTop;
+  }
+
   touchStart.value = { y: e.touches[0].clientY, t: Date.now() };
   isDragging.value = true;
+  // Don't trigger haptics immediately on touch start to prevent noise
 };
 
 const handleTouchMove = (e) => {
   if (!isDragging.value) return;
-  const deltaY = e.touches[0].clientY - touchStart.value.y;
 
-  // Apply visual transform immediately (1:1 follow or resistance)
-  if (deltaY > 0) {
-    // Dragging down (closing) - 1:1
-    apply({ y: deltaY, scale: 1 - deltaY / 2000 });
-  } else {
-    // Dragging up (overshoot) - Rubber Banding
-    const resistance = Math.sqrt(Math.abs(deltaY)) * 2; // Square root resistance
-    apply({ y: -resistance });
+  const currentY = e.touches[0].clientY;
+  const deltaY = currentY - touchStart.value.y;
+
+  // ⛔️ BLOCKER 1: If we started scrolled down, NEVER drag
+  if (initialScrollTop.value > 0) return;
+
+  // ⛔️ BLOCKER 2: If we are currently scrolling content, NEVER drag
+  if (scrollContentRef.value && scrollContentRef.value.scrollTop > 0) return;
+
+  // ⛔️ BLOCKER 3: If dragging UP (scrolling content), allow native scroll
+  if (deltaY < 0) return;
+
+  // ✅ ACTIVE DRAG (At top, pulling down)
+  if (e.cancelable && deltaY > 0) {
+    e.preventDefault(); // Stop native pull-to-refresh or rubberband
+
+    // Logarithmic Resistance (iOS feel)
+    // Formula: y = limit * log(1 + x / limit)
+    // This gives a heavy, satisfying feel that gets harder the further you pull
+    const limit = 200;
+    const resistance = limit * Math.log10(1 + deltaY / (limit * 0.5)) * 2.5;
+
+    dragProgress.value = Math.min(deltaY / 600, 1);
+
+    apply({
+      y: resistance,
+      scale: 1 - deltaY / 3000, // Very subtle scale
+      opacity: 1, // Keep full opacity until release/threshold
+    });
   }
 };
 
@@ -120,21 +184,41 @@ const handleTouchEnd = (e) => {
   if (!isDragging.value) return;
   isDragging.value = false;
 
-  const deltaY = e.changedTouches[0].clientY - touchStart.value.y;
+  const currentY = e.changedTouches[0].clientY;
+  const deltaY = currentY - touchStart.value.y;
   const time = Date.now() - touchStart.value.t;
   const velocity = deltaY / time; // px/ms
 
-  // Haptic Feedback
-  selectFeedback();
+  // Only consider for dismissal if we were correctly in drag mode
+  // (i.e., we have some positive translation)
+  // We check deltaY > 0 to ensure we only close on "Pull Down"
 
-  // Close Condition: Dragged down > 150px OR fast flick down
-  if (deltaY > 150 || (deltaY > 50 && velocity > 0.5)) {
-    emit("close");
-  } else {
-    // Snap back to open
+  const isScrolledToTop =
+    !scrollContentRef.value || scrollContentRef.value.scrollTop <= 0;
+
+  if (isScrolledToTop && deltaY > 0) {
+    // Dismiss conditions:
+    // 1. Fast flick (> 0.5px/ms)
+    // 2. Long drag (> 100px)
+    if ((deltaY > 60 && velocity > 0.5) || deltaY > 150) {
+      impactFeedback("medium");
+      apply("leave"); // ✅ Use leave animation instead of direct emit
+      setTimeout(() => emit("close"), 300);
+      return; // Exit, don't snap back
+    }
+  }
+
+  // Snap back (Reset)
+  if (deltaY > 0) {
     apply("enter");
   }
+
+  dragProgress.value = 0;
 };
+
+// ==========================================
+// ✅ MEDIA CAROUSEL SYSTEM
+// ==========================================
 
 const media = computed(() => getMediaDetails(props.shop.videoUrl));
 
@@ -142,37 +226,123 @@ const processedImages = computed(() => {
   return (props.shop.images || []).map((imgUrl) => getMediaDetails(imgUrl).url);
 });
 
-// ✅ Double Tap Logic
+const currentImageIndex = ref(0);
+const imageCarouselRef = ref(null);
+
+const nextImage = () => {
+  if (currentImageIndex.value < processedImages.value.length - 1) {
+    currentImageIndex.value++;
+    scrollToImage(currentImageIndex.value);
+    impactFeedback("light");
+  }
+};
+
+const prevImage = () => {
+  if (currentImageIndex.value > 0) {
+    currentImageIndex.value--;
+    scrollToImage(currentImageIndex.value);
+    impactFeedback("light");
+  }
+};
+
+const scrollToImage = (index) => {
+  if (!imageCarouselRef.value) return;
+  const container = imageCarouselRef.value;
+  const itemWidth = container.clientWidth;
+  container.scrollTo({
+    left: itemWidth * index,
+    behavior: "smooth",
+  });
+};
+
+// ==========================================
+// ✅ DOUBLE TAP TO LIKE
+// ==========================================
+
 const lastTap = ref(0);
 const showHeartAnim = ref(false);
 
-const handleDoubleTap = (_e) => {
+const handleDoubleTap = () => {
   const now = Date.now();
   const DOUBLE_TAP_DELAY = 300;
 
   if (now - lastTap.value < DOUBLE_TAP_DELAY) {
-    // Action: Save / Like
     emit("toggle-favorite", props.shop.id);
-
-    // Show Animation
     showHeartAnim.value = true;
-    setTimeout(() => { copyStatus.value = ""; }, 1000);
-
-
-    // Haptic
     successFeedback();
+
+    setTimeout(() => {
+      showHeartAnim.value = false;
+    }, 1000);
   }
 
   lastTap.value = now;
 };
 
-const zoomedImage = ref(null);
+// ==========================================
+// ✅ RIDE APP SYSTEM
+// ==========================================
+
 const showRidePopup = ref(false);
 const copyStatus = ref("");
 const rideLoading = ref("");
 const isMobile = ref(false);
 
-// --- ระบบ Countdown โปรโมชั่น (ต้องเก็บไว้ในนี้เพราะมี State เวลาที่เปลี่ยนตลอด) ---
+const openRide = (appName) => {
+  rideLoading.value = appName;
+  impactFeedback("medium");
+
+  // Copy shop name to clipboard with error handling
+  copyToClipboard(props.shop.name)
+    .then(() => {
+      copyStatus.value = "📋 Copied!";
+    })
+    .catch((err) => {
+      console.warn("Copy to clipboard failed:", err);
+      copyStatus.value = "⚠️ Could not copy name";
+    });
+
+  let success = false;
+  try {
+    switch (appName) {
+      case "grab":
+        success = openGrabApp(props.shop);
+        break;
+      case "bolt":
+        success = openBoltApp(props.shop);
+        break;
+      case "lineman":
+        success = openLinemanApp(props.shop);
+        break;
+      default:
+        success = false;
+        copyStatus.value = "❌ Unknown app";
+    }
+
+    if (success) {
+      copyStatus.value = `🚗 Opening ${appName}...`;
+    } else if (!copyStatus.value.includes("Unknown")) {
+      copyStatus.value = "❌ App not found";
+    }
+  } catch (err) {
+    console.error("Error opening ride app:", err);
+    success = false;
+    copyStatus.value = "❌ Failed to open app";
+  }
+
+  setTimeout(() => {
+    showRidePopup.value = false;
+    rideLoading.value = "";
+    setTimeout(() => {
+      copyStatus.value = "";
+    }, 1000);
+  }, 1500);
+};
+
+// ==========================================
+// ✅ PROMOTION COUNTDOWN
+// ==========================================
+
 const timeLeft = ref("");
 const isPromoActive = ref(false);
 let timerInterval = null;
@@ -187,10 +357,10 @@ const updateCountdown = () => {
   const [hours, minutes] = props.shop.promotionEndtime.split(":");
 
   const target = new Date();
-  target.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+  target.setHours(Number.parseInt(hours), Number.parseInt(minutes), 0, 0);
 
   const diff = target - now;
-  const maxFlashWindow = 1200000; // 20 นาที
+  const maxFlashWindow = 1200000; // 20 min
 
   if (diff <= 0 || diff > maxFlashWindow) {
     isPromoActive.value = false;
@@ -205,22 +375,82 @@ const updateCountdown = () => {
   isPromoActive.value = true;
 };
 
-onMounted(() => {
-  isMobile.value = isMobileDevice();
-  updateCountdown();
-  timerInterval = setInterval(updateCountdown, 1000);
+// ==========================================
+// ✅ SHARE SYSTEM
+// ==========================================
 
-  // If opened via swipe and initialIndex is set, show specific image
-  if (props.initialIndex > 0 && processedImages.value[props.initialIndex]) {
-    handleZoom(processedImages.value[props.initialIndex]);
+const handleShare = async () => {
+  impactFeedback("medium");
+  const success = await shareLocation(
+    props.shop.name,
+    props.shop.lat,
+    props.shop.lng,
+  );
+
+  if (success) {
+    copyStatus.value = "✅ Shared!";
+    successFeedback();
+  } else {
+    copyStatus.value = "📋 Link copied!";
   }
-});
 
-const handleZoom = (img) => {
-  zoomedImage.value = img;
+  setTimeout(() => {
+    copyStatus.value = "";
+  }, 2000);
 };
 
-// --- Media Sync ---
+const openGoogleMaps = () => {
+  impactFeedback("medium");
+  openGoogleMapsDir(props.shop.lat, props.shop.lng);
+};
+
+// ==========================================
+// ✅ LAZY LOADING SYSTEM
+// ==========================================
+
+const isMediaVisible = ref(false);
+const isReviewsVisible = ref(false);
+const mediaObserver = ref(null);
+const reviewsObserver = ref(null);
+
+const setupIntersectionObservers = () => {
+  // Media Observer
+  mediaObserver.value = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          isMediaVisible.value = true;
+        }
+      });
+    },
+    { threshold: 0.1 },
+  );
+
+  // Reviews Observer
+  reviewsObserver.value = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          isReviewsVisible.value = true;
+        }
+      });
+    },
+    { threshold: 0.1 },
+  );
+
+  nextTick(() => {
+    const mediaEl = document.querySelector("#media-container");
+    const reviewsEl = document.querySelector("#reviews-container");
+
+    if (mediaEl) mediaObserver.value.observe(mediaEl);
+    if (reviewsEl) reviewsObserver.value.observe(reviewsEl);
+  });
+};
+
+// ==========================================
+// ✅ VIDEO SYNC
+// ==========================================
+
 const videoPlayer = ref(null);
 watchEffect(() => {
   if (videoPlayer.value && props.shop.initialTime) {
@@ -228,617 +458,604 @@ watchEffect(() => {
   }
 });
 
-onUnmounted(() => {
-  if (timerInterval) clearInterval(timerInterval);
+// ==========================================
+// ✅ LIFECYCLE
+// ==========================================
+
+onMounted(() => {
+  isMobile.value = isMobileDevice();
+  initialVisitorCount.value = Math.floor(Math.random() * 50) + 10; // ✅ Generate stable random count
+  updateCountdown();
+  timerInterval = setInterval(updateCountdown, 1000);
+  setupIntersectionObservers();
+
+  // ✅ Add scroll listener for carousel index sync
+  if (imageCarouselRef.value) {
+    imageCarouselRef.value.addEventListener("scroll", handleCarouselScroll);
+  }
 });
 
-// --- REFACTOR: เรียกใช้ Utils Function ---
-const handleCopy = async (text) => {
-  const success = await copyToClipboard(text);
-  if (success) {
-    copyStatus.value = "Copied!";
-    setTimeout(() => { copyStatus.value = ""; }, 1000);
-
-  } else {
-    copyStatus.value = "Manual search required";
+// ✅ Carousel scroll handler to sync currentImageIndex
+const handleCarouselScroll = () => {
+  if (!imageCarouselRef.value) return;
+  const container = imageCarouselRef.value;
+  const newIndex = Math.round(container.scrollLeft / container.clientWidth);
+  if (
+    newIndex !== currentImageIndex.value &&
+    newIndex >= 0 &&
+    newIndex < processedImages.value.length
+  ) {
+    currentImageIndex.value = newIndex;
   }
 };
 
-const openGoogleMaps = () => {
-  openGoogleMapsDir(props.shop.lat, props.shop.lng);
-};
-
-// เปิดแอพ Grab พร้อม feedback
-const openGrab = () => {
-  rideLoading.value = "grab";
-
-  // Fire-and-forget copy (don't await) to prevent blocking deep link
-  copyToClipboard(props.shop.name).then(() => {
-    copyStatus.value = "Copied!";
-  });
-
-  // Call immediately to satisfy browser security (Synchronous-like intent)
-  const success = openGrabApp(props.shop);
-
-  if (success) {
-    copyStatus.value = "กำลังเปิด Grab...";
-  } else {
-    copyStatus.value = "ไม่พบ Grab";
+onUnmounted(() => {
+  if (timerInterval) clearInterval(timerInterval);
+  if (mediaObserver.value) mediaObserver.value.disconnect();
+  if (reviewsObserver.value) reviewsObserver.value.disconnect();
+  // ✅ Cleanup carousel scroll listener
+  if (imageCarouselRef.value) {
+    imageCarouselRef.value.removeEventListener("scroll", handleCarouselScroll);
   }
-
-  // ปิด popup หลังจาก 1.5 วินาที
-  setTimeout(() => {
-    showRidePopup.value = false;
-    rideLoading.value = "";
-    setTimeout(() => (copyStatus.value = ""), 1000);
-  }, 1500);
-};
-
-// เปิดแอพ Bolt พร้อม feedback
-const openBolt = () => {
-  rideLoading.value = "bolt";
-
-  copyToClipboard(props.shop.name).then(() => {
-    copyStatus.value = "Copied!";
-  });
-
-  const success = openBoltApp(props.shop);
-
-  if (success) {
-    copyStatus.value = "กำลังเปิด Bolt...";
-  } else {
-    copyStatus.value = "ไม่พบ Bolt";
-  }
-
-  setTimeout(() => {
-    showRidePopup.value = false;
-    rideLoading.value = "";
-    setTimeout(() => (copyStatus.value = ""), 1000);
-  }, 1500);
-};
-
-// เปิดแอพ Lineman
-const openLineman = () => {
-  rideLoading.value = "lineman";
-
-  copyToClipboard(props.shop.name).then(() => {
-    copyStatus.value = "Copied!";
-  });
-
-  const success = openLinemanApp(props.shop);
-
-  if (success) {
-    copyStatus.value = "กำลังเปิด Lineman...";
-  } else {
-    copyStatus.value = "ตไม่พบ Lineman";
-  }
-
-  setTimeout(() => {
-    showRidePopup.value = false;
-    rideLoading.value = "";
-    setTimeout(() => (copyStatus.value = ""), 1000);
-  }, 1500);
-};
+});
 </script>
 
 <template>
   <div
     data-testid="vibe-modal"
-    class="fixed inset-0 flex items-center justify-center p-4 pointer-events-auto font-sans overflow-hidden"
+    class="fixed inset-0 flex items-end md:items-center justify-center pointer-events-auto font-sans overflow-hidden"
     :style="{ zIndex: Z.MODAL }"
   >
-    <!-- Backdrop -->
+    <!-- ✅ iOS-Style Backdrop with Blur -->
     <div
-      class="absolute inset-0 bg-black/90 backdrop-blur-sm"
-      @click="emit('close')"
+      class="absolute inset-0 bg-black/70 backdrop-blur-xl transition-opacity duration-300"
+      :style="{ opacity: 1 - dragProgress * 0.5 }"
+      @click="handleClose"
     ></div>
 
-    <!-- Main Modal / Bottom Sheet -->
+    <!-- ✅ Main Modal Container - iOS Bottom Sheet Style -->
     <div
       ref="modalCard"
       @touchstart.stop="handleTouchStart"
       @touchmove.stop="handleTouchMove"
       @touchend.stop="handleTouchEnd"
-      class="relative w-full max-w-5xl m-auto bg-zinc-950/90 backdrop-blur-3xl rounded-[2.5rem] border border-white/10 flex flex-col md:flex-row shadow-[0_20px_100px_rgba(0,0,0,0.8)] h-[92vh] max-h-[92vh] md:h-[90vh] pointer-events-auto overflow-hidden"
-      :style="{ zIndex: Z.MODAL }"
+      class="relative w-full md:max-w-5xl bg-white dark:bg-zinc-900 md:rounded-[2rem] rounded-t-[2rem] flex flex-col shadow-[0_-10px_80px_rgba(0,0,0,0.3)] max-h-[94vh] md:max-h-[90vh] pointer-events-auto overflow-hidden"
+      :style="{
+        zIndex: Z.MODAL,
+        '--safe-area-top': 'env(safe-area-inset-top)',
+        '--safe-area-bottom': 'env(safe-area-inset-bottom)',
+      }"
     >
-      <!-- Top Interaction Area (Close Shortcut) -->
+      <!-- ✅ iOS-Style Drag Handle -->
       <div
-        @click="
-          emit('close');
-          selectFeedback();
-        "
-        class="absolute top-4 right-4 z-[4000] p-2 bg-white/10 backdrop-blur-xl rounded-full border border-white/20 active:scale-90 transition-all pointer-events-auto cursor-pointer"
+        class="flex justify-center pt-3 pb-1 cursor-grab active:cursor-grabbing"
       >
-        <X class="w-6 h-6 text-white" />
+        <div
+          class="w-10 h-1 bg-gray-300 dark:bg-gray-500 rounded-full transition-all duration-200"
+          :style="{
+            width: dragProgress > 0 ? `${10 + dragProgress * 20}px` : '40px',
+            backgroundColor: dragProgress > 0.3 ? '#10b981' : undefined,
+          }"
+        ></div>
       </div>
 
-      <!-- Drag Handle (Visual only now, or for vertical dismiss resistance) -->
-      <div class="w-full flex justify-center py-4 pointer-events-none">
-        <div class="w-12 h-1.5 bg-white/10 rounded-full"></div>
-      </div>
-
-      <div
-        :class="[
-          'relative w-full flex flex-col overflow-hidden transition-all duration-300',
-          shop.isPromoted || shop.IsPromoted === 'TRUE'
-            ? 'shadow-[0_0_40px_rgba(250,204,21,0.1)]'
-            : shop.status === 'LIVE'
-              ? 'shadow-[0_0_40px_rgba(34,211,238,0.1)]'
-              : '',
-        ]"
+      <!-- ✅ Close Button (iOS-style) -->
+      <button
+        @click="handleClose"
+        aria-label="Close details"
+        class="absolute top-4 right-4 z-50 w-8 h-8 flex items-center justify-center rounded-full bg-black/10 dark:bg-white/10 backdrop-blur-xl border border-white/20 active:scale-90 transition-all"
       >
-        <!-- Header -->
-        <div class="px-5 py-4 sm:px-6 sm:py-5 border-b border-white/10">
-          <div class="flex items-start justify-between gap-2 sm:gap-4">
-            <div class="flex-1 text-left min-w-0">
+        <X class="w-5 h-5 text-gray-700 dark:text-white" />
+      </button>
+
+      <!-- ✅ Scrollable Content -->
+      <div
+        ref="scrollContentRef"
+        class="flex-1 overflow-y-auto overflow-x-hidden -webkit-overflow-scrolling-touch"
+      >
+        <!-- ✅ Header Section -->
+        <div class="px-5 py-4 space-y-3">
+          <!-- Title Row -->
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex-1 min-w-0">
               <h2
-                class="text-lg sm:text-2xl font-black text-white uppercase tracking-tighter leading-tight break-words"
+                class="text-2xl font-black text-gray-900 dark:text-white leading-tight break-words"
               >
                 {{ shop.name }}
               </h2>
-              <div class="mt-2 flex">
-                <VisitorCount
-                  :shopId="shop.id"
-                  :initialCount="Math.floor(Math.random() * 50) + 10"
-                />
+              <div
+                class="mt-2 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400"
+              >
+                <MapPin class="w-4 h-4" />
+                <span class="font-medium">{{
+                  shop.category || "Entertainment"
+                }}</span>
               </div>
             </div>
 
-            <div class="flex flex-col items-end gap-1.5 shrink-0">
-              <div class="flex flex-wrap justify-end gap-1.5">
-                <transition name="fade">
-                  <div
-                    v-if="isPromoActive"
-                    class="promo-status-badge font-black rounded-md uppercase tracking-wider text-white shrink-0 text-[10px] sm:text-[12px] px-2 py-1 sm:px-2.5 sm:py-1"
-                  >
-                    FLASH SALE
-                  </div>
-                </transition>
-                <transition name="fade">
-                  <div
-                    v-if="shop.isPromoted || shop.IsPromoted === 'TRUE'"
-                    class="px-2 py-1 text-[10px] sm:text-[11px] font-black rounded-md uppercase tracking-tighter bg-gradient-to-r from-yellow-400 to-amber-600 text-black shadow-[0_0_15px_rgba(250,204,21,0.4)]"
-                  >
-                    PROMOTED
-                  </div>
-                </transition>
+            <!-- Status Badges -->
+            <div class="flex flex-col gap-1.5 shrink-0">
+              <transition name="scale">
                 <div
-                  :class="[
-                    'px-2 py-1 sm:px-2.5 sm:py-1 text-[10px] sm:text-[12px] font-black rounded-md uppercase tracking-wider text-white shadow-lg shrink-0 flex items-center gap-1.5',
-                    getStatusColorClass(shop.status),
-                  ]"
+                  v-if="isPromoActive"
+                  class="px-2.5 py-1 text-[10px] font-black rounded-full uppercase tracking-wider text-white bg-gradient-to-r from-red-500 to-orange-500 shadow-lg animate-pulse"
                 >
-                  <span
-                    v-if="shop.status === 'LIVE'"
-                    class="w-2 h-2 rounded-full bg-white animate-pulse"
-                  ></span>
-                  {{ shop.status }}
+                  🔥 FLASH
                 </div>
+              </transition>
+
+              <transition name="scale">
+                <div
+                  v-if="shop.isPromoted || shop.IsPromoted === 'TRUE'"
+                  class="px-2.5 py-1 text-[10px] font-black rounded-full uppercase tracking-tight bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg"
+                >
+                  ⭐ HOT
+                </div>
+              </transition>
+
+              <div
+                :class="[
+                  'px-2.5 py-1 text-[10px] font-black rounded-full uppercase tracking-wide text-white shadow-lg flex items-center gap-1.5',
+                  getStatusColorClass(shop.status),
+                ]"
+              >
+                <span
+                  v-if="shop.status === 'LIVE'"
+                  class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"
+                ></span>
+                {{ shop.status }}
               </div>
             </div>
           </div>
+
+          <!-- Visitor Count -->
+          <VisitorCount
+            v-if="isMediaVisible"
+            :shopId="shop.id"
+            :initialCount="initialVisitorCount"
+            :liveCount="userCount"
+          />
         </div>
 
-        <!-- Media Section (Updated for Double Tap & Landscape) -->
+        <!-- ✅ Media Section with Lazy Loading -->
         <div
-          class="relative w-full aspect-video md:aspect-auto md:w-[70%] md:h-full bg-zinc-900 overflow-hidden flex-shrink-0 group"
+          id="media-container"
+          class="relative w-full aspect-[16/10] bg-gray-100 dark:bg-zinc-800 overflow-hidden"
           @touchstart.stop="handleDoubleTap"
-          @click.stop="handleDoubleTap"
         >
+          <!-- Loading Skeleton -->
+          <div
+            v-if="!isMediaVisible"
+            class="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-zinc-700 dark:to-zinc-800 animate-pulse"
+          ></div>
+
           <!-- Heart Animation -->
-          <transition name="pop">
+          <transition name="heart">
             <div
               v-if="showHeartAnim"
               class="absolute inset-0 flex items-center justify-center pointer-events-none z-50"
             >
               <Heart
-                class="w-32 h-32 text-pink-500 fill-current drop-shadow-2xl animate-ping"
+                class="w-24 h-24 text-pink-500 fill-current drop-shadow-2xl"
+                style="animation: heartBeat 0.6s ease-out"
               />
             </div>
           </transition>
 
+          <!-- Double Tap Hint -->
           <div
-            class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-40"
+            class="absolute top-3 left-3 px-3 py-1.5 rounded-full bg-black/30 backdrop-blur-md text-white text-[10px] font-semibold opacity-0 group-hover:opacity-100 transition-opacity"
           >
-            <span
-              class="bg-black/50 text-white text-xs px-3 py-1 rounded-full backdrop-blur"
-              >Double tap to save ❤️</span
-            >
+            Double tap to like ❤️
           </div>
 
-          <transition name="fade">
+          <!-- Promotion Badge -->
+          <transition name="slide-up">
             <div
               v-if="isPromoActive"
-              class="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 z-[3100] bg-gradient-to-r from-red-600 to-orange-600 p-3 sm:p-3 shadow-[0_4px_20px_rgba(220,38,38,0.6)] animate-pulse-slow border-l-[4px] border-white"
+              class="absolute bottom-3 left-3 z-10 bg-gradient-to-r from-red-600 to-orange-600 rounded-2xl p-3 shadow-2xl border-l-4 border-white/50"
             >
-              <div class="flex flex-col items-start">
+              <div class="flex flex-col">
                 <span
-                  class="text-[8px] sm:text-[9px] font-black text-white/80 uppercase tracking-[0.2em] leading-none mb-1"
-                  >Limited Deal</span
+                  class="text-[9px] font-bold text-white/80 uppercase tracking-widest"
                 >
-                <h3
-                  class="text-base sm:text-lg font-black text-white tracking-tighter leading-none italic uppercase"
-                >
+                  Limited Deal
+                </span>
+                <h3 class="text-sm font-black text-white mt-0.5 leading-tight">
                   {{ shop.promotionInfo }}
                 </h3>
                 <div
-                  class="mt-1.5 sm:mt-2 flex items-center gap-1 sm:gap-1.5 bg-black/40 px-2 py-1 rounded-sm"
+                  class="mt-1.5 flex items-center gap-1 bg-black/30 px-2 py-0.5 rounded-md"
                 >
-                  <span
-                    class="text-[10px] sm:text-[11px] font-mono font-bold text-red-100 tracking-[0.1em]"
-                    >ENDS IN: {{ timeLeft }}</span
-                  >
+                  <Clock class="w-3 h-3 text-white" />
+                  <span class="text-[10px] font-mono font-bold text-white">
+                    {{ timeLeft }}
+                  </span>
                 </div>
               </div>
             </div>
           </transition>
 
-          <video
-            ref="videoPlayer"
-            v-if="!zoomedImage && media.type === 'video'"
-            :src="media.url"
-            autoplay
-            loop
-            muted
-            playsinline
-            class="w-full h-full object-cover"
-          ></video>
-          <iframe
-            v-else-if="!zoomedImage && media.type === 'youtube'"
-            :src="media.url"
-            class="w-full h-full scale-[1]"
-            frameborder="0"
-            allow="autoplay; encrypted-media; picture-in-picture"
-            allowfullscreen
-          ></iframe>
-          <img
-            v-else
-            :src="zoomedImage || media.url || FALLBACK_IMAGE"
-            class="w-full h-full object-cover"
-          />
+          <!-- Media Content -->
+          <template v-if="isMediaVisible">
+            <video
+              ref="videoPlayer"
+              v-if="media.type === 'video'"
+              :src="media.url"
+              autoplay
+              loop
+              muted
+              playsinline
+              class="w-full h-full object-cover"
+            ></video>
+            <iframe
+              v-else-if="media.type === 'youtube'"
+              :src="media.url"
+              class="w-full h-full"
+              frameborder="0"
+              allow="autoplay; encrypted-media; picture-in-picture"
+              allowfullscreen
+              loading="lazy"
+            ></iframe>
+            <img
+              v-else
+              :src="media.url || FALLBACK_IMAGE"
+              :alt="props.shop.name || 'Venue image'"
+              class="w-full h-full object-cover"
+              loading="lazy"
+            />
+          </template>
         </div>
 
-        <!-- Content -->
-        <div
-          class="p-5 sm:p-6 flex flex-col gap-4 sm:gap-5 overflow-y-auto no-scrollbar"
-        >
-          <div class="flex flex-row justify-between items-start gap-3">
-            <div class="flex-1 space-y-3 sm:space-y-2 text-left min-w-0">
-              <div
-                class="flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-2"
-              >
-                <span
-                  class="text-[10px] sm:text-[11px] text-white/30 font-bold uppercase tracking-[0.15em] shrink-0"
-                  >Crowd:</span
-                >
-                <p
-                  class="text-[13px] sm:text-[15px] font-medium text-white/90 leading-snug break-words"
-                >
-                  {{ shop.crowdInfo || "-" }}
-                </p>
-              </div>
-              <div
-                class="flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-2"
-              >
-                <span
-                  class="text-[10px] sm:text-[11px] text-white/30 font-bold uppercase tracking-[0.15em] shrink-0"
-                  >Vibe:</span
-                >
-                <p
-                  class="text-[13px] sm:text-[15px] font-medium text-white/90 leading-snug break-words"
-                >
-                  {{ shop.vibeTag || "-" }}
-                </p>
-              </div>
-            </div>
+        <!-- ✅ Image Gallery Carousel (iOS-style) -->
+        <div v-if="processedImages.length > 0" class="relative px-5 py-4">
+          <h4
+            class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3"
+          >
+            Gallery ({{ processedImages.length }})
+          </h4>
 
+          <div class="relative">
+            <!-- Carousel Container -->
             <div
-              class="flex flex-row gap-2 shrink-0 overflow-x-auto no-scrollbar pb-1"
-              v-if="processedImages.length > 0"
+              ref="imageCarouselRef"
+              class="flex gap-3 overflow-x-auto snap-x snap-mandatory no-scrollbar scroll-smooth"
             >
               <div
                 v-for="(img, idx) in processedImages"
                 :key="idx"
-                @click="handleZoom(img)"
-                class="w-12 h-12 sm:w-16 sm:h-16 rounded-lg sm:rounded-xl overflow-hidden border border-white/10 cursor-pointer active:scale-95 transition-all shadow-lg bg-zinc-900 flex-shrink-0"
+                class="flex-shrink-0 w-32 h-32 rounded-2xl overflow-hidden bg-gray-100 dark:bg-zinc-800 snap-start"
               >
                 <img
                   :src="img"
+                  :alt="`${shop.name} gallery image ${idx + 1}`"
                   class="w-full h-full object-cover"
                   loading="lazy"
                 />
               </div>
             </div>
-          </div>
 
-          <!-- ✅ Social Presence (New for Entertainment Map Concept) -->
-          <div
-            v-if="shop.IG_URL || shop.FB_URL || shop.TikTok_URL"
-            class="border-t border-white/5 pt-4"
-          >
-            <h4
-              class="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] mb-4 text-left"
+            <!-- Navigation Buttons -->
+            <button
+              v-if="currentImageIndex > 0"
+              @click="prevImage"
+              aria-label="Previous image"
+              class="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 dark:bg-black/50 backdrop-blur-md shadow-lg active:scale-90 transition-all"
             >
-              Explore Atmosphere
-            </h4>
-            <div class="flex gap-2.5">
-              <a
-                v-if="shop.IG_URL"
-                :href="shop.IG_URL"
-                target="_blank"
-                class="flex-1 py-3 px-2 rounded-2xl bg-gradient-to-tr from-[#f9ce34] via-[#ee2a7b] to-[#6228d7] flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl group"
+              <ChevronLeft class="w-5 h-5 text-gray-700 dark:text-white" />
+            </button>
+
+            <button
+              v-if="currentImageIndex < processedImages.length - 1"
+              @click="nextImage"
+              aria-label="Next image"
+              class="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 dark:bg-black/50 backdrop-blur-md shadow-lg active:scale-90 transition-all"
+            >
+              <ChevronRight class="w-5 h-5 text-gray-700 dark:text-white" />
+            </button>
+          </div>
+        </div>
+
+        <!-- ✅ Info Cards (iOS-style) -->
+        <div class="px-5 py-4 space-y-3">
+          <!-- Crowd Info -->
+          <div
+            class="bg-gray-50 dark:bg-zinc-800/50 rounded-2xl p-4 backdrop-blur-sm"
+          >
+            <div class="flex items-start gap-3">
+              <div
+                class="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0"
               >
-                <Instagram class="w-4 h-4 text-white" />
-                <span
-                  class="text-[10px] font-black text-white uppercase tracking-tighter"
-                  >IG</span
+                <Users class="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <h5
+                  class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1"
                 >
-              </a>
-              <a
-                v-if="shop.FB_URL"
-                :href="shop.FB_URL"
-                target="_blank"
-                class="flex-1 py-3 px-2 rounded-2xl bg-[#1877F2] flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl group"
-              >
-                <Facebook class="w-4 h-4 text-white" />
-                <span
-                  class="text-[10px] font-black text-white uppercase tracking-tighter"
-                  >FB</span
+                  Crowd Vibe
+                </h5>
+                <p
+                  class="text-sm font-medium text-gray-900 dark:text-white leading-relaxed"
                 >
-              </a>
-              <a
-                v-if="shop.TikTok_URL"
-                :href="shop.TikTok_URL"
-                target="_blank"
-                class="flex-1 py-3 px-2 rounded-2xl bg-black border border-white/20 flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl group"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="w-4 h-4 text-white"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"></path>
-                </svg>
-                <span
-                  class="text-[10px] font-black text-white uppercase tracking-tighter"
-                  >TikTok</span
-                >
-              </a>
+                  {{ shop.crowdInfo || "Mixed crowd, all ages welcome" }}
+                </p>
+              </div>
             </div>
           </div>
 
-          <!-- ✅ REVIEW SYSTEM (PHASE 3) -->
-          <div class="border-t border-white/5 pt-4">
-            <ReviewSystem :shop-id="shop.id" :shop-name="shop.name" />
+          <!-- Vibe Tag -->
+          <div
+            class="bg-gray-50 dark:bg-zinc-800/50 rounded-2xl p-4 backdrop-blur-sm"
+          >
+            <div class="flex items-start gap-3">
+              <div
+                class="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center shrink-0"
+              >
+                <Sparkles
+                  class="w-5 h-5 text-purple-600 dark:text-purple-400"
+                />
+              </div>
+              <div class="flex-1 min-w-0">
+                <h5
+                  class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1"
+                >
+                  Atmosphere
+                </h5>
+                <p
+                  class="text-sm font-medium text-gray-900 dark:text-white leading-relaxed"
+                >
+                  {{ shop.vibeTag || "Chill and relaxed atmosphere" }}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Action Buttons -->
+        <!-- ✅ Social Links (iOS-style) -->
         <div
-          class="p-5 sm:p-6 pt-0 grid grid-cols-3 gap-2 sm:gap-3 flex-shrink-0"
+          v-if="shop.IG_URL || shop.FB_URL || shop.TikTok_URL"
+          class="px-5 py-4"
         >
-          <!-- แชร์ -->
+          <h4
+            class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3"
+          >
+            Explore Atmosphere
+          </h4>
+          <div class="grid grid-cols-3 gap-2">
+            <a
+              v-if="shop.IG_URL"
+              :href="shop.IG_URL"
+              target="_blank"
+              @click="impactFeedback('medium')"
+              class="h-12 rounded-2xl bg-gradient-to-tr from-[#f9ce34] via-[#ee2a7b] to-[#6228d7] flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg"
+            >
+              <Instagram class="w-5 h-5 text-white" />
+              <span class="text-xs font-bold text-white">IG</span>
+            </a>
+
+            <a
+              v-if="shop.FB_URL"
+              :href="shop.FB_URL"
+              target="_blank"
+              @click="impactFeedback('medium')"
+              class="h-12 rounded-2xl bg-[#1877F2] flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg"
+            >
+              <Facebook class="w-5 h-5 text-white" />
+              <span class="text-xs font-bold text-white">FB</span>
+            </a>
+
+            <a
+              v-if="shop.TikTok_URL"
+              :href="shop.TikTok_URL"
+              target="_blank"
+              @click="impactFeedback('medium')"
+              class="h-12 rounded-2xl bg-black flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg border border-white/10"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="w-5 h-5 text-white"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+              >
+                <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"></path>
+              </svg>
+              <span class="text-xs font-bold text-white">TT</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- ✅ Reviews Section (Lazy Loaded) -->
+        <div id="reviews-container" class="px-5 py-4">
+          <ReviewSystem
+            v-if="isReviewsVisible"
+            :shop-id="shop.id"
+            :shop-name="shop.name"
+          />
+        </div>
+
+        <!-- Bottom Safe Area -->
+        <div class="h-[calc(var(--safe-area-bottom)+20px)]"></div>
+      </div>
+
+      <!-- ✅ iOS-Style Action Bar (Sticky Bottom) -->
+      <div
+        class="border-t border-gray-200 dark:border-zinc-700 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl"
+      >
+        <div class="px-5 py-3 grid grid-cols-3 gap-2">
+          <!-- Share -->
           <button
             @click="handleShare"
-            class="h-12 sm:h-14 flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-xl sm:rounded-2xl transition-all active:scale-95 shadow-lg shadow-blue-900/20 group relative overflow-hidden"
+            class="h-14 rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 flex flex-col items-center justify-center gap-1 active:scale-95 transition-all shadow-lg"
           >
-            <div
-              class="absolute inset-0 bg-white/10 group-hover:bg-white/20 transition-all duration-300"
-            ></div>
-            <Share2 class="w-4 h-4 sm:w-5 sm:h-5 text-white relative z-10" />
+            <Share2 class="w-5 h-5 text-white" />
             <span
-              class="text-[10px] sm:text-xs font-black text-white uppercase tracking-widest relative z-10"
+              class="text-[10px] font-bold text-white uppercase tracking-wide"
+              >Share</span
             >
-              แชร์
-            </span>
           </button>
 
-          <!-- Google Maps -->
+          <!-- Navigate -->
           <button
             @click="openGoogleMaps"
-            class="h-12 sm:h-14 flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl sm:rounded-2xl transition-all active:scale-95 shadow-lg shadow-indigo-900/20 group relative overflow-hidden"
+            class="h-14 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 flex flex-col items-center justify-center gap-1 active:scale-95 transition-all shadow-lg"
           >
-            <div
-              class="absolute inset-0 bg-white/10 group-hover:bg-white/20 transition-all duration-300"
-            ></div>
-            <Navigation
-              class="w-4 h-4 sm:w-5 sm:h-5 text-white relative z-10"
-            />
+            <Navigation class="w-5 h-5 text-white" />
             <span
-              class="text-[10px] sm:text-xs font-black text-white uppercase tracking-widest relative z-10"
+              class="text-[10px] font-bold text-white uppercase tracking-wide"
+              >Navigate</span
             >
-              นำทาง
-            </span>
           </button>
 
-          <!-- เรียกรถ -->
+          <!-- Ride -->
           <button
-            @click="showRidePopup = true"
-            class="h-12 sm:h-14 flex items-center justify-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 rounded-xl sm:rounded-2xl transition-all active:scale-95 shadow-lg shadow-green-900/20 group relative overflow-hidden"
+            @click="
+              showRidePopup = true;
+              impactFeedback('medium');
+            "
+            class="h-14 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 flex flex-col items-center justify-center gap-1 active:scale-95 transition-all shadow-lg"
           >
-            <div
-              class="absolute inset-0 bg-white/10 group-hover:bg-white/20 transition-all duration-300"
-            ></div>
-            <Car class="w-4 h-4 sm:w-5 sm:h-5 text-white relative z-10" />
+            <Car class="w-5 h-5 text-white" />
             <span
-              class="text-[10px] sm:text-xs font-black text-white uppercase tracking-widest relative z-10"
+              class="text-[10px] font-bold text-white uppercase tracking-wide"
+              >Ride</span
             >
-              เรียกรถ
-            </span>
           </button>
         </div>
+
+        <!-- Safe Area Bottom Padding -->
+        <div class="h-[var(--safe-area-bottom)]"></div>
       </div>
     </div>
 
-    <!-- ✅ Ride Popup -->
-    <transition name="fade">
+    <!-- ✅ Ride Selection Bottom Sheet -->
+    <transition name="sheet">
       <div
         v-if="showRidePopup"
-        class="fixed inset-0 flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl"
+        class="fixed inset-0 flex items-end justify-center bg-black/70 backdrop-blur-xl"
         :style="{ zIndex: Z.SUBMODAL }"
         @click.self="showRidePopup = false"
       >
         <div
-          class="w-full max-w-[320px] bg-zinc-900 border border-white/10 rounded-3xl p-6 shadow-2xl animate-pop relative"
+          class="w-full max-w-md bg-white dark:bg-zinc-900 rounded-t-[2rem] shadow-2xl"
         >
-          <!-- Close Button -->
-          <button
-            @click="showRidePopup = false"
-            class="absolute top-4 right-4 text-white/50 hover:text-white transition-all bg-white/5 hover:bg-white/10 rounded-full p-2"
-          >
-            <X class="w-5 h-5" />
-          </button>
-
-          <div class="mb-6 text-center">
+          <!-- Drag Handle -->
+          <div class="flex justify-center pt-3 pb-1">
             <div
-              class="w-14 h-14 mx-auto mb-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center shadow-lg shadow-green-500/30"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="w-7 h-7 text-white"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2m2 0h10"
-                />
-                <circle cx="7" cy="17" r="2" />
-                <circle cx="17" cy="17" r="2" />
-              </svg>
-            </div>
-            <h3 class="text-lg font-black text-white uppercase tracking-tight">
-              เรียกรวดเร็ว
-            </h3>
-            <p class="text-[11px] text-white/60 font-medium mt-1">
-              {{ shop.name }}
-            </p>
+              class="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full"
+            ></div>
           </div>
 
-          <div class="flex flex-col gap-3">
-            <!-- Grab -->
-            <button
-              @click="openGrab"
-              :disabled="rideLoading === 'grab'"
-              class="w-full h-14 bg-gradient-to-r from-[#00B14F] to-[#00A84D] hover:from-[#009e47] hover:to-[#009441] rounded-2xl flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-all duration-200 group relative overflow-hidden"
-            >
+          <div class="px-5 py-4">
+            <!-- Header -->
+            <div class="text-center mb-6">
               <div
-                class="absolute inset-0 bg-white/10 group-hover:bg-white/20 transition-all duration-300"
-              ></div>
-              <div class="relative z-10 flex items-center justify-center gap-3">
-                <div class="bg-white p-2 rounded-full">
-                  <div
-                    class="w-5 h-5 flex items-center justify-center text-green-600 font-bold text-xs"
-                  >
-                    G
-                  </div>
-                </div>
-                <span class="font-bold text-white text-base tracking-wide">
-                  {{ rideLoading === "grab" ? "กำลังเปิด..." : "Grab" }}
-                </span>
-              </div>
-            </button>
-
-            <!-- Bolt -->
-            <button
-              @click="openBolt"
-              :disabled="rideLoading === 'bolt'"
-              class="w-full h-14 bg-gradient-to-r from-[#34D186] to-[#2EC477] hover:from-[#2bc87d] hover:to-[#26b572] rounded-2xl flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-all duration-200 group relative overflow-hidden"
-            >
-              <div
-                class="absolute inset-0 bg-white/10 group-hover:bg-white/20 transition-all duration-300"
-              ></div>
-              <div class="relative z-10 flex items-center justify-center gap-3">
-                <div class="bg-white p-2 rounded-full">
-                  <div
-                    class="w-5 h-5 flex items-center justify-center text-[#34D186] font-bold text-xs"
-                  >
-                    B
-                  </div>
-                </div>
-                <span class="font-bold text-white text-base tracking-wide">
-                  {{ rideLoading === "bolt" ? "กำลังเปิด..." : "Bolt" }}
-                </span>
-              </div>
-            </button>
-
-            <!-- Lineman -->
-            <button
-              @click="openLineman"
-              :disabled="rideLoading === 'lineman'"
-              class="w-full h-14 bg-gradient-to-r from-[#00B14F] to-[#009440] hover:from-[#009e47] hover:to-[#008439] rounded-2xl flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-all duration-200 group relative overflow-hidden border-l-4 border-green-400"
-            >
-              <div
-                class="absolute inset-0 bg-white/10 group-hover:bg-white/20 transition-all duration-300"
-              ></div>
-              <div class="relative z-10 flex items-center justify-center gap-3">
-                <div class="bg-white p-2 rounded-full">
-                  <div
-                    class="w-5 h-5 flex items-center justify-center text-green-600 font-bold text-xs"
-                  >
-                    L
-                  </div>
-                </div>
-                <span class="font-bold text-white text-base tracking-wide">
-                  {{ rideLoading === "lineman" ? "กำลังเปิด..." : "Lineman" }}
-                </span>
-              </div>
-            </button>
-          </div>
-
-          <div class="mt-6 text-center border-t border-white/10 pt-4">
-            <transition name="fade">
-              <p
-                v-if="copyStatus"
-                class="text-xs font-bold text-green-400 uppercase animate-pulse"
+                class="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-xl"
               >
-                {{ copyStatus }}
+                <Car class="w-8 h-8 text-white" />
+              </div>
+              <h3 class="text-xl font-black text-gray-900 dark:text-white">
+                Book a Ride
+              </h3>
+              <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                {{ shop.name }}
               </p>
+            </div>
+
+            <!-- Ride Options -->
+            <div class="space-y-3 mb-6">
+              <!-- Grab -->
+              <button
+                @click="openRide('grab')"
+                :disabled="rideLoading === 'grab'"
+                aria-label="Open Grab"
+                class="w-full h-16 bg-gradient-to-r from-[#00B14F] to-[#00A84D] rounded-2xl flex items-center px-4 gap-3 active:scale-98 transition-all shadow-lg"
+              >
+                <div
+                  class="w-10 h-10 bg-white rounded-full flex items-center justify-center"
+                >
+                  <span class="text-lg font-black text-[#00B14F]">G</span>
+                </div>
+                <span class="flex-1 text-left font-bold text-white text-lg">
+                  {{ rideLoading === "grab" ? "Opening..." : "Grab" }}
+                </span>
+                <ChevronRight class="w-5 h-5 text-white/70" />
+              </button>
+
+              <!-- Bolt -->
+              <button
+                @click="openRide('bolt')"
+                :disabled="rideLoading === 'bolt'"
+                aria-label="Open Bolt"
+                class="w-full h-16 bg-gradient-to-r from-[#34D186] to-[#2EC477] rounded-2xl flex items-center px-4 gap-3 active:scale-98 transition-all shadow-lg"
+              >
+                <div
+                  class="w-10 h-10 bg-white rounded-full flex items-center justify-center"
+                >
+                  <span class="text-lg font-black text-[#34D186]">B</span>
+                </div>
+                <span class="flex-1 text-left font-bold text-white text-lg">
+                  {{ rideLoading === "bolt" ? "Opening..." : "Bolt" }}
+                </span>
+                <ChevronRight class="w-5 h-5 text-white/70" />
+              </button>
+
+              <!-- Lineman -->
+              <button
+                @click="openRide('lineman')"
+                :disabled="rideLoading === 'lineman'"
+                aria-label="Open Lineman"
+                class="w-full h-16 bg-gradient-to-r from-[#00B14F] to-[#009440] rounded-2xl flex items-center px-4 gap-3 active:scale-98 transition-all shadow-lg"
+              >
+                <div
+                  class="w-10 h-10 bg-white rounded-full flex items-center justify-center"
+                >
+                  <span class="text-lg font-black text-[#00B14F]">L</span>
+                </div>
+                <span class="flex-1 text-left font-bold text-white text-lg">
+                  {{ rideLoading === "lineman" ? "Opening..." : "Lineman" }}
+                </span>
+                <ChevronRight class="w-5 h-5 text-white/70" />
+              </button>
+            </div>
+
+            <!-- Status Message -->
+            <transition name="fade">
+              <div
+                v-if="copyStatus"
+                class="text-center py-2 px-4 bg-green-100 dark:bg-green-900/30 rounded-xl"
+              >
+                <p class="text-sm font-bold text-green-600 dark:text-green-400">
+                  {{ copyStatus }}
+                </p>
+              </div>
             </transition>
-            <p class="text-[10px] text-white/40 mt-2 italic" v-if="isMobile">
-              * ถ้าแอพไม่เปิดอัตโนมัติ กรุณาเปิดแอพด้วยตนเอง
+
+            <!-- Helper Text -->
+            <p
+              class="text-center text-xs text-gray-400 dark:text-gray-500 mt-4"
+              v-if="isMobile"
+            >
+              If app doesn't open, please launch manually
             </p>
           </div>
-        </div>
-      </div>
-    </transition>
 
-    <!-- Zoomed Image -->
-    <transition name="fade">
-      <div
-        v-if="zoomedImage"
-        class="fixed inset-0 flex items-center justify-center p-6 bg-black/95 backdrop-blur-md cursor-pointer"
-        :style="{ zIndex: Z.SUBMODAL }"
-        @click="zoomedImage = null"
-      >
-        <img
-          :src="zoomedImage"
-          class="max-w-[90vw] max-h-[80vh] rounded-2xl shadow-2xl object-contain animate-zoom"
-        />
+          <!-- Safe Area Bottom -->
+          <div class="h-[calc(var(--safe-area-bottom)+16px)]"></div>
+        </div>
       </div>
     </transition>
   </div>
 </template>
 
 <style scoped>
-/* Existing styles remain */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease;
+/* iOS-Style Smooth Scrolling */
+.overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
 }
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
+
+/* Hide Scrollbar */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -847,82 +1064,82 @@ const openLineman = () => {
   scrollbar-width: none;
 }
 
-@keyframes slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(100%);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* Transitions */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.25s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
-.animate-slide-up {
-  animation: slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
-@keyframes pop {
-  from {
-    opacity: 0;
-    transform: scale(0.97) translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
+.scale-enter-active,
+.scale-leave-active {
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.animate-pop {
-  animation: pop 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+.scale-enter-from,
+.scale-leave-to {
+  opacity: 0;
+  transform: scale(0.8);
 }
 
-@keyframes zoom {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+.sheet-enter-active,
+.sheet-leave-active {
+  transition: transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
-.animate-zoom {
-  animation: zoom 0.2s ease-out forwards;
+.sheet-enter-from,
+.sheet-leave-to {
+  transform: translateY(100%);
 }
 
-.promo-status-badge {
-  background: linear-gradient(270deg, #ff4d4d, #f97316, #ff4d4d);
-  background-size: 200% 200%;
-  animation: wave-gradient 2s linear infinite;
-  box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+.slide-up-enter-from,
+.slide-up-leave-to {
+  opacity: 0;
+  transform: translateY(20px);
 }
 
-@keyframes wave-gradient {
+.heart-enter-active {
+  animation: heartBeat 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.heart-leave-active {
+  transition: opacity 0.3s ease;
+}
+.heart-leave-to {
+  opacity: 0;
+}
+
+@keyframes heartBeat {
   0% {
-    background-position: 0% 50%;
-  }
-  100% {
-    background-position: 200% 50%;
-  }
-}
-
-.animate-pulse-slow {
-  animation: pulse-slow 3s infinite;
-}
-@keyframes pulse-slow {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
+    opacity: 0;
+    transform: scale(0);
   }
   50% {
-    opacity: 0.95;
-    transform: scale(1.03);
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
   }
 }
 
-/* ปุ่ม disabled */
+/* Active Scale */
+.active\:scale-95:active {
+  transform: scale(0.95);
+}
+
+.active\:scale-98:active {
+  transform: scale(0.98);
+}
+
+/* Disable Button States */
 button:disabled {
-  opacity: 0.7;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 </style>

@@ -3,66 +3,83 @@
  * VisitorCount.vue - Real-time visitor count display
  * Feature #36: Real-time Visitor Count UI
  */
-import { onMounted, onUnmounted, ref } from "vue";
+import { onMounted, onUnmounted, ref, watch } from "vue";
 
 const props = defineProps({
-	shopId: {
-		type: [String, Number],
-		required: true,
-	},
-	isDarkMode: {
-		type: Boolean,
-		default: true,
-	},
-	initialCount: {
-		type: Number,
-		default: 0,
-	},
+  shopId: {
+    type: [String, Number],
+    required: true,
+  },
+  isDarkMode: {
+    type: Boolean,
+    default: true,
+  },
+  initialCount: {
+    type: Number,
+    default: 0,
+  },
+  liveCount: {
+    type: Number,
+    default: null,
+  },
 });
 
 const visitorCount = ref(props.initialCount);
 const trend = ref("stable"); // 'up', 'down', 'stable'
 let interval = null;
 
+import { useRoomStore } from "../../store/roomStore";
+
+const roomStore = useRoomStore();
+
+// Watch for live updates from store
+watch(
+  () => roomStore.getCount(props.shopId),
+  (newVal, oldVal) => {
+    if (newVal !== undefined) {
+      if (newVal > (oldVal || visitorCount.value)) trend.value = "up";
+      else if (newVal < (oldVal || visitorCount.value)) trend.value = "down";
+      else trend.value = "stable";
+      visitorCount.value = newVal;
+    }
+  },
+  { immediate: true },
+);
+
 // Simulate real-time updates (would be WebSocket in production)
 onMounted(() => {
-	// Random initial count based on shop ID
-	visitorCount.value = props.initialCount || Math.floor(Math.random() * 50) + 5;
+  // If live count provided via props, use it (override)
+  if (props.liveCount !== null) {
+    visitorCount.value = props.liveCount;
+    return;
+  }
 
-	interval = setInterval(() => {
-		const change = Math.floor(Math.random() * 5) - 2; // -2 to +2
-		const newCount = Math.max(0, visitorCount.value + change);
-
-		if (newCount > visitorCount.value) trend.value = "up";
-		else if (newCount < visitorCount.value) trend.value = "down";
-		else trend.value = "stable";
-
-		visitorCount.value = newCount;
-	}, 5000);
+  // Initial load from store
+  visitorCount.value = roomStore.getCount(props.shopId);
 });
 
 onUnmounted(() => {
-	if (interval) clearInterval(interval);
+  // Cleanup if needed
 });
 
 const getTrendIcon = () => {
-	if (trend.value === "up") return "↑";
-	if (trend.value === "down") return "↓";
-	return "•";
+  if (trend.value === "up") return "↑";
+  if (trend.value === "down") return "↓";
+  return "•";
 };
 
 const getTrendColor = () => {
-	if (trend.value === "up") return "text-green-400";
-	if (trend.value === "down") return "text-red-400";
-	return "text-gray-400";
+  if (trend.value === "up") return "text-green-400";
+  if (trend.value === "down") return "text-red-400";
+  return "text-gray-400";
 };
 
 const getCrowdLevel = () => {
-	if (visitorCount.value > 40) return { label: "Packed", color: "bg-red-500" };
-	if (visitorCount.value > 25) return { label: "Busy", color: "bg-orange-500" };
-	if (visitorCount.value > 10)
-		return { label: "Moderate", color: "bg-yellow-500" };
-	return { label: "Quiet", color: "bg-green-500" };
+  if (visitorCount.value > 40) return { label: "Packed", color: "bg-red-500" };
+  if (visitorCount.value > 25) return { label: "Busy", color: "bg-orange-500" };
+  if (visitorCount.value > 10)
+    return { label: "Moderate", color: "bg-yellow-500" };
+  return { label: "Quiet", color: "bg-green-500" };
 };
 </script>
 

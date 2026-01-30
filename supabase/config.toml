@@ -1,0 +1,4 @@
+project_id = "vibe-city-live"
+
+[functions.webhook-handler]
+verify_jwt = false
