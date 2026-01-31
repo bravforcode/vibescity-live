@@ -1,0 +1,35 @@
+name: VibeCity OSM Sync
+
+on:
+  schedule:
+    # Run every 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install redis h3>=4.0.0 supabase requests python-dotenv fakeredis
+
+      - name: Run OSM Sync (Short Batch)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          WORKERS: 6
+          TILE_Z: 9
+        # Run loop=5 to do a batch of work and then stop (freeing up the runner)
+        # The script is incremental, so next run picks up where it left off.
+        run: python backend/scripts/osm_sync_ultimate.py --loop=5
