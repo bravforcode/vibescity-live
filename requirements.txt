@@ -1,0 +1,6 @@
+redis
+h3>=4.0.0
+supabase
+requests
+python-dotenv
+fakeredis
