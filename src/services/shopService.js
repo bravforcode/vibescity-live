@@ -5,15 +5,29 @@ import { supabase } from "../lib/supabase";
  * This ensures the UI doesn't break even if DB column names differ from CSV headers.
  */
 const mapShopData = (item, index) => {
-	const img1 = item.image_url_1 || item.Image_URL1 || "";
-	const img2 = item.image_url_2 || item.Image_URL2 || "";
+	// Handle array images from 'venues' or legacy individual columns
+	const img1 =
+		(item.image_urls && item.image_urls[0]) ||
+		item.image_url_1 ||
+		item.Image_URL1 ||
+		"";
+	const img2 =
+		(item.image_urls && item.image_urls[1]) ||
+		item.image_url_2 ||
+		item.Image_URL2 ||
+		"";
 
 	return {
 		id: item.id || index,
 		name: item.name || "",
 		category: item.category || "General",
-		lat: parseFloat(item.latitude || item.Latitude || 0),
-		lng: parseFloat(item.longitude || item.Longitude || 0),
+		// Support PostGIS location object if present, else fallback
+		lat: item.location?.coordinates
+			? item.location.coordinates[1]
+			: parseFloat(item.latitude || item.Latitude || 0),
+		lng: item.location?.coordinates
+			? item.location.coordinates[0]
+			: parseFloat(item.longitude || item.Longitude || 0),
 		videoUrl: item.video_url || item.Video_URL || "",
 
 		// Status logic
@@ -29,32 +43,42 @@ const mapShopData = (item, index) => {
 		// Time Ranges
 		openTime: item.open_time || "",
 		closeTime: item.close_time || "",
+		// Legacy fields logic if needed, new venues might not have golden_time explicitly
 		goldenStart: item.golden_time || "",
 		goldenEnd: item.end_golden_time || "",
 
 		// Zone & Building
 		Province: item.province || item.Province || "เชียงใหม่",
-		Zone: item.zone || item.Zone || null,
+		Zone: item.district || item.zone || item.Zone || null, // Map district to Zone for backward compat
 		Building: item.building || item.Building || null,
 		Floor: item.floor || item.Floor || null,
 		CategoryColor: item.category_color || item.CategoryColor || null,
 
-		images: [img1, img2].filter((url) => url && url.length > 5),
+		images:
+			item.image_urls && item.image_urls.length > 0
+				? item.image_urls
+				: [img1, img2].filter((url) => url && url.length > 5),
 		Image_URL1: img1,
 		Image_URL2: img2,
 
-		// Socials
-		IG_URL: item.ig_url || item.IG_URL || "",
-		FB_URL: item.fb_url || item.FB_URL || "",
-		TikTok_URL: item.tiktok_url || item.TikTok_URL || "",
+		// Socials (Check for JSONB social_links or legacy columns)
+		IG_URL: item.social_links?.instagram || item.ig_url || item.IG_URL || "",
+		FB_URL: item.social_links?.facebook || item.fb_url || item.FB_URL || "",
+		TikTok_URL:
+			item.social_links?.tiktok || item.tiktok_url || item.TikTok_URL || "",
 		isPromoted:
 			String(item.is_promoted || item.IsPromoted).toUpperCase() === "TRUE",
+
+		// New fields
+		rating: Number(item.rating || 0),
+		reviewCount: Number(item.review_count || 0),
+		verified: Boolean(item.verified),
 	};
 };
 
 export const getShops = async (province = "ทุกจังหวัด") => {
 	try {
-		let query = supabase.from("shops").select("*");
+		let query = supabase.from("venues").select("*");
 
 		if (province && province !== "ทุกจังหวัด") {
 			query = query.eq("province", province);
@@ -77,7 +101,7 @@ export const getShops = async (province = "ทุกจังหวัด") => {
 export const getLiveEverywhere = async () => {
 	try {
 		const { data, error } = await supabase
-			.from("shops")
+			.from("venues")
 			.select("*")
 			.eq("status", "LIVE");
 
@@ -122,7 +146,7 @@ export const getReviews = async (shopId) => {
 		const { data, error } = await supabase
 			.from("reviews")
 			.select("*")
-			.eq("shop_id", shopId)
+			.eq("venue_id", shopId) // Use venue_id instead of shop_id
 			.order("created_at", { ascending: false });
 
 		if (error) {
@@ -156,7 +180,7 @@ export const postReview = async (shopId, review) => {
 			.from("reviews")
 			.insert([
 				{
-					shop_id: shopId,
+					venue_id: shopId, // Use venue_id
 					user_name: review.userName || "Anonymous",
 					rating: review.rating,
 					comment: review.comment,
@@ -180,7 +204,7 @@ export const subscribeToShopUpdates = (callback) => {
 		.channel("public:table_updates")
 		.on(
 			"postgres_changes",
-			{ event: "*", schema: "public", table: "shops" },
+			{ event: "*", schema: "public", table: "venues" }, // Listen to venues
 			(payload) => {
 				callback({ type: "shop", payload });
 			},

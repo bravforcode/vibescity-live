@@ -1,21 +1,21 @@
 <script setup>
 import { useHead } from "@unhead/vue";
 import {
-  Heart,
-  MapPin,
-  Navigation,
-  Phone,
-  Send,
-  Share2,
-  X,
+	Heart,
+	MapPin,
+	Navigation,
+	Phone,
+	Send,
+	Share2,
+	X,
 } from "lucide-vue-next";
 import {
-  computed,
-  defineAsyncComponent,
-  nextTick,
-  onMounted,
-  ref,
-  watch,
+	computed,
+	defineAsyncComponent,
+	nextTick,
+	onMounted,
+	ref,
+	watch,
 } from "vue";
 import PlaceCard from "../design-system/compositions/PlaceCard.vue";
 import ShopCard from "../panel/ShopCard.vue";
@@ -23,92 +23,92 @@ import PullToRefresh from "../ui/PullToRefresh.vue";
 import SwipeCard from "../ui/SwipeCard.vue";
 
 const VisitorCount = defineAsyncComponent(
-  () => import("../ui/VisitorCount.vue"),
+	() => import("../ui/VisitorCount.vue"),
 );
 
 const SkeletonCard = defineAsyncComponent(
-  () => import("../ui/SkeletonCard.vue"),
+	() => import("../ui/SkeletonCard.vue"),
 );
 
 const props = defineProps({
-  isDataLoading: Boolean,
-  isRefreshing: Boolean,
-  isImmersive: Boolean, // Feature: Immersive Mode
-  isDarkMode: Boolean,
-  isIndoorView: Boolean,
-  activeFloor: String,
-  liveCount: Number,
-  carouselShops: {
-    type: Array,
-    default: () => [],
-  },
-  suggestedShops: {
-    type: Array,
-    default: () => [],
-  },
-  favorites: {
-    type: Array,
-    default: () => [],
-  },
-  activeShopId: [Number, String],
-  mallShops: {
-    type: Array,
-    default: () => [],
-  },
-  setBottomUiRef: Function,
-  setMobileCardScrollRef: Function,
+	isDataLoading: Boolean,
+	isRefreshing: Boolean,
+	isImmersive: Boolean, // Feature: Immersive Mode
+	isDarkMode: Boolean,
+	isIndoorView: Boolean,
+	activeFloor: String,
+	liveCount: Number,
+	carouselShops: {
+		type: Array,
+		default: () => [],
+	},
+	suggestedShops: {
+		type: Array,
+		default: () => [],
+	},
+	favorites: {
+		type: Array,
+		default: () => [],
+	},
+	activeShopId: [Number, String],
+	mallShops: {
+		type: Array,
+		default: () => [],
+	},
+	setBottomUiRef: Function,
+	setMobileCardScrollRef: Function,
 });
 
 // ✅ Dynamic SEO: Update Title/Meta based on Active Shop
 const activeShopData = computed(() => {
-  if (!props.carouselShops.length) return null;
-  return props.carouselShops.find((s) => s.id === props.activeShopId);
+	if (!props.carouselShops.length) return null;
+	return props.carouselShops.find((s) => s.id === props.activeShopId);
 });
 
 useHead({
-  title: computed(() =>
-    activeShopData.value
-      ? `${activeShopData.value.name} - VibeCity`
-      : "VibeCity - Chiang Mai",
-  ),
-  meta: [
-    {
-      name: "description",
-      content: computed(() =>
-        activeShopData.value
-          ? `Check out ${activeShopData.value.name} (${activeShopData.value.category}). ${activeShopData.value.description || "Best vibes in Chiang Mai."}`
-          : "Discover top spots in Chiang Mai.",
-      ),
-    },
-  ],
+	title: computed(() =>
+		activeShopData.value
+			? `${activeShopData.value.name} - VibeCity`
+			: "VibeCity - Chiang Mai",
+	),
+	meta: [
+		{
+			name: "description",
+			content: computed(() =>
+				activeShopData.value
+					? `Check out ${activeShopData.value.name} (${activeShopData.value.category}). ${activeShopData.value.description || "Best vibes in Chiang Mai."}`
+					: "Discover top spots in Chiang Mai.",
+			),
+		},
+	],
 });
 
 const emit = defineEmits([
-  "click-shop",
-  "open-detail",
-  "open-ride",
-  "swipe-left",
-  "swipe-right",
-  "toggle-favorite",
-  "toggle-immersive",
-  "refresh",
-  "set-active-floor",
-  "reset-filters",
-  "scroll",
-  "scroll-start",
-  "scroll-end",
-  "load-more",
-  "enter-giant-view",
-  "exit-giant-view",
+	"click-shop",
+	"open-detail",
+	"open-ride",
+	"swipe-left",
+	"swipe-right",
+	"toggle-favorite",
+	"toggle-immersive",
+	"refresh",
+	"set-active-floor",
+	"reset-filters",
+	"scroll",
+	"scroll-start",
+	"scroll-end",
+	"load-more",
+	"enter-giant-view",
+	"exit-giant-view",
 ]);
 
 const isFavorited = (shopId) => {
-  return props.favorites.includes(Number(shopId));
+	return props.favorites.includes(Number(shopId));
 };
 
 const isGridView = ref(false);
 const toggleView = () => {
-  isGridView.value = !isGridView.value;
+	isGridView.value = !isGridView.value;
 };
 
 // ✅ TikTok-style Video Expansion State
@@ -124,150 +124,150 @@ const selectedGiantShop = ref(null);
 
 // ✅ Detect if current shop is a Giant Pin (building)
 const currentShopIsGiant = computed(() => {
-  if (!props.activeShopId) return false;
-  const shop = props.carouselShops.find((s) => s.id == props.activeShopId);
-  return shop?.is_giant_active || shop?.isGiantPin || false;
+	if (!props.activeShopId) return false;
+	const shop = props.carouselShops.find((s) => s.id == props.activeShopId);
+	return shop?.is_giant_active || shop?.isGiantPin || false;
 });
 
 // ✅ Watch for Giant Pin activation
 watch(
-  () => props.activeShopId,
-  (newId) => {
-    if (!newId) {
-      isGiantPinView.value = false;
-      activeGiantPin.value = null;
-      return;
-    }
+	() => props.activeShopId,
+	(newId) => {
+		if (!newId) {
+			isGiantPinView.value = false;
+			activeGiantPin.value = null;
+			return;
+		}
 
-    const shop = props.carouselShops.find((s) => s.id == newId);
-    if (shop?.is_giant_active || shop?.isGiantPin) {
-      // Activate Giant Pin View
-      activeGiantPin.value = shop;
-      isGiantPinView.value = true;
-      // Get shops inside this building
-      giantPinShops.value = props.carouselShops.filter(
-        (s) => s.Building === shop.name || s.Building === shop.Building,
-      );
-      selectedGiantShop.value = giantPinShops.value[0] || shop;
-      emit("enter-giant-view", shop);
-    } else {
-      isGiantPinView.value = false;
-      activeGiantPin.value = null;
-    }
-  },
+		const shop = props.carouselShops.find((s) => s.id == newId);
+		if (shop?.is_giant_active || shop?.isGiantPin) {
+			// Activate Giant Pin View
+			activeGiantPin.value = shop;
+			isGiantPinView.value = true;
+			// Get shops inside this building
+			giantPinShops.value = props.carouselShops.filter(
+				(s) => s.Building === shop.name || s.Building === shop.Building,
+			);
+			selectedGiantShop.value = giantPinShops.value[0] || shop;
+			emit("enter-giant-view", shop);
+		} else {
+			isGiantPinView.value = false;
+			activeGiantPin.value = null;
+		}
+	},
 );
 
 // ✅ Exit Giant Pin View
 const exitGiantView = () => {
-  isGiantPinView.value = false;
-  activeGiantPin.value = null;
-  emit("exit-giant-view");
+	isGiantPinView.value = false;
+	activeGiantPin.value = null;
+	emit("exit-giant-view");
 };
 
 // ✅ Select shop within Giant Pin
 const selectGiantShop = (shop) => {
-  selectedGiantShop.value = shop;
-  emit("click-shop", shop);
+	selectedGiantShop.value = shop;
+	emit("click-shop", shop);
 };
 
 // ✅ Expand video when card is centered
 const expandVideo = (shop) => {
-  if (!shop) return;
-  expandedShop.value = shop;
-  isVideoExpanded.value = true;
+	if (!shop) return;
+	expandedShop.value = shop;
+	isVideoExpanded.value = true;
 
-  // Try to play video
-  nextTick(() => {
-    if (videoRef.value) {
-      videoRef.value.muted = true;
-      videoRef.value.play().catch(() => {});
-    }
-  });
+	// Try to play video
+	nextTick(() => {
+		if (videoRef.value) {
+			videoRef.value.muted = true;
+			videoRef.value.play().catch(() => {});
+		}
+	});
 };
 
 // ✅ Close expanded video
 const closeExpandedVideo = () => {
-  isVideoExpanded.value = false;
-  if (videoRef.value) {
-    videoRef.value.pause();
-  }
-  expandedShop.value = null;
+	isVideoExpanded.value = false;
+	if (videoRef.value) {
+		videoRef.value.pause();
+	}
+	expandedShop.value = null;
 };
 
 // ✅ Performance: Throttled Scroll Handler
 let scrollFrame = null;
 
 const handleScroll = (e) => {
-  emit("scroll", e);
+	emit("scroll", e);
 
-  const container = e.target;
-  const { scrollLeft, clientWidth, scrollWidth } = container;
+	const container = e.target;
+	const { scrollLeft, clientWidth, scrollWidth } = container;
 
-  // 1. Infinite Scroll Trigger
-  if (scrollLeft + clientWidth >= scrollWidth - 200) {
-    emit("load-more");
-  }
+	// 1. Infinite Scroll Trigger
+	if (scrollLeft + clientWidth >= scrollWidth - 200) {
+		emit("load-more");
+	}
 
-  // 2. Optimized Active Detection (using rAF)
-  if (scrollFrame) cancelAnimationFrame(scrollFrame);
+	// 2. Optimized Active Detection (using rAF)
+	if (scrollFrame) cancelAnimationFrame(scrollFrame);
 
-  scrollFrame = requestAnimationFrame(() => {
-    detectActiveCard(container);
-    scrollFrame = null;
-  });
+	scrollFrame = requestAnimationFrame(() => {
+		detectActiveCard(container);
+		scrollFrame = null;
+	});
 };
 
 // Center Detection Logic
 // Optimized Center Detection
 const detectActiveCard = (container) => {
-  if (!props.carouselShops.length) return;
+	if (!props.carouselShops.length) return;
 
-  // 1. Immersive Mode (Vertical Snap)
-  if (props.isImmersive) {
-    const itemHeight = window.innerHeight; // 100dvh
-    const triggerPoint = container.scrollTop + itemHeight / 2;
-    const index = Math.floor(triggerPoint / itemHeight);
+	// 1. Immersive Mode (Vertical Snap)
+	if (props.isImmersive) {
+		const itemHeight = window.innerHeight; // 100dvh
+		const triggerPoint = container.scrollTop + itemHeight / 2;
+		const index = Math.floor(triggerPoint / itemHeight);
 
-    const shop = props.carouselShops[index];
-    if (shop && Number(shop.id) !== Number(props.activeShopId)) {
-      emit("click-shop", shop);
-    }
-    return;
-  }
+		const shop = props.carouselShops[index];
+		if (shop && Number(shop.id) !== Number(props.activeShopId)) {
+			emit("click-shop", shop);
+		}
+		return;
+	}
 
-  // 2. Normal Carousel (Horizontal)
-  // Card Width (220px) + Gap (12px = gap-3) = 232px
-  const cardStride = 232;
-  const index = Math.round(container.scrollLeft / cardStride);
+	// 2. Normal Carousel (Horizontal)
+	// Card Width (220px) + Gap (12px = gap-3) = 232px
+	const cardStride = 232;
+	const index = Math.round(container.scrollLeft / cardStride);
 
-  const shop = props.carouselShops[index];
-  if (shop && Number(shop.id) !== Number(props.activeShopId)) {
-    // ✅ DEBOUNCE: Only select if user stops scrolling for 150ms
-    if (debounceTimer) clearTimeout(debounceTimer);
+	const shop = props.carouselShops[index];
+	if (shop && Number(shop.id) !== Number(props.activeShopId)) {
+		// ✅ DEBOUNCE: Only select if user stops scrolling for 150ms
+		if (debounceTimer) clearTimeout(debounceTimer);
 
-    debounceTimer = setTimeout(() => {
-      emit("click-shop", shop);
+		debounceTimer = setTimeout(() => {
+			emit("click-shop", shop);
 
-      // Debounced Expansion
-      if (expandTimeout) clearTimeout(expandTimeout);
-      expandTimeout = setTimeout(() => {
-        if (shop && !shop.is_giant_active && !shop.isGiantPin) {
-          expandVideo(shop);
-        }
-      }, 400); // ⚡ Faster response (was 800ms)
-    }, 150);
-  }
+			// Debounced Expansion
+			if (expandTimeout) clearTimeout(expandTimeout);
+			expandTimeout = setTimeout(() => {
+				if (shop && !shop.is_giant_active && !shop.isGiantPin) {
+					expandVideo(shop);
+				}
+			}, 400); // ⚡ Faster response (was 800ms)
+		}, 150);
+	}
 };
 let expandTimeout = null;
 let debounceTimer = null;
 
 // No longer need Observer
 onMounted(() => {
-  // initial check
-  setTimeout(() => {
-    const el = document.querySelector('[data-testid="vibe-carousel"]');
-    if (el) detectActiveCard(el);
-  }, 500);
+	// initial check
+	setTimeout(() => {
+		const el = document.querySelector('[data-testid="vibe-carousel"]');
+		if (el) detectActiveCard(el);
+	}, 500);
 });
 </script>
 

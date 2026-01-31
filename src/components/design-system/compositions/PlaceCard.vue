@@ -170,19 +170,19 @@ import ActionBtn from "../primitives/ActionBtn.vue";
 import GlassCard from "../primitives/GlassCard.vue";
 
 const props = defineProps({
-  shop: Object,
-  isActive: Boolean,
-  isSelected: Boolean,
-  isFavorited: Boolean,
+	shop: Object,
+	isActive: Boolean,
+	isSelected: Boolean,
+	isFavorited: Boolean,
 });
 
 const emit = defineEmits([
-  "toggle-favorite",
-  "navigate",
-  "open-ride",
-  "collapse",
-  "expand",
-  "share",
+	"toggle-favorite",
+	"navigate",
+	"open-ride",
+	"collapse",
+	"expand",
+	"share",
 ]);
 
 // Physics State
@@ -193,53 +193,53 @@ const isDragging = ref(false);
 const threshold = 120; // Hardcoded or prop
 
 const applyResistance = (diff) => {
-  const limit = 200;
-  return (1 - Math.exp(-Math.abs(diff) / 300)) * limit;
+	const limit = 200;
+	return (1 - Math.exp(-Math.abs(diff) / 300)) * limit;
 };
 
 const handleTouchStart = (e) => {
-  if (props.isSelected) return; // Only allow expand from collapsed
-  touchStartY.value = e.touches[0].clientY;
-  isDragging.value = true;
+	if (props.isSelected) return; // Only allow expand from collapsed
+	touchStartY.value = e.touches[0].clientY;
+	isDragging.value = true;
 };
 
 const handleTouchMove = (e) => {
-  if (!isDragging.value || props.isSelected) return;
+	if (!isDragging.value || props.isSelected) return;
 
-  const currentY = e.touches[0].clientY;
-  const diffY = currentY - touchStartY.value;
+	const currentY = e.touches[0].clientY;
+	const diffY = currentY - touchStartY.value;
 
-  if (diffY < 0) {
-    if (e.cancelable) e.preventDefault();
-    pullUpDistance.value = applyResistance(diffY);
-  }
+	if (diffY < 0) {
+		if (e.cancelable) e.preventDefault();
+		pullUpDistance.value = applyResistance(diffY);
+	}
 };
 
 const handleTouchEnd = () => {
-  isDragging.value = false;
-  if (pullUpDistance.value > threshold) {
-    emit("expand");
-    // Reset after animation
-    setTimeout(() => {
-      pullUpDistance.value = 0;
-    }, 300);
-  } else {
-    pullUpDistance.value = 0;
-  }
+	isDragging.value = false;
+	if (pullUpDistance.value > threshold) {
+		emit("expand");
+		// Reset after animation
+		setTimeout(() => {
+			pullUpDistance.value = 0;
+		}, 300);
+	} else {
+		pullUpDistance.value = 0;
+	}
 };
 
 // Computed Transformations
 const cardStyle = computed(() => {
-  if (props.isSelected) return {};
+	if (props.isSelected) return {};
 
-  // Slight scale effect when pulling
-  const progress = Math.min(pullUpDistance.value / threshold, 1.0);
-  return {
-    transform: `translateY(${-pullUpDistance.value}px) scale(${1 - progress * 0.05})`,
-    transition: isDragging.value
-      ? "none"
-      : "transform 0.5s cubic-bezier(0.19, 1, 0.22, 1)",
-  };
+	// Slight scale effect when pulling
+	const progress = Math.min(pullUpDistance.value / threshold, 1.0);
+	return {
+		transform: `translateY(${-pullUpDistance.value}px) scale(${1 - progress * 0.05})`,
+		transition: isDragging.value
+			? "none"
+			: "transform 0.5s cubic-bezier(0.19, 1, 0.22, 1)",
+	};
 });
 </script>
 

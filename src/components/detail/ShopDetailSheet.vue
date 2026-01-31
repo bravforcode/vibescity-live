@@ -81,11 +81,20 @@
               </div>
               <div class="text-xs text-gray-400 mt-1">Last updated 24h ago</div>
             </div>
-            <div
-              class="flex items-center gap-2 text-gray-500 text-sm font-medium bg-gray-50 px-3 py-1.5 rounded-lg"
-            >
-              <Clock class="w-4 h-4" />
-              <span>17:00 - 02:00</span>
+            <div class="flex gap-2">
+              <button
+                @click="isEditModalOpen = true"
+                class="flex items-center gap-1 text-xs font-bold text-purple-500 bg-purple-50 px-3 py-1.5 rounded-lg active:scale-95 transition-transform"
+              >
+                <Edit3 class="w-3 h-3" />
+                Edit
+              </button>
+              <div
+                class="flex items-center gap-2 text-gray-500 text-sm font-medium bg-gray-50 px-3 py-1.5 rounded-lg"
+              >
+                <Clock class="w-4 h-4" />
+                <span>17:00 - 02:00</span>
+              </div>
             </div>
           </div>
 
@@ -150,41 +159,63 @@
         </div>
       </template>
     </BottomSheet>
+
+    <!-- ✅ Edit Modal Integration -->
+    <EditShopModal
+      v-if="isEditModalOpen"
+      :is-open="isEditModalOpen"
+      :shop="shop"
+      @close="isEditModalOpen = false"
+      @success="isEditModalOpen = false"
+    />
   </div>
 </template>
 
 <script setup>
-import { ArrowLeft, Bookmark, Clock, Lock, PlayCircle } from "lucide-vue-next";
-import { ref, watch } from "vue";
+import {
+	ArrowLeft,
+	Bookmark,
+	Clock,
+	Edit3,
+	Lock,
+	PlayCircle,
+} from "lucide-vue-next";
+import { defineAsyncComponent, ref, watch } from "vue";
 import BottomSheet from "../design-system/compositions/BottomSheet.vue";
 
+// Async import for performance
+const EditShopModal = defineAsyncComponent(
+	() => import("../ugc/EditShopModal.vue"),
+);
+
 const props = defineProps({
-  shop: {
-    type: Object,
-    default: null,
-  },
-  isOpen: {
-    type: Boolean,
-    default: false,
-  },
-  isFavorited: {
-    type: Boolean,
-    default: false,
-  },
+	shop: {
+		type: Object,
+		default: null,
+	},
+	isOpen: {
+		type: Boolean,
+		default: false,
+	},
+	isFavorited: {
+		type: Boolean,
+		default: false,
+	},
 });
 
 const emit = defineEmits(["close", "toggle-favorite"]);
 
 const sheetState = ref("half"); // Initial state for sheet
+const isEditModalOpen = ref(false);
 
 // Reset sheet state when opened
 watch(
-  () => props.isOpen,
-  (newVal) => {
-    if (newVal) {
-      sheetState.value = "half";
-    }
-  },
+	() => props.isOpen,
+	(newVal) => {
+		if (newVal) {
+			sheetState.value = "half";
+		}
+	},
 );
 </script>
 

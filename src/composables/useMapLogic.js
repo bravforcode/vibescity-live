@@ -45,12 +45,16 @@ export function useMapLogic({ isMobileView, bottomUiHeight, userLocation }) {
 		if (mapRef.value?.map && typeof mapRef.value.map.flyTo === "function") {
 			try {
 				mapRef.value.map.flyTo(flyOptions);
-			} catch (e) { console.warn("Mapbox flyTo failed:", e); }
+			} catch (e) {
+				console.warn("Mapbox flyTo failed:", e);
+			}
 		} else if (mapRef.value && typeof mapRef.value.flyTo === "function") {
 			// If MapContainer exposes a wrapper flyTo(options)
 			try {
 				mapRef.value.flyTo(flyOptions);
-			} catch (e) { console.warn("Map component flyTo failed:", e); }
+			} catch (e) {
+				console.warn("Map component flyTo failed:", e);
+			}
 		}
 	};
 
@@ -71,8 +75,10 @@ export function useMapLogic({ isMobileView, bottomUiHeight, userLocation }) {
 		if (selectFeedback) selectFeedback();
 		// Fly to the building location
 		if (building?.lat && building.lng && mapRef.value) {
-			const flyCall = mapRef.value.map ? mapRef.value.map.flyTo : mapRef.value.flyTo;
-			if (typeof flyCall === 'function') {
+			const flyCall = mapRef.value.map
+				? mapRef.value.map.flyTo
+				: mapRef.value.flyTo;
+			if (typeof flyCall === "function") {
 				flyCall.call(mapRef.value.map || mapRef.value, {
 					center: [building.lng, building.lat],
 					zoom: 18,
@@ -88,8 +94,10 @@ export function useMapLogic({ isMobileView, bottomUiHeight, userLocation }) {
 		if (tapFeedback) tapFeedback();
 		// Reset to normal view
 		if (userLocation?.value && mapRef.value) {
-			const flyCall = mapRef.value.map ? mapRef.value.map.flyTo : mapRef.value.flyTo;
-			if (typeof flyCall === 'function') {
+			const flyCall = mapRef.value.map
+				? mapRef.value.map.flyTo
+				: mapRef.value.flyTo;
+			if (typeof flyCall === "function") {
 				flyCall.call(mapRef.value.map || mapRef.value, {
 					center: [userLocation.value[1], userLocation.value[0]],
 					zoom: 15,
@@ -121,6 +129,6 @@ export function useMapLogic({ isMobileView, bottomUiHeight, userLocation }) {
 		handleEnterGiantView,
 		handleExitGiantView,
 		mapUiTopOffset,
-		mapUiBottomOffset
+		mapUiBottomOffset,
 	};
 }

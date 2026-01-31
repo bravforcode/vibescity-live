@@ -38,10 +38,10 @@
 
 <script setup>
 defineProps({
-  isLoading: {
-    type: Boolean,
-    required: true,
-  },
+	isLoading: {
+		type: Boolean,
+		required: true,
+	},
 });
 </script>
 

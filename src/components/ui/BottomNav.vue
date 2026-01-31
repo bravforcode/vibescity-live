@@ -8,42 +8,42 @@ import { useHaptics } from "../../composables/useHaptics";
 const { selectFeedback } = useHaptics();
 
 const props = defineProps({
-  activeTab: {
-    type: String,
-    default: "map",
-  },
-  isDarkMode: {
-    type: Boolean,
-    default: true,
-  },
-  liveCount: {
-    type: Number,
-    default: 0,
-  },
-  favoritesCount: {
-    type: Number,
-    default: 0,
-  },
+	activeTab: {
+		type: String,
+		default: "map",
+	},
+	isDarkMode: {
+		type: Boolean,
+		default: true,
+	},
+	liveCount: {
+		type: Number,
+		default: 0,
+	},
+	favoritesCount: {
+		type: Number,
+		default: 0,
+	},
 });
 
 const emit = defineEmits(["change-tab"]);
 
 const tabs = [
-  { id: "map", label: "Map", icon: MapIcon },
-  { id: "events", label: "Events", icon: Zap },
-  { id: "favorites", label: "Saved", icon: Heart },
-  { id: "profile", label: "Profile", icon: User },
+	{ id: "map", label: "Map", icon: MapIcon },
+	{ id: "events", label: "Events", icon: Zap },
+	{ id: "favorites", label: "Saved", icon: Heart },
+	{ id: "profile", label: "Profile", icon: User },
 ];
 
 const handleTabClick = (tabId) => {
-  selectFeedback();
-  emit("change-tab", tabId);
+	selectFeedback();
+	emit("change-tab", tabId);
 };
 
 const getBadgeCount = (tabId) => {
-  if (tabId === "events") return props.liveCount;
-  if (tabId === "favorites") return props.favoritesCount;
-  return 0;
+	if (tabId === "events") return props.liveCount;
+	if (tabId === "favorites") return props.favoritesCount;
+	return 0;
 };
 </script>
 

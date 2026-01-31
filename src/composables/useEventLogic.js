@@ -147,6 +147,6 @@ export function useEventLogic() {
 		buildingsData,
 		mockEvents,
 		updateEventsData,
-		activeEvents
+		activeEvents,
 	};
 }

@@ -4,9 +4,9 @@ import { watch } from "vue";
 import { useTransportLogic } from "../../composables/useTransportLogic";
 
 const props = defineProps({
-  isOpen: Boolean,
-  shop: Object,
-  userLocation: Array,
+	isOpen: Boolean,
+	shop: Object,
+	userLocation: Array,
 });
 
 const emit = defineEmits(["close", "open-app"]);
@@ -15,28 +15,28 @@ const { estimates, isLoading, error, fetchRideEstimates } = useTransportLogic();
 
 // Fetch when modal opens or shop changes
 watch(
-  () => props.shop,
-  (newShop) => {
-    if (newShop && props.isOpen && props.userLocation) {
-      fetchRideEstimates(newShop, props.userLocation);
-    }
-  },
-  { immediate: true },
+	() => props.shop,
+	(newShop) => {
+		if (newShop && props.isOpen && props.userLocation) {
+			fetchRideEstimates(newShop, props.userLocation);
+		}
+	},
+	{ immediate: true },
 );
 
 // Also watch isOpen if shop was already set
 watch(
-  () => props.isOpen,
-  (isOpen) => {
-    if (isOpen && props.shop && props.userLocation) {
-      fetchRideEstimates(props.shop, props.userLocation);
-    }
-  },
+	() => props.isOpen,
+	(isOpen) => {
+		if (isOpen && props.shop && props.userLocation) {
+			fetchRideEstimates(props.shop, props.userLocation);
+		}
+	},
 );
 
 const handleRideSelect = (provider) => {
-  // In a real app, this would deep link to the specific provider
-  emit("open-app", provider.name.toLowerCase());
+	// In a real app, this would deep link to the specific provider
+	emit("open-app", provider.name.toLowerCase());
 };
 </script>
 

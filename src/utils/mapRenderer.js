@@ -2,92 +2,92 @@
  * Mappings for Vibe Status and Emojis
  */
 const crowdMap = {
-  5: "คึกคัก",
-  4: "มาก",
-  3: "ปานกลาง",
-  2: "น้อย",
-  1: "เงียบ",
+	5: "คึกคัก",
+	4: "มาก",
+	3: "ปานกลาง",
+	2: "น้อย",
+	1: "เงียบ",
 };
 
 const crowdEmojiMap = {
-  5: "🔥",
-  4: "🔥",
-  3: "👥",
-  2: "😌",
-  1: "😌",
+	5: "🔥",
+	4: "🔥",
+	3: "👥",
+	2: "😌",
+	1: "😌",
 };
 
 /**
  * Creates the HTML string for the Mapbox Popup
  */
 export const createPopupHTML = ({
-  item,
-  isDarkMode,
-  hasCoins,
-  roadDistance,
-  roadDuration,
-  tt, // translation function
+	item,
+	isDarkMode,
+	hasCoins,
+	roadDistance,
+	roadDuration,
+	tt, // translation function
 }) => {
-  const isLive = item.status === "LIVE";
-  const bgClass = isDarkMode ? "bg-zinc-900/95" : "bg-white/95";
-  const textClass = isDarkMode ? "text-white" : "text-gray-900";
+	const isLive = item.status === "LIVE";
+	const bgClass = isDarkMode ? "bg-zinc-900/95" : "bg-white/95";
+	const textClass = isDarkMode ? "text-white" : "text-gray-900";
 
-  // Real-time Vibe calculation (Simplified Logic from Ref)
-  const currentHour = new Date().getHours();
-  // ... (Simplified logic for brevity, ideally passed in or utility used)
-  let vibeLevel = item.vibe_level || item.VibeLevel || 3;
+	// Real-time Vibe calculation (Simplified Logic from Ref)
+	const currentHour = new Date().getHours();
+	// ... (Simplified logic for brevity, ideally passed in or utility used)
+	const vibeLevel = item.vibe_level || item.VibeLevel || 3;
 
-  // Visual Vibe Bars
-  const vibeBars = Array(5)
-    .fill(0)
-    .map(
-      (_, i) =>
-        `<div class="h-4 w-2 rounded-sm ${i < vibeLevel ? "bg-gradient-to-t from-pink-500 to-purple-400" : "bg-white"}"></div>`
-    )
-    .join("");
+	// Visual Vibe Bars
+	const vibeBars = Array(5)
+		.fill(0)
+		.map(
+			(_, i) =>
+				`<div class="h-4 w-2 rounded-sm ${i < vibeLevel ? "bg-gradient-to-t from-pink-500 to-purple-400" : "bg-white"}"></div>`,
+		)
+		.join("");
 
-  const crowdText = crowdMap[vibeLevel] || "ปานกลาง";
-  const crowdEmoji = crowdEmojiMap[vibeLevel] || "👥";
+	const crowdText = crowdMap[vibeLevel] || "ปานกลาง";
+	const crowdEmoji = crowdEmojiMap[vibeLevel] || "👥";
 
-  // Distance HTML
-  let distanceHtml = "";
-  if (roadDistance) {
-    const distTxt =
-      roadDistance < 1000
-        ? `${Math.round(roadDistance)} m`
-        : `${(roadDistance / 1000).toFixed(1)} km`;
-    const timeTxt = `${Math.round(roadDuration / 60)} min`;
-    distanceHtml = `<div class="road-dist-label absolute bottom-2 right-2 px-2 py-1 rounded-lg bg-black text-white text-[11px] font-black border border-white/30 shadow-xl">📍 ${distTxt} (${timeTxt})</div>`;
-  } else if (item.distance !== undefined) {
-    const fallbackTxt =
-      item.distance < 1
-        ? `${(item.distance * 1000).toFixed(0)} m`
-        : `${item.distance.toFixed(1)} km`;
-    distanceHtml = `<div class="road-dist-label absolute bottom-2 right-2 px-2 py-1 rounded-lg bg-black text-white text-[11px] font-black border border-white/30 shadow-xl">📍 ${fallbackTxt}</div>`;
-  }
+	// Distance HTML
+	let distanceHtml = "";
+	if (roadDistance) {
+		const distTxt =
+			roadDistance < 1000
+				? `${Math.round(roadDistance)} m`
+				: `${(roadDistance / 1000).toFixed(1)} km`;
+		const timeTxt = `${Math.round(roadDuration / 60)} min`;
+		distanceHtml = `<div class="road-dist-label absolute bottom-2 right-2 px-2 py-1 rounded-lg bg-black text-white text-[11px] font-black border border-white/30 shadow-xl">📍 ${distTxt} (${timeTxt})</div>`;
+	} else if (item.distance !== undefined) {
+		const fallbackTxt =
+			item.distance < 1
+				? `${(item.distance * 1000).toFixed(0)} m`
+				: `${item.distance.toFixed(1)} km`;
+		distanceHtml = `<div class="road-dist-label absolute bottom-2 right-2 px-2 py-1 rounded-lg bg-black text-white text-[11px] font-black border border-white/30 shadow-xl">📍 ${fallbackTxt}</div>`;
+	}
 
-  // Descriptions (Optional: Pass defaultDescs or handle here)
-  const description =
-    item.description ||
-    item.Description ||
-    item.vibe_status ||
-    "✨ สถานที่ยอดนิยมที่คุณต้องมาสัมผัสด้วยตัวเอง";
-  const shortDesc =
-    description.length > 85
-      ? `${description.substring(0, 85)}...`
-      : description;
+	// Descriptions (Optional: Pass defaultDescs or handle here)
+	const description =
+		item.description ||
+		item.Description ||
+		item.vibe_status ||
+		"✨ สถานที่ยอดนิยมที่คุณต้องมาสัมผัสด้วยตัวเอง";
+	const shortDesc =
+		description.length > 85
+			? `${description.substring(0, 85)}...`
+			: description;
 
-  const openHours = item.open_hours || item.Open || "";
+	const openHours = item.open_hours || item.Open || "";
 
-  return `
+	return `
     <div class="vibe-popup ${bgClass} rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] border-2 border-white/20 overflow-hidden w-[280px] backdrop-blur-3xl" data-shop-id="${item.id}">
      <div class="relative w-full aspect-[9/16] max-h-[360px] overflow-hidden">
         <div class="absolute inset-0 bg-gradient-to-br from-purple-700 via-pink-600 to-red-600"></div>
         ${
-          item.Image_URL1
-            ? `<img src="${item.Image_URL1}" class="absolute inset-0 w-full h-full object-cover" />`
-            : ""
-        }
+					item.Image_URL1
+						? `<img src="${item.Image_URL1}" class="absolute inset-0 w-full h-full object-cover" />`
+						: ""
+				}
         <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
 
         <div class="absolute top-2 left-2 flex flex-col gap-1">
@@ -141,29 +141,29 @@ export const createPopupHTML = ({
  * Creates the DOM element for a map marker
  */
 export const createMarkerElement = ({
-  item,
-  isHighlighted,
-  isLive,
-  hasCoins, // boolean
+	item,
+	isHighlighted,
+	isLive,
+	hasCoins, // boolean
 }) => {
-  const el = document.createElement("div");
-  el.className = `vibe-marker ${isLive ? "vibe-marker-live" : ""} ${isHighlighted ? "vibe-marker-active" : ""}`;
-  el.dataset.shopId = item.id;
+	const el = document.createElement("div");
+	el.className = `vibe-marker ${isLive ? "vibe-marker-live" : ""} ${isHighlighted ? "vibe-marker-active" : ""}`;
+	el.dataset.shopId = item.id;
 
-  const size = isHighlighted ? 44 : 30;
+	const size = isHighlighted ? 44 : 30;
 
-  // HTML content for marker
-  el.innerHTML = `
+	// HTML content for marker
+	el.innerHTML = `
     <div class="marker-wrapper ${isHighlighted ? "highlighted-marker" : ""} ${isLive ? "live-marker" : ""}" style="width: ${size}px; height: ${size + 12}px; position: relative;">
       ${
-        isLive
-          ? `
+				isLive
+					? `
         <div class="live-pulse-ring-outer"></div>
         <div class="live-pulse-ring-inner"></div>
         <div class="live-pulse-core"></div>
       `
-          : ""
-      }
+					: ""
+			}
 
       <div
         class="marker-pin-shape"
@@ -186,34 +186,34 @@ export const createMarkerElement = ({
       >
          <div style="transform: rotate(45deg); width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
              ${
-               item.Image_URL1
-                 ? `<img src="${item.Image_URL1}" style="width: 100%; height: 100%; object-cover; border-radius: 50%;" />`
-                 : `<span style="font-size: ${size * 0.4}px;">📍</span>`
-             }
+								item.Image_URL1
+									? `<img src="${item.Image_URL1}" style="width: 100%; height: 100%; object-cover; border-radius: 50%;" />`
+									: `<span style="font-size: ${size * 0.4}px;">📍</span>`
+							}
          </div>
       </div>
 
       ${
-        hasCoins
-          ? `<div class="coin-badge absolute -top-2 -right-2 bg-yellow-400 text-black text-[8px] font-black px-1 rounded-full border border-white shadow-sm animate-bounce">🪙</div>`
-          : ""
-      }
+				hasCoins
+					? `<div class="coin-badge absolute -top-2 -right-2 bg-yellow-400 text-black text-[8px] font-black px-1 rounded-full border border-white shadow-sm animate-bounce">🪙</div>`
+					: ""
+			}
     </div>
   `;
 
-  return el;
+	return el;
 };
 
 /**
  * Creates the DOM element for a giant pin marker (Events)
  */
 export const createGiantPinElement = (event) => {
-  const el = document.createElement("div");
-  el.className = "giant-pin-marker";
-  el.dataset.eventId = event.id;
+	const el = document.createElement("div");
+	el.className = "giant-pin-marker";
+	el.dataset.eventId = event.id;
 
-  // Premium SVG-based event marker
-  el.innerHTML = `
+	// Premium SVG-based event marker
+	el.innerHTML = `
     <div class="giant-pin-wrapper">
       <svg class="giant-pin-svg" width="80" height="100" viewBox="0 0 80 100" fill="none">
         <defs>
@@ -260,11 +260,11 @@ export const createGiantPinElement = (event) => {
       <!-- Icon overlay -->
       <div class="giant-pin-icon-overlay" style="display: flex; align-items: center; justify-content: center; height: 100%;">
         ${
-          event.icon &&
-          (event.icon.includes("http") || event.icon.includes("/"))
-            ? `<img src="${event.icon}" class="w-7 h-7 object-contain" />`
-            : `<span style="font-size: 24px;">${event.icon || "🎪"}</span>`
-        }
+					event.icon &&
+					(event.icon.includes("http") || event.icon.includes("/"))
+						? `<img src="${event.icon}" class="w-7 h-7 object-contain" />`
+						: `<span style="font-size: 24px;">${event.icon || "🎪"}</span>`
+				}
       </div>
 
       <!-- Label -->
@@ -272,6 +272,6 @@ export const createGiantPinElement = (event) => {
     </div>
   `;
 
-  el.style.cursor = "pointer";
-  return el;
+	el.style.cursor = "pointer";
+	return el;
 };

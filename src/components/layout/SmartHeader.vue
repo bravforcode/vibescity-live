@@ -4,60 +4,65 @@ import { Coins, Menu, Search, SlidersHorizontal, X } from "lucide-vue-next";
 import { useCoinStore } from "../../store/coinStore";
 
 const props = defineProps({
-  isVibeNowCollapsed: Boolean,
-  isDarkMode: Boolean,
-  globalSearchQuery: String,
-  showSearchResults: Boolean,
-  globalSearchResults: {
-    type: Array,
-    default: () => [],
-  },
-  t: Function,
-  isImmersive: Boolean,
+	isVibeNowCollapsed: Boolean,
+	isDarkMode: Boolean,
+	globalSearchQuery: String,
+	showSearchResults: Boolean,
+	globalSearchResults: {
+		type: Array,
+		default: () => [],
+	},
+	t: Function,
+	isImmersive: Boolean,
 });
 
 const emit = defineEmits([
-  "open-sidebar",
-  "open-filter",
-  "update:globalSearchQuery",
-  "update:showSearchResults",
-  "select-search-result",
-  "select-search-result",
-  "haptic-tap",
+	"open-sidebar",
+	"open-filter",
+	"update:globalSearchQuery",
+	"update:showSearchResults",
+	"select-search-result",
+	"select-search-result",
+	"haptic-tap",
+	"open-add-shop",
 ]);
 
 import { ref, watch } from "vue";
 
 // Debounce Utility
 const debounce = (fn, delay) => {
-  let timeout;
-  return (...args) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => fn(...args), delay);
-  };
+	let timeout;
+	return (...args) => {
+		clearTimeout(timeout);
+		timeout = setTimeout(() => fn(...args), delay);
+	};
 };
 
 const localSearchQuery = ref(props.globalSearchQuery);
 
 // Sync local with prop if changed externally
 watch(
-  () => props.globalSearchQuery,
-  (newVal) => {
-    if (newVal !== localSearchQuery.value) {
-      localSearchQuery.value = newVal;
-    }
-  },
+	() => props.globalSearchQuery,
+	(newVal) => {
+		if (newVal !== localSearchQuery.value) {
+			localSearchQuery.value = newVal;
+		}
+	},
 );
 
+const emitAddShop = () => {
+	emit("open-add-shop");
+};
+
 const debouncedEmit = debounce((val) => {
-  emit("update:globalSearchQuery", val);
+	emit("update:globalSearchQuery", val);
 }, 300); // 300ms delay
 
 const handleSearchInput = (e) => {
-  const val = e.target.value;
-  localSearchQuery.value = val;
-  debouncedEmit(val);
-  debouncedEmit(val);
+	const val = e.target.value;
+	localSearchQuery.value = val;
+	debouncedEmit(val);
+	debouncedEmit(val);
 };
 
 const coinStore = useCoinStore();

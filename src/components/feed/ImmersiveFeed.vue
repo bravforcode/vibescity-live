@@ -9,26 +9,26 @@ const coinStore = useCoinStore();
 
 // Async Components (Lazy Load)
 const SmartHeader = defineAsyncComponent(
-  () => import("../layout/SmartHeader.vue"),
+	() => import("../layout/SmartHeader.vue"),
 );
 const BottomFeed = defineAsyncComponent(() => import("./BottomFeed.vue"));
 
 const props = defineProps({
-  shops: {
-    type: Array,
-    default: () => [],
-  },
-  favorites: {
-    type: Array,
-    default: () => [],
-  },
-  activeShopId: [Number, String], // Synced ID
+	shops: {
+		type: Array,
+		default: () => [],
+	},
+	favorites: {
+		type: Array,
+		default: () => [],
+	},
+	activeShopId: [Number, String], // Synced ID
 });
 
 const emit = defineEmits([
-  "open-detail",
-  "toggle-immersive",
-  "update-active-shop",
+	"open-detail",
+	"toggle-immersive",
+	"update-active-shop",
 ]);
 
 const shopStore = useShopStore();
@@ -37,62 +37,62 @@ const { selectFeedback } = useHaptics();
 // Current Active Shop Logic
 const activeShopIndex = ref(0);
 const activeShop = computed(() => {
-  // If external activeShopId is passed, prioritize it
-  if (props.activeShopId) {
-    return (
-      props.shops.find((s) => s.id == props.activeShopId) || props.shops[0]
-    );
-  }
-  return props.shops[activeShopIndex.value] || null;
+	// If external activeShopId is passed, prioritize it
+	if (props.activeShopId) {
+		return (
+			props.shops.find((s) => s.id == props.activeShopId) || props.shops[0]
+		);
+	}
+	return props.shops[activeShopIndex.value] || null;
 });
 
 // Watch for swipe changes from BottomFeed
 const handleSwipeChange = (shop) => {
-  if (shop) {
-    emit("update-active-shop", shop.id);
-  }
+	if (shop) {
+		emit("update-active-shop", shop.id);
+	}
 };
 
 const handleBack = () => {
-  selectFeedback();
-  emit("toggle-immersive");
+	selectFeedback();
+	emit("toggle-immersive");
 };
 
 const isFavorited = (shopId) => {
-  return props.favorites.includes(Number(shopId));
+	return props.favorites.includes(Number(shopId));
 };
 
 const handleFavorite = (shopId) => {
-  selectFeedback();
-  shopStore.toggleFavorite(shopId);
-  coinStore.awardCoins(1);
+	selectFeedback();
+	shopStore.toggleFavorite(shopId);
+	coinStore.awardCoins(1);
 };
 
 const handleShare = async (shop) => {
-  selectFeedback();
-  if (navigator.share) {
-    try {
-      await navigator.share({
-        title: shop.name || "VibeCity",
-        text: `Check out ${shop.name} on VibeCity!`,
-        url: globalThis.location.href,
-      });
-      coinStore.awardCoins(5);
-    } catch (err) {
-      console.error(err);
-    }
-  } else {
-    console.log("Web Share API not supported");
-  }
+	selectFeedback();
+	if (navigator.share) {
+		try {
+			await navigator.share({
+				title: shop.name || "VibeCity",
+				text: `Check out ${shop.name} on VibeCity!`,
+				url: globalThis.location.href,
+			});
+			coinStore.awardCoins(5);
+		} catch (err) {
+			console.error(err);
+		}
+	} else {
+		console.log("Web Share API not supported");
+	}
 };
 
 const getDistance = (shop) => {
-  if (shop?.distance) {
-    return shop.distance < 1
-      ? `${(shop.distance * 1000).toFixed(0)}m`
-      : `${shop.distance.toFixed(1)}km`;
-  }
-  return "";
+	if (shop?.distance) {
+		return shop.distance < 1
+			? `${(shop.distance * 1000).toFixed(0)}m`
+			: `${shop.distance.toFixed(1)}km`;
+	}
+	return "";
 };
 </script>
 

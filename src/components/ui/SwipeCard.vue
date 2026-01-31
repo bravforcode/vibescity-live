@@ -4,25 +4,25 @@
  * Optimized for visual excellence and smooth interactions
  */
 
+import { useHaptics } from "@/composables/useHaptics";
 import { ChevronUp } from "lucide-vue-next";
 import { computed, defineEmits, defineProps, ref, watch } from "vue";
-import { useHaptics } from "@/composables/useHaptics";
 import { useShopStore } from "../../store/shopStore";
 
 const props = defineProps({
-	threshold: { type: Number, default: 120 },
-	showExpand: { type: Boolean, default: true },
-	isSelected: { type: Boolean, default: false },
-	isImmersive: { type: Boolean, default: false },
-	isActive: { type: Boolean, default: false, Shop: Object },
-	shop: { type: Object },
+  threshold: { type: Number, default: 120 },
+  showExpand: { type: Boolean, default: true },
+  isSelected: { type: Boolean, default: false },
+  isImmersive: { type: Boolean, default: false },
+  isActive: { type: Boolean, default: false, Shop: Object },
+  shop: { type: Object },
 });
 
 const emit = defineEmits([
-	"swipe-left",
-	"swipe-right",
-	"expand",
-	"toggle-favorite",
+  "swipe-left",
+  "swipe-right",
+  "expand",
+  "toggle-favorite",
 ]);
 
 const { selectFeedback, successFeedback } = useHaptics();
@@ -32,12 +32,12 @@ const container = ref(null);
 const shopStore = useShopStore();
 
 watch(
-	() => props.isActive,
-	(active) => {
-		if (active && props.shop?.id) {
-			shopStore.incrementView(props.shop.id);
-		}
-	},
+  () => props.isActive,
+  (active) => {
+    if (active && props.shop?.id) {
+      shopStore.incrementView(props.shop.id);
+    }
+  },
 );
 
 // Physics State
@@ -48,90 +48,90 @@ const isDragging = ref(false);
 const hasTriggeredSnap = ref(false);
 
 const applyResistance = (diff) => {
-	const limit = 200;
-	return (1 - Math.exp(-Math.abs(diff) / 300)) * limit;
+  const limit = 200;
+  return (1 - Math.exp(-Math.abs(diff) / 300)) * limit;
 };
 
 const handleTouchStart = (e) => {
-	if (props.isImmersive) return; // Disable drag in immersive mode
-	touchStartY.value = e.touches[0].clientY;
-	touchStartX.value = e.touches[0].clientX;
-	isDragging.value = true;
-	hasTriggeredSnap.value = false;
+  if (props.isImmersive) return; // Disable drag in immersive mode
+  touchStartY.value = e.touches[0].clientY;
+  touchStartX.value = e.touches[0].clientX;
+  isDragging.value = true;
+  hasTriggeredSnap.value = false;
 };
 
 const handleTouchMove = (e) => {
-	if (!isDragging.value) return;
+  if (!isDragging.value) return;
 
-	// Use rAF to sync with screen refresh
-	requestAnimationFrame(() => {
-		const currentY = e.touches[0].clientY;
-		const currentX = e.touches[0].clientX;
-		const diffY = currentY - touchStartY.value;
-		const diffX = currentX - touchStartX.value;
+  // Use rAF to sync with screen refresh
+  requestAnimationFrame(() => {
+    const currentY = e.touches[0].clientY;
+    const currentX = e.touches[0].clientX;
+    const diffY = currentY - touchStartY.value;
+    const diffX = currentX - touchStartX.value;
 
-		// Horizontal Swipe Protection
-		if (Math.abs(diffX) > Math.abs(diffY) * 1.5) {
-			if (pullUpDistance.value !== 0) pullUpDistance.value = 0;
-			return;
-		}
+    // Horizontal Swipe Protection
+    if (Math.abs(diffX) > Math.abs(diffY) * 1.5) {
+      if (pullUpDistance.value !== 0) pullUpDistance.value = 0;
+      return;
+    }
 
-		if (diffY < 0) {
-			if (e.cancelable) e.preventDefault();
-			pullUpDistance.value = applyResistance(diffY);
+    if (diffY < 0) {
+      if (e.cancelable) e.preventDefault();
+      pullUpDistance.value = applyResistance(diffY);
 
-			if (
-				pullUpDistance.value > props.threshold * 0.8 &&
-				!hasTriggeredSnap.value
-			) {
-				selectFeedback();
-				hasTriggeredSnap.value = true;
-			} else if (
-				pullUpDistance.value < props.threshold * 0.8 &&
-				hasTriggeredSnap.value
-			) {
-				hasTriggeredSnap.value = false;
-			}
-		}
-	});
+      if (
+        pullUpDistance.value > props.threshold * 0.8 &&
+        !hasTriggeredSnap.value
+      ) {
+        selectFeedback();
+        hasTriggeredSnap.value = true;
+      } else if (
+        pullUpDistance.value < props.threshold * 0.8 &&
+        hasTriggeredSnap.value
+      ) {
+        hasTriggeredSnap.value = false;
+      }
+    }
+  });
 };
 
 const handleTouchEnd = () => {
-	isDragging.value = false;
+  isDragging.value = false;
 
-	if (pullUpDistance.value > props.threshold) {
-		successFeedback();
-		emit("expand");
+  if (pullUpDistance.value > props.threshold) {
+    successFeedback();
+    emit("expand");
 
-		setTimeout(() => {
-			pullUpDistance.value = 0;
-		}, 300);
-	} else {
-		pullUpDistance.value = 0;
-	}
+    setTimeout(() => {
+      pullUpDistance.value = 0;
+    }, 300);
+  } else {
+    pullUpDistance.value = 0;
+  }
 };
 
 // Computed Transformations
 const cardStyle = computed(() => {
-	const progress = Math.min(pullUpDistance.value / props.threshold, 1.0);
-	const scale = 1.0 - progress * 0.05;
+  const progress = Math.min(pullUpDistance.value / props.threshold, 1.0);
+  const scale = 1.0 - progress * 0.05;
 
-	return {
-		transform: `
+  return {
+    transform: `
       translateY(${-pullUpDistance.value}px)
       scale(${scale})
       perspective(1000px)
     `,
-		borderRadius: `${24 + progress * 8}px`,
-		transition: isDragging.value
-			? "none"
-			: "transform 0.5s cubic-bezier(0.19, 1, 0.22, 1), border-radius 0.3s ease",
-		willChange: "transform, border-radius",
-	};
+    borderRadius: `${24 + progress * 8}px`,
+    transition: isDragging.value
+      ? "none"
+      : "transform 0.5s cubic-bezier(0.19, 1, 0.22, 1), border-radius 0.3s ease",
+    willChange: "transform, border-radius",
+  };
 });
 
 const uiOpacity = computed(() =>
-	Math.max(0, 1 - pullUpDistance.value / (props.threshold * 0.6)),
+  Math.max(0, 1 - pullUpDistance.value / (props.threshold * 0.6)),
 );
 </script>
 
@@ -143,23 +143,7 @@ const uiOpacity = computed(() =>
     :class="{ 'z-30': isSelected }"
     @touchstart="handleTouchStart"
     @touchmove="handleTouchMove"
-    @touchend="handleTouchEnd"
-    role="region"
-    aria-label="Shop Detail Card"
-    :aria-expanded="isSelected"
   >
-    <!-- Content Wrapper with Clean Premium Dark Style -->
-    <div
-      class="swipe-card-content origin-center relative overflow-hidden border border-white/10 pointer-events-auto"
-      :class="[isSelected ? 'bg-zinc-900/90 shadow-2xl' : 'bg-black shadow-xl']"
-      :style="cardStyle"
-    >
-      <!-- Slot for Image/Video content (FULL COVERAGE) -->
-      <div class="absolute inset-0">
-        <slot />
-      </div>
-    </div>
-
     <!-- ✨ Enhanced Pull Handle Overlay (iPhone Style Home Bar) - Inside Card for safety -->
     <div
       v-if="showExpand"

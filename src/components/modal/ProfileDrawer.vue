@@ -5,23 +5,22 @@
  * ProfileDrawer.vue - Premium Sidebar Hub Redesign
  * Featuring Glassmorphism and Tile Iconography
  */
-import { computed, defineAsyncComponent, ref } from "vue";
+import { defineAsyncComponent } from "vue";
 
 const AchievementBadges = defineAsyncComponent(
-	() => import("../ui/AchievementBadges.vue"),
+  () => import("../ui/AchievementBadges.vue"),
 );
 
 import {
-	ChevronRight,
-	Gift,
-	HelpCircle,
-	History,
-	LogOut,
-	Settings,
-	Star,
-	Trophy,
-	User,
-	Zap,
+  ChevronRight,
+  HelpCircle,
+  History,
+  LogOut,
+  Settings,
+  Star,
+  Trophy,
+  User,
+  Zap,
 } from "lucide-vue-next";
 import { storeToRefs } from "pinia";
 import { useI18n } from "vue-i18n";
@@ -30,8 +29,8 @@ import { Z } from "../../constants/zIndex";
 import { useShopStore } from "../../store/shopStore";
 
 const props = defineProps({
-	isOpen: Boolean,
-	isDarkMode: Boolean,
+  isOpen: Boolean,
+  isDarkMode: Boolean,
 });
 
 const emit = defineEmits(["close", "toggle-language"]);
@@ -42,57 +41,57 @@ const shopStore = useShopStore();
 const { userLevel, totalCoins, levelProgress } = storeToRefs(shopStore);
 
 const handleClose = () => {
-	selectFeedback();
-	emit("close");
+  selectFeedback();
+  emit("close");
 };
 
 const menuSections = [
-	{
-		title: "Vibe Discovery",
-		items: [
-			{
-				id: "events",
-				label: "Nearby Events",
-				icon: Zap,
-				color: "text-amber-400",
-			},
-			{
-				id: "quests",
-				label: "Vibe Quests",
-				icon: Trophy,
-				color: "text-purple-400",
-			},
-			{
-				id: "history",
-				label: "Visit History",
-				icon: History,
-				color: "text-blue-400",
-			},
-		],
-	},
-	{
-		title: "Account",
-		items: [
-			{
-				id: "profile",
-				label: "Edit Profile",
-				icon: User,
-				color: "text-zinc-400",
-			},
-			{
-				id: "settings",
-				label: "Preferences",
-				icon: Settings,
-				color: "text-zinc-400",
-			},
-			{
-				id: "support",
-				label: "Help & Support",
-				icon: HelpCircle,
-				color: "text-zinc-400",
-			},
-		],
-	},
+  {
+    title: "Vibe Discovery",
+    items: [
+      {
+        id: "events",
+        label: "Nearby Events",
+        icon: Zap,
+        color: "text-amber-400",
+      },
+      {
+        id: "quests",
+        label: "Vibe Quests",
+        icon: Trophy,
+        color: "text-purple-400",
+      },
+      {
+        id: "history",
+        label: "Visit History",
+        icon: History,
+        color: "text-blue-400",
+      },
+    ],
+  },
+  {
+    title: "Account",
+    items: [
+      {
+        id: "profile",
+        label: "Edit Profile",
+        icon: User,
+        color: "text-zinc-400",
+      },
+      {
+        id: "settings",
+        label: "Preferences",
+        icon: Settings,
+        color: "text-zinc-400",
+      },
+      {
+        id: "support",
+        label: "Help & Support",
+        icon: HelpCircle,
+        color: "text-zinc-400",
+      },
+    ],
+  },
 ];
 </script>
 
@@ -106,9 +105,7 @@ const menuSections = [
       <div
         :class="[
           'h-full flex flex-col shadow-2xl overflow-hidden backdrop-blur-3xl',
-          isDarkMode
-            ? 'bg-zinc-950/90 border-l border-white/10'
-            : 'bg-white/95 border-l border-gray-100',
+          'bg-surface-glass border-l border-surface-border',
         ]"
       >
         <!-- ✅ 1. Glass Stats Card (The "Wow" Factor) -->
@@ -274,7 +271,10 @@ const menuSections = [
         </div>
 
         <!-- ✅ 3. Footer with Premium Brand -->
-        <div class="p-6 border-t border-white/5 bg-black/20 backdrop-blur-xl">
+        <!-- ✅ 3. Footer with Premium Brand -->
+        <div
+          class="p-6 border-t border-surface-border bg-surface-glass backdrop-blur-xl"
+        >
           <button
             @click="handleClose"
             class="w-full py-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-black uppercase tracking-widest active:scale-95 transition-all mb-4 flex items-center justify-center gap-2"

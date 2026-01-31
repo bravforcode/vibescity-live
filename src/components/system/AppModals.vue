@@ -5,98 +5,98 @@ import { useAppLogic } from "../../composables/useAppLogic";
 import PortalLayer from "./PortalLayer.vue"; // Adjust relative path if needed
 
 const {
-  activeShopId,
-  closeShopDetail,
-  activeBuildingId,
-  closeBuildingDetail,
-  activeUserCount,
-  isOwnerDashboardOpen,
-  toggleOwnerDashboard,
+	activeShopId,
+	closeShopDetail,
+	activeBuildingId,
+	closeBuildingDetail,
+	activeUserCount,
+	isOwnerDashboardOpen,
+	toggleOwnerDashboard,
 } = useAppLogic();
 
 // ✅ Async load heavy modals
 const MallDrawer = defineAsyncComponent(
-  () => import("../modal/MallDrawer.vue"),
+	() => import("../modal/MallDrawer.vue"),
 );
 const ProfileDrawer = defineAsyncComponent(
-  () => import("../modal/ProfileDrawer.vue"),
+	() => import("../modal/ProfileDrawer.vue"),
 );
 const VibeModal = defineAsyncComponent(() => import("../modal/VibeModal.vue"));
 const ConfettiEffect = defineAsyncComponent(
-  () => import("../ui/ConfettiEffect.vue"),
+	() => import("../ui/ConfettiEffect.vue"),
 );
 const RideComparisonModal = defineAsyncComponent(
-  () => import("../transport/RideComparisonModal.vue"),
+	() => import("../transport/RideComparisonModal.vue"),
 );
 
 defineProps({
-  selectedShop: Object,
-  rideModalShop: Object,
-  showMallDrawer: Boolean,
-  activeMall: Object,
-  mallShops: {
-    type: Array,
-    default: () => [],
-  },
-  activeShopId: [Number, String],
-  favorites: {
-    type: Array,
-    default: () => [],
-  },
-  showProfileDrawer: Boolean,
-  isDarkMode: Boolean,
-  isDataLoading: Boolean,
-  isDataLoading: Boolean,
-  errorMessage: String,
-  showConfetti: Boolean,
-  userLocation: {
-    type: Array,
-    default: () => [18.7883, 98.9853],
-  },
-  activeUserCount: {
-    type: Number,
-    default: 0,
-  },
+	selectedShop: Object,
+	rideModalShop: Object,
+	showMallDrawer: Boolean,
+	activeMall: Object,
+	mallShops: {
+		type: Array,
+		default: () => [],
+	},
+	activeShopId: [Number, String],
+	favorites: {
+		type: Array,
+		default: () => [],
+	},
+	showProfileDrawer: Boolean,
+	isDarkMode: Boolean,
+	isDataLoading: Boolean,
+
+	errorMessage: String,
+	showConfetti: Boolean,
+	userLocation: {
+		type: Array,
+		default: () => [18.7883, 98.9853],
+	},
+	activeUserCount: {
+		type: Number,
+		default: 0,
+	},
 });
 
 const emit = defineEmits([
-  "close-vibe-modal",
-  "toggle-favorite",
-  "close-ride-modal",
-  "open-ride-app",
-  "close-mall-drawer",
-  "select-mall-shop",
-  "open-ride-modal",
-  "close-profile-drawer",
-  "toggle-language",
-  "clear-error",
-  "retry",
+	"close-vibe-modal",
+	"toggle-favorite",
+	"close-ride-modal",
+	"open-ride-app",
+	"close-mall-drawer",
+	"select-mall-shop",
+	"open-ride-modal",
+	"close-profile-drawer",
+	"toggle-language",
+	"clear-error",
+	"retry",
 ]);
 
 // ✅ Smart Prefetching
 import { onMounted } from "vue";
 
 onMounted(() => {
-  // Prefetch heavy modals after initial rendering (5s delay)
-  setTimeout(() => {
-    const prefetch = (componentFactory) => {
-      if (componentFactory && typeof componentFactory === "function") {
-        try {
-          componentFactory();
-        } catch (e) {
-          /* ignore */
-        }
-      }
-    };
+	// Prefetch heavy modals after initial rendering (5s delay)
+	setTimeout(() => {
+		const prefetch = (componentFactory) => {
+			if (componentFactory && typeof componentFactory === "function") {
+				try {
+					componentFactory();
+				} catch (e) {
+					/* ignore */
+				}
+			}
+		};
 
-    // Trigger import()
-    import("../modal/MallDrawer.vue");
-    import("../modal/ProfileDrawer.vue");
-    import("../modal/VibeModal.vue");
-    import("../ui/ConfettiEffect.vue");
+		// Trigger import()
+		import("../modal/MallDrawer.vue");
+		import("../modal/ProfileDrawer.vue");
+		import("../modal/VibeModal.vue");
+		import("../ui/ConfettiEffect.vue");
 
-    console.log("🚀 Smart Prefetch: Heavy components loaded in background");
-  }, 5000);
+		console.log("🚀 Smart Prefetch: Heavy components loaded in background");
+	}, 5000);
 });
 </script>
 

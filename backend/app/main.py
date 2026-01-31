@@ -42,3 +42,5 @@ app.include_router(rides.router, prefix=settings.API_V1_STR + "/rides", tags=["r
 app.include_router(payments.router, prefix=settings.API_V1_STR + "/payments", tags=["payments"])
 app.include_router(shops.router, prefix=settings.API_V1_STR + "/shops", tags=["shops"])
 app.include_router(owner.router, prefix=settings.API_V1_STR + "/owner", tags=["owner"])
+from app.api.routers import ugc
+app.include_router(ugc.router, prefix=settings.API_V1_STR + "/ugc", tags=["ugc"])

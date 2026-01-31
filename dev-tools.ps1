@@ -43,14 +43,16 @@ function Show-AgentSkills {
     Write-Host "   'Use frontend-mobile-development-component-scaffold to create a new [Component Name] with TypeScript and Tailwind.'"
 
     Write-Host "`n12. [Debug] Systematic Debugging:" -ForegroundColor Cyan
-    Write-Host "   'Use systematic-debugging to investigate [Bug/Error Message] in [File]. Find the root cause and fix it.'"
+    Write-Host "   'Use systematic-debugging to investigate [Bug/Error Message]
+    in [File]. Find the root cause and fix it.'"
 
     Write-Host "--------------------------------------------------------" -ForegroundColor Gray
 
     Write-Host "`n--- 🛠️ QA & UX POWER TOOLS ---" -ForegroundColor Yellow
 
     Write-Host "13. [Test] Auto-Fix Failing Tests:" -ForegroundColor Cyan
-    Write-Host "    'Use test-fixing to run the test suite and automatically fix any failures found.'"
+    Write-Host "    'Use test-fixing to run the test suite and
+    automatically fix any failures found.'"
 
     Write-Host "`n14. [Test] Full E2E Browser Test:" -ForegroundColor Cyan
     Write-Host "    'Use playwright-skill to test the user flow: Map Load -> Click Shop -> Open Drawer -> Scroll.'"
@@ -65,7 +67,8 @@ function Show-AgentSkills {
     Write-Host "    'Use scroll-experience to refine the synchronization between the Card Scroll and Map FlyTo animation.'"
 
     Write-Host "`n18. [Debug] Deep Error Detective:" -ForegroundColor Cyan
-    Write-Host "    'Use error-detective to analyze [Log File/Error Message] and find the root cause across the stack.'"
+    Write-Host "    'Use error-detective to analyze [Log File/Error Message]
+     and find the root cause across the stack.'"
 
     Write-Host "--------------------------------------------------------" -ForegroundColor Gray
 }

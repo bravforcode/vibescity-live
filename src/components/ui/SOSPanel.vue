@@ -2,28 +2,28 @@
 import { Shield, X } from "lucide-vue-next";
 
 const props = defineProps({
-  isOpen: {
-    type: Boolean,
-    default: false,
-  },
+	isOpen: {
+		type: Boolean,
+		default: false,
+	},
 });
 
 const emit = defineEmits(["close"]);
 
 // Emergency Data (Moved from SidebarDrawer)
 const nearbyEmergency = {
-  hospitals: [],
-  police: [],
-  emergencyNumbers: [
-    { name: "Emergency", number: "191", icon: "🚨" },
-    { name: "Ambulance", number: "1669", icon: "🚑" },
-    { name: "Tourist Police", number: "1155", icon: "👮" },
-    { name: "Fire", number: "199", icon: "🚒" },
-  ],
+	hospitals: [],
+	police: [],
+	emergencyNumbers: [
+		{ name: "Emergency", number: "191", icon: "🚨" },
+		{ name: "Ambulance", number: "1669", icon: "🚑" },
+		{ name: "Tourist Police", number: "1155", icon: "👮" },
+		{ name: "Fire", number: "199", icon: "🚒" },
+	],
 };
 
 const callEmergency = (number) => {
-  window.location.href = `tel:${number}`;
+	window.location.href = `tel:${number}`;
 };
 </script>
 

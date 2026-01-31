@@ -2,25 +2,25 @@ import * as Sentry from "@sentry/vue";
 import { VueQueryPlugin } from "@tanstack/vue-query";
 import { createPinia } from "pinia";
 import { createApp } from "vue";
-import { vTestId } from "./directives/testid.js";
-
 import App from "./App.vue";
 import "./assets/css/main.postcss";
 import "./assets/vibe-animations.css";
-import i18n from "./i18n";
-import { vueQueryOptions } from "./plugins/queryClient";
 
 import { headSymbol } from "@unhead/vue";
 import { createHead } from "@unhead/vue/client";
+import { vTestId } from "./directives/testid.js";
+import i18n from "./i18n";
+import { vueQueryOptions } from "./plugins/queryClient";
+import router from "./router"; // ✅ Import Router
 
 const app = createApp(App);
 const head = createHead();
 
 // ✅ Patch: Shim install if missing (fixes unhead v2 issue)
 if (!head.install) {
-  head.install = (app) => {
-    app.provide(headSymbol, head);
-  };
+	head.install = (app) => {
+		app.provide(headSymbol, head);
+	};
 }
 
 app.use(head);
@@ -91,6 +91,7 @@ if (sentryDsn) {
 }
 
 app.use(createPinia());
+app.use(router); // ✅ Register Router
 app.use(i18n);
 app.use(VueQueryPlugin, vueQueryOptions);
 app.directive("testid", vTestId);

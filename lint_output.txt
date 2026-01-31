@@ -1,0 +1,398 @@
+Debugger listening on ws://127.0.0.1:59735/28d9e53f-cffa-4a6f-b0f0-13e17e8d7794
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger attached.
+
+> vibescity-live@0.0.0 lint
+> biome lint src
+
+Debugger listening on ws://127.0.0.1:59743/0b9c0d99-0898-48e0-9c2e-4f62afaca52d
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger attached.
+src\components\ugc\AddShopModal.vue:241:9 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+  
+    239 │ 	} catch (error) {
+    240 │ 		console.error(error);
+  > 241 │ 		alert("Error submitting shop: " + error.message);
+        │ 		      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    242 │ 	} finally {
+    243 │ 		loading.value = false;
+  
+  i Unsafe fix: Use a template literal.
+  
+     98  98 │   	} catch (error) {
+     99  99 │   		console.error(error);
+    100     │ - → → alert("Error·submitting·shop:·"·+·error.message);
+        100 │ + → → alert(`Error·submitting·shop:·${error.message}`);
+    101 101 │   	} finally {
+    102 102 │   		loading.value = false;
+  
+
+src\components\ugc\EditShopModal.vue:238:9 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+  
+    236 │ 	} catch (error) {
+    237 │ 		console.error(error);
+  > 238 │ 		alert("Error submitting edit: " + error.message);
+        │ 		      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    239 │ 	} finally {
+    240 │ 		loading.value = false;
+  
+  i Unsafe fix: Use a template literal.
+  
+    101 101 │   	} catch (error) {
+    102 102 │   		console.error(error);
+    103     │ - → → alert("Error·submitting·edit:·"·+·error.message);
+        103 │ + → → alert(`Error·submitting·edit:·${error.message}`);
+    104 104 │   	} finally {
+    105 105 │   		loading.value = false;
+  
+
+src\components\ugc\AddShopModal.vue:177:5 lint/correctness/noUnusedFunctionParameters  FIXABLE  ━━━━━━━━━━
+
+  ! This parameter is unused.
+  
+    175 │ 				form.value.lng = position.coords.longitude;
+    176 │ 			},
+  > 177 │ 			(error) => {
+        │ 			 ^^^^^
+    178 │ 				alert("Could not get location. Please enable GPS.");
+    179 │ 			},
+  
+  i Unused parameters might be the result of an incomplete refactoring.
+  
+  i Unsafe fix: If this is intentional, prepend error with an underscore.
+  
+     34  34 │   				form.value.lng = position.coords.longitude;
+     35  35 │   			},
+     36     │ - → → → (error)·=>·{
+         36 │ + → → → (_error)·=>·{
+     37  37 │   				alert("Could not get location. Please enable GPS.");
+     38  38 │   			},
+  
+
+src\components\ugc\EditShopModal.vue:190:5 lint/correctness/noUnusedFunctionParameters  FIXABLE  ━━━━━━━━━━
+
+  ! This parameter is unused.
+  
+    188 │ 				form.value.lng = position.coords.longitude;
+    189 │ 			},
+  > 190 │ 			(error) => {
+        │ 			 ^^^^^
+    191 │ 				alert("Could not get location. Please enable GPS.");
+    192 │ 			},
+  
+  i Unused parameters might be the result of an incomplete refactoring.
+  
+  i Unsafe fix: If this is intentional, prepend error with an underscore.
+  
+     53  53 │   				form.value.lng = position.coords.longitude;
+     54  54 │   			},
+     55     │ - → → → (error)·=>·{
+         55 │ + → → → (_error)·=>·{
+     56  56 │   				alert("Could not get location. Please enable GPS.");
+     57  57 │   			},
+  
+
+src\composables\map\useMapCore.js:5:42 lint/correctness/noUnusedFunctionParameters  FIXABLE  ━━━━━━━━━━
+
+  ! This parameter is unused.
+  
+    3 │ import { onUnmounted, ref, shallowRef } from 'vue';
+    4 │ 
+  > 5 │ export function useMapCore(containerRef, options = {}) {
+      │                                          ^^^^^^^
+    6 │     const map = shallowRef(null);
+    7 │     const isMapReady = ref(false);
+  
+  i Unused parameters might be the result of an incomplete refactoring.
+  
+  i Unsafe fix: If this is intentional, prepend options with an underscore.
+  
+     3  3 │   import { onUnmounted, ref, shallowRef } from 'vue';␍
+     4  4 │   ␍
+     5    │ - export·function·useMapCore(containerRef,·options·=·{})·{␍
+        5 │ + export·function·useMapCore(containerRef,·_options·=·{})·{␍
+     6  6 │       const map = shallowRef(null);␍
+     7  7 │       const isMapReady = ref(false);␍
+  
+
+src\router\index.js:35:17 lint/correctness/noUnusedFunctionParameters  FIXABLE  ━━━━━━━━━━━━━━━━━━━━
+
+  ! This parameter is unused.
+  
+    33 │ 	history: createWebHistory(),
+    34 │ 	routes,
+  > 35 │ 	scrollBehavior(to, from, savedPosition) {
+       │ 	               ^^
+    36 │ 		if (savedPosition) return savedPosition;
+    37 │ 		return { top: 0 };
+  
+  i Unused parameters might be the result of an incomplete refactoring.
+  
+  i Unsafe fix: If this is intentional, prepend to with an underscore.
+  
+    33 33 │   	history: createWebHistory(),
+    34 34 │   	routes,
+    35    │ - → scrollBehavior(to,·from,·savedPosition)·{
+       35 │ + → scrollBehavior(_to,·from,·savedPosition)·{
+    36 36 │   		if (savedPosition) return savedPosition;
+    37 37 │   		return { top: 0 };
+  
+
+src\router\index.js:35:21 lint/correctness/noUnusedFunctionParameters  FIXABLE  ━━━━━━━━━━━━━━━━━━━━
+
+  ! This parameter is unused.
+  
+    33 │ 	history: createWebHistory(),
+    34 │ 	routes,
+  > 35 │ 	scrollBehavior(to, from, savedPosition) {
+       │ 	                   ^^^^
+    36 │ 		if (savedPosition) return savedPosition;
+    37 │ 		return { top: 0 };
+  
+  i Unused parameters might be the result of an incomplete refactoring.
+  
+  i Unsafe fix: If this is intentional, prepend from with an underscore.
+  
+    33 33 │   	history: createWebHistory(),
+    34 34 │   	routes,
+    35    │ - → scrollBehavior(to,·from,·savedPosition)·{
+       35 │ + → scrollBehavior(to,·_from,·savedPosition)·{
+    36 36 │   		if (savedPosition) return savedPosition;
+    37 37 │   		return { top: 0 };
+  
+
+src\router\index.js:42:24 lint/correctness/noUnusedFunctionParameters  FIXABLE  ━━━━━━━━━━━━━━━━━━━━
+
+  ! This parameter is unused.
+  
+    41 │ // Basic title updater
+  > 42 │ router.beforeEach((to, from, next) => {
+       │                        ^^^^
+    43 │ 	document.title = to.meta.title || "VibeCity";
+    44 │ 	next();
+  
+  i Unused parameters might be the result of an incomplete refactoring.
+  
+  i Unsafe fix: If this is intentional, prepend from with an underscore.
+  
+    40 40 │   
+    41 41 │   // Basic title updater
+    42    │ - router.beforeEach((to,·from,·next)·=>·{
+       42 │ + router.beforeEach((to,·_from,·next)·=>·{
+    43 43 │   	document.title = to.meta.title || "VibeCity";
+    44 44 │   	next();
+  
+
+src\services\geoService.js:12:63 lint/correctness/noUnusedFunctionParameters  FIXABLE  ━━━━━━━━━━━━━
+
+  ! This parameter is unused.
+  
+    10 │  * @param {Array} categories - Optional filter categories
+    11 │  */
+  > 12 │ export async function getNearbyShops(lat, lng, radius = 5000, categories = []) {
+       │                                                               ^^^^^^^^^^
+    13 │ 	try {
+    14 │ 		// Use v6 'search_venues' RPC
+  
+  i Unused parameters might be the result of an incomplete refactoring.
+  
+  i Unsafe fix: If this is intentional, prepend categories with an underscore.
+  
+    10 10 │    * @param {Array} categories - Optional filter categories
+    11 11 │    */
+    12    │ - export·async·function·getNearbyShops(lat,·lng,·radius·=·5000,·categories·=·[])·{
+       12 │ + export·async·function·getNearbyShops(lat,·lng,·radius·=·5000,·_categories·=·[])·{
+    13 13 │   	try {
+    14 14 │   		// Use v6 'search_venues' RPC
+  
+
+src\utils\mapRenderer.js:29:2 lint/correctness/noUnusedFunctionParameters ━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ! This parameter is unused.
+  
+    27 │ 	roadDistance,
+    28 │ 	roadDuration,
+  > 29 │ 	tt, // translation function
+       │ 	^^
+    30 │ }) => {
+    31 │ 	const isLive = item.status === "LIVE";
+  
+  i Unused parameters might be the result of an incomplete refactoring.
+  
+
+src\components\map\MapboxContainer.vue:884:26 parse ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Illegal return statement outside of a function
+  
+    882 │ console.log("🗺� Starting map initialization via useMapCore...");
+    883 │ 
+  > 884 │ if (!mapContainer.value) return;
+        │                          ^^^^^^^
+    885 │ 
+    886 │ // initMap handles WebGL check and instance creation
+  
+
+src\components\map\MapboxContainer.vue:907:1 parse ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Illegal return statement outside of a function
+  
+    906 │ // Cleanup / Error checks are handled in composable or below
+  > 907 │ return;
+        │ ^^^^^^^
+    908 │ 
+    909 │ // Navigation controls removed (user prefers cleaner map)
+  
+
+src\components\system\AppModals.vue:48:2 lint/suspicious/noDuplicateObjectKeys  FIXABLE  ━━━━━━━━━━━
+
+  × This property is later overwritten by an object member with the same name.
+  
+    46 │ 	showProfileDrawer: Boolean,
+    47 │ 	isDarkMode: Boolean,
+  > 48 │ 	isDataLoading: Boolean,
+       │ 	^^^^^^^^^^^^^^^^^^^^^^
+    49 │ 	isDataLoading: Boolean,
+    50 │ 	errorMessage: String,
+  
+  i Overwritten with this property.
+  
+    44 │ 		default: () => [],
+    45 │ 	},
+  > 46 │ 	showProfileDrawer: Boolean,
+       │ 	                ^^^^^^^^^^^
+  > 47 │ 	isDarkMode: Boolean,
+       │ 	^^^^^^^^^
+    48 │ 	isDataLoading: Boolean,
+    49 │ 	isDataLoading: Boolean,
+  
+  i If an object property with the same name is defined multiple times (except when combining a getter with a setter), only the last definition makes it into the object and previous definitions are ignored.
+  
+  i Unsafe fix: Remove this property.
+  
+    44 44 │   	showProfileDrawer: Boolean,
+    45 45 │   	isDarkMode: Boolean,
+    46    │ - → isDataLoading:·Boolean,
+    47 46 │   	isDataLoading: Boolean,
+    48 47 │   	errorMessage: String,
+  
+
+src\composables\useAppLogic.js:317:22 lint/suspicious/noAssignInExpressions ━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × The assignment should not be in an expression.
+  
+    316 │ 	// Gestures (Must be called in setup, not inside onMounted)
+  > 317 │ 	useEdgeSwipe(() => (showSidebar.value = true));
+        │ 	                    ^^^^^^^^^^^^^^^^^^^^^^^^
+    318 │ 
+    319 │ 	// --- OnMounted ---
+  
+  i The use of assignments in expressions is confusing.
+    Expressions are often considered as side-effect free.
+  
+
+src\composables\useAppLogic.js:363:20 lint/suspicious/noAssignInExpressions ━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × The assignment should not be in an expression.
+  
+    361 │ 				fetch("/data/buildings.json")
+    362 │ 					.then((r) => r.json())
+  > 363 │ 					.then((d) => (buildingsData.value = d))
+        │ 					              ^^^^^^^^^^^^^^^^^^^^^^^
+    364 │ 					.catch(() => {}),
+    365 │ 				fetch("/data/events.json")
+  
+  i The use of assignments in expressions is confusing.
+    Expressions are often considered as side-effect free.
+  
+
+src\composables\useAppLogic.js:367:20 lint/suspicious/noAssignInExpressions ━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × The assignment should not be in an expression.
+  
+    365 │ 				fetch("/data/events.json")
+    366 │ 					.then((r) => r.json())
+  > 367 │ 					.then((d) => (timedEvents.value = d))
+        │ 					              ^^^^^^^^^^^^^^^^^^^^^
+    368 │ 					.catch(() => {}),
+    369 │ 			]);
+  
+  i The use of assignments in expressions is confusing.
+    Expressions are often considered as side-effect free.
+  
+
+src\composables\useAppLogic.js:425:35 lint/suspicious/noAssignInExpressions ━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × The assignment should not be in an expression.
+  
+    424 │ 	// Ride App
+  > 425 │ 	const openRideModal = (shop) => (uiLogic.rideModalShop.value = shop);
+        │ 	                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    426 │ 	const closeRideModal = () => (uiLogic.rideModalShop.value = null);
+    427 │ 	const openRideApp = (appName) => {
+  
+  i The use of assignments in expressions is confusing.
+    Expressions are often considered as side-effect free.
+  
+
+src\composables\useAppLogic.js:426:32 lint/suspicious/noAssignInExpressions ━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × The assignment should not be in an expression.
+  
+    424 │ 	// Ride App
+    425 │ 	const openRideModal = (shop) => (uiLogic.rideModalShop.value = shop);
+  > 426 │ 	const closeRideModal = () => (uiLogic.rideModalShop.value = null);
+        │ 	                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    427 │ 	const openRideApp = (appName) => {
+    428 │ 		if (!uiLogic.rideModalShop.value) return;
+  
+  i The use of assignments in expressions is confusing.
+    Expressions are often considered as side-effect free.
+  
+
+src\composables\useAppLogic.js:497:5 lint/suspicious/noAssignInExpressions ━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × The assignment should not be in an expression.
+  
+    495 │ 		isOwnerDashboardOpen, // ✅ New Owner State
+    496 │ 		toggleOwnerDashboard: () =>
+  > 497 │ 			(isOwnerDashboardOpen.value = !isOwnerDashboardOpen.value),
+        │ 			 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    498 │ 		clearError: () => {
+    499 │ 			errorMessage.value = null;
+  
+  i The use of assignments in expressions is confusing.
+    Expressions are often considered as side-effect free.
+  
+
+src\composables\useAppLogic.js:533:22 lint/suspicious/noAssignInExpressions ━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × The assignment should not be in an expression.
+  
+    531 │ 		},
+    532 │ 		handleSearchBlur: () =>
+  > 533 │ 			setTimeout(() => (uiLogic.showSearchResults.value = false), 200),
+        │ 			                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    534 │ 
+    535 │ 		// Misc (Keep compatibility)
+  
+  i The use of assignments in expressions is confusing.
+    Expressions are often considered as side-effect free.
+  
+
+The number of diagnostics exceeds the limit allowed. Use --max-diagnostics to increase it.
+Diagnostics not shown: 6.
+Checked 114 files in 253ms. No fixes applied.
+Found 12 errors.
+Found 12 warnings.
+Found 2 infos.
+lint ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Some errors were emitted while running checks.
+  
+
+Waiting for the debugger to disconnect...
+Waiting for the debugger to disconnect...

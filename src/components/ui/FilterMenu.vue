@@ -94,18 +94,20 @@ const applyFilters = () => {
 
     <div
       data-testid="filter-menu"
-      class="relative w-64 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-fade-in-right"
+      class="relative w-64 bg-surface-elevated backdrop-blur-xl border border-surface-border rounded-2xl shadow-glass overflow-hidden flex flex-col animate-fade-in-right"
     >
       <!-- Header -->
       <div
-        class="p-4 border-b border-white/10 flex items-center justify-between bg-white/5"
+        class="p-4 border-b border-surface-border flex items-center justify-between bg-surface-light"
       >
-        <h3 class="text-sm font-black text-white uppercase tracking-widest">
+        <h3
+          class="text-sm font-black text-text-primary uppercase tracking-widest"
+        >
           Filter Vibe
         </h3>
         <button
           @click="$emit('close')"
-          class="w-6 h-6 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white"
+          class="w-6 h-6 flex items-center justify-center rounded-full bg-surface-light hover:bg-surface-glass text-text-primary"
         >
           <X class="w-3 h-3" />
         </button>
@@ -138,10 +140,10 @@ const applyFilters = () => {
       </div>
 
       <!-- Footer -->
-      <div class="p-3 border-t border-white/10 bg-black/40">
+      <div class="p-3 border-t border-surface-border bg-black/40">
         <button
           @click="applyFilters"
-          class="w-full py-3 rounded-xl bg-white text-black font-black text-xs uppercase tracking-widest hover:bg-gray-200 active:scale-95 transition-all shadow-lg"
+          class="w-full py-3 rounded-xl bg-text-primary text-void font-black text-xs uppercase tracking-widest hover:bg-white active:scale-95 transition-all shadow-lg"
         >
           Apply Filters
         </button>

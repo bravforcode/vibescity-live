@@ -95,6 +95,6 @@ export function useUILogic() {
 		// Methods
 		toggleVibeNow,
 		checkMobileView,
-		measureBottomUi
+		measureBottomUi,
 	};
 }

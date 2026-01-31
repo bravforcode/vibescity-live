@@ -1,13 +1,13 @@
 <script setup>
 import { useMotion } from "@vueuse/motion";
 import {
-  computed,
-  defineAsyncComponent,
-  nextTick,
-  onMounted,
-  onUnmounted,
-  ref,
-  watchEffect,
+	computed,
+	defineAsyncComponent,
+	nextTick,
+	onMounted,
+	onUnmounted,
+	ref,
+	watchEffect,
 } from "vue";
 import { useHaptics } from "../../composables/useHaptics";
 import { Z } from "../../constants/zIndex";
@@ -15,60 +15,60 @@ import { getMediaDetails } from "../../utils/linkHelper";
 
 // ✅ Lazy Load Components
 const VisitorCount = defineAsyncComponent(
-  () => import("../ui/VisitorCount.vue"),
+	() => import("../ui/VisitorCount.vue"),
 );
 const ReviewSystem = defineAsyncComponent(
-  () => import("../ui/ReviewSystem.vue"),
+	() => import("../ui/ReviewSystem.vue"),
 );
 
 import {
-  Car,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  Facebook,
-  Heart,
-  Instagram,
-  MapPin,
-  Navigation,
-  Share2,
-  Sparkles,
-  Users,
-  X,
+	Car,
+	ChevronLeft,
+	ChevronRight,
+	Clock,
+	Facebook,
+	Heart,
+	Instagram,
+	MapPin,
+	Navigation,
+	Share2,
+	Sparkles,
+	Users,
+	X,
 } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
 import {
-  openBoltApp,
-  openGrabApp,
-  openLinemanApp,
+	openBoltApp,
+	openGrabApp,
+	openLinemanApp,
 } from "../../services/DeepLinkService";
 import {
-  copyToClipboard,
-  isMobileDevice,
-  openGoogleMapsDir,
-  shareLocation,
+	copyToClipboard,
+	isMobileDevice,
+	openGoogleMapsDir,
+	shareLocation,
 } from "../../utils/browserUtils";
 import { getStatusColorClass } from "../../utils/shopUtils";
 
 const { t } = useI18n();
 
 const props = defineProps({
-  shop: {
-    type: Object,
-    required: true,
-  },
-  initialIndex: {
-    type: Number,
-    default: 0,
-  },
-  userCount: {
-    type: Number,
-    default: null,
-  },
+	shop: {
+		type: Object,
+		required: true,
+	},
+	initialIndex: {
+		type: Number,
+		default: 0,
+	},
+	userCount: {
+		type: Number,
+		default: null,
+	},
 });
 
 const FALLBACK_IMAGE =
-  "https://images.unsplash.com/photo-1534531173927-aeb928d54385?w=800&q=80";
+	"https://images.unsplash.com/photo-1534531173927-aeb928d54385?w=800&q=80";
 
 const emit = defineEmits(["close", "toggle-favorite"]);
 
@@ -80,15 +80,15 @@ const initialVisitorCount = ref(null);
 
 // ✅ Smooth Exit Logic
 const handleClose = async () => {
-  impactFeedback("medium");
+	impactFeedback("medium");
 
-  // Trigger animations
-  apply("leave");
+	// Trigger animations
+	apply("leave");
 
-  // Wait for animation (350ms duration)
-  setTimeout(() => {
-    emit("close");
-  }, 300);
+	// Wait for animation (350ms duration)
+	setTimeout(() => {
+		emit("close");
+	}, 300);
 };
 
 // ==========================================
@@ -97,31 +97,31 @@ const handleClose = async () => {
 
 const modalCard = ref(null);
 const { apply } = useMotion(modalCard, {
-  initial: {
-    y: "100%",
-    opacity: 0,
-    scale: 0.95,
-  },
-  enter: {
-    y: 0,
-    opacity: 1,
-    scale: 1,
-    transition: {
-      type: "spring",
-      stiffness: 260,
-      damping: 30,
-      mass: 0.8,
-    },
-  },
-  leave: {
-    y: "100%",
-    opacity: 0,
-    scale: 0.95,
-    transition: {
-      duration: 350,
-      ease: [0.25, 0.1, 0.25, 1], // iOS default easing
-    },
-  },
+	initial: {
+		y: "100%",
+		opacity: 0,
+		scale: 0.95,
+	},
+	enter: {
+		y: 0,
+		opacity: 1,
+		scale: 1,
+		transition: {
+			type: "spring",
+			stiffness: 260,
+			damping: 30,
+			mass: 0.8,
+		},
+	},
+	leave: {
+		y: "100%",
+		opacity: 0,
+		scale: 0.95,
+		transition: {
+			duration: 350,
+			ease: [0.25, 0.1, 0.25, 1], // iOS default easing
+		},
+	},
 });
 
 // ==========================================
@@ -135,85 +135,85 @@ const scrollContentRef = ref(null);
 const initialScrollTop = ref(0);
 
 const handleTouchStart = (e) => {
-  // Capture scroll position at start of touch
-  if (scrollContentRef.value) {
-    initialScrollTop.value = scrollContentRef.value.scrollTop;
-  }
+	// Capture scroll position at start of touch
+	if (scrollContentRef.value) {
+		initialScrollTop.value = scrollContentRef.value.scrollTop;
+	}
 
-  touchStart.value = { y: e.touches[0].clientY, t: Date.now() };
-  isDragging.value = true;
-  // Don't trigger haptics immediately on touch start to prevent noise
+	touchStart.value = { y: e.touches[0].clientY, t: Date.now() };
+	isDragging.value = true;
+	// Don't trigger haptics immediately on touch start to prevent noise
 };
 
 const handleTouchMove = (e) => {
-  if (!isDragging.value) return;
+	if (!isDragging.value) return;
 
-  const currentY = e.touches[0].clientY;
-  const deltaY = currentY - touchStart.value.y;
+	const currentY = e.touches[0].clientY;
+	const deltaY = currentY - touchStart.value.y;
 
-  // ⛔️ BLOCKER 1: If we started scrolled down, NEVER drag
-  if (initialScrollTop.value > 0) return;
+	// ⛔️ BLOCKER 1: If we started scrolled down, NEVER drag
+	if (initialScrollTop.value > 0) return;
 
-  // ⛔️ BLOCKER 2: If we are currently scrolling content, NEVER drag
-  if (scrollContentRef.value && scrollContentRef.value.scrollTop > 0) return;
+	// ⛔️ BLOCKER 2: If we are currently scrolling content, NEVER drag
+	if (scrollContentRef.value && scrollContentRef.value.scrollTop > 0) return;
 
-  // ⛔️ BLOCKER 3: If dragging UP (scrolling content), allow native scroll
-  if (deltaY < 0) return;
+	// ⛔️ BLOCKER 3: If dragging UP (scrolling content), allow native scroll
+	if (deltaY < 0) return;
 
-  // ✅ ACTIVE DRAG (At top, pulling down)
-  if (e.cancelable && deltaY > 0) {
-    e.preventDefault(); // Stop native pull-to-refresh or rubberband
+	// ✅ ACTIVE DRAG (At top, pulling down)
+	if (e.cancelable && deltaY > 0) {
+		e.preventDefault(); // Stop native pull-to-refresh or rubberband
 
-    // Logarithmic Resistance (iOS feel)
-    // Formula: y = limit * log(1 + x / limit)
-    // This gives a heavy, satisfying feel that gets harder the further you pull
-    const limit = 200;
-    const resistance = limit * Math.log10(1 + deltaY / (limit * 0.5)) * 2.5;
+		// Logarithmic Resistance (iOS feel)
+		// Formula: y = limit * log(1 + x / limit)
+		// This gives a heavy, satisfying feel that gets harder the further you pull
+		const limit = 200;
+		const resistance = limit * Math.log10(1 + deltaY / (limit * 0.5)) * 2.5;
 
-    dragProgress.value = Math.min(deltaY / 600, 1);
+		dragProgress.value = Math.min(deltaY / 600, 1);
 
-    apply({
-      y: resistance,
-      scale: 1 - deltaY / 3000, // Very subtle scale
-      opacity: 1, // Keep full opacity until release/threshold
-    });
-  }
+		apply({
+			y: resistance,
+			scale: 1 - deltaY / 3000, // Very subtle scale
+			opacity: 1, // Keep full opacity until release/threshold
+		});
+	}
 };
 
 const handleTouchEnd = (e) => {
-  if (!isDragging.value) return;
-  isDragging.value = false;
+	if (!isDragging.value) return;
+	isDragging.value = false;
 
-  const currentY = e.changedTouches[0].clientY;
-  const deltaY = currentY - touchStart.value.y;
-  const time = Date.now() - touchStart.value.t;
-  const velocity = deltaY / time; // px/ms
+	const currentY = e.changedTouches[0].clientY;
+	const deltaY = currentY - touchStart.value.y;
+	const time = Date.now() - touchStart.value.t;
+	const velocity = deltaY / time; // px/ms
 
-  // Only consider for dismissal if we were correctly in drag mode
-  // (i.e., we have some positive translation)
-  // We check deltaY > 0 to ensure we only close on "Pull Down"
+	// Only consider for dismissal if we were correctly in drag mode
+	// (i.e., we have some positive translation)
+	// We check deltaY > 0 to ensure we only close on "Pull Down"
 
-  const isScrolledToTop =
-    !scrollContentRef.value || scrollContentRef.value.scrollTop <= 0;
+	const isScrolledToTop =
+		!scrollContentRef.value || scrollContentRef.value.scrollTop <= 0;
 
-  if (isScrolledToTop && deltaY > 0) {
-    // Dismiss conditions:
-    // 1. Fast flick (> 0.5px/ms)
-    // 2. Long drag (> 100px)
-    if ((deltaY > 60 && velocity > 0.5) || deltaY > 150) {
-      impactFeedback("medium");
-      apply("leave"); // ✅ Use leave animation instead of direct emit
-      setTimeout(() => emit("close"), 300);
-      return; // Exit, don't snap back
-    }
-  }
+	if (isScrolledToTop && deltaY > 0) {
+		// Dismiss conditions:
+		// 1. Fast flick (> 0.5px/ms)
+		// 2. Long drag (> 100px)
+		if ((deltaY > 60 && velocity > 0.5) || deltaY > 150) {
+			impactFeedback("medium");
+			apply("leave"); // ✅ Use leave animation instead of direct emit
+			setTimeout(() => emit("close"), 300);
+			return; // Exit, don't snap back
+		}
+	}
 
-  // Snap back (Reset)
-  if (deltaY > 0) {
-    apply("enter");
-  }
+	// Snap back (Reset)
+	if (deltaY > 0) {
+		apply("enter");
+	}
 
-  dragProgress.value = 0;
+	dragProgress.value = 0;
 };
 
 // ==========================================
@@ -223,36 +223,36 @@ const handleTouchEnd = (e) => {
 const media = computed(() => getMediaDetails(props.shop.videoUrl));
 
 const processedImages = computed(() => {
-  return (props.shop.images || []).map((imgUrl) => getMediaDetails(imgUrl).url);
+	return (props.shop.images || []).map((imgUrl) => getMediaDetails(imgUrl).url);
 });
 
 const currentImageIndex = ref(0);
 const imageCarouselRef = ref(null);
 
 const nextImage = () => {
-  if (currentImageIndex.value < processedImages.value.length - 1) {
-    currentImageIndex.value++;
-    scrollToImage(currentImageIndex.value);
-    impactFeedback("light");
-  }
+	if (currentImageIndex.value < processedImages.value.length - 1) {
+		currentImageIndex.value++;
+		scrollToImage(currentImageIndex.value);
+		impactFeedback("light");
+	}
 };
 
 const prevImage = () => {
-  if (currentImageIndex.value > 0) {
-    currentImageIndex.value--;
-    scrollToImage(currentImageIndex.value);
-    impactFeedback("light");
-  }
+	if (currentImageIndex.value > 0) {
+		currentImageIndex.value--;
+		scrollToImage(currentImageIndex.value);
+		impactFeedback("light");
+	}
 };
 
 const scrollToImage = (index) => {
-  if (!imageCarouselRef.value) return;
-  const container = imageCarouselRef.value;
-  const itemWidth = container.clientWidth;
-  container.scrollTo({
-    left: itemWidth * index,
-    behavior: "smooth",
-  });
+	if (!imageCarouselRef.value) return;
+	const container = imageCarouselRef.value;
+	const itemWidth = container.clientWidth;
+	container.scrollTo({
+		left: itemWidth * index,
+		behavior: "smooth",
+	});
 };
 
 // ==========================================
@@ -263,20 +263,20 @@ const lastTap = ref(0);
 const showHeartAnim = ref(false);
 
 const handleDoubleTap = () => {
-  const now = Date.now();
-  const DOUBLE_TAP_DELAY = 300;
+	const now = Date.now();
+	const DOUBLE_TAP_DELAY = 300;
 
-  if (now - lastTap.value < DOUBLE_TAP_DELAY) {
-    emit("toggle-favorite", props.shop.id);
-    showHeartAnim.value = true;
-    successFeedback();
+	if (now - lastTap.value < DOUBLE_TAP_DELAY) {
+		emit("toggle-favorite", props.shop.id);
+		showHeartAnim.value = true;
+		successFeedback();
 
-    setTimeout(() => {
-      showHeartAnim.value = false;
-    }, 1000);
-  }
+		setTimeout(() => {
+			showHeartAnim.value = false;
+		}, 1000);
+	}
 
-  lastTap.value = now;
+	lastTap.value = now;
 };
 
 // ==========================================
@@ -289,54 +289,54 @@ const rideLoading = ref("");
 const isMobile = ref(false);
 
 const openRide = (appName) => {
-  rideLoading.value = appName;
-  impactFeedback("medium");
+	rideLoading.value = appName;
+	impactFeedback("medium");
 
-  // Copy shop name to clipboard with error handling
-  copyToClipboard(props.shop.name)
-    .then(() => {
-      copyStatus.value = "📋 Copied!";
-    })
-    .catch((err) => {
-      console.warn("Copy to clipboard failed:", err);
-      copyStatus.value = "⚠️ Could not copy name";
-    });
+	// Copy shop name to clipboard with error handling
+	copyToClipboard(props.shop.name)
+		.then(() => {
+			copyStatus.value = "📋 Copied!";
+		})
+		.catch((err) => {
+			console.warn("Copy to clipboard failed:", err);
+			copyStatus.value = "⚠️ Could not copy name";
+		});
 
-  let success = false;
-  try {
-    switch (appName) {
-      case "grab":
-        success = openGrabApp(props.shop);
-        break;
-      case "bolt":
-        success = openBoltApp(props.shop);
-        break;
-      case "lineman":
-        success = openLinemanApp(props.shop);
-        break;
-      default:
-        success = false;
-        copyStatus.value = "❌ Unknown app";
-    }
+	let success = false;
+	try {
+		switch (appName) {
+			case "grab":
+				success = openGrabApp(props.shop);
+				break;
+			case "bolt":
+				success = openBoltApp(props.shop);
+				break;
+			case "lineman":
+				success = openLinemanApp(props.shop);
+				break;
+			default:
+				success = false;
+				copyStatus.value = "❌ Unknown app";
+		}
 
-    if (success) {
-      copyStatus.value = `🚗 Opening ${appName}...`;
-    } else if (!copyStatus.value.includes("Unknown")) {
-      copyStatus.value = "❌ App not found";
-    }
-  } catch (err) {
-    console.error("Error opening ride app:", err);
-    success = false;
-    copyStatus.value = "❌ Failed to open app";
-  }
+		if (success) {
+			copyStatus.value = `🚗 Opening ${appName}...`;
+		} else if (!copyStatus.value.includes("Unknown")) {
+			copyStatus.value = "❌ App not found";
+		}
+	} catch (err) {
+		console.error("Error opening ride app:", err);
+		success = false;
+		copyStatus.value = "❌ Failed to open app";
+	}
 
-  setTimeout(() => {
-    showRidePopup.value = false;
-    rideLoading.value = "";
-    setTimeout(() => {
-      copyStatus.value = "";
-    }, 1000);
-  }, 1500);
+	setTimeout(() => {
+		showRidePopup.value = false;
+		rideLoading.value = "";
+		setTimeout(() => {
+			copyStatus.value = "";
+		}, 1000);
+	}, 1500);
 };
 
 // ==========================================
@@ -348,31 +348,31 @@ const isPromoActive = ref(false);
 let timerInterval = null;
 
 const updateCountdown = () => {
-  if (!props.shop.promotionEndtime || !props.shop.promotionInfo) {
-    isPromoActive.value = false;
-    return;
-  }
+	if (!props.shop.promotionEndtime || !props.shop.promotionInfo) {
+		isPromoActive.value = false;
+		return;
+	}
 
-  const now = new Date();
-  const [hours, minutes] = props.shop.promotionEndtime.split(":");
+	const now = new Date();
+	const [hours, minutes] = props.shop.promotionEndtime.split(":");
 
-  const target = new Date();
-  target.setHours(Number.parseInt(hours), Number.parseInt(minutes), 0, 0);
+	const target = new Date();
+	target.setHours(Number.parseInt(hours), Number.parseInt(minutes), 0, 0);
 
-  const diff = target - now;
-  const maxFlashWindow = 1200000; // 20 min
+	const diff = target - now;
+	const maxFlashWindow = 1200000; // 20 min
 
-  if (diff <= 0 || diff > maxFlashWindow) {
-    isPromoActive.value = false;
-    return;
-  }
+	if (diff <= 0 || diff > maxFlashWindow) {
+		isPromoActive.value = false;
+		return;
+	}
 
-  const totalSeconds = Math.floor(diff / 1000);
-  const mins = Math.floor(totalSeconds / 60);
-  const secs = totalSeconds % 60;
+	const totalSeconds = Math.floor(diff / 1000);
+	const mins = Math.floor(totalSeconds / 60);
+	const secs = totalSeconds % 60;
 
-  timeLeft.value = `${mins}:${secs.toString().padStart(2, "0")}`;
-  isPromoActive.value = true;
+	timeLeft.value = `${mins}:${secs.toString().padStart(2, "0")}`;
+	isPromoActive.value = true;
 };
 
 // ==========================================
@@ -380,28 +380,28 @@ const updateCountdown = () => {
 // ==========================================
 
 const handleShare = async () => {
-  impactFeedback("medium");
-  const success = await shareLocation(
-    props.shop.name,
-    props.shop.lat,
-    props.shop.lng,
-  );
+	impactFeedback("medium");
+	const success = await shareLocation(
+		props.shop.name,
+		props.shop.lat,
+		props.shop.lng,
+	);
 
-  if (success) {
-    copyStatus.value = "✅ Shared!";
-    successFeedback();
-  } else {
-    copyStatus.value = "📋 Link copied!";
-  }
+	if (success) {
+		copyStatus.value = "✅ Shared!";
+		successFeedback();
+	} else {
+		copyStatus.value = "📋 Link copied!";
+	}
 
-  setTimeout(() => {
-    copyStatus.value = "";
-  }, 2000);
+	setTimeout(() => {
+		copyStatus.value = "";
+	}, 2000);
 };
 
 const openGoogleMaps = () => {
-  impactFeedback("medium");
-  openGoogleMapsDir(props.shop.lat, props.shop.lng);
+	impactFeedback("medium");
+	openGoogleMapsDir(props.shop.lat, props.shop.lng);
 };
 
 // ==========================================
@@ -414,37 +414,37 @@ const mediaObserver = ref(null);
 const reviewsObserver = ref(null);
 
 const setupIntersectionObservers = () => {
-  // Media Observer
-  mediaObserver.value = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          isMediaVisible.value = true;
-        }
-      });
-    },
-    { threshold: 0.1 },
-  );
+	// Media Observer
+	mediaObserver.value = new IntersectionObserver(
+		(entries) => {
+			entries.forEach((entry) => {
+				if (entry.isIntersecting) {
+					isMediaVisible.value = true;
+				}
+			});
+		},
+		{ threshold: 0.1 },
+	);
 
-  // Reviews Observer
-  reviewsObserver.value = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          isReviewsVisible.value = true;
-        }
-      });
-    },
-    { threshold: 0.1 },
-  );
+	// Reviews Observer
+	reviewsObserver.value = new IntersectionObserver(
+		(entries) => {
+			entries.forEach((entry) => {
+				if (entry.isIntersecting) {
+					isReviewsVisible.value = true;
+				}
+			});
+		},
+		{ threshold: 0.1 },
+	);
 
-  nextTick(() => {
-    const mediaEl = document.querySelector("#media-container");
-    const reviewsEl = document.querySelector("#reviews-container");
+	nextTick(() => {
+		const mediaEl = document.querySelector("#media-container");
+		const reviewsEl = document.querySelector("#reviews-container");
 
-    if (mediaEl) mediaObserver.value.observe(mediaEl);
-    if (reviewsEl) reviewsObserver.value.observe(reviewsEl);
-  });
+		if (mediaEl) mediaObserver.value.observe(mediaEl);
+		if (reviewsEl) reviewsObserver.value.observe(reviewsEl);
+	});
 };
 
 // ==========================================
@@ -453,9 +453,9 @@ const setupIntersectionObservers = () => {
 
 const videoPlayer = ref(null);
 watchEffect(() => {
-  if (videoPlayer.value && props.shop.initialTime) {
-    videoPlayer.value.currentTime = props.shop.initialTime;
-  }
+	if (videoPlayer.value && props.shop.initialTime) {
+		videoPlayer.value.currentTime = props.shop.initialTime;
+	}
 });
 
 // ==========================================
@@ -463,40 +463,40 @@ watchEffect(() => {
 // ==========================================
 
 onMounted(() => {
-  isMobile.value = isMobileDevice();
-  initialVisitorCount.value = Math.floor(Math.random() * 50) + 10; // ✅ Generate stable random count
-  updateCountdown();
-  timerInterval = setInterval(updateCountdown, 1000);
-  setupIntersectionObservers();
+	isMobile.value = isMobileDevice();
+	initialVisitorCount.value = Math.floor(Math.random() * 50) + 10; // ✅ Generate stable random count
+	updateCountdown();
+	timerInterval = setInterval(updateCountdown, 1000);
+	setupIntersectionObservers();
 
-  // ✅ Add scroll listener for carousel index sync
-  if (imageCarouselRef.value) {
-    imageCarouselRef.value.addEventListener("scroll", handleCarouselScroll);
-  }
+	// ✅ Add scroll listener for carousel index sync
+	if (imageCarouselRef.value) {
+		imageCarouselRef.value.addEventListener("scroll", handleCarouselScroll);
+	}
 });
 
 // ✅ Carousel scroll handler to sync currentImageIndex
 const handleCarouselScroll = () => {
-  if (!imageCarouselRef.value) return;
-  const container = imageCarouselRef.value;
-  const newIndex = Math.round(container.scrollLeft / container.clientWidth);
-  if (
-    newIndex !== currentImageIndex.value &&
-    newIndex >= 0 &&
-    newIndex < processedImages.value.length
-  ) {
-    currentImageIndex.value = newIndex;
-  }
+	if (!imageCarouselRef.value) return;
+	const container = imageCarouselRef.value;
+	const newIndex = Math.round(container.scrollLeft / container.clientWidth);
+	if (
+		newIndex !== currentImageIndex.value &&
+		newIndex >= 0 &&
+		newIndex < processedImages.value.length
+	) {
+		currentImageIndex.value = newIndex;
+	}
 };
 
 onUnmounted(() => {
-  if (timerInterval) clearInterval(timerInterval);
-  if (mediaObserver.value) mediaObserver.value.disconnect();
-  if (reviewsObserver.value) reviewsObserver.value.disconnect();
-  // ✅ Cleanup carousel scroll listener
-  if (imageCarouselRef.value) {
-    imageCarouselRef.value.removeEventListener("scroll", handleCarouselScroll);
-  }
+	if (timerInterval) clearInterval(timerInterval);
+	if (mediaObserver.value) mediaObserver.value.disconnect();
+	if (reviewsObserver.value) reviewsObserver.value.disconnect();
+	// ✅ Cleanup carousel scroll listener
+	if (imageCarouselRef.value) {
+		imageCarouselRef.value.removeEventListener("scroll", handleCarouselScroll);
+	}
 });
 </script>
 

@@ -1,4 +1,5 @@
 <script setup>
+import { useHaptics } from "@/composables/useHaptics";
 import {
   ChevronRight,
   Coffee,
@@ -17,8 +18,7 @@ import {
   VolumeX,
   X,
 } from "lucide-vue-next";
-import { ref, defineAsyncComponent } from "vue";
-import { useHaptics } from "@/composables/useHaptics";
+import { defineAsyncComponent, ref } from "vue";
 
 // Async import for better code splitting
 const SOSPanel = defineAsyncComponent(() => import("./SOSPanel.vue"));
@@ -179,7 +179,7 @@ const handleNavigate = (id) => {
                   $
                 </div>
                 <span class="text-sm font-bold text-yellow-100"
-                  >{{ userStats.coins.toLocaleString() }} Coins</span
+                  >{{ userStats.coins?.toLocaleString() || 0 }} Coins</span
                 >
               </div>
             </div>

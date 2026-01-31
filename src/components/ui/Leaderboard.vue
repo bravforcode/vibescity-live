@@ -3,45 +3,81 @@
  * Leaderboard.vue - Top coin collectors leaderboard
  * Feature #31: Leaderboard UI
  */
-import { computed, ref } from "vue";
+import { onMounted, ref } from "vue";
+import { supabase } from "../../lib/supabase";
 
 const props = defineProps({
-	isDarkMode: {
-		type: Boolean,
-		default: true,
-	},
-	currentUser: {
-		type: Object,
-		default: () => ({ name: "You", coins: 0, rank: 99 }),
-	},
+  isDarkMode: {
+    type: Boolean,
+    default: true,
+  },
+  currentUser: {
+    type: Object,
+    default: () => ({ name: "You", coins: 0, rank: 99 }),
+  },
 });
 
-// Mock leaderboard data
-const leaders = ref([
-	{ rank: 1, name: "NightOwl_CM", coins: 2450, avatar: "🦉" },
-	{ rank: 2, name: "PartyKing", coins: 2120, avatar: "👑" },
-	{ rank: 3, name: "VibeHunter", coins: 1890, avatar: "🎯" },
-	{ rank: 4, name: "ChiangMaiPro", coins: 1650, avatar: "🏔️" },
-	{ rank: 5, name: "ClubMaster", coins: 1520, avatar: "🎧" },
-	{ rank: 6, name: "NeonRider", coins: 1380, avatar: "🌙" },
-	{ rank: 7, name: "BarHopper", coins: 1250, avatar: "🍻" },
-	{ rank: 8, name: "DanceFloor", coins: 1100, avatar: "💃" },
-	{ rank: 9, name: "MidnightWalker", coins: 980, avatar: "🌃" },
-	{ rank: 10, name: "VibeSeeker", coins: 850, avatar: "✨" },
-]);
+const leaders = ref([]);
+const loading = ref(true);
+
+const fetchLeaderboard = async () => {
+  try {
+    loading.value = true;
+    // Query the view created in v6 script
+    const { data, error } = await supabase
+      .from("leaderboard_view")
+      .select("*")
+      .limit(10); // Check top 10
+
+    if (error) throw error;
+
+    // Map to UI format
+    leaders.value = data.map((user, index) => ({
+      rank: index + 1,
+      name: user.email
+        ? user.email.split("@")[0]
+        : `User ${user.id.slice(0, 4)}`, // Mask email
+      coins: user.xp, // We display XP as "Coins" or just XP
+      avatar: getAvatarForRank(index + 1),
+      id: user.id,
+    }));
+  } catch (e) {
+    console.error("Error fetching leaderboard:", e);
+    // Fallback to mock if empty or error (for demo)
+    if (leaders.value.length === 0) {
+      leaders.value = [
+        { rank: 1, name: "NightOwl_CM", coins: 2450, avatar: "🦉" },
+        { rank: 2, name: "PartyKing", coins: 2120, avatar: "👑" },
+        { rank: 3, name: "VibeHunter", coins: 1890, avatar: "🎯" },
+      ];
+    }
+  } finally {
+    loading.value = false;
+  }
+};
+
+const getAvatarForRank = (rank) => {
+  // Fun avatars based on rank
+  const avatars = ["🦉", "👑", "🎯", "🏔️", "🎧", "🌙", "🍻", "💃", "🌃", "✨"];
+  return avatars[rank - 1] || "👤";
+};
+
+onMounted(() => {
+  fetchLeaderboard();
+});
 
 const getRankColor = (rank) => {
-	if (rank === 1) return "from-yellow-400 to-amber-500";
-	if (rank === 2) return "from-gray-300 to-gray-400";
-	if (rank === 3) return "from-amber-600 to-amber-700";
-	return "";
+  if (rank === 1) return "from-yellow-400 to-amber-500";
+  if (rank === 2) return "from-gray-300 to-gray-400";
+  if (rank === 3) return "from-amber-600 to-amber-700";
+  return "";
 };
 
 const getRankIcon = (rank) => {
-	if (rank === 1) return "🥇";
-	if (rank === 2) return "🥈";
-	if (rank === 3) return "🥉";
-	return rank;
+  if (rank === 1) return "🥇";
+  if (rank === 2) return "🥈";
+  if (rank === 3) return "🥉";
+  return rank;
 };
 </script>
 
@@ -126,10 +162,8 @@ const getRankIcon = (rank) => {
         v-for="leader in leaders.slice(3)"
         :key="leader.rank"
         :class="[
-          'flex items-center gap-3 p-3 rounded-xl transition-colors',
-          isDarkMode
-            ? 'bg-zinc-800 hover:bg-zinc-700'
-            : 'bg-gray-100 hover:bg-gray-200',
+          'flex items-center gap-3 p-3 rounded-xl transition-colors border border-surface-border',
+          'bg-surface-elevated hover:bg-surface-light',
         ]"
       >
         <span
@@ -163,8 +197,7 @@ const getRankIcon = (rank) => {
     <!-- Current user -->
     <div
       :class="[
-        'mt-4 p-3 rounded-xl border-2 border-purple-500/50',
-        isDarkMode ? 'bg-purple-500/10' : 'bg-purple-50',
+        'mt-4 p-3 rounded-xl border border-neon-purple bg-surface-elevated shadow-neon-purple shadow-sm',
       ]"
     >
       <div class="flex items-center gap-3">
