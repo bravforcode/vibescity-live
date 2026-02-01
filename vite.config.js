@@ -13,6 +13,18 @@ export default defineConfig({
     }),
   ],
 
+  // ✅ Proxy for Local Development (matches Vercel rewrites)
+  server: {
+    port: 5173,
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:8000",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
+
   build: {
     // ถ้าอยาก “ไม่เห็น warning” ก็ปรับค่านี้ได้ (optional)
     // chunkSizeWarningLimit: 2000,

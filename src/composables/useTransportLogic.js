@@ -1,6 +1,6 @@
 import { ref } from "vue";
 
-const BASE_URL = "http://127.0.0.1:8000"; // ✅ Connected to your local Python Backend
+const BASE_URL = ""; // ✅ Relative path - works on Vercel & Localhost (via Proxy)
 
 export function useTransportLogic() {
 	const estimates = ref([]);

@@ -225,7 +225,7 @@ const submit = async () => {
     // Fallback/Legacy API call removed for MVP speed
     /*
     const response = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/ugc/shops`,
+      `/api/v1/ugc/shops`, // ✅ Universal Path (Vercel / Local Proxy)
       ...
     );
     */
