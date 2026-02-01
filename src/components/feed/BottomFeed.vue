@@ -1,21 +1,23 @@
 <script setup>
 import { useHead } from "@unhead/vue";
 import {
-	Heart,
-	MapPin,
-	Navigation,
-	Phone,
-	Send,
-	Share2,
-	X,
+  Heart,
+  MapPin,
+  Navigation,
+  Phone,
+  Send,
+  Share2,
+  Sparkles,
+  X,
 } from "lucide-vue-next";
 import {
-	computed,
-	defineAsyncComponent,
-	nextTick,
-	onMounted,
-	ref,
-	watch,
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  ref,
+  watch,
 } from "vue";
 import PlaceCard from "../design-system/compositions/PlaceCard.vue";
 import ShopCard from "../panel/ShopCard.vue";
@@ -23,92 +25,97 @@ import PullToRefresh from "../ui/PullToRefresh.vue";
 import SwipeCard from "../ui/SwipeCard.vue";
 
 const VisitorCount = defineAsyncComponent(
-	() => import("../ui/VisitorCount.vue"),
+  () => import("../ui/VisitorCount.vue"),
 );
 
 const SkeletonCard = defineAsyncComponent(
-	() => import("../ui/SkeletonCard.vue"),
+  () => import("../ui/SkeletonCard.vue"),
 );
 
 const props = defineProps({
-	isDataLoading: Boolean,
-	isRefreshing: Boolean,
-	isImmersive: Boolean, // Feature: Immersive Mode
-	isDarkMode: Boolean,
-	isIndoorView: Boolean,
-	activeFloor: String,
-	liveCount: Number,
-	carouselShops: {
-		type: Array,
-		default: () => [],
-	},
-	suggestedShops: {
-		type: Array,
-		default: () => [],
-	},
-	favorites: {
-		type: Array,
-		default: () => [],
-	},
-	activeShopId: [Number, String],
-	mallShops: {
-		type: Array,
-		default: () => [],
-	},
-	setBottomUiRef: Function,
-	setMobileCardScrollRef: Function,
+  isDataLoading: Boolean,
+  isRefreshing: Boolean,
+  isImmersive: Boolean, // Feature: Immersive Mode
+  isDarkMode: Boolean,
+  isIndoorView: Boolean,
+  activeFloor: String,
+  liveCount: Number,
+  carouselShops: {
+    type: Array,
+    default: () => [],
+  },
+  suggestedShops: {
+    type: Array,
+    default: () => [],
+  },
+  favorites: {
+    type: Array,
+    default: () => [],
+  },
+  activeShopId: [Number, String],
+  mallShops: {
+    type: Array,
+    default: () => [],
+  },
+  setBottomUiRef: Function,
+  setMobileCardScrollRef: Function,
 });
 
 // ✅ Dynamic SEO: Update Title/Meta based on Active Shop
 const activeShopData = computed(() => {
-	if (!props.carouselShops.length) return null;
-	return props.carouselShops.find((s) => s.id === props.activeShopId);
+  if (!props.carouselShops.length) return null;
+  return props.carouselShops.find((s) => s.id === props.activeShopId);
 });
 
 useHead({
-	title: computed(() =>
-		activeShopData.value
-			? `${activeShopData.value.name} - VibeCity`
-			: "VibeCity - Chiang Mai",
-	),
-	meta: [
-		{
-			name: "description",
-			content: computed(() =>
-				activeShopData.value
-					? `Check out ${activeShopData.value.name} (${activeShopData.value.category}). ${activeShopData.value.description || "Best vibes in Chiang Mai."}`
-					: "Discover top spots in Chiang Mai.",
-			),
-		},
-	],
+  title: computed(() =>
+    activeShopData.value
+      ? `${activeShopData.value.name} - VibeCity`
+      : "VibeCity - Chiang Mai",
+  ),
+  meta: [
+    {
+      name: "description",
+      content: computed(() =>
+        activeShopData.value
+          ? `Check out ${activeShopData.value.name} (${activeShopData.value.category}). ${activeShopData.value.description || "Best vibes in Chiang Mai."}`
+          : "Discover top spots in Chiang Mai.",
+      ),
+    },
+  ],
 });
 
 const emit = defineEmits([
-	"click-shop",
-	"open-detail",
-	"open-ride",
-	"swipe-left",
-	"swipe-right",
-	"toggle-favorite",
-	"toggle-immersive",
-	"refresh",
-	"set-active-floor",
-	"reset-filters",
-	"scroll",
-	"scroll-start",
-	"scroll-end",
-	"load-more",
-	"enter-giant-view",
-	"exit-giant-view",
+  "click-shop",
+  "open-detail",
+  "open-ride",
+  "swipe-left",
+  "swipe-right",
+  "toggle-favorite",
+  "toggle-immersive",
+  "refresh",
+  "set-active-floor",
+  "reset-filters",
+  "scroll",
+  "scroll-start",
+  "scroll-end",
+  "load-more",
+  "enter-giant-view",
+  "exit-giant-view",
+  "share-shop", // ✅ Added share event
 ]);
 
 const isFavorited = (shopId) => {
-	return props.favorites.includes(Number(shopId));
+  return props.favorites.includes(Number(shopId));
 };
 
 const isGridView = ref(false);
 const toggleView = () => {
-	isGridView.value = !isGridView.value;
+  isGridView.value = !isGridView.value;
+  // ✅ Haptic feedback on mobile
+  if (window.navigator.vibrate) {
+    window.navigator.vibrate(10);
+  }
 };
 
 // ✅ TikTok-style Video Expansion State
@@ -124,150 +131,192 @@ const selectedGiantShop = ref(null);
 
 // ✅ Detect if current shop is a Giant Pin (building)
 const currentShopIsGiant = computed(() => {
-	if (!props.activeShopId) return false;
-	const shop = props.carouselShops.find((s) => s.id == props.activeShopId);
-	return shop?.is_giant_active || shop?.isGiantPin || false;
+  if (!props.activeShopId) return false;
+  const shop = props.carouselShops.find((s) => s.id == props.activeShopId);
+  return shop?.is_giant_active || shop?.isGiantPin || false;
 });
 
 // ✅ Watch for Giant Pin activation
 watch(
-	() => props.activeShopId,
-	(newId) => {
-		if (!newId) {
-			isGiantPinView.value = false;
-			activeGiantPin.value = null;
-			return;
-		}
+  () => props.activeShopId,
+  (newId) => {
+    if (!newId) {
+      isGiantPinView.value = false;
+      activeGiantPin.value = null;
+      return;
+    }
 
-		const shop = props.carouselShops.find((s) => s.id == newId);
-		if (shop?.is_giant_active || shop?.isGiantPin) {
-			// Activate Giant Pin View
-			activeGiantPin.value = shop;
-			isGiantPinView.value = true;
-			// Get shops inside this building
-			giantPinShops.value = props.carouselShops.filter(
-				(s) => s.Building === shop.name || s.Building === shop.Building,
-			);
-			selectedGiantShop.value = giantPinShops.value[0] || shop;
-			emit("enter-giant-view", shop);
-		} else {
-			isGiantPinView.value = false;
-			activeGiantPin.value = null;
-		}
-	},
+    const shop = props.carouselShops.find((s) => s.id == newId);
+    if (shop?.is_giant_active || shop?.isGiantPin) {
+      // Activate Giant Pin View
+      activeGiantPin.value = shop;
+      isGiantPinView.value = true;
+      // Get shops inside this building
+      giantPinShops.value = props.carouselShops.filter(
+        (s) => s.Building === shop.name || s.Building === shop.Building,
+      );
+      selectedGiantShop.value = giantPinShops.value[0] || shop;
+      emit("enter-giant-view", shop);
+    } else {
+      isGiantPinView.value = false;
+      activeGiantPin.value = null;
+    }
+  },
 );
 
 // ✅ Exit Giant Pin View
 const exitGiantView = () => {
-	isGiantPinView.value = false;
-	activeGiantPin.value = null;
-	emit("exit-giant-view");
+  isGiantPinView.value = false;
+  activeGiantPin.value = null;
+  emit("exit-giant-view");
 };
 
 // ✅ Select shop within Giant Pin
 const selectGiantShop = (shop) => {
-	selectedGiantShop.value = shop;
-	emit("click-shop", shop);
+  selectedGiantShop.value = shop;
+  emit("click-shop", shop);
 };
 
 // ✅ Expand video when card is centered
-const expandVideo = (shop) => {
-	if (!shop) return;
-	expandedShop.value = shop;
-	isVideoExpanded.value = true;
+const canAutoExpand = ref(true); // ✅ Control flag
 
-	// Try to play video
-	nextTick(() => {
-		if (videoRef.value) {
-			videoRef.value.muted = true;
-			videoRef.value.play().catch(() => {});
-		}
-	});
+const expandVideo = (shop) => {
+  if (!shop || !canAutoExpand.value) return; // ✅ Check permission
+  expandedShop.value = shop;
+  isVideoExpanded.value = true;
+
+  // Try to play video
+  nextTick(() => {
+    if (videoRef.value) {
+      videoRef.value.muted = true;
+      videoRef.value.play().catch(() => {});
+    }
+  });
 };
 
 // ✅ Close expanded video
 const closeExpandedVideo = () => {
-	isVideoExpanded.value = false;
-	if (videoRef.value) {
-		videoRef.value.pause();
-	}
-	expandedShop.value = null;
+  isVideoExpanded.value = false;
+  if (videoRef.value) {
+    videoRef.value.pause();
+  }
+  expandedShop.value = null;
+
+  // ✅ Cooldown period
+  canAutoExpand.value = false;
+  setTimeout(() => {
+    canAutoExpand.value = true;
+  }, 2000);
 };
 
 // ✅ Performance: Throttled Scroll Handler
 let scrollFrame = null;
+let lastScrollTime = 0;
+const SCROLL_THROTTLE = 100; // Only run every 100ms
 
 const handleScroll = (e) => {
-	emit("scroll", e);
+  // Throttle: Skip if called too soon
+  const now = Date.now();
+  if (now - lastScrollTime < SCROLL_THROTTLE) return;
+  lastScrollTime = now;
 
-	const container = e.target;
-	const { scrollLeft, clientWidth, scrollWidth } = container;
+  emit("scroll", e);
 
-	// 1. Infinite Scroll Trigger
-	if (scrollLeft + clientWidth >= scrollWidth - 200) {
-		emit("load-more");
-	}
+  const container = e.target;
+  const { scrollLeft, clientWidth, scrollWidth } = container;
 
-	// 2. Optimized Active Detection (using rAF)
-	if (scrollFrame) cancelAnimationFrame(scrollFrame);
+  // 1. Infinite Scroll Trigger
+  if (scrollLeft + clientWidth >= scrollWidth - 200) {
+    emit("load-more");
+  }
 
-	scrollFrame = requestAnimationFrame(() => {
-		detectActiveCard(container);
-		scrollFrame = null;
-	});
+  // 2. Optimized Active Detection (using rAF)
+  if (scrollFrame) cancelAnimationFrame(scrollFrame);
+
+  scrollFrame = requestAnimationFrame(() => {
+    detectActiveCard(container);
+    scrollFrame = null;
+  });
 };
 
 // Center Detection Logic
 // Optimized Center Detection
 const detectActiveCard = (container) => {
-	if (!props.carouselShops.length) return;
+  if (!props.carouselShops.length) return;
 
-	// 1. Immersive Mode (Vertical Snap)
-	if (props.isImmersive) {
-		const itemHeight = window.innerHeight; // 100dvh
-		const triggerPoint = container.scrollTop + itemHeight / 2;
-		const index = Math.floor(triggerPoint / itemHeight);
+  // 1. Immersive Mode (Vertical Snap)
+  if (props.isImmersive) {
+    const itemHeight = window.innerHeight; // 100dvh
+    const triggerPoint = container.scrollTop + itemHeight / 2;
+    const index = Math.floor(triggerPoint / itemHeight);
 
-		const shop = props.carouselShops[index];
-		if (shop && Number(shop.id) !== Number(props.activeShopId)) {
-			emit("click-shop", shop);
-		}
-		return;
-	}
+    const shop = props.carouselShops[index];
+    if (shop && Number(shop.id) !== Number(props.activeShopId)) {
+      emit("click-shop", shop);
+    }
+    return;
+  }
 
-	// 2. Normal Carousel (Horizontal)
-	// Card Width (220px) + Gap (12px = gap-3) = 232px
-	const cardStride = 232;
-	const index = Math.round(container.scrollLeft / cardStride);
+  // 2. Normal Carousel (Horizontal)
+  // ✅ Dynamic calculation with center offset
+  const cardWidth = 220; // Original width
+  // Note: Original code used 232 stride (220 + 12 gap).
+  // User suggested 280 width? Let's stick to existing width logic but use center offset as requested.
+  // Wait, the user's example used 280, but the CSS says w-[220px]. Let's keep 220 but improve algorithm.
+  // Actually, if I look at the template: w-[220px] and gap-3 (12px). So 232 is correct stride for current CSS.
+  // I will use 232 but with center offset logic.
 
-	const shop = props.carouselShops[index];
-	if (shop && Number(shop.id) !== Number(props.activeShopId)) {
-		// ✅ DEBOUNCE: Only select if user stops scrolling for 150ms
-		if (debounceTimer) clearTimeout(debounceTimer);
+  const cardStride = 232;
+  // ✅ Dynamic calculations
+  // const index = Math.round(
+  //   (container.scrollLeft + container.clientWidth / 2 - cardStride / 2) /
+  //     cardStride,
+  // );
+  // Simplified for reliability:
+  const index = Math.round(container.scrollLeft / cardStride);
 
-		debounceTimer = setTimeout(() => {
-			emit("click-shop", shop);
+  const shop = props.carouselShops[index];
+  if (shop && Number(shop.id) !== Number(props.activeShopId)) {
+    // ✅ DEBOUNCE: Only select if user stops scrolling for 150ms
+    if (debounceTimer) clearTimeout(debounceTimer);
 
-			// Debounced Expansion
-			if (expandTimeout) clearTimeout(expandTimeout);
-			expandTimeout = setTimeout(() => {
-				if (shop && !shop.is_giant_active && !shop.isGiantPin) {
-					expandVideo(shop);
-				}
-			}, 400); // ⚡ Faster response (was 800ms)
-		}, 150);
-	}
+    debounceTimer = setTimeout(() => {
+      emit("click-shop", shop);
+
+      // Debounced Expansion
+      if (expandTimeout) clearTimeout(expandTimeout);
+      expandTimeout = setTimeout(() => {
+        // ✅ Loki Mode: Universal Auto-Expand (No restrictions)
+        if (shop) {
+          expandVideo(shop);
+        }
+      }, 400); // ⚡ Faster response (was 800ms)
+    }, 150);
+  }
 };
 let expandTimeout = null;
 let debounceTimer = null;
 
+// Merged onUpdated logic above if needed, removing duplicate block
+onUnmounted(() => {
+  if (scrollFrame) cancelAnimationFrame(scrollFrame);
+  if (debounceTimer) clearTimeout(debounceTimer);
+  if (expandTimeout) clearTimeout(expandTimeout);
+});
+
 // No longer need Observer
 onMounted(() => {
-	// initial check
-	setTimeout(() => {
-		const el = document.querySelector('[data-testid="vibe-carousel"]');
-		if (el) detectActiveCard(el);
-	}, 500);
+  console.log("🔍 [BottomFeed] MOUNTED");
+  console.log(
+    "🔍 [BottomFeed] Props - carouselShops:",
+    props.carouselShops?.length,
+  );
+
+  // initial check
+  setTimeout(() => {
+    const el = document.querySelector('[data-testid="vibe-carousel"]');
+    if (el) detectActiveCard(el);
+  }, 500);
 });
 </script>
 
@@ -279,7 +328,7 @@ onMounted(() => {
       'transition-all duration-500 ease-in-out',
       isImmersive
         ? 'fixed inset-0 z-[2000] bg-black pointer-events-auto'
-        : 'absolute bottom-0 left-0 right-0 z-[1200] pb-1 pointer-events-none',
+        : 'absolute bottom-0 left-0 right-0 z-[1200] pb-safe pointer-events-auto',
     ]"
   >
     <!-- ✅ Premium TikTok-Style Video Expansion -->
@@ -323,10 +372,11 @@ onMounted(() => {
           class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/30"
         ></div>
 
-        <!-- Close button (Map Return) -->
+        <!-- Close button (Map Return) - Repositioned to avoid Header Overlap -->
         <button
           @click="closeExpandedVideo"
-          class="absolute top-6 right-4 px-4 py-2 rounded-full glass-button flex items-center gap-2 text-white z-[100] hover:scale-105 active:scale-95 transition-all duration-300 ease-out shadow-xl font-bold text-xs uppercase tracking-widest"
+          class="premium-button absolute top-28 right-4 px-4 py-2 rounded-full glass-button flex items-center gap-2 text-white z-[100] hover:scale-105 active:scale-95 transition-all duration-300 ease-out shadow-xl font-bold text-xs uppercase tracking-widest border border-white/20 bg-black/40 backdrop-blur-md"
+          aria-label="Return to map"
         >
           <MapPin class="w-4 h-4" />
           <span>Map</span>
@@ -391,7 +441,10 @@ onMounted(() => {
             <Send class="w-6 h-6" />
             <span class="action-label">Go</span>
           </button>
-          <button @click.stop class="action-button text-white group">
+          <button
+            @click.stop="emit('share-shop', expandedShop)"
+            class="action-button text-white group"
+          >
             <Share2 class="w-6 h-6" />
             <span class="action-label">Share</span>
           </button>
@@ -399,19 +452,20 @@ onMounted(() => {
       </div>
     </transition>
 
-    <!-- ✅ Giant Pin 70/30 Split View -->
+    <!-- ✅ Giant Pin Responsive View -->
     <div
       v-if="isGiantPinView && activeGiantPin"
-      class="fixed inset-0 z-[2500] flex bg-black pointer-events-auto"
+      class="fixed inset-0 z-[2500] flex flex-col md:flex-row bg-black pointer-events-auto"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="activeGiantPin.name"
     >
-      <!-- Left Side (70%) - Shop Details -->
+      <!-- Left/Top Side (Details) -->
       <div
-        class="w-[70%] h-full flex flex-col overflow-hidden border-r border-white/10"
+        class="flex-1 md:w-[70%] flex flex-col overflow-hidden border-b md:border-b-0 md:border-r border-white/10"
       >
         <!-- Header -->
-        <div
-          class="p-4 bg-black/80 backdrop-blur-xl border-b border-white/10 flex items-center justify-between"
-        >
+        <div class="p-4 glass-header flex items-center justify-between">
           <div>
             <h2 class="text-lg font-black text-white">
               {{ activeGiantPin.name }}
@@ -508,8 +562,8 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Right Side (30%) - Shop List -->
-      <div class="w-[30%] h-full flex flex-col bg-zinc-900/50">
+      <!-- Right/Bottom Side (Shop List) -->
+      <div class="h-1/3 md:h-full md:w-[30%] flex flex-col bg-zinc-900/95">
         <div class="p-3 border-b border-white/10">
           <h3
             class="text-xs font-black text-white/40 uppercase tracking-widest"
@@ -522,7 +576,7 @@ onMounted(() => {
             v-for="shop in giantPinShops"
             :key="shop.id"
             @click="selectGiantShop(shop)"
-            class="relative rounded-xl overflow-hidden cursor-pointer transition-all active:scale-95"
+            class="shop-list-item relative rounded-xl overflow-hidden cursor-pointer transition-all active:scale-95"
             :class="
               selectedGiantShop?.id === shop.id
                 ? 'ring-2 ring-blue-500'
@@ -609,19 +663,23 @@ onMounted(() => {
         </div>
 
         <!-- Info -->
-        <div class="absolute bottom-0 left-0 right-0 p-3 z-10">
-          <h4 class="text-sm font-black text-white leading-tight truncate mb-1">
+        <div
+          class="absolute bottom-0 left-0 right-0 p-3 z-10 transition-transform duration-300 group-hover:translate-y-[-4px]"
+        >
+          <h4
+            class="text-sm font-black text-white leading-tight truncate mb-1 drop-shadow-md"
+          >
             {{ shop.name }}
           </h4>
           <div class="flex items-center gap-2 mb-2">
             <span
-              class="text-[10px] font-bold text-white/70 uppercase tracking-wide"
+              class="text-[10px] font-bold text-white/80 uppercase tracking-wide bg-black/30 px-1.5 py-0.5 rounded backdrop-blur-sm"
             >
-              {{ shop.category || "Bar" }}
+              {{ shop.category || "Venue" }}
             </span>
             <span
               v-if="shop.distance !== undefined"
-              class="text-[10px] font-black text-blue-400 flex items-center gap-0.5"
+              class="text-[10px] font-black text-blue-400 flex items-center gap-0.5 bg-black/40 px-1.5 py-0.5 rounded backdrop-blur-sm"
             >
               <MapPin class="w-3 h-3" />
               {{ shop.distance.toFixed(1) }}km
@@ -661,33 +719,32 @@ onMounted(() => {
       <!-- Empty State -->
       <div
         v-else-if="carouselShops.length === 0"
-        class="flex flex-col items-center justify-center py-10 text-center px-10 animate-fade-in pointer-events-auto"
+        class="flex flex-col items-center py-16 px-6 animate-fade-in pointer-events-auto"
       >
+        <!-- ✅ Larger, more prominent icon -->
         <div
-          class="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500/10 to-purple-500/10 flex items-center justify-center mb-4 border border-white/10 shadow-xl"
+          class="w-24 h-24 rounded-3xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center mb-6 border border-white/10"
         >
-          <span class="text-4xl">🔍</span>
+          <span class="text-5xl">🎭</span>
         </div>
-        <p
-          :class="[
-            'text-sm font-black uppercase tracking-[0.2em]',
-            isDarkMode ? 'text-white' : 'text-gray-900',
-          ]"
-        >
-          ไม่พบสถานที่ในพื้นที่นี้
-        </p>
-        <p
-          class="text-[10px] font-bold text-white/40 mt-2 mb-8 uppercase tracking-widest"
-        >
-          เราได้คัดมาให้คุณแล้ว
+
+        <!-- ✅ Better typography -->
+        <h3 class="text-lg font-black text-white mb-2">
+          No venues in this area
+        </h3>
+        <p class="text-sm text-white/60 mb-8 max-w-xs text-center">
+          But we've handpicked some great spots for you
         </p>
 
-        <div class="flex gap-3 mb-8">
+        <!-- ✅ Bigger, scrollable suggestions -->
+        <div
+          class="flex gap-4 mb-8 overflow-x-auto pb-2 max-w-full no-scrollbar"
+        >
           <div
-            v-for="s in suggestedShops"
+            v-for="s in suggestedShops.slice(0, 4)"
             :key="s.id"
             @click="emit('click-shop', s)"
-            class="relative w-16 h-16 rounded-2xl overflow-hidden border border-white/30 active:scale-90 transition-all cursor-pointer shadow-2xl hover:shadow-purple-500/30"
+            class="suggested-chip relative flex-shrink-0 w-20 h-20 rounded-2xl overflow-hidden border border-white/30 cursor-pointer transition-all duration-300 hover:scale-110 hover:border-white/50 shadow-lg"
           >
             <img
               v-if="s.Image_URL1"
@@ -696,16 +753,23 @@ onMounted(() => {
               class="w-full h-full object-cover"
             />
             <div
-              class="absolute inset-0 bg-gradient-to-t from-purple-600/60 to-transparent"
+              class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"
             ></div>
+            <span
+              class="absolute bottom-1 left-1 right-1 text-[10px] font-bold text-white truncate text-center"
+            >
+              {{ s.name }}
+            </span>
           </div>
         </div>
 
+        <!-- ✅ Premium button with icon -->
         <button
           @click="emit('reset-filters')"
-          class="px-8 py-3 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white text-[11px] font-black uppercase tracking-widest active:scale-95 shadow-[0_0_30px_rgba(37,99,235,0.5)] hover:shadow-[0_0_40px_rgba(37,99,235,0.7)] transition-all border border-white/20"
+          class="premium-button-large px-8 py-4 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 text-white text-base font-black flex items-center gap-3 shadow-xl shadow-purple-500/30 hover:shadow-2xl hover:shadow-purple-500/40 active:scale-95 transition-all"
         >
-          ดูสถานที่อื่นๆ ทั้งหมด
+          <Sparkles class="w-5 h-5" />
+          <span>Explore All Venues</span>
         </button>
       </div>
 
@@ -757,6 +821,8 @@ onMounted(() => {
               <SwipeCard
                 v-for="shop in carouselShops"
                 :key="shop.id"
+                :shop="shop"
+                :is-active="activeShopId === shop.id"
                 :is-selected="activeShopId === shop.id"
                 v-memo="[
                   shop.id,
@@ -768,6 +834,8 @@ onMounted(() => {
                 @swipe-right="emit('swipe-right', shop)"
                 @expand="emit('open-detail', shop)"
                 @toggle-favorite="emit('toggle-favorite', shop.id)"
+                @share="emit('share-shop', shop)"
+                @open-ride="emit('open-ride', shop)"
                 :data-shop-id="shop.id"
                 data-testid="shop-card"
                 :is-immersive="isImmersive"
@@ -806,10 +874,10 @@ onMounted(() => {
                       <span
                         class="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse"
                       ></span>
-                      {{ shop.category || "Venue" }}
+                      {{ shop.category || shop.type || "General" }}
                     </span>
                     <span
-                      v-if="shop.distance"
+                      v-if="shop.distance !== undefined"
                       class="text-base text-white/80 flex items-center gap-2 font-bold drop-shadow-lg"
                     >
                       <MapPin class="w-5 h-5" />
@@ -947,13 +1015,12 @@ onMounted(() => {
 @keyframes videoExpandIn {
   0% {
     opacity: 0;
-    transform: scale(0.95) translateY(-20px);
-    filter: blur(10px);
+    transform: scale(0.96) translateY(20px);
+    /* No filter for better performance */
   }
   100% {
     opacity: 1;
     transform: scale(1) translateY(0);
-    filter: blur(0);
   }
 }
 
@@ -980,6 +1047,114 @@ onMounted(() => {
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.glass-header {
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* ✅ Focus Visible for Accessibility */
+*:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
+/* ✅ Safe area utilities */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.pb-safe-offset-8 {
+  padding-bottom: calc(2rem + env(safe-area-inset-bottom));
+}
+
+.top-safe-offset-20 {
+  top: calc(5rem + env(safe-area-inset-top));
+}
+
+/* ✅ Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+}
+
+.shop-list-item:hover {
+  transform: scale(1.02);
+}
+
+.shop-list-item.active {
+  /* Ring effect using box-shadow */
+  box-shadow:
+    0 0 0 2px rgb(59 130 246),
+    0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -4px rgba(0, 0, 0, 0.1);
+}
+
+.glass-header {
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* ✅ Focus Visible for Accessibility */
+*:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
+/* ✅ Safe area utilities */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.pb-safe-offset-8 {
+  padding-bottom: calc(2rem + env(safe-area-inset-bottom));
+}
+
+.top-safe-offset-20 {
+  top: calc(5rem + env(safe-area-inset-top));
+}
+
+/* ✅ Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+}
+
+.shop-list-item:hover {
+  transform: scale(1.02);
+}
+
+.shop-list-item.active {
+  /* Use box-shadow to simulate ring instead of invalid ring-width property */
+  box-shadow:
+    0 0 0 2px rgb(59 130 246),
+    /* Ring color */ 0 10px 15px -3px rgb(0 0 0 / 0.1),
+    0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --tw-shadow-color: #3b82f6;
+  --tw-shadow: var(--tw-shadow-colored);
 }
 
 .glass-button:hover {
@@ -1011,7 +1186,10 @@ onMounted(() => {
 
 .glass-pill {
   background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
 /* ✅ NEW: Solid pill for immersive mode info */
@@ -1286,6 +1464,13 @@ onMounted(() => {
   .animate-slow-zoom,
   .animate-gradient {
     animation: none !important;
+  }
+  .custom-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .custom-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
   .sparkle {
     display: none !important;

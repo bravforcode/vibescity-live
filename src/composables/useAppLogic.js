@@ -9,9 +9,9 @@ import { useShopStore } from "../store/shopStore";
 import { useUserStore } from "../store/userStore";
 import { calculateDistance } from "../utils/shopUtils";
 import {
-	loadFavoritesWithTTL,
-	removeFavoriteItem,
-	saveFavoriteItem,
+    loadFavoritesWithTTL,
+    removeFavoriteItem,
+    saveFavoriteItem,
 } from "../utils/storageHelper";
 import { useAudioSystem } from "./useAudioSystem";
 // ✅ Modular Composables
@@ -58,7 +58,12 @@ export function useAppLogic() {
 		levelProgress,
 		rotationSeed,
 		userLocation,
+        visibleShops, // Destructure this!
 	} = storeToRefs(shopStore);
+
+    watch(visibleShops, (val) => {
+        console.log(`🔍 [useAppLogic] visibleShops changed: ${val?.length}`);
+    });
 
 	const { preferences } = storeToRefs(userStore);
 	const isDarkMode = computed(() => preferences.value.isDarkMode);
@@ -314,7 +319,9 @@ export function useAppLogic() {
 	});
 
 	// Gestures (Must be called in setup, not inside onMounted)
-	useEdgeSwipe(() => (showSidebar.value = true));
+	useEdgeSwipe(() => {
+		showSidebar.value = true;
+	});
 
 	// --- OnMounted ---
 	const activeUserCount = ref(0);
@@ -360,24 +367,45 @@ export function useAppLogic() {
 				updateEventsData(),
 				fetch("/data/buildings.json")
 					.then((r) => r.json())
-					.then((d) => (buildingsData.value = d))
+					.then((d) => {
+						buildingsData.value = d;
+					})
 					.catch(() => {}),
 				fetch("/data/events.json")
 					.then((r) => r.json())
-					.then((d) => (timedEvents.value = d))
+					.then((d) => {
+						timedEvents.value = d;
+					})
 					.catch(() => {}),
 			]);
 
-			// Geolocation
+			// Geolocation with Throttling (Real Data Smoothness)
 			if (navigator.geolocation) {
-				navigator.geolocation.getCurrentPosition(
-					(pos) =>
-						shopStore.setUserLocation([
-							pos.coords.latitude,
-							pos.coords.longitude,
-						]),
-					() => shopStore.setUserLocation([18.7883, 98.9853]),
-					{ enableHighAccuracy: true, timeout: 5000 },
+				let lastLat = 0;
+				let lastLng = 0;
+				const MIN_DIST = 0.0002; // Approx 20 meters
+
+				navigator.geolocation.watchPosition(
+					(pos) => {
+						const { latitude, longitude } = pos.coords;
+						// Simple Taxicab geometry check for throttle
+						if (
+							Math.abs(latitude - lastLat) > MIN_DIST ||
+							Math.abs(longitude - lastLng) > MIN_DIST
+						) {
+							shopStore.setUserLocation([latitude, longitude]);
+							lastLat = latitude;
+							lastLng = longitude;
+						}
+					},
+					(err) => {
+						console.warn("Geolocation warning:", err.message);
+						// Fallback only if no location set yet
+						if (!shopStore.userLocation) {
+							shopStore.setUserLocation([18.7883, 98.9853]);
+						}
+					},
+					{ enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 },
 				);
 			}
 
@@ -422,8 +450,12 @@ export function useAppLogic() {
 	const isFavorited = (id) => favorites.value.includes(Number(id));
 
 	// Ride App
-	const openRideModal = (shop) => (uiLogic.rideModalShop.value = shop);
-	const closeRideModal = () => (uiLogic.rideModalShop.value = null);
+	const openRideModal = (shop) => {
+		uiLogic.rideModalShop.value = shop;
+	};
+	const closeRideModal = () => {
+		uiLogic.rideModalShop.value = null;
+	};
 	const openRideApp = (appName) => {
 		if (!uiLogic.rideModalShop.value) return;
 		openRideAppService(appName, uiLogic.rideModalShop.value);
@@ -493,8 +525,9 @@ export function useAppLogic() {
 		errorMessage,
 		activeUserCount, // ✅ New
 		isOwnerDashboardOpen, // ✅ New Owner State
-		toggleOwnerDashboard: () =>
-			(isOwnerDashboardOpen.value = !isOwnerDashboardOpen.value),
+		toggleOwnerDashboard: () => {
+			isOwnerDashboardOpen.value = !isOwnerDashboardOpen.value;
+		},
 		clearError: () => {
 			errorMessage.value = null;
 		},
@@ -502,9 +535,18 @@ export function useAppLogic() {
 
 		// Methods
 		applyShopSelection,
-		handleMarkerClick,
-		handleCardClick,
-		handlePanelScroll,
+    handleMarkerClick,
+    handleCardClick,
+    handleOpenDetail: (shop) => {
+      // ✅ Fix: Ensure detailed view opens when swiping up
+      if (!shop) {
+        selectedShop.value = null;
+        return;
+      }
+      applyShopSelection(shop.id);
+      selectedShop.value = shop;
+    },
+    handlePanelScroll,
 		toggleFavorite,
 		isFavorited,
 		openRideModal,
@@ -530,7 +572,9 @@ export function useAppLogic() {
 			uiLogic.showSearchResults.value = false;
 		},
 		handleSearchBlur: () =>
-			setTimeout(() => (uiLogic.showSearchResults.value = false), 200),
+			setTimeout(() => {
+				uiLogic.showSearchResults.value = false;
+			}, 200),
 
 		// Misc (Keep compatibility)
 		carouselShops: computed(() => {

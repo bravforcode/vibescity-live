@@ -12,6 +12,7 @@ export function useUILogic() {
 
 	const checkMobileView = () => {
 		isMobileView.value = window.innerWidth < 768;
+        console.log(`🔍 [useUILogic] checkMobileView: width=${window.innerWidth} -> isMobileView=${isMobileView.value}`);
 	};
 
 	const checkOrientation = () => {
@@ -57,6 +58,10 @@ export function useUILogic() {
 		isVibeNowCollapsed.value = !isVibeNowCollapsed.value;
 		nextTick(measureBottomUi); // Remeasure after toggle
 	};
+    const isImmersive = ref(false);
+    const toggleImmersive = () => {
+        isImmersive.value = !isImmersive.value;
+    };
 
 	// Modals/Overlays
 	const activeTab = ref("map");
@@ -94,6 +99,7 @@ export function useUILogic() {
 
 		// Methods
 		toggleVibeNow,
+        toggleImmersive,
 		checkMobileView,
 		measureBottomUi,
 	};

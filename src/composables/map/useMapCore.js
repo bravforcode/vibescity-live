@@ -2,7 +2,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { onUnmounted, ref, shallowRef } from 'vue';
 
-export function useMapCore(containerRef, options = {}) {
+export function useMapCore(containerRef, _options = {}) {
     const map = shallowRef(null);
     const isMapReady = ref(false);
     const isMapLoaded = ref(false);
@@ -31,7 +31,9 @@ export function useMapCore(containerRef, options = {}) {
         map.value.on('load', () => {
             isMapReady.value = true;
             isMapLoaded.value = true;
-            map.value.resize(); // Ensure correct size
+            if (map.value) {
+                map.value.resize(); // Ensure correct size
+            }
         });
 
         // Error handling

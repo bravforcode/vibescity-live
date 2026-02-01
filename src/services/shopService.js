@@ -7,12 +7,12 @@ import { supabase } from "../lib/supabase";
 const mapShopData = (item, index) => {
 	// Handle array images from 'venues' or legacy individual columns
 	const img1 =
-		(item.image_urls && item.image_urls[0]) ||
+		item.image_urls?.[0] ||
 		item.image_url_1 ||
 		item.Image_URL1 ||
 		"";
 	const img2 =
-		(item.image_urls && item.image_urls[1]) ||
+		item.image_urls?.[1] ||
 		item.image_url_2 ||
 		item.Image_URL2 ||
 		"";

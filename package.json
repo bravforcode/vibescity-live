@@ -22,7 +22,7 @@
     "test:e2e:smoke": "PW_GREP=@smoke playwright test",
     "test:e2e:debug": "PW_SLOWMO=150 playwright test --debug",
     "test:spike": "k6 run k6-tests/spike-test.js",
-  "test:chaos": "k6 run k6-tests/chaos-test.js"
+    "test:chaos": "k6 run k6-tests/chaos-test.js"
   },
   "dependencies": {
     "@mapbox/mapbox-gl-geocoder": "^5.1.2",
@@ -34,6 +34,7 @@
     "@turf/helpers": "^7.3.2",
     "@turf/line-offset": "^7.3.2",
     "@vercel/speed-insights": "^1.3.1",
+    "@vueuse/core": "^14.2.0",
     "@vueuse/motion": "^3.0.3",
     "aos": "^2.3.4",
     "axios": "^1.13.2",

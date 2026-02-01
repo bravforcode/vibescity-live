@@ -1,10 +1,10 @@
 <script setup>
+import { useHaptics } from "@/composables/useHaptics";
 import { Loader2 } from "lucide-vue-next";
 import { onBeforeUnmount, ref, watch } from "vue";
-import { useHaptics } from "@/composables/useHaptics";
 
 const props = defineProps({
-	isRefreshing: Boolean,
+  isRefreshing: Boolean,
 });
 
 const emit = defineEmits(["refresh"]);
@@ -21,75 +21,75 @@ let isDragging = false;
 let resetTimeout = null; // ✅ Store timeout ID for cleanup
 
 const onTouchStart = (e) => {
-	// Only trigger if at top of scroll (use || not &&)
-	if (
-		window.scrollY > 0 ||
-		(containerRef.value && containerRef.value.scrollTop > 0)
-	)
-		return;
+  // Only trigger if at top of scroll (use || not &&)
+  if (
+    window.scrollY > 0 ||
+    (containerRef.value && containerRef.value.scrollTop > 0)
+  )
+    return;
 
-	startY = e.touches[0].clientY;
-	isDragging = true;
+  startY = e.touches[0].clientY;
+  isDragging = true;
 };
 
 const onTouchMove = (e) => {
-	if (!isDragging) return;
+  if (!isDragging) return;
 
-	const currentY = e.touches[0].clientY;
-	const diff = currentY - startY;
+  const currentY = e.touches[0].clientY;
+  const diff = currentY - startY;
 
-	// Only pull down
-	if (diff > 0) {
-		// Apply resistance
-		const resistance = diff * 0.4;
-		pullDistance.value = Math.min(resistance, 150); // Cap visual pull
+  // Only pull down
+  if (diff > 0) {
+    // Apply resistance
+    const resistance = diff * 0.4;
+    pullDistance.value = Math.min(resistance, 150); // Cap visual pull
 
-		// Haptic snap logic
-		if (pullDistance.value > THRESHOLD && !isReadyToRefresh.value) {
-			isReadyToRefresh.value = true;
-			selectFeedback();
-		} else if (pullDistance.value < THRESHOLD && isReadyToRefresh.value) {
-			isReadyToRefresh.value = false;
-		}
+    // Haptic snap logic
+    if (pullDistance.value > THRESHOLD && !isReadyToRefresh.value) {
+      isReadyToRefresh.value = true;
+      selectFeedback();
+    } else if (pullDistance.value < THRESHOLD && isReadyToRefresh.value) {
+      isReadyToRefresh.value = false;
+    }
 
-		// Always prevent native pull-to-refresh when actively handling
-		if (e.cancelable) e.preventDefault();
-	}
+    // Always prevent native pull-to-refresh when actively handling
+    if (e.cancelable) e.preventDefault();
+  }
 };
 
 const onTouchEnd = () => {
-	isDragging = false;
-	if (isReadyToRefresh.value) {
-		pullDistance.value = THRESHOLD; // Snap to loading position
-		successFeedback();
-		emit("refresh");
-	} else {
-		pullDistance.value = 0; // Snap back
-	}
+  isDragging = false;
+  if (isReadyToRefresh.value) {
+    pullDistance.value = THRESHOLD; // Snap to loading position
+    successFeedback();
+    emit("refresh");
+  } else {
+    pullDistance.value = 0; // Snap back
+  }
 };
 
 watch(
-	() => props.isRefreshing,
-	(newVal) => {
-		if (!newVal) {
-			// Clear existing timeout before creating new one
-			if (resetTimeout) clearTimeout(resetTimeout);
-			// Reset after refresh done
-			resetTimeout = setTimeout(() => {
-				pullDistance.value = 0;
-				isReadyToRefresh.value = false;
-				resetTimeout = null;
-			}, 300);
-		}
-	},
+  () => props.isRefreshing,
+  (newVal) => {
+    if (!newVal) {
+      // Clear existing timeout before creating new one
+      if (resetTimeout) clearTimeout(resetTimeout);
+      // Reset after refresh done
+      resetTimeout = setTimeout(() => {
+        pullDistance.value = 0;
+        isReadyToRefresh.value = false;
+        resetTimeout = null;
+      }, 300);
+    }
+  },
 );
 
 // ✅ Cleanup timeout on unmount
 onBeforeUnmount(() => {
-	if (resetTimeout) {
-		clearTimeout(resetTimeout);
-		resetTimeout = null;
-	}
+  if (resetTimeout) {
+    clearTimeout(resetTimeout);
+    resetTimeout = null;
+  }
 });
 </script>
 
@@ -114,10 +114,12 @@ onBeforeUnmount(() => {
     >
       <div class="transform translate-y-2">
         <Loader2
-          class="w-6 h-6"
+          class="w-6 h-6 transition-all duration-300"
           :class="[
-            isRefreshing || isReadyToRefresh ? 'animate-spin' : '',
-            isReadyToRefresh ? 'text-blue-400' : 'text-white/50',
+            isRefreshing || isReadyToRefresh
+              ? 'animate-spin text-purple-400 drop-shadow-[0_0_8px_rgba(192,132,252,0.8)]'
+              : 'text-white/20',
+            isDragging && !isReadyToRefresh ? 'scale-75' : 'scale-100',
           ]"
         />
       </div>

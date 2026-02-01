@@ -144,103 +144,103 @@ import { computed, ref } from "vue";
 import { supabase } from "../../lib/supabase";
 
 const props = defineProps({
-	isOpen: Boolean,
+  isOpen: Boolean,
 });
 
 const emit = defineEmits(["close", "success"]);
 
 const form = ref({
-	name: "",
-	category: "Cafe",
-	province: "",
-	imageUrl: "",
-	lat: null,
-	lng: null,
+  name: "",
+  category: "Cafe",
+  province: "",
+  imageUrl: "",
+  lat: null,
+  lng: null,
 });
 
 const loading = ref(false);
 
 const currentLocationText = computed(() => {
-	if (form.value.lat && form.value.lng) {
-		return `${form.value.lat.toFixed(4)}, ${form.value.lng.toFixed(4)}`;
-	}
-	return "No location selected";
+  if (form.value.lat && form.value.lng) {
+    return `${form.value.lat.toFixed(4)}, ${form.value.lng.toFixed(4)}`;
+  }
+  return "No location selected";
 });
 
 const getCurrentLocation = () => {
-	if (navigator.geolocation) {
-		navigator.geolocation.getCurrentPosition(
-			(position) => {
-				form.value.lat = position.coords.latitude;
-				form.value.lng = position.coords.longitude;
-			},
-			(error) => {
-				alert("Could not get location. Please enable GPS.");
-			},
-		);
-	}
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        form.value.lat = position.coords.latitude;
+        form.value.lng = position.coords.longitude;
+      },
+      (_error) => {
+        alert("Could not get location. Please enable GPS.");
+      },
+    );
+  }
 };
 
 const close = () => {
-	emit("close");
+  emit("close");
 };
 
 const submit = async () => {
-	if (!form.value.name || !form.value.lat) {
-		alert("Please enter a name and select a location.");
-		return;
-	}
+  if (!form.value.name || !form.value.lat) {
+    alert("Please enter a name and select a location.");
+    return;
+  }
 
-	loading.value = true;
+  loading.value = true;
 
-	try {
-		// 1. Get User
-		const {
-			data: { user },
-		} = await supabase.auth.getUser();
-		const userId = user?.id || "anonymous_for_mvp"; // Handle auth later if needed
+  try {
+    // 1. Get User
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const userId = user?.id || "anonymous_for_mvp"; // Handle auth later if needed
 
-		// 2. Call API
-		// 2. Direct Supabase Insert (Loki Mode Speed)
-		// We insert into 'user_submissions' which triggers the 'gamification_logs' via generic logic if we add it later
-		// For now, simple insert.
-		const { data, error } = await supabase
-			.from("user_submissions")
-			.insert([
-				{
-					user_id: userId,
-					shop_name: form.value.name,
-					category: form.value.category,
-					latitude: form.value.lat,
-					longitude: form.value.lng,
-					province: form.value.province,
-					image_url: form.value.imageUrl,
-					status: "PENDING",
-				},
-			])
-			.select();
+    // 2. Call API
+    // 2. Direct Supabase Insert (Loki Mode Speed)
+    // We insert into 'user_submissions' which triggers the 'gamification_logs' via generic logic if we add it later
+    // For now, simple insert.
+    const { data, error } = await supabase
+      .from("user_submissions")
+      .insert([
+        {
+          user_id: userId,
+          shop_name: form.value.name,
+          category: form.value.category,
+          latitude: form.value.lat,
+          longitude: form.value.lng,
+          province: form.value.province,
+          image_url: form.value.imageUrl,
+          status: "PENDING",
+        },
+      ])
+      .select();
 
-		if (error) throw error;
+    if (error) throw error;
 
-		// Fallback/Legacy API call removed for MVP speed
-		/*
+    // Fallback/Legacy API call removed for MVP speed
+    /*
     const response = await fetch(
       `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/ugc/shops`,
       ...
     );
     */
 
-		// const result = await response.json();
-		// if (!response.ok) throw new Error(result.detail || "Submission failed");
+    // const result = await response.json();
+    // if (!response.ok) throw new Error(result.detail || "Submission failed");
 
-		alert("🎉 Submitted! You earned +10 Coins pending approval.");
-		emit("success");
-		close();
-	} catch (error) {
-		console.error(error);
-		alert("Error submitting shop: " + error.message);
-	} finally {
-		loading.value = false;
-	}
+    alert("🎉 Submitted! You earned +10 Coins pending approval.");
+    emit("success");
+    close();
+  } catch (error) {
+    console.error(error);
+    alert(`Error submitting shop: ${error.message}`);
+  } finally {
+    loading.value = false;
+  }
 };
 </script>

@@ -138,106 +138,106 @@ import { computed, ref, watch } from "vue";
 import { supabase } from "../../lib/supabase";
 
 const props = defineProps({
-	isOpen: Boolean,
-	shop: Object, // The shop being edited
+  isOpen: Boolean,
+  shop: Object, // The shop being edited
 });
 
 const emit = defineEmits(["close", "success"]);
 
 const form = ref({
-	name: "",
-	category: "Cafe",
-	province: "",
-	imageUrl: "",
-	lat: null,
-	lng: null,
+  name: "",
+  category: "Cafe",
+  province: "",
+  imageUrl: "",
+  lat: null,
+  lng: null,
 });
 
 const loading = ref(false);
 
 // Initialize form when shop changes or modal opens
 watch(
-	() => props.shop,
-	(newShop) => {
-		if (newShop) {
-			form.value = {
-				name: newShop.name,
-				category: newShop.category || "Cafe",
-				province: newShop.Province || "", // Note capitalization in shopStore
-				imageUrl: newShop.Image_URL1 || "",
-				lat: newShop.lat,
-				lng: newShop.lng,
-			};
-		}
-	},
-	{ immediate: true },
+  () => props.shop,
+  (newShop) => {
+    if (newShop) {
+      form.value = {
+        name: newShop.name,
+        category: newShop.category || "Cafe",
+        province: newShop.Province || "", // Note capitalization in shopStore
+        imageUrl: newShop.Image_URL1 || "",
+        lat: newShop.lat,
+        lng: newShop.lng,
+      };
+    }
+  },
+  { immediate: true },
 );
 
 const currentLocationText = computed(() => {
-	if (form.value.lat && form.value.lng) {
-		return `${form.value.lat.toFixed(4)}, ${form.value.lng.toFixed(4)}`;
-	}
-	return "Original Location";
+  if (form.value.lat && form.value.lng) {
+    return `${form.value.lat.toFixed(4)}, ${form.value.lng.toFixed(4)}`;
+  }
+  return "Original Location";
 });
 
 const getCurrentLocation = () => {
-	if (navigator.geolocation) {
-		navigator.geolocation.getCurrentPosition(
-			(position) => {
-				form.value.lat = position.coords.latitude;
-				form.value.lng = position.coords.longitude;
-			},
-			(error) => {
-				alert("Could not get location. Please enable GPS.");
-			},
-		);
-	}
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        form.value.lat = position.coords.latitude;
+        form.value.lng = position.coords.longitude;
+      },
+      (_error) => {
+        alert("Could not get location. Please enable GPS.");
+      },
+    );
+  }
 };
 
 const close = () => {
-	emit("close");
+  emit("close");
 };
 
 const submit = async () => {
-	if (!form.value.name) {
-		alert("Please enter a name.");
-		return;
-	}
+  if (!form.value.name) {
+    alert("Please enter a name.");
+    return;
+  }
 
-	loading.value = true;
+  loading.value = true;
 
-	try {
-		const {
-			data: { user },
-		} = await supabase.auth.getUser();
-		const userId = user?.id || "anonymous_edit_mvp";
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const userId = user?.id || "anonymous_edit_mvp";
 
-		// Direct Supabase Insert for Edit
-		const { data, error } = await supabase.from("user_submissions").insert([
-			{
-				user_id: userId,
-				venue_id: props.shop.id, // Link to existing venue
-				shop_name: form.value.name,
-				category: form.value.category,
-				latitude: form.value.lat,
-				longitude: form.value.lng,
-				province: form.value.province,
-				image_url: form.value.imageUrl,
-				status: "PENDING",
-				notes: "User suggested edit",
-			},
-		]);
+    // Direct Supabase Insert for Edit
+    const { data, error } = await supabase.from("user_submissions").insert([
+      {
+        user_id: userId,
+        venue_id: props.shop.id, // Link to existing venue
+        shop_name: form.value.name,
+        category: form.value.category,
+        latitude: form.value.lat,
+        longitude: form.value.lng,
+        province: form.value.province,
+        image_url: form.value.imageUrl,
+        status: "PENDING",
+        notes: "User suggested edit",
+      },
+    ]);
 
-		if (error) throw error;
+    if (error) throw error;
 
-		alert("📝 Edit submitted for review! Thanks for helping.");
-		emit("success");
-		close();
-	} catch (error) {
-		console.error(error);
-		alert("Error submitting edit: " + error.message);
-	} finally {
-		loading.value = false;
-	}
+    alert("📝 Edit submitted for review! Thanks for helping.");
+    emit("success");
+    close();
+  } catch (error) {
+    console.error(error);
+    alert(`Error submitting edit: ${error.message}`);
+  } finally {
+    loading.value = false;
+  }
 };
 </script>

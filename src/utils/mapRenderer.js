@@ -26,7 +26,7 @@ export const createPopupHTML = ({
 	hasCoins,
 	roadDistance,
 	roadDuration,
-	tt, // translation function
+	_tt, // translation function
 }) => {
 	const isLive = item.status === "LIVE";
 	const bgClass = isDarkMode ? "bg-zinc-900/95" : "bg-white/95";

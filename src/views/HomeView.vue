@@ -5,6 +5,7 @@ import { defineAsyncComponent, ref } from "vue";
 import BottomFeed from "../components/feed/BottomFeed.vue";
 import SmartHeader from "../components/layout/SmartHeader.vue";
 import AppModals from "../components/system/AppModals.vue";
+import SidebarDrawer from "../components/ui/SidebarDrawer.vue"; // ✅ Sync Import to fix loading
 import { useAppLogic } from "../composables/useAppLogic";
 
 // ✅ Async Components (Preserved)
@@ -14,9 +15,7 @@ const MapContainer = defineAsyncComponent(
 const VideoPanel = defineAsyncComponent(
   () => import("../components/panel/VideoPanel.vue"),
 );
-const SidebarDrawer = defineAsyncComponent(
-  () => import("../components/ui/SidebarDrawer.vue"),
-);
+// SidebarDrawer moved to sync above
 const VibeError = defineAsyncComponent(
   () => import("../components/ui/VibeError.vue"),
 );
@@ -191,6 +190,22 @@ const onExitGiantView = () => {
   isGiantPinView.value = false;
   handleExitGiantView();
 };
+
+// 🔍 DEBUG: Trace UI State
+import { onMounted, watch } from "vue";
+onMounted(() => {
+  console.log("🔍 [HomeView] Mounted");
+  console.log("🔍 [HomeView] isMobileView:", isMobileView.value);
+  console.log("🔍 [HomeView] isLandscape:", isLandscape.value);
+  console.log("🔍 [HomeView] isUiVisible:", isUiVisible.value);
+  console.log("🔍 [HomeView] carouselShops:", carouselShops.value?.length);
+});
+
+watch([isMobileView, isLandscape, isUiVisible], ([m, l, v]) => {
+  console.log(
+    `🔍 [HomeView] State Change -> Mobile: ${m}, Landscape: ${l}, UiVisible: ${v}`,
+  );
+});
 </script>
 
 <template>
@@ -491,51 +506,72 @@ const onExitGiantView = () => {
           />
         </transition>
 
-        <Transition name="ui-slide-up">
-          <div
-            v-show="isUiVisible && !isImmersive"
-            class="absolute bottom-0 left-0 right-0 z-10"
-          >
-            <BottomFeed
-              ref="bottomUiRef"
-              :is-data-loading="isDataLoading"
-              :is-refreshing="isRefreshing"
-              :is-immersive="isImmersive"
-              :is-dark-mode="isDarkMode"
-              :is-indoor-view="isIndoorView"
-              :active-floor="activeFloor"
-              :live-count="liveCount"
-              :carousel-shops="carouselShops"
-              :suggested-shops="suggestedShops"
-              :favorites="favorites"
-              :active-shop-id="activeShopId"
-              :mall-shops="mallShops"
-              :set-bottom-ui-ref="(el) => (bottomUiRef = el)"
-              :set-mobile-card-scroll-ref="(el) => (mobileCardScrollRef = el)"
-              @click-shop="handleCardClick"
-              @open-detail="handleOpenDetail"
-              @open-ride="openRideModal"
-              @swipe-left="(shop) => handleSwipe('left', shop)"
-              @swipe-right="(shop) => handleSwipe('right', shop)"
-              @toggle-favorite="toggleFavorite"
-              @toggle-immersive="toggleImmersive"
-              @set-active-floor="(f) => (activeFloor = f)"
-              @reset-filters="
-                () => {
-                  activeCategories = [];
-                  activeStatus = 'ALL';
+        <!-- REMOVED Transition for Debugging -->
+        <div
+          v-show="isUiVisible && !isImmersive"
+          class="absolute bottom-0 left-0 right-0 z-10 border-4 border-red-500 pointer-events-auto"
+        >
+          <BottomFeed
+            ref="bottomUiRef"
+            :is-data-loading="isDataLoading"
+            :is-refreshing="isRefreshing"
+            :is-immersive="isImmersive"
+            :is-dark-mode="isDarkMode"
+            :is-indoor-view="isIndoorView"
+            :active-floor="activeFloor"
+            :live-count="liveCount"
+            :carousel-shops="carouselShops"
+            :suggested-shops="suggestedShops"
+            :favorites="favorites"
+            :active-shop-id="activeShopId"
+            :mall-shops="mallShops"
+            :set-bottom-ui-ref="(el) => (bottomUiRef = el)"
+            :set-mobile-card-scroll-ref="(el) => (mobileCardScrollRef = el)"
+            @click-shop="handleCardClick"
+            @open-detail="handleOpenDetail"
+            @open-ride="openRideModal"
+            @swipe-left="(shop) => handleSwipe('left', shop)"
+            @swipe-right="(shop) => handleSwipe('right', shop)"
+            @toggle-favorite="toggleFavorite"
+            @share-shop="
+              (shop) => {
+                /* ✅ Handle Share safely */
+                if (
+                  typeof window !== 'undefined' &&
+                  window.navigator &&
+                  window.navigator.share
+                ) {
+                  window.navigator
+                    .share({
+                      title: shop?.name || 'VibeCity Shop',
+                      text: `Check out ${shop?.name || 'this shop'} on VibeCity!`,
+                      url: window.location.href,
+                    })
+                    .catch((err) => console.warn('Share failed:', err));
+                } else {
+                  console.log('Share API not supported on this browser');
+                  // Optional: Fallback to clipboard copy
                 }
-              "
-              @scroll="handleHorizontalScroll"
-              @scroll-start="onScrollStart"
-              @scroll-end="onScrollEnd"
-              @load-more="loadMoreVibes"
-              @refresh="handleRefresh"
-              @enter-giant-view="onEnterGiantView"
-              @exit-giant-view="onExitGiantView"
-            />
-          </div>
-        </Transition>
+              }
+            "
+            @toggle-immersive="toggleImmersive"
+            @set-active-floor="(f) => (activeFloor = f)"
+            @reset-filters="
+              () => {
+                activeCategories = [];
+                activeStatus = 'ALL';
+              }
+            "
+            @scroll="handleHorizontalScroll"
+            @scroll-start="onScrollStart"
+            @scroll-end="onScrollEnd"
+            @load-more="loadMoreVibes"
+            @refresh="handleRefresh"
+            @enter-giant-view="onEnterGiantView"
+            @exit-giant-view="onExitGiantView"
+          />
+        </div>
+        <!-- /Transition -->
       </template>
     </div>
 

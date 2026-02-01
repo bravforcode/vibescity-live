@@ -82,6 +82,28 @@ export function useMapLayers(map) {
             },
             paint: { "text-color": "#ffffff" },
         });
+
+        // ✅ Missing Layer: Unclustered Points (Individual Pins)
+        map.value.addLayer({
+            id: "unclustered-point",
+            type: "circle",
+            source: sourceId,
+            filter: ["!", ["has", "point_count"]],
+            paint: {
+                "circle-color": [
+                    "match",
+                    ["get", "status"],
+                    "LIVE", "#ef4444", // Red for LIVE
+                    "#3b82f6" // Blue for others
+                ],
+                "circle-radius": 6,
+                "circle-stroke-width": 2,
+                "circle-stroke-color": "#fff",
+                "circle-opacity": 0.9,
+            }
+        });
+
+        // Add specific interaction later if needed (handled by MapboxContainer click)
     };
 
     // Public API

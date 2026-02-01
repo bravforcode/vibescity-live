@@ -5,12 +5,12 @@
  */
 
 import { useHaptics } from "@/composables/useHaptics";
-import { ChevronUp } from "lucide-vue-next";
+import { Car, ChevronUp, Clock, Heart, Share2 } from "lucide-vue-next";
 import { computed, defineEmits, defineProps, ref, watch } from "vue";
 import { useShopStore } from "../../store/shopStore";
 
 const props = defineProps({
-  threshold: { type: Number, default: 120 },
+  threshold: { type: Number, default: 90 },
   showExpand: { type: Boolean, default: true },
   isSelected: { type: Boolean, default: false },
   isImmersive: { type: Boolean, default: false },
@@ -23,7 +23,48 @@ const emit = defineEmits([
   "swipe-right",
   "expand",
   "toggle-favorite",
+  "share",
+  "open-ride", // ✅ Added
 ]);
+
+// ... (keep existing setup)
+
+// Computed for Safe Display
+const displayName = computed(
+  () => props.shop?.name || props.shop?.Name || "Venue",
+);
+const displayCategory = computed(
+  () =>
+    props.shop?.category ||
+    props.shop?.Category ||
+    props.shop?.type ||
+    "General",
+);
+const displayTime = computed(() => {
+  const o = props.shop?.openTime || props.shop?.OpenTime || "10:00";
+  const c = props.shop?.closeTime || props.shop?.CloseTime || "22:00";
+  return `${o} - ${c}`;
+});
+const displayDistance = computed(() => {
+  const d = props.shop?.distance || props.shop?.Distance;
+  return d !== undefined ? `${Number(d).toFixed(1)}km` : "Nearby";
+});
+
+// ...
+
+// In Template:
+// Replace {{ shop?.name }} with {{ displayName }}
+// Replace category with {{ displayCategory }}
+// Update Ride Button:
+/*
+<button
+  @click.stop="emit('open-ride')"
+  class="w-full py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-bold text-sm shadow-lg shadow-blue-500/30 active:scale-95 transition-all flex items-center justify-center gap-2 border border-blue-400/50"
+>
+  <Car class="w-4 h-4" />
+  เรียกรถ
+</button>
+*/
 
 const { selectFeedback, successFeedback } = useHaptics();
 
@@ -144,6 +185,115 @@ const uiOpacity = computed(() =>
     @touchstart="handleTouchStart"
     @touchmove="handleTouchMove"
   >
+    <!-- ✅ Shop Content (Restored) -->
+    <div
+      class="swipe-card-content bg-zinc-900 overflow-hidden shadow-2xl relative w-full h-full"
+    >
+      <!-- Image -->
+      <img
+        v-if="shop?.Image_URL1"
+        :src="shop.Image_URL1"
+        :alt="shop?.name"
+        class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 hover:scale-110"
+        loading="lazy"
+      />
+      <div
+        v-else
+        class="absolute inset-0 bg-gradient-to-br from-zinc-800 to-zinc-900 flex items-center justify-center"
+      >
+        <div class="flex flex-col items-center gap-2 opacity-30">
+          <span class="text-4xl">📸</span>
+          <span class="text-[10px] font-bold uppercase tracking-widest"
+            >No Image</span
+          >
+        </div>
+      </div>
+
+      <!-- Gradient Overlay -->
+      <div
+        class="absolute inset-0 bg-gradient-to-t from-black/95 via-black/20 to-transparent"
+      ></div>
+
+      <!-- Badges & Actions (Top) -->
+      <div
+        class="absolute top-3 left-3 right-3 flex justify-between items-start z-20"
+      >
+        <div class="flex flex-col gap-2">
+          <div
+            v-if="shop?.status === 'LIVE'"
+            class="px-2.5 py-1 rounded-full bg-red-600 text-white text-[10px] font-black animate-pulse shadow-lg backdrop-blur-sm border border-red-400/50 flex items-center gap-1"
+          >
+            <span class="w-1.5 h-1.5 bg-white rounded-full"></span> LIVE
+          </div>
+          <div
+            v-if="shop?.isPromoted"
+            class="px-2.5 py-1 rounded-full bg-gradient-to-r from-yellow-400 to-amber-600 text-black text-[10px] font-black shadow-lg border border-yellow-300/50 flex items-center gap-1"
+          >
+            🔥 GOLDEN
+          </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div v-if="!isImmersive" class="flex flex-col gap-2">
+          <button
+            @click.stop="emit('toggle-favorite')"
+            class="w-8 h-8 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white border border-white/10 active:scale-90 transition-all hover:bg-black/60"
+          >
+            <Heart class="w-4 h-4" />
+          </button>
+          <button
+            @click.stop="emit('share')"
+            class="w-8 h-8 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white border border-white/10 active:scale-90 transition-all hover:bg-black/60"
+          >
+            <Share2 class="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      <!-- Info Area -->
+      <div class="absolute bottom-0 left-0 right-0 p-4 z-20 pb-10">
+        <!-- Title & Type -->
+        <h4
+          class="text-xl font-black text-white leading-tight truncate mb-1 drop-shadow-md"
+        >
+          {{ displayName }}
+        </h4>
+        <div class="flex items-center gap-2 mb-2">
+          <span
+            class="px-2 py-0.5 rounded-md bg-white/20 text-[10px] font-bold text-white/90 uppercase backdrop-blur-sm"
+          >
+            {{ displayCategory }}
+          </span>
+          <div class="flex items-center gap-1 text-white/80 text-[10px]">
+            <Clock class="w-3 h-3" />
+            <span>{{ displayTime }}</span>
+          </div>
+        </div>
+
+        <!-- Rating & Status stats -->
+        <div class="flex items-center gap-3 mb-3">
+          <div
+            class="flex items-center gap-1 bg-black/40 px-2 py-1 rounded-full border border-white/10"
+          >
+            <span class="w-2 h-2 rounded-full bg-yellow-400"></span>
+            <span class="text-xs font-bold text-white">16</span>
+          </div>
+          <span class="text-[10px] text-green-400 font-bold flex items-center">
+            ↑ {{ displayDistance }}
+          </span>
+        </div>
+
+        <!-- CTA Button -->
+        <button
+          @click.stop="emit('open-ride')"
+          class="w-full py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-bold text-sm shadow-lg shadow-blue-500/30 active:scale-95 transition-all flex items-center justify-center gap-2 border border-blue-400/50"
+        >
+          <Car class="w-4 h-4" />
+          เรียกรถ
+        </button>
+      </div>
+    </div>
+
     <!-- ✨ Enhanced Pull Handle Overlay (iPhone Style Home Bar) - Inside Card for safety -->
     <div
       v-if="showExpand"
@@ -155,22 +305,25 @@ const uiOpacity = computed(() =>
       ></div>
     </div>
 
-    <!-- Release Indicator (Enhanced) -->
+    <!-- Release Indicator (Enhanced: Blended) -->
     <div
-      class="absolute bottom-12 left-0 right-0 flex justify-center pointer-events-none z-0"
+      class="absolute bottom-16 left-0 right-0 flex justify-center pointer-events-none z-0"
       :style="{
-        opacity: pullUpDistance > 60 ? pullUpDistance / props.threshold : 0,
-        transform: `translateY(${Math.min(0, -pullUpDistance * 0.15 + 10)}px) scale(${0.8 + (pullUpDistance / props.threshold) * 0.2})`,
+        opacity:
+          pullUpDistance > 40
+            ? Math.min(1, (pullUpDistance - 40) / (props.threshold - 40))
+            : 0,
+        transform: `translateY(${Math.min(0, -pullUpDistance * 0.1)}px) scale(${0.9 + (pullUpDistance / props.threshold) * 0.1})`,
       }"
     >
       <div
-        class="relative px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-600 text-white font-black text-[11px] uppercase tracking-[0.2em] shadow-2xl flex items-center gap-2 border-2 border-white/30"
+        class="relative px-5 py-2.5 rounded-full bg-black/60 backdrop-blur-xl text-white font-bold text-[10px] uppercase tracking-widest shadow-2xl flex items-center gap-2 border border-white/10"
       >
-        <div
-          class="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 blur-xl opacity-60 -z-10"
-        ></div>
-        <ChevronUp class="w-4 h-4 animate-bounce" stroke-width="3" />
-        <span>Release to Open</span>
+        <ChevronUp
+          class="w-4 h-4 animate-bounce text-blue-400"
+          stroke-width="3"
+        />
+        <span class="text-white/90">More details</span>
       </div>
     </div>
   </div>

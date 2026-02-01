@@ -4,7 +4,7 @@ test.describe('VibeCity Core User Journey', () => {
 
   test.beforeEach(async ({ page }) => {
     // Go to the app root
-    await page.goto('http://localhost:5173');
+    await page.goto('/');
     // Wait for the app to hydrate
     await page.waitForTimeout(1000);
   });

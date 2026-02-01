@@ -82,6 +82,7 @@ export const useShopStore = defineStore(
 		// Computed: Visible Shops (Nearest 30 + Random Rotation)
 		// Refactored from nearbyShops function to be a reactive computed property
 		const visibleShops = computed(() => {
+            console.log(`🔍 [ShopStore] visibleShops calc: filtered=${filteredShops.value?.length}`);
 			if (!filteredShops.value) return [];
 
 			// 1. Get User Location (or default)
@@ -316,12 +317,14 @@ export const useShopStore = defineStore(
 				// However, we are in 'Loki Mode' - let's try to trust the previous migration or handle it gracefully.
 				// ideally we should have 'increment_venue_view'.
 				// For now, let's keep the RPC name if we didn't change it, but be aware.
-				// Actually, let's suppressing error log to avoid console spam if legacy RPC is broken.
-				const { error } = await supabase.rpc("increment_shop_view", {
-					row_id: shopId,
-				});
-				if (error) {
-					// console.warn("Legacy usage stats RPC failed (expected during migration)");
+				// ✅ Safety Check
+				if (!shopId) return;
+
+				try {
+					const { error } = await supabase.rpc("increment_shop_view", { row_id: shopId });
+					if (error) throw error;
+				} catch (err) {
+					// console.warn("Stats update failed:", err);
 				}
 
 				// Optimistic Update
@@ -408,7 +411,6 @@ export const useShopStore = defineStore(
 			fetchShops, // ✅ Export Action
 			reviews,
 			incrementView,
-			incrementClick,
 			incrementClick,
 			updateProStatus,
 			visibleShops, // ✅ Expose Computed

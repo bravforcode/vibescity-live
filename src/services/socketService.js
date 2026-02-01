@@ -85,7 +85,9 @@ class SocketService {
 	}
 
 	notifyListeners(data) {
-		this.listeners.forEach((cb) => cb(data));
+		this.listeners.forEach((cb) => {
+			cb(data);
+		});
 	}
 }
 

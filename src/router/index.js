@@ -32,14 +32,14 @@ const routes = [
 const router = createRouter({
 	history: createWebHistory(),
 	routes,
-	scrollBehavior(to, from, savedPosition) {
+	scrollBehavior(_to, _from, savedPosition) {
 		if (savedPosition) return savedPosition;
 		return { top: 0 };
 	},
 });
 
 // Basic title updater
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, _from, next) => {
 	document.title = to.meta.title || "VibeCity";
 	next();
 });

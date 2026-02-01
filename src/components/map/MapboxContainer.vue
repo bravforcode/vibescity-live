@@ -78,7 +78,7 @@ const updateHeatmapData = (densityData) => {
   const features = [];
   Object.entries(densityData).forEach(([shopId, count]) => {
     const shop = props.shops.find((s) => s.id == shopId);
-    if (shop && shop.lat && shop.lng) {
+    if (shop?.lat && shop?.lng) {
       features.push({
         type: "Feature",
         geometry: {
@@ -95,7 +95,7 @@ const updateHeatmapData = (densityData) => {
   heatmapGeoJson.features = features;
 
   // Update Map Source
-  if (map.value && map.value.getSource("heatmap-source")) {
+  if (map.value?.getSource("heatmap-source")) {
     map.value.getSource("heatmap-source").setData(heatmapGeoJson);
   }
 };
