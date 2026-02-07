@@ -82,6 +82,7 @@ tests/e2e/screenshots/
 # 9. Temporary & Cache Files
 # ----------------------------------------
 # Temporary and system files that are not needed in version control
+.worktrees/
 *.bak
 *.swp
 *.swo
