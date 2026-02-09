@@ -152,6 +152,7 @@ async function main() {
       (check) => check.method === method && check.path === path,
     );
     const latest = matched.length > 0 ? matched[matched.length - 1] : null;
+    const latestOk = latest?.ok !== false;
     const statuses = matched
       .map((item) => item.status)
       .filter((value) => Number.isFinite(value));
@@ -163,9 +164,8 @@ async function main() {
     const missingBreach = matched.length === 0 && required;
     const statusBreach =
       matched.length > 0 &&
-      latest?.status !== null &&
       allowedStatuses.length > 0 &&
-      !allowedStatuses.includes(latest.status);
+      (!latestOk || latest?.status === null || !allowedStatuses.includes(latest.status));
     const latencyBreach =
       latencyLimit !== null && latencyP95 !== null && latencyP95 > latencyLimit;
 
@@ -185,6 +185,7 @@ async function main() {
       checks_found: matched.length,
       observed_statuses: statuses,
       latest_status: latest?.status ?? null,
+      latest_ok: latestOk,
       observed_latency_samples: latencies,
       latency_ms_p95: latencyP95,
       max_latency_ms_p95: latencyLimit,
