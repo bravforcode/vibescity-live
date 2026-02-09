@@ -1,0 +1,127 @@
+name: Monthly Quality Trend
+
+on:
+  schedule:
+    - cron: "20 0 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+concurrency:
+  group: monthly-quality-trend
+  cancel-in-progress: true
+
+jobs:
+  monthly-quality-trend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build monthly strict/quarantine/synthetic trend summary
+        id: trend
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TREND_DAYS: "30"
+          TREND_STRICT_MIN_PASS_RATE: "92"
+          TREND_SYNTHETIC_OVERALL_MIN_PASS_RATE: "92"
+          TREND_TITLE: "Monthly Quality Trend Summary"
+          TREND_OUTPUT_PATH: "reports/ci/monthly-quality-trend.json"
+        run: node scripts/ci/weekly-quality-trend.mjs
+
+      - name: Alert on monthly threshold breach
+        if: ${{ always() && steps.trend.outputs.breach == 'true' }}
+        continue-on-error: true
+        env:
+          SYNTHETIC_ALERT_WEBHOOK_URL: "${{ secrets.SYNTHETIC_ALERT_WEBHOOK_URL }}"
+          ALERT_TYPE: "monthly_quality_threshold_breach"
+          ALERT_TEXT: "Monthly quality trend threshold breached"
+          ALERT_LANE: "monthly-quality-trend"
+          ALERT_RUN_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          ALERT_MAX_RETRIES: "4"
+          ALERT_RETRY_DELAY_MS: "2000"
+          ALERT_DEDUP_WINDOW_MINUTES: "720"
+          ALERT_DEDUP_KEY: "monthly_quality_threshold_breach"
+        run: |
+          {
+            echo "## Monthly Trend Alert"
+            echo "- Type: monthly_quality_threshold_breach"
+            echo "- Breaches: ${{ steps.trend.outputs.breach_message }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+          node scripts/ci/send-alert-webhook.mjs
+
+      - name: Upload monthly quality trend snapshot
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: monthly-quality-trend
+          path: reports/ci/monthly-quality-trend.json
+          retention-days: 60
+
+      - name: Publish observability metrics (monthly trend)
+        if: ${{ always() }}
+        continue-on-error: true
+        env:
+          OBS_LANE: "monthly-quality-trend"
+          OBS_MONTHLY_TREND_PATH: "reports/ci/monthly-quality-trend.json"
+          OBS_METRICS_OUTPUT_PATH: "reports/ci/metrics-export-log.json"
+          OBS_METRICS_FAIL_ON_ERROR: "0"
+          BIGQUERY_PROJECT_ID: "${{ vars.BIGQUERY_PROJECT_ID }}"
+          BIGQUERY_DATASET: "${{ vars.BIGQUERY_DATASET }}"
+          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON }}"
+          GRAFANA_LOKI_URL: "${{ vars.GRAFANA_LOKI_URL }}"
+          GRAFANA_LOKI_USER: "${{ vars.GRAFANA_LOKI_USER }}"
+          GRAFANA_LOKI_TOKEN: "${{ secrets.GRAFANA_LOKI_TOKEN }}"
+        run: node scripts/ci/publish-observability-metrics.mjs
+
+      - name: Manage incidents (monthly trend)
+        if: ${{ always() }}
+        continue-on-error: true
+        env:
+          INCIDENT_MONTHLY_TREND_PATH: "reports/ci/monthly-quality-trend.json"
+          INCIDENT_OUTPUT_PATH: "reports/ci/incident-manager-log.json"
+          INCIDENT_CONSECUTIVE_THRESHOLD: "3"
+          INCIDENT_RECOVERY_THRESHOLD: "3"
+          INCIDENT_DRY_RUN: "0"
+          INCIDENT_FAIL_ON_ERROR: "0"
+          BIGQUERY_PROJECT_ID: "${{ vars.BIGQUERY_PROJECT_ID }}"
+          BIGQUERY_DATASET: "${{ vars.BIGQUERY_DATASET }}"
+          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON }}"
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          GITHUB_REPOSITORY: "${{ github.repository }}"
+          GITHUB_SERVER_URL: "${{ github.server_url }}"
+          GITHUB_RUN_ID: "${{ github.run_id }}"
+        run: node scripts/ci/manage-incidents.mjs
+
+      - name: Upload metrics export log
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: monthly-metrics-export-log
+          path: reports/ci/metrics-export-log.json
+          retention-days: 60
+          if-no-files-found: ignore
+
+      - name: Upload incident manager log
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: monthly-incident-manager-log
+          path: reports/ci/incident-manager-log.json
+          retention-days: 60
+          if-no-files-found: ignore

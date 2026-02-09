@@ -1,34 +1,299 @@
-name: VibeCity CI
+name: CI
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
+    branches: [ main ]
+  push:
     branches: [ main ]
 
 jobs:
-  build-and-test:
+  frontend:
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Install Bun
-      uses: oven-sh/setup-bun@v1
-      with:
-        bun-version: latest
-    
-    - name: Install Dependencies
-      run: bun install
-      
-    - name: Lint Check (Biome)
-      run: bun run check
-      
-    - name: Build Project (Rspack)
-      run: bun run build
-      
-    - name: Install Playwright Browsers
-      run: bun x playwright install --with-deps
-      
-    - name: Run E2E Tests
-      run: bun x playwright test
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Check for env placeholders
+        run: node scripts/ci/check-env-placeholders.mjs
+
+      - name: Guard SQL runlist safety rules
+        run: node scripts/ci/check-runlist-guards.mjs
+
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+
+      - name: Run backend pytest
+        env:
+          PYTHONPATH: backend
+          ENV: testing
+          METRICS_ENABLED: "true"
+          OTEL_ENABLED: "false"
+        run: python -m pytest backend/tests
+
+  map-quarantine-sla:
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
+    needs: [frontend, backend-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate map quarantine SLA metadata
+        env:
+          PW_NO_WEBSERVER: "1"
+        run: node scripts/ci/validate-map-quarantine-sla.mjs
+
+  e2e-smoke:
+    if: ${{ github.event_name == 'pull_request' }}
+    needs: [frontend, backend-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Run E2E smoke (low-mem)
+        run: PW_LOW_MEM=1 PW_GREP=@smoke npx playwright test
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-smoke
+          path: playwright-report/
+          retention-days: 14
+
+  e2e-full:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: [frontend, backend-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Run E2E full matrix (exclude quarantine lane)
+        run: PW_GREP_INVERT=@map-quarantine npx playwright test
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-full
+          path: playwright-report/
+          retention-days: 30
+
+  e2e-map-required:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: [frontend, backend-tests, map-quarantine-sla, e2e-map-preflight]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Validate MAPBOX_PUBLIC_TOKEN (strict lane)
+        run: |
+          if [ -z "${{ secrets.MAPBOX_PUBLIC_TOKEN }}" ]; then
+            echo "MAPBOX_PUBLIC_TOKEN is required for e2e-map-required."
+            exit 1
+          fi
+
+      - name: Run E2E @map-required (Desktop Chromium)
+        env:
+          VITE_MAPBOX_TOKEN: ${{ secrets.MAPBOX_PUBLIC_TOKEN }}
+        run: npm run test:e2e:map-required
+
+      - name: Step Summary (map-required)
+        if: ${{ always() }}
+        run: node scripts/ci/e2e-summary.mjs --lane map-required --junit reports/e2e/junit.xml
+
+      - name: Upload Playwright report (map-required)
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-map-required
+          path: playwright-report/
+          retention-days: 30
+
+  e2e-map-preflight:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: [frontend, backend-tests, map-quarantine-sla]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Validate MAPBOX_PUBLIC_TOKEN (preflight lane)
+        run: |
+          if [ -z "${{ secrets.MAPBOX_PUBLIC_TOKEN }}" ]; then
+            echo "MAPBOX_PUBLIC_TOKEN is required for e2e-map-preflight."
+            exit 1
+          fi
+
+      - name: Run E2E @map-preflight (Desktop Chromium)
+        env:
+          VITE_MAPBOX_TOKEN: ${{ secrets.MAPBOX_PUBLIC_TOKEN }}
+        run: npm run test:e2e:map-preflight
+
+      - name: Step Summary (map-preflight)
+        if: ${{ always() }}
+        run: node scripts/ci/e2e-summary.mjs --lane map-preflight --junit reports/e2e/junit.xml
+
+      - name: Upload Playwright report (map-preflight)
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-map-preflight
+          path: playwright-report/
+          retention-days: 30
+
+  e2e-map-quarantine:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: [frontend, backend-tests, map-quarantine-sla]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Validate MAPBOX_PUBLIC_TOKEN (quarantine lane)
+        run: |
+          if [ -z "${{ secrets.MAPBOX_PUBLIC_TOKEN }}" ]; then
+            echo "MAPBOX_PUBLIC_TOKEN is required for e2e-map-quarantine."
+            exit 1
+          fi
+
+      - name: Run E2E @map-quarantine (non-blocking)
+        env:
+          VITE_MAPBOX_TOKEN: ${{ secrets.MAPBOX_PUBLIC_TOKEN }}
+        run: npm run test:e2e:map-quarantine
+
+      - name: Step Summary (map-quarantine)
+        if: ${{ always() }}
+        run: node scripts/ci/e2e-summary.mjs --lane map-quarantine --junit reports/e2e/junit.xml
+
+      - name: Upload Playwright report (map-quarantine)
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-map-quarantine
+          path: playwright-report/
+          retention-days: 14
+
+  e2e-fallback:
+    if: ${{ needs.e2e-full.result == 'failure' }}
+    needs: [e2e-full]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Run E2E fallback (low-mem)
+        run: PW_LOW_MEM=1 npx playwright test
+
+      - name: Upload Playwright report (fallback)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-fallback
+          path: playwright-report/
+          retention-days: 14
