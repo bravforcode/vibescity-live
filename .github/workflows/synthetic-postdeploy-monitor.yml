@@ -141,6 +141,21 @@ jobs:
           retention-days: 30
           if-no-files-found: ignore
 
+      - name: Save Step Summary (synthetic-postdeploy)
+        if: ${{ always() && !cancelled() }}
+        run: |
+          mkdir -p reports/ci
+          cp "$GITHUB_STEP_SUMMARY" reports/ci/step-summary-synthetic-api.md || true
+
+      - name: Upload Step Summary (synthetic-postdeploy)
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: step-summary-synthetic-api
+          path: reports/ci/step-summary-synthetic-api.md
+          retention-days: 14
+          if-no-files-found: ignore
+
   browser-smoke-map-lite:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -239,6 +254,21 @@ jobs:
           name: playwright-report-smoke-map-lite
           path: playwright-report/
           retention-days: 14
+
+      - name: Save Step Summary (browser-smoke-map-lite)
+        if: ${{ always() && !cancelled() }}
+        run: |
+          mkdir -p reports/ci
+          cp "$GITHUB_STEP_SUMMARY" reports/ci/step-summary-synthetic-browser.md || true
+
+      - name: Upload Step Summary (browser-smoke-map-lite)
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: step-summary-synthetic-browser
+          path: reports/ci/step-summary-synthetic-browser.md
+          retention-days: 14
+          if-no-files-found: ignore
 
   release-health-snapshot:
     if: ${{ always() }}
@@ -367,5 +397,20 @@ jobs:
         with:
           name: incident-manager-log
           path: reports/ci/incident-manager-log.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Save Step Summary (release-health-snapshot)
+        if: ${{ always() && !cancelled() }}
+        run: |
+          mkdir -p reports/ci
+          cp "$GITHUB_STEP_SUMMARY" reports/ci/step-summary-release-health.md || true
+
+      - name: Upload Step Summary (release-health-snapshot)
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: step-summary-release-health
+          path: reports/ci/step-summary-release-health.md
           retention-days: 14
           if-no-files-found: ignore

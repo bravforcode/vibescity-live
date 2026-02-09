@@ -124,3 +124,18 @@ jobs:
           path: reports/ci/metrics-export-log.json
           retention-days: 30
           if-no-files-found: ignore
+
+      - name: Save Step Summary
+        if: ${{ always() && !cancelled() }}
+        run: |
+          mkdir -p reports/ci
+          cp "$GITHUB_STEP_SUMMARY" reports/ci/step-summary-weekly-lighthouse.md || true
+
+      - name: Upload Step Summary
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: step-summary-weekly-lighthouse
+          path: reports/ci/step-summary-weekly-lighthouse.md
+          retention-days: 30
+          if-no-files-found: ignore
