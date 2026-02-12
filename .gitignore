@@ -162,6 +162,12 @@ playwright-report*/
 
 nul
 playwright-report*/
-
+AGENTS.md
+CLAUDE.md
 .claude/
 .tmp*
+# local notes / artifacts
+findings.md
+progress.md
+task_plan.md
+observability/
