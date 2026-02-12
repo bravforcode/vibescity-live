@@ -63,7 +63,9 @@ const enrichedShops = computed(() => {
 	}));
 });
 
-const liveShopsCount = computed(() => enrichedShops.value.filter(s => s.status === 'LIVE').length);
+const liveShopsCount = computed(
+	() => enrichedShops.value.filter((s) => s.status === "LIVE").length,
+);
 const categories = computed(() => uniqueCategories.value);
 const statuses = ["ALL", "LIVE", "TONIGHT", "OFF"];
 

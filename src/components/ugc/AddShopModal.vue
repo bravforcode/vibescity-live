@@ -162,13 +162,13 @@
 
 <script setup>
 import { Crosshair, MapPin, X } from "lucide-vue-next";
+import { storeToRefs } from "pinia";
 import { computed, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { storeToRefs } from "pinia";
 import { useNotifications } from "@/composables/useNotifications";
-import { supabase } from "../../lib/supabase";
-import { useUserStore } from "@/store/userStore";
 import { Z } from "@/constants/zIndex";
+import { useUserStore } from "@/store/userStore";
+import { supabase } from "../../lib/supabase";
 
 const { t } = useI18n();
 const userStore = useUserStore();
@@ -219,7 +219,8 @@ const errors = computed(() => {
 	else if (HTML_TAG_RE.test(name)) e.name = t("ugc.error_name_html");
 
 	if (!form.value.category) e.category = t("ugc.error_category_required");
-	if (!form.value.province.trim()) e.province = t("ugc.error_province_required");
+	if (!form.value.province.trim())
+		e.province = t("ugc.error_province_required");
 
 	if (form.value.lat == null || form.value.lng == null) {
 		e.location = t("ugc.error_location_required");
@@ -229,7 +230,10 @@ const errors = computed(() => {
 		e.location = t("ugc.error_lng_invalid");
 	}
 
-	if (form.value.imageUrl.trim() && !HTTPS_URL_RE.test(form.value.imageUrl.trim())) {
+	if (
+		form.value.imageUrl.trim() &&
+		!HTTPS_URL_RE.test(form.value.imageUrl.trim())
+	) {
 		e.imageUrl = t("ugc.error_url_invalid");
 	}
 
@@ -294,7 +298,12 @@ const submit = async () => {
 
 		if (error) throw error;
 
-		notifySuccess(t("ugc.submit_success", { coins: REWARD_CONFIG.coins, xp: REWARD_CONFIG.xp }));
+		notifySuccess(
+			t("ugc.submit_success", {
+				coins: REWARD_CONFIG.coins,
+				xp: REWARD_CONFIG.xp,
+			}),
+		);
 		resetForm();
 		emit("success");
 		close();

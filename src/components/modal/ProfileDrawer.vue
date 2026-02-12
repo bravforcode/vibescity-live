@@ -65,9 +65,9 @@ const progressPercent = computed(() => Math.floor(levelProgress.value * 100));
 
 // Status map for order statuses
 const statusMap = {
-	pending_review: 'status.pendingReview',
-	paid: 'status.completed',
-	rejected: 'status.rejected'
+	pending_review: "status.pendingReview",
+	paid: "status.completed",
+	rejected: "status.rejected",
 };
 
 // View State
@@ -79,7 +79,7 @@ const closeButtonRef = ref(null);
 const comingSoonToast = ref(false);
 let comingSoonTimer = null;
 const isDev = import.meta.env.DEV;
-const appVersion = import.meta.env.VITE_APP_VERSION || 'dev';
+const appVersion = import.meta.env.VITE_APP_VERSION || "dev";
 
 const drawerTitleId = "profile-drawer-title";
 const focusableSelector =
@@ -110,7 +110,9 @@ const fetchOrders = async () => {
 const showComingSoon = () => {
 	comingSoonToast.value = true;
 	clearTimeout(comingSoonTimer);
-	comingSoonTimer = setTimeout(() => { comingSoonToast.value = false; }, 2000);
+	comingSoonTimer = setTimeout(() => {
+		comingSoonToast.value = false;
+	}, 2000);
 };
 
 const handleMenuItemClick = (item) => {
