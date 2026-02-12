@@ -1,0 +1,96 @@
+/*
+  src/design-system/tokens.css
+
+  Purpose:
+  - Runtime design tokens (CSS variables) to keep code in sync with Figma Variables.
+  - Default mode is "Night Neon".
+
+  Safety:
+  - Keep values conservative; avoid breaking contrast/perf.
+  - Use data-theme for future theme expansion.
+*/
+
+:root {
+	/* Theme selector (default). */
+	--vc-theme: night;
+
+	/* Typography */
+	--vc-font-display: "Chakra Petch", "Prompt", "Sarabun", system-ui, sans-serif;
+	--vc-font-body: "Prompt", "Sarabun", system-ui, sans-serif;
+	--vc-font-mono: "JetBrains Mono", "Fira Code", "IBM Plex Mono", monospace;
+
+	/* Colors: Night Neon (Figma: color/*) */
+	--vc-color-bg-canvas: #030305;
+	--vc-color-bg-base: #050508;
+
+	--vc-color-surface-glass: rgba(10, 10, 20, 0.5);
+	--vc-color-surface-elevated: rgba(20, 20, 25, 0.8);
+	--vc-color-border-glass: rgba(255, 255, 255, 0.08);
+
+	--vc-color-text-primary: #ffffff;
+	--vc-color-text-secondary: rgba(255, 255, 255, 0.7);
+	--vc-color-text-muted: rgba(255, 255, 255, 0.4);
+
+	--vc-color-brand-primary: #00f0ff;
+	--vc-color-accent-purple: #bc13fe;
+	--vc-color-accent-pink: #ff00aa;
+	--vc-color-accent-green: #00ff9d;
+	--vc-color-accent-yellow: #fcee0a;
+
+	/* Spacing */
+	--vc-space-2: 2px;
+	--vc-space-4: 4px;
+	--vc-space-8: 8px;
+	--vc-space-12: 12px;
+	--vc-space-16: 16px;
+	--vc-space-20: 20px;
+	--vc-space-24: 24px;
+	--vc-space-32: 32px;
+	--vc-space-40: 40px;
+	--vc-space-48: 48px;
+	--vc-space-64: 64px;
+
+	/* Radius */
+	--vc-radius-card: 16px;
+	--vc-radius-sheet: 24px;
+	--vc-radius-pill: 999px;
+
+	/* Motion */
+	--vc-motion-fast: 160ms;
+	--vc-motion-base: 240ms;
+	--vc-motion-slow: 320ms;
+
+	/* Shadows */
+	--vc-shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.37);
+	--vc-shadow-neon-blue: 0 0 10px rgba(0, 240, 255, 0.5);
+	--vc-shadow-neon-pink: 0 0 10px rgba(255, 0, 170, 0.5);
+}
+
+:root[data-theme="night"] {
+	--vc-theme: night;
+}
+
+/*
+  Optional: day mode placeholder.
+  We intentionally keep the same palette for now to avoid unintended regressions.
+  When day mode is designed, override variables here.
+*/
+:root[data-theme="day"] {
+	--vc-theme: day;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	/* Avoid global motion flashes; keep it targeted. */
+	:root .animate-neon-pulse,
+	:root .animate-float,
+	:root .animate-bounce-in,
+	:root .animate-heart-pop,
+	:root .animate-bounce-press,
+	:root .animate-pulse,
+	:root .animate-bounce,
+	:root .animate-ping,
+	:root .animate-spin,
+	:root .animate-shimmer {
+		animation: none;
+	}
+}
