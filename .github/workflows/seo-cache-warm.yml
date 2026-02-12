@@ -1,0 +1,39 @@
+name: SEO Cache Warm
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "15 * * * *"
+
+jobs:
+  cache-warm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Warm SEO routes
+        env:
+          SITE_ORIGIN: ${{ vars.SITE_ORIGIN || 'https://vibecity.live' }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SEO_CACHE_MAX_VENUES: ${{ vars.SEO_CACHE_MAX_VENUES || '10000' }}
+          SEO_CACHE_CONCURRENCY: ${{ vars.SEO_CACHE_CONCURRENCY || '8' }}
+        run: node scripts/ci/cache-warm-seo.mjs | tee seo-cache-warm-log.json
+
+      - name: Upload cache warm log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: seo-cache-warm-log
+          path: seo-cache-warm-log.json
+          retention-days: 14
+

@@ -1,0 +1,95 @@
+name: PII Access Anomaly Alert
+
+on:
+  schedule:
+    - cron: "25 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pii-access-anomaly-alert
+  cancel-in-progress: false
+
+jobs:
+  pii-access-anomaly-alert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "latest"
+
+      - name: Cache Bun install
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Check PII access anomalies
+        id: check
+        env:
+          SUPABASE_URL: "${{ secrets.SUPABASE_URL }}"
+          SUPABASE_SERVICE_ROLE_KEY: "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+          PII_ACCESS_ALERT_ENABLED: "${{ vars.PII_ACCESS_ALERT_ENABLED }}"
+          PII_ACCESS_ALERT_WINDOW_MINUTES: "${{ vars.PII_ACCESS_ALERT_WINDOW_MINUTES }}"
+          PII_ACCESS_ALERT_TOTAL_THRESHOLD: "${{ vars.PII_ACCESS_ALERT_TOTAL_THRESHOLD }}"
+          PII_ACCESS_ALERT_EXPORT_THRESHOLD: "${{ vars.PII_ACCESS_ALERT_EXPORT_THRESHOLD }}"
+          PII_ACCESS_ALERT_PER_ACTOR_THRESHOLD: "${{ vars.PII_ACCESS_ALERT_PER_ACTOR_THRESHOLD }}"
+          PII_ACCESS_ALERT_MAX_ROWS: "${{ vars.PII_ACCESS_ALERT_MAX_ROWS }}"
+          PII_ACCESS_ALERT_OUTPUT_PATH: "reports/ci/pii-access-anomaly-log.json"
+        run: node scripts/ci/check-pii-access-anomalies.mjs
+
+      - name: Send alert webhook
+        if: ${{ steps.check.outputs.alert == 'true' }}
+        continue-on-error: true
+        env:
+          ALERT_WEBHOOK_URL: "${{ secrets.PII_AUDIT_ALERT_WEBHOOK_URL }}"
+          ALERT_TYPE: "pii_access_anomaly"
+          ALERT_TEXT: "${{ steps.check.outputs.alert_text }}"
+          ALERT_LANE: "pii-audit"
+          ALERT_RUN_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          ALERT_MAX_RETRIES: "4"
+          ALERT_RETRY_DELAY_MS: "2000"
+          ALERT_DEDUP_WINDOW_MINUTES: "${{ vars.PII_ACCESS_ALERT_DEDUP_WINDOW_MINUTES }}"
+          ALERT_DEDUP_KEY: "pii_access_anomaly"
+        run: node scripts/ci/send-alert-webhook.mjs
+
+      - name: Upload anomaly log
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: pii-access-anomaly-log
+          path: reports/ci/pii-access-anomaly-log.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Save Step Summary
+        if: ${{ always() && !cancelled() }}
+        run: |
+          mkdir -p reports/ci
+          cp "$GITHUB_STEP_SUMMARY" reports/ci/step-summary-pii-access-anomaly.md || true
+
+      - name: Upload Step Summary
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: step-summary-pii-access-anomaly
+          path: reports/ci/step-summary-pii-access-anomaly.md
+          retention-days: 30
+          if-no-files-found: ignore

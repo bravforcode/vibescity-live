@@ -1,0 +1,102 @@
+name: Analytics Warehouse Export (BigQuery)
+
+on:
+  schedule:
+    # Run after Supabase daily rollup cron (default was 00:05 UTC in migrations).
+    - cron: "20 1 * * *"
+  workflow_dispatch:
+    inputs:
+      start_day:
+        description: "Start day (UTC, YYYY-MM-DD). Default: yesterday."
+        required: false
+      end_day:
+        description: "End day (UTC, YYYY-MM-DD). Default: start_day."
+        required: false
+      source_env:
+        description: "source_env label written to BigQuery rows (ex: production/staging)."
+        required: false
+        default: "production"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: analytics-warehouse-export
+  cancel-in-progress: false
+
+jobs:
+  export-analytics-archive-daily:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "latest"
+
+      - name: Cache Bun install
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Provision BigQuery analytics table (partitioning + retention)
+        continue-on-error: true
+        env:
+          BIGQUERY_PROJECT_ID: "${{ vars.BIGQUERY_PROJECT_ID }}"
+          BIGQUERY_DATASET: "${{ vars.BIGQUERY_DATASET }}"
+          BIGQUERY_ANALYTICS_DATASET: "${{ vars.BIGQUERY_ANALYTICS_DATASET }}"
+          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON }}"
+          BIGQUERY_ALLOW_CREATE_DATASET: "0"
+          BIGQUERY_ALLOW_CREATE_TABLES: "1"
+          BIGQUERY_APPLY_PARTITION_RETENTION: "1"
+          BIGQUERY_ANALYTICS_PARTITION_RETENTION_DAYS: "${{ vars.BIGQUERY_ANALYTICS_PARTITION_RETENTION_DAYS }}"
+          BIGQUERY_ANALYTICS_PROVISION_OUTPUT_PATH: "reports/ci/bigquery-analytics-provision-log.json"
+          BIGQUERY_PROVISION_FAIL_ON_ERROR: "0"
+        run: node scripts/ci/provision-bigquery-analytics.mjs
+
+      - name: Export Supabase analytics archive daily to BigQuery
+        env:
+          SUPABASE_URL: "${{ secrets.SUPABASE_URL }}"
+          SUPABASE_SERVICE_ROLE_KEY: "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+          BIGQUERY_PROJECT_ID: "${{ vars.BIGQUERY_PROJECT_ID }}"
+          BIGQUERY_DATASET: "${{ vars.BIGQUERY_DATASET }}"
+          BIGQUERY_ANALYTICS_DATASET: "${{ vars.BIGQUERY_ANALYTICS_DATASET }}"
+          BIGQUERY_ANALYTICS_TABLE: "analytics_events_archive_daily"
+          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON }}"
+          ANALYTICS_EXPORT_START_DAY: "${{ github.event.inputs.start_day }}"
+          ANALYTICS_EXPORT_END_DAY: "${{ github.event.inputs.end_day }}"
+          ANALYTICS_EXPORT_SOURCE: "${{ github.event.inputs.source_env || 'production' }}"
+          ANALYTICS_EXPORT_OUTPUT_PATH: "reports/ci/analytics-warehouse-export-log.json"
+          ANALYTICS_EXPORT_FAIL_ON_ERROR: "1"
+        run: node scripts/ci/export-analytics-archive-daily-to-bigquery.mjs
+
+      - name: Upload BigQuery analytics provision log
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bigquery-analytics-provision-log
+          path: reports/ci/bigquery-analytics-provision-log.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Upload analytics warehouse export log
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: analytics-warehouse-export-log
+          path: reports/ci/analytics-warehouse-export-log.json
+          retention-days: 30
