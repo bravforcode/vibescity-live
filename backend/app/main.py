@@ -1,13 +1,24 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from app.core.config import get_settings
-from app.api.routers import vibes, rides, payments, shops, owner
+from app.core.config import get_settings, validate_settings
+from app.core.logging import setup_logging
+from app.core.observability import setup_observability
+from starlette.middleware.base import BaseHTTPMiddleware
+import logging
+import time
+import uuid
+from app.api.routers import vibes, rides, payments, shops, owner, ugc, emergency, admin, redemption, analytics, seo
 
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from app.core.rate_limit import limiter
 
 settings = get_settings()
+validate_settings(settings)
+setup_logging(settings.ENV)
+
+request_logger = logging.getLogger("app.request")
 
 # ✅ Rate Limiting
 app = FastAPI(
@@ -17,6 +28,7 @@ app = FastAPI(
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # Set all CORS enabled origins
 if settings.BACKEND_CORS_ORIGINS:
@@ -24,9 +36,61 @@ if settings.BACKEND_CORS_ORIGINS:
         CORSMiddleware,
         allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "Accept"],
+        expose_headers=["X-Request-ID"],
     )
+
+setup_observability(app, settings)
+
+
+class RequestIdMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
+        request.state.request_id = request_id
+        start = time.perf_counter()
+
+        try:
+            response = await call_next(request)
+        except Exception:
+            duration_ms = (time.perf_counter() - start) * 1000
+            request_logger.exception(
+                "http_request_failed",
+                extra={
+                    "request_id": request_id,
+                    "method": request.method,
+                    "path": request.url.path,
+                    "duration_ms": round(duration_ms, 2),
+                },
+            )
+            raise
+
+        duration_ms = (time.perf_counter() - start) * 1000
+        response.headers["X-Request-ID"] = request_id
+        request_logger.info(
+            "http_request",
+            extra={
+                "request_id": request_id,
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": response.status_code,
+                "duration_ms": round(duration_ms, 2),
+            },
+        )
+        return response
+
+
+app.add_middleware(RequestIdMiddleware)
+
+
+@app.on_event("startup")
+async def _startup_background_tasks():
+    await vibes.start_background_tasks()
+
+
+@app.on_event("shutdown")
+async def _shutdown_background_tasks():
+    await vibes.stop_background_tasks()
 
 @app.get("/health")
 async def health_check():
@@ -34,7 +98,7 @@ async def health_check():
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to VibeCity API"}
+    return {"message": "Welcome to VibeCity API", "docs": "/docs"}
 
 # Include Routers
 app.include_router(vibes.router, prefix=settings.API_V1_STR + "/vibes", tags=["vibes"])
@@ -42,5 +106,9 @@ app.include_router(rides.router, prefix=settings.API_V1_STR + "/rides", tags=["r
 app.include_router(payments.router, prefix=settings.API_V1_STR + "/payments", tags=["payments"])
 app.include_router(shops.router, prefix=settings.API_V1_STR + "/shops", tags=["shops"])
 app.include_router(owner.router, prefix=settings.API_V1_STR + "/owner", tags=["owner"])
-from app.api.routers import ugc
 app.include_router(ugc.router, prefix=settings.API_V1_STR + "/ugc", tags=["ugc"])
+app.include_router(emergency.router, prefix=settings.API_V1_STR + "/emergency", tags=["emergency"])
+app.include_router(admin.router, prefix=settings.API_V1_STR + "/admin", tags=["admin"])
+app.include_router(redemption.router, prefix=settings.API_V1_STR + "/redemption", tags=["redemption"])
+app.include_router(analytics.router, prefix=settings.API_V1_STR + "/analytics", tags=["analytics"])
+app.include_router(seo.router, prefix=settings.API_V1_STR + "/seo", tags=["seo"])

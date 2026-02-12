@@ -1,7 +1,10 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel
 import random
 from app.api.routers.vibes import manager
+from app.core.rate_limit import limiter
+from app.core.auth import verify_admin, verify_user
+from app.core.supabase import supabase, supabase_admin
 
 router = APIRouter()
 
@@ -13,10 +16,18 @@ class OwnerStats(BaseModel):
     is_promoted: bool
 
 @router.get("/stats/{shop_id}", response_model=OwnerStats)
-async def get_shop_stats(shop_id: str):
+@limiter.limit("60/minute")
+async def get_shop_stats(
+    request: Request,
+    shop_id: str,
+    user: dict = Depends(verify_user),
+):
     # 1. Get Real-time Count from ConnectionManager
     # manager.room_connections is { shop_id: [ws1, ws2] }
     # shop_id in room_connections is usually string (from URL)
+
+    # Ownership check (or admin)
+    await _ensure_owner_or_admin(shop_id, user)
 
     live_count = 0
     if shop_id in manager.room_connections:
@@ -33,6 +44,35 @@ async def get_shop_stats(shop_id: str):
     }
 
 @router.post("/promote/{shop_id}")
-async def toggle_promote(shop_id: str):
+@limiter.limit("10/minute")
+async def toggle_promote(
+    request: Request,
+    shop_id: str,
+    user: dict = Depends(verify_user),
+):
+    await _ensure_owner_or_admin(shop_id, user)
     # In real app, check payment/credits
     return {"status": "success", "is_promoted": True, "message": "Shop boosted! Giant Pin activated."}
+
+
+async def _ensure_owner_or_admin(shop_id: str, user: dict):
+    # Allow admin
+    try:
+        await verify_admin(user)
+        return
+    except Exception:
+        pass
+
+    user_id = getattr(user, "id", None)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    client = supabase_admin or supabase
+    try:
+        res = client.table("shops").select("owner_id").eq("id", shop_id).single().execute()
+        owner_id = res.data.get("owner_id") if res and res.data else None
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to verify ownership")
+
+    if not owner_id or str(owner_id) != str(user_id):
+        raise HTTPException(status_code=403, detail="Owner privileges required")
