@@ -2,7 +2,7 @@
   <GlassCard
     :radius="isSelected ? '2xl' : 'xl'"
     :interactive="!isSelected"
-    class="w-full h-full flex flex-col overflow-hidden transition-all duration-500 will-change-transform touch-pan-y"
+    class="w-full h-full flex flex-col overflow-hidden transition-[transform,opacity,border-radius] duration-500 will-change-transform touch-pan-y"
     :class="[
       isActive ? 'opacity-100 scale-100 z-10' : 'opacity-100 scale-95 z-0',
       isSelected ? 'rounded-t-[32px] border-t-white/20' : '',
@@ -21,7 +21,7 @@
 
     <!-- 1. Media Area -->
     <div
-      class="relative w-full shrink-0 transition-all duration-500 ease-emphasized"
+      class="relative w-full shrink-0 transition-[height,transform,opacity] duration-500 ease-emphasized"
       :class="isSelected ? 'h-[35vh]' : 'h-full absolute inset-0'"
     >
       <img
@@ -55,7 +55,8 @@
           <!-- Favorite -->
           <button
             @click.stop="$emit('toggle-favorite')"
-            class="p-2.5 rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-pink-500/80 transition-all border border-white/10 shadow-lg"
+            aria-label="Toggle favorite"
+            class="p-2.5 rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-pink-500/80 transition-colors transition-transform border border-white/10 shadow-lg"
           >
             <Heart
               class="w-5 h-5"
@@ -111,9 +112,14 @@
     <!-- 3. Expanded Content (Scrollable) -->
     <div v-else class="flex-1 bg-dark flex flex-col relative animate-slide-up">
       <!-- Handle -->
-      <div class="w-full flex justify-center py-3" @click="$emit('collapse')">
-        <div class="w-12 h-1.5 bg-white/20 rounded-full"></div>
-      </div>
+      <button
+        type="button"
+        class="w-full flex justify-center py-3"
+        aria-label="Collapse details"
+        @click="$emit('collapse')"
+      >
+        <span class="w-12 h-1.5 bg-white/20 rounded-full"></span>
+      </button>
 
       <div class="p-6 overflow-y-auto pb-safe-bottom">
         <div class="flex justify-between items-start mb-6">
@@ -259,5 +265,11 @@ const cardStyle = computed(() => {
 }
 .pb-safe-bottom {
   padding-bottom: env(safe-area-inset-bottom, 24px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-slide-up {
+    animation: none;
+  }
 }
 </style>

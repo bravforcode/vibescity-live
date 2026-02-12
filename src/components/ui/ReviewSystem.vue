@@ -283,7 +283,9 @@ const setRating = (r) => {
 <style scoped>
 .fade-slide-enter-active,
 .fade-slide-leave-active {
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .fade-slide-enter-from {
@@ -296,7 +298,7 @@ const setRating = (r) => {
 }
 
 .list-stagger-enter-active {
-  transition: all 0.5s ease;
+  transition: opacity 0.5s ease, transform 0.5s ease;
 }
 .list-stagger-enter-from {
   opacity: 0;

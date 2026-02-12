@@ -4,20 +4,45 @@
 
 :root {
   /* Use Tailwind Theme Color */
-  --map-bg: theme('colors.void');
+  --map-bg: var(--vc-color-bg-canvas);
+  --font-display: var(--vc-font-display);
+  --font-body: var(--vc-font-body);
+  --font-mono: var(--vc-font-mono);
 }
 
 body {
   margin: 0;
   padding: 0;
   background-color: var(--map-bg);
+  font-family: var(--font-body);
   -webkit-tap-highlight-color: transparent;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "liga" 1, "kern" 1;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.01em;
+}
+
+code,
+pre,
+kbd,
+samp,
+.font-mono {
+  font-family: var(--font-mono);
 }
 
 /* Fix Leaflet attribution positioning and dark mode feel */
 .leaflet-container {
   background: var(--map-bg) !important;
-  font-family: inherit !important;
+  font-family: var(--font-body) !important;
 }
 
 .leaflet-control-attribution {
@@ -106,13 +131,20 @@ body {
 }
 
 /* Smooth global transitions */
-* {
+html {
   scroll-behavior: smooth;
 }
 
 /* Ultra-smooth transitions for interactive elements */
 .smooth-transition {
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    filter 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Premium hover lift effect */
@@ -124,6 +156,44 @@ body {
 .hover-lift:hover {
   transform: translateY(-2px);
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+/* ========================================
+   🎯 BOUNCE ANIMATION (Global)
+   ======================================== */
+@keyframes btn-bounce {
+  0%, 100% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(0.92);
+  }
+  70% {
+    transform: scale(1.05);
+  }
+}
+
+/* Universal button bounce on press */
+.btn-bounce:active {
+  animation: btn-bounce 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Bounce animation class (programmatic) */
+.animate-bounce-press {
+  animation: btn-bounce 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Success/heart animation */
+@keyframes heart-pop {
+  0% { transform: scale(1); }
+  25% { transform: scale(1.3); }
+  50% { transform: scale(0.9); }
+  75% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.animate-heart-pop {
+  animation: heart-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* Hide scrollbar but keep functionality */
@@ -170,4 +240,338 @@ body {
 .low-power .animate-ping,
 .low-power .animate-shimmer {
   animation: none !important;
+}
+
+/* ========================================
+   ♿ ACCESSIBILITY UTILITIES (WCAG 2.2 AA)
+   ======================================== */
+
+/* Focus ring for keyboard navigation - visible on :focus-visible */
+.focus-ring {
+  outline: none;
+}
+.focus-ring:focus-visible {
+  outline: 2px solid #3B82F6;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Interactive elements: Minimum touch target size (44x44px per WCAG) */
+.touch-target {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* Icon-only buttons: Visual target 44px, icon inside */
+.icon-button {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  outline: none;
+}
+.icon-button:focus-visible {
+  outline: 2px solid #3B82F6;
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+
+/* Screen reader only (visually hidden but accessible) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Skip link for keyboard users */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: #3B82F6;
+  color: white;
+  padding: 8px 16px;
+  z-index: 9999;
+  text-decoration: none;
+  font-weight: bold;
+}
+.skip-link:focus {
+  top: 0;
+}
+
+/* Respect user preferences for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .glass-container,
+  .glass-container-light {
+    backdrop-filter: none;
+    background: rgba(0, 0, 0, 0.95);
+    border: 2px solid white;
+  }
+
+  button, a, [role="button"] {
+    border: 2px solid currentColor !important;
+  }
+}
+
+/* Force visible focus for accessibility testing */
+*:focus-visible {
+  outline: 2px solid #3B82F6 !important;
+  outline-offset: 2px !important;
+}
+
+/* Safe area padding for notched devices */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.safe-area-left {
+  padding-left: env(safe-area-inset-left);
+}
+.safe-area-right {
+  padding-right: env(safe-area-inset-right);
+}
+
+/* ========================================
+   🪙 COIN & PIN ANIMATIONS (New)
+   ======================================== */
+
+@keyframes coin-flip {
+  0% { transform: rotateY(0); }
+  100% { transform: rotateY(360deg); }
+}
+
+.coin-flipping {
+  animation: coin-flip 3s infinite linear;
+  transform-style: preserve-3d;
+}
+
+.coin-face {
+  backface-visibility: hidden;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.5);
+  font-size: 8px;
+  font-weight: 900;
+}
+
+.coin-front {
+  background: linear-gradient(135deg, #FFD700, #FDB931);
+  color: #78350f;
+  z-index: 2;
+  border: 1px solid #B8860B;
+}
+
+.coin-back {
+  background: linear-gradient(135deg, #FDB931, #FFD700);
+  color: #78350f;
+  transform: rotateY(180deg);
+  border: 1px solid #B8860B;
+}
+
+/* Pin Float */
+@keyframes pin-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.marker-float {
+  animation: pin-float 3s ease-in-out infinite;
+}
+
+/* New Marker Styles */
+.vibe-marker-container {
+  /* Positioning handled by Mapbox, this aligns internal content */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  pointer-events: none; /* Let box pass */
+}
+
+/* Clickable part */
+.vibe-marker-hitbox {
+    pointer-events: auto;
+    cursor: pointer;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.vibe-marker-hitbox:hover {
+    transform: scale(1.15);
+    z-index: 100;
+}
+
+.pin-body-shape {
+  width: 100%;
+  height: 100%;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  border: 2px solid white;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease,
+    border-color 0.3s ease;
+}
+
+/* Image inside pin needs counter-rotation */
+.pin-content-rotator {
+  transform: rotate(45deg);
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background-color: #f3f4f6;
+}
+
+/* Live Pulse Ring */
+@keyframes pulse-ring-red {
+  0% { transform: scale(0.8); opacity: 0.8; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+.live-pulse-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background-color: rgba(239, 68, 68, 0.7);
+  animation: pulse-ring-red 2s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+  z-index: -1;
+}
+/* ========================================
+   📍 NEW MAP PIN ANIMATIONS & STYLES
+   ======================================== */
+
+@keyframes pin-bounce-in {
+  0% { transform: scale(0) translateY(-20px); opacity: 0; }
+  60% { transform: scale(1.1) translateY(5px); opacity: 1; }
+  80% { transform: scale(0.95) translateY(0); }
+  100% { transform: scale(1) translateY(0); }
+}
+
+.vibe-pin-bounce {
+  transform-origin: bottom center;
+  animation: pin-bounce-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.vibe-pin-highlighted {
+  z-index: 999 !important;
+  filter: drop-shadow(0 10px 15px rgba(0,0,0,0.3));
+}
+
+.vibe-pin-img {
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.vibe-marker-hitbox:hover .vibe-pin-img {
+  transform: scale(1.15) translateY(-4px);
+}
+
+/* LIVE Status Glow */
+@keyframes live-glow-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.vibe-live-glow {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  animation: live-glow-pulse 2s infinite;
+  z-index: -1;
+}
+
+.vibe-live-badge {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  background: #DC2626; /* red-600 */
+  color: white;
+  font-size: 8px;
+  font-weight: 900;
+  padding: 1px 4px;
+  border-radius: 4px;
+  border: 1px solid white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* GIANT Pin Custom Styles */
+@keyframes giant-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+.vibe-giant-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(168,85,247,0.4) 0%, transparent 70%);
+  filter: blur(4px);
+  z-index: -1;
+  animation: giant-float 3s ease-in-out infinite;
+}
+
+.vibe-giant-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #9333EA; /* purple-600 */
+  color: white;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1.5px solid white;
+  font-size: 9px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  z-index: 10;
 }

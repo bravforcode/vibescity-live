@@ -1,4 +1,4 @@
-import SwipeCard from "./SwipeCard.vue";
+import SwipeCard from "../components/ui/SwipeCard.vue";
 
 // 1. Setup the "Meta" config (Tells Storybook about the component)
 export default {

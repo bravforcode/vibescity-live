@@ -28,11 +28,22 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-          cache-dependency-path: package-lock.json
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "latest"
+
+      - name: Cache Bun install
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: DNS precheck for vibecity-api.fly.dev
         id: dns_precheck
@@ -80,7 +91,7 @@ jobs:
           POSTDEPLOY_RETRY_DELAY_MS: "3000"
           POSTDEPLOY_FETCH_TIMEOUT_MS: "10000"
           POSTDEPLOY_REPORT_PATH: "reports/ci/postdeploy-route-health.json"
-        run: npm run healthcheck:postdeploy
+        run: bun run healthcheck:postdeploy
 
       - name: Evaluate route-level SLO thresholds
         id: route_slo_eval
@@ -167,14 +178,25 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-          cache-dependency-path: package-lock.json
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "latest"
+
+      - name: Cache Bun install
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: Install Playwright browser (Chromium)
-        run: npx playwright install --with-deps chromium
+        run: bunx playwright install --with-deps chromium
 
       - name: Validate MAPBOX_PUBLIC_TOKEN (synthetic browser)
         run: |
@@ -241,7 +263,7 @@ jobs:
           PW_LOW_MEM: "1"
           E2E_MAP_REQUIRED: "1"
           VITE_MAPBOX_TOKEN: "${{ secrets.MAPBOX_PUBLIC_TOKEN }}"
-        run: npm run test:e2e:smoke-map-lite
+        run: bun run test:e2e:smoke-map-lite
 
       - name: Synthetic browser summary
         if: ${{ always() }}
@@ -321,6 +343,22 @@ jobs:
           TREND_OUTPUT_PATH: "reports/ci/synthetic-trend-7d.json"
         run: node scripts/ci/weekly-quality-trend.mjs
 
+      - name: Provision BigQuery observability tables (partitioning + retention)
+        if: ${{ always() }}
+        continue-on-error: true
+        env:
+          BIGQUERY_PROJECT_ID: "${{ vars.BIGQUERY_PROJECT_ID }}"
+          BIGQUERY_DATASET: "${{ vars.BIGQUERY_DATASET }}"
+          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON }}"
+          BIGQUERY_ALLOW_CREATE_DATASET: "0"
+          BIGQUERY_ALLOW_CREATE_TABLES: "1"
+          BIGQUERY_APPLY_PARTITION_RETENTION: "1"
+          BIGQUERY_OBS_PARTITION_RETENTION_DAYS: "365"
+          BIGQUERY_SET_DATASET_DEFAULTS: "0"
+          BIGQUERY_PROVISION_OUTPUT_PATH: "reports/ci/bigquery-provision-log.json"
+          BIGQUERY_PROVISION_FAIL_ON_ERROR: "0"
+        run: node scripts/ci/provision-bigquery-observability.mjs
+
       - name: Publish observability metrics (BigQuery + Loki)
         if: ${{ always() }}
         continue-on-error: true
@@ -356,6 +394,12 @@ jobs:
           INCIDENT_RECOVERY_THRESHOLD: "3"
           INCIDENT_DRY_RUN: "0"
           INCIDENT_FAIL_ON_ERROR: "0"
+          INCIDENT_SUPPRESS: "${{ vars.INCIDENT_SUPPRESS }}"
+          INCIDENT_SUPPRESS_UNTIL_UTC: "${{ vars.INCIDENT_SUPPRESS_UNTIL_UTC }}"
+          INCIDENT_SUPPRESS_START_UTC: "${{ vars.INCIDENT_SUPPRESS_START_UTC }}"
+          INCIDENT_SUPPRESS_END_UTC: "${{ vars.INCIDENT_SUPPRESS_END_UTC }}"
+          INCIDENT_SUPPRESS_WINDOWS_UTC: "${{ vars.INCIDENT_SUPPRESS_WINDOWS_UTC }}"
+          INCIDENT_SUPPRESS_REASON: "${{ vars.INCIDENT_SUPPRESS_REASON }}"
           BIGQUERY_PROJECT_ID: "${{ vars.BIGQUERY_PROJECT_ID }}"
           BIGQUERY_DATASET: "${{ vars.BIGQUERY_DATASET }}"
           BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON }}"
@@ -388,6 +432,15 @@ jobs:
         with:
           name: metrics-export-log
           path: reports/ci/metrics-export-log.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload BigQuery provision log
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bigquery-provision-log
+          path: reports/ci/bigquery-provision-log.json
           retention-days: 14
           if-no-files-found: ignore
 

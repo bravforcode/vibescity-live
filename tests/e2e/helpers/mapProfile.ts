@@ -3,6 +3,7 @@ import { test, type Page } from "@playwright/test";
 const MAP_REQUIRED_TAG = "@map-required";
 const MAP_READY_SELECTOR = '[data-testid="map-shell"][data-map-ready="true"]';
 const MAP_SHELL_SELECTOR = '[data-testid="map-shell"]';
+const MAP_WRAPPER_SELECTOR = '[data-testid="map-shell-wrapper"]';
 const MAP_TOKEN_OVERLAY_TEXT = "Mapbox Token Required";
 const WEBGL_FALLBACK_TEXT = "Map Not Available";
 const MAP_CANVAS_SELECTOR = '[data-testid="map-canvas"]';
@@ -42,17 +43,32 @@ export async function waitForMapReadyOrSkip(
   page: Page,
   timeoutMs = 20_000,
 ): Promise<boolean> {
-  const mapShell = page.locator(MAP_SHELL_SELECTOR).first();
-  const mapShellVisible = await mapShell
-    .isVisible({ timeout: timeoutMs })
+  const mapWrapper = page.locator(MAP_WRAPPER_SELECTOR).first();
+  const wrapperVisible = await mapWrapper
+    .waitFor({ state: "visible", timeout: timeoutMs })
+    .then(() => true)
     .catch(() => false);
 
   enforceMapConditionOrSkip(
-    mapShellVisible,
-    `Map shell did not render within ${timeoutMs}ms.`,
+    wrapperVisible,
+    `Map shell wrapper did not render within ${timeoutMs}ms.`,
   );
 
+  const mapShell = page.locator(MAP_SHELL_SELECTOR).first();
+  const mapShellVisible = await mapShell
+    .waitFor({ state: "visible", timeout: timeoutMs })
+    .then(() => true)
+    .catch(() => false);
+
   if (!mapShellVisible) {
+    // Wrapper rendered but map component didn't mount.
+    enforceMapConditionOrSkip(
+      mapShellVisible,
+      [
+        `Map component failed to mount within ${timeoutMs}ms.`,
+        wrapperVisible ? "Map wrapper is visible." : "Map wrapper is not visible.",
+      ].join(" "),
+    );
     return false;
   }
 

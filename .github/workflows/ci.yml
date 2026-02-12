@@ -27,8 +27,17 @@ jobs:
       - name: Unit tests
         run: npm run test:unit
 
+      - name: Build (prerender)
+        run: npm run build
+
+      - name: SEO lint gate
+        run: node scripts/ci/seo-lint.mjs
+
       - name: Check for env placeholders
         run: node scripts/ci/check-env-placeholders.mjs
+
+      - name: Secret scan (Stripe)
+        run: npm run ci:secret-scan
 
       - name: Guard SQL runlist safety rules
         run: node scripts/ci/check-runlist-guards.mjs

@@ -2,14 +2,17 @@
 import { BarChart, Clock, Heart, MapPin, Share2 } from "lucide-vue-next";
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useNotifications } from "@/composables/useNotifications";
 import { useSmartVideo } from "../../composables/useSmartVideo";
 import { useCoinStore } from "../../store/coinStore";
+import { openExternal } from "../../utils/browserUtils";
 import { isFlashActive } from "../../utils/shopUtils";
 import VisitorCount from "../ui/VisitorCount.vue";
 import MerchantStats from "./MerchantStats.vue";
 
 const coinStore = useCoinStore();
 const { videoRef } = useSmartVideo();
+const { notifySuccess } = useNotifications();
 
 const { t } = useI18n();
 
@@ -79,7 +82,7 @@ const handleShare = async (e) => {
 		} else {
 			// Fallback: copy to clipboard
 			await navigator.clipboard.writeText(shopUrl);
-			alert("Link copied to clipboard!");
+			notifySuccess("Link copied to clipboard!");
 		}
 		emit("share", props.shop);
 		coinStore.awardCoins(5); // Higher reward for sharing
@@ -92,13 +95,17 @@ const handleShare = async (e) => {
 const openGoogleMaps = (e) => {
 	e.stopPropagation();
 	const url = `https://www.google.com/maps/dir/?api=1&destination=${props.shop.lat},${props.shop.lng}`;
-	window.open(url, "_blank");
+	openExternal(url);
 };
 
 // Check if favorited - normalize types for comparison
 const isFavorited = computed(() => {
-	const shopId = Number(props.shop.id);
-	return props.favorites.some((fav) => Number(fav) === shopId);
+	const shopId =
+		props.shop?.id === null || props.shop?.id === undefined
+			? ""
+			: String(props.shop.id).trim();
+	if (!shopId) return false;
+	return props.favorites.some((fav) => String(fav).trim() === shopId);
 });
 
 // Helper to optimize Supabase/remote images
@@ -216,14 +223,18 @@ const handleMouseEnter = () => {
 
         <!-- Distance Badge -->
         <div
-          v-if="shop.distance != null && typeof shop.distance === 'number'"
           class="px-2.5 py-1.5 rounded-xl bg-black/40 backdrop-blur-xl border border-white/20 shadow-lg self-start"
         >
           <span
             class="text-[10px] font-black text-blue-300 flex items-center gap-1"
           >
             <MapPin class="w-3 h-3" stroke-width="2.5" />
-            {{ shop.distance.toFixed(1) }}km
+            <template v-if="shop.distance != null && typeof shop.distance === 'number'">
+              {{ shop.distance.toFixed(1) }}km
+            </template>
+            <template v-else>
+              {{ t('shop.nearby') }}
+            </template>
           </span>
         </div>
       </div>
@@ -303,6 +314,18 @@ const handleMouseEnter = () => {
                 class="px-1.5 py-0.5 rounded-md bg-white/20 backdrop-blur-sm border border-white/10"
                 >{{ shop.category || "Shop" }}</span
               >
+              <span
+                v-if="shop.rating"
+                class="px-1.5 py-0.5 rounded-md bg-yellow-500/30 backdrop-blur-sm border border-yellow-400/30 flex items-center gap-0.5"
+              >
+                ⭐ {{ shop.rating.toFixed(1) }}
+              </span>
+              <span
+                v-else
+                class="px-1.5 py-0.5 rounded-md bg-purple-500/30 backdrop-blur-sm border border-purple-400/30"
+              >
+                {{ t('shop.new') }}
+              </span>
               <span class="flex items-center gap-1"
                 ><Clock class="w-2.5 h-2.5" /> {{ shop.openTime || "--" }} -
                 {{ shop.closeTime || "--" }}</span
@@ -312,6 +335,16 @@ const handleMouseEnter = () => {
             <!-- Visitor Count -->
             <div class="mb-2 origin-left scale-90">
               <VisitorCount :shopId="shop.id" :isDarkMode="true" />
+            </div>
+
+            <!-- Promotion Info -->
+            <div
+              v-if="shop.promotionInfo"
+              class="mb-2 px-2 py-1 rounded-lg bg-gradient-to-r from-orange-500/20 to-red-500/20 border border-orange-400/30"
+            >
+              <span class="text-[9px] font-black text-orange-300 uppercase tracking-wide">
+                🔥 {{ shop.promotionInfo }}
+              </span>
             </div>
 
             <!-- Action Buttons -->

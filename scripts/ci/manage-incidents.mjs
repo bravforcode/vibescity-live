@@ -33,6 +33,88 @@ function base64Url(input) {
     .replace(/=+$/g, "");
 }
 
+function parseIsoMs(value) {
+  if (!value) return null;
+  const parsed = Date.parse(String(value));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseSuppressionWindows() {
+  const now = Date.now();
+
+  // Hard switch.
+  if (toBool(process.env.INCIDENT_SUPPRESS, false)) {
+    return {
+      suppressed: true,
+      reason: "INCIDENT_SUPPRESS enabled",
+      active_window: null,
+    };
+  }
+
+  // One-off "suppress until" window.
+  const suppressUntil = parseIsoMs(process.env.INCIDENT_SUPPRESS_UNTIL_UTC);
+  if (suppressUntil && now < suppressUntil) {
+    return {
+      suppressed: true,
+      reason: `Suppressed until ${new Date(suppressUntil).toISOString()}`,
+      active_window: {
+        start: new Date(now).toISOString(),
+        end: new Date(suppressUntil).toISOString(),
+        reason: "INCIDENT_SUPPRESS_UNTIL_UTC",
+      },
+    };
+  }
+
+  // Explicit window (start/end) for planned maintenance.
+  const explicitStart = parseIsoMs(process.env.INCIDENT_SUPPRESS_START_UTC);
+  const explicitEnd = parseIsoMs(process.env.INCIDENT_SUPPRESS_END_UTC);
+  if (explicitStart && explicitEnd && explicitStart <= now && now < explicitEnd) {
+    return {
+      suppressed: true,
+      reason: "Suppressed (explicit start/end window)",
+      active_window: {
+        start: new Date(explicitStart).toISOString(),
+        end: new Date(explicitEnd).toISOString(),
+        reason: process.env.INCIDENT_SUPPRESS_REASON || "planned maintenance",
+      },
+    };
+  }
+
+  const rawWindows = process.env.INCIDENT_SUPPRESS_WINDOWS_UTC;
+  if (rawWindows) {
+    try {
+      const parsed = JSON.parse(rawWindows);
+      if (Array.isArray(parsed)) {
+        for (const entry of parsed) {
+          const start = parseIsoMs(entry?.start);
+          const end = parseIsoMs(entry?.end);
+          if (!start || !end) continue;
+          if (start <= now && now < end) {
+            return {
+              suppressed: true,
+              reason: "Suppressed (maintenance window)",
+              active_window: {
+                start: new Date(start).toISOString(),
+                end: new Date(end).toISOString(),
+                reason: entry?.reason || "planned maintenance",
+              },
+            };
+          }
+        }
+      }
+    } catch {
+      // Ignore invalid JSON; report it later via Step Summary.
+      return {
+        suppressed: false,
+        reason: "INCIDENT_SUPPRESS_WINDOWS_UTC invalid JSON (ignored)",
+        active_window: null,
+      };
+    }
+  }
+
+  return { suppressed: false, reason: "", active_window: null };
+}
+
 async function appendSummary(lines) {
   if (!STEP_SUMMARY) return;
   await appendFile(STEP_SUMMARY, `${lines.join("\n")}\n`);
@@ -399,11 +481,14 @@ async function main() {
       ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
       : "";
 
+  const suppression = parseSuppressionWindows();
+
   const result = {
     generated_at: new Date().toISOString(),
     threshold,
     recovery_threshold: recoveryThreshold,
     dry_run: dryRun,
+    suppression,
     bigquery_configured: bqConfigured,
     signals_evaluated: signals.length,
     opened: [],
@@ -469,6 +554,18 @@ async function main() {
     const existingIssue = openByKey.get(signal.breach_key);
 
     if (signal.breached && breachStreak >= threshold) {
+      if (suppression.suppressed) {
+        result.skipped.push({
+          breach_key: signal.breach_key,
+          breached: signal.breached,
+          breach_streak: breachStreak,
+          reason: `suppressed: ${suppression.reason || "maintenance window"}`,
+          would_action: existingIssue ? "comment" : "open",
+          active_window: suppression.active_window,
+        });
+        continue;
+      }
+
       if (!canManageIssues) {
         result.skipped.push({
           breach_key: signal.breach_key,
@@ -552,6 +649,18 @@ async function main() {
     }
 
     if (!signal.breached && existingIssue && recoveryStreak >= recoveryThreshold) {
+      if (suppression.suppressed) {
+        result.skipped.push({
+          breach_key: signal.breach_key,
+          breached: signal.breached,
+          recovery_streak: recoveryStreak,
+          reason: `suppressed: ${suppression.reason || "maintenance window"}`,
+          would_action: "close",
+          active_window: suppression.active_window,
+        });
+        continue;
+      }
+
       if (!canManageIssues) {
         result.skipped.push({
           breach_key: signal.breach_key,
@@ -620,6 +729,7 @@ async function main() {
     `- BigQuery source: ${bqConfigured ? "enabled" : "disabled (local fallback)"}`,
     `- GitHub issues integration: ${canManageIssues ? "enabled" : "disabled"}`,
     `- Dry run: ${dryRun ? "yes" : "no"}`,
+    `- Suppression: ${suppression.suppressed ? "enabled" : "disabled"}${suppression.suppressed ? ` (${suppression.reason || "maintenance"})` : ""}`,
     `- Opened: ${result.opened.length}`,
     `- Updated: ${result.updated.length}`,
     `- Closed: ${result.closed.length}`,

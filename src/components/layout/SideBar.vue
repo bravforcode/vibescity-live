@@ -1,32 +1,36 @@
 <script setup>
 import { computed, nextTick, onUnmounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useShopFilters } from "../../composables/useShopFilters";
+import { Z } from "../../constants/zIndex";
 import { getStatusColorClass, isFlashActive } from "../../utils/shopUtils";
+
+const { t } = useI18n();
 
 // ==================== PROPS & EMITS ====================
 const props = defineProps({
-  isOpen: Boolean,
-  shops: {
-    type: Array,
-    default: () => [],
-    validator: (value) => Array.isArray(value),
-  },
-  activeCategories: {
-    type: Array,
-    default: () => [],
-  },
-  activeStatus: {
-    type: String,
-    default: "ALL",
-  },
+	isOpen: Boolean,
+	shops: {
+		type: Array,
+		default: () => [],
+		validator: (value) => Array.isArray(value),
+	},
+	activeCategories: {
+		type: Array,
+		default: () => [],
+	},
+	activeStatus: {
+		type: String,
+		default: "ALL",
+	},
 });
 
 const emit = defineEmits([
-  "close",
-  "update:categories",
-  "update:status",
-  "select-shop",
-  "open-ride-modal",
+	"close",
+	"update:categories",
+	"update:status",
+	"select-shop",
+	"open-ride-modal",
 ]);
 
 // ==================== STATE ====================
@@ -40,162 +44,163 @@ const lastFocusableRef = ref(null);
 // ==================== COMPUTED PROPERTIES (Performance Optimization) ====================
 // ใช้ computed แทน toRefs เพื่อลด reactivity overhead
 const { uniqueCategories, sortedShops } = useShopFilters(
-  computed(() => props.shops),
-  computed(() => props.activeCategories),
-  computed(() => props.activeStatus),
+	computed(() => props.shops),
+	computed(() => props.activeCategories),
+	computed(() => props.activeStatus),
 );
 
 // Pre-compute shop metadata เพื่อหลีกเลี่ยงการคำนวณซ้ำใน template
 const enrichedShops = computed(() => {
-  return sortedShops.value.map((shop) => ({
-    ...shop,
-    _isFlash: isFlashActive(shop),
-    _statusClass: getStatusColorClass(shop.status),
-    _badgeType: shop.isGolden
-      ? "highlight"
-      : isFlashActive(shop)
-        ? "flash"
-        : "status",
-  }));
+	return sortedShops.value.map((shop) => ({
+		...shop,
+		_isFlash: isFlashActive(shop),
+		_statusClass: getStatusColorClass(shop.status),
+		_badgeType: shop.isGolden
+			? "highlight"
+			: isFlashActive(shop)
+				? "flash"
+				: "status",
+	}));
 });
 
+const liveShopsCount = computed(() => enrichedShops.value.filter(s => s.status === 'LIVE').length);
 const categories = computed(() => uniqueCategories.value);
 const statuses = ["ALL", "LIVE", "TONIGHT", "OFF"];
 
 // Active filter summary
 const activeFilterSummary = computed(() => {
-  const catText =
-    props.activeCategories.length > 0
-      ? props.activeCategories.join(", ")
-      : "ALL";
-  return `${catText} • ${props.activeStatus}`;
+	const catText =
+		props.activeCategories.length > 0
+			? props.activeCategories.join(", ")
+			: "ALL";
+	return `${catText} • ${props.activeStatus}`;
 });
 
 // Count active filters for badge
 const activeFilterCount = computed(() => {
-  let count = 0;
-  if (props.activeCategories.length > 0) count += props.activeCategories.length;
-  if (props.activeStatus !== "ALL") count += 1;
-  return count;
+	let count = 0;
+	if (props.activeCategories.length > 0) count += props.activeCategories.length;
+	if (props.activeStatus !== "ALL") count += 1;
+	return count;
 });
 
 // ==================== METHODS ====================
 const toggleCategory = (cat) => {
-  const updated = [...props.activeCategories];
-  const idx = updated.indexOf(cat);
+	const updated = [...props.activeCategories];
+	const idx = updated.indexOf(cat);
 
-  if (idx > -1) {
-    updated.splice(idx, 1);
-  } else {
-    updated.push(cat);
-  }
+	if (idx > -1) {
+		updated.splice(idx, 1);
+	} else {
+		updated.push(cat);
+	}
 
-  emit("update:categories", updated);
+	emit("update:categories", updated);
 };
 
 const resetCategories = () => {
-  emit("update:categories", []);
+	emit("update:categories", []);
 };
 
 const selectStatus = (stat) => {
-  emit("update:status", stat);
+	emit("update:status", stat);
 };
 
 const resetAllFilters = () => {
-  resetCategories();
-  selectStatus("ALL");
+	resetCategories();
+	selectStatus("ALL");
 };
 
 // Improved shop click handler with visual feedback before closing
 const handleShopClick = async (shop) => {
-  if (isClosing.value) return;
+	if (isClosing.value) return;
 
-  // Set selected state for visual feedback
-  selectedShopId.value = shop.id;
+	// Set selected state for visual feedback
+	selectedShopId.value = shop.id;
 
-  // Emit selection immediately
-  emit("select-shop", shop);
+	// Emit selection immediately
+	emit("select-shop", shop);
 
-  // Wait for animation feedback (300ms) before closing
-  await new Promise((resolve) => setTimeout(resolve, 300));
+	// Wait for animation feedback (300ms) before closing
+	await new Promise((resolve) => setTimeout(resolve, 300));
 
-  // Close sidebar
-  isClosing.value = true;
-  emit("close");
+	// Close sidebar
+	isClosing.value = true;
+	emit("close");
 
-  // Reset states after transition
-  await new Promise((resolve) => setTimeout(resolve, 400));
-  selectedShopId.value = null;
-  isClosing.value = false;
+	// Reset states after transition
+	await new Promise((resolve) => setTimeout(resolve, 400));
+	selectedShopId.value = null;
+	isClosing.value = false;
 };
 
 // ==================== KEYBOARD NAVIGATION ====================
 const handleKeyDown = (event) => {
-  if (!props.isOpen) return;
+	if (!props.isOpen) return;
 
-  // ESC to close
-  if (event.key === "Escape") {
-    emit("close");
-    return;
-  }
+	// ESC to close
+	if (event.key === "Escape") {
+		emit("close");
+		return;
+	}
 
-  // Tab trapping
-  if (event.key === "Tab") {
-    const focusableElements = sidebarRef.value?.querySelectorAll(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-    );
+	// Tab trapping
+	if (event.key === "Tab") {
+		const focusableElements = sidebarRef.value?.querySelectorAll(
+			'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+		);
 
-    if (!focusableElements || focusableElements.length === 0) return;
+		if (!focusableElements || focusableElements.length === 0) return;
 
-    const firstElement = focusableElements[0];
-    const lastElement = focusableElements[focusableElements.length - 1];
+		const firstElement = focusableElements[0];
+		const lastElement = focusableElements[focusableElements.length - 1];
 
-    if (event.shiftKey) {
-      if (document.activeElement === firstElement) {
-        lastElement.focus();
-        event.preventDefault();
-      }
-    } else {
-      if (document.activeElement === lastElement) {
-        firstElement.focus();
-        event.preventDefault();
-      }
-    }
-  }
+		if (event.shiftKey) {
+			if (document.activeElement === firstElement) {
+				lastElement.focus();
+				event.preventDefault();
+			}
+		} else {
+			if (document.activeElement === lastElement) {
+				firstElement.focus();
+				event.preventDefault();
+			}
+		}
+	}
 };
 
 // ==================== LIFECYCLE ====================
 watch(
-  () => props.isOpen,
-  async (isOpen) => {
-    if (isOpen) {
-      // Add keyboard listener
-      document.addEventListener("keydown", handleKeyDown);
+	() => props.isOpen,
+	async (isOpen) => {
+		if (isOpen) {
+			// Add keyboard listener
+			document.addEventListener("keydown", handleKeyDown);
 
-      // Prevent body scroll
-      document.body.style.overflow = "hidden";
+			// Prevent body scroll
+			document.body.style.overflow = "hidden";
 
-      // Focus first element
-      await nextTick();
-      const firstButton = sidebarRef.value?.querySelector("button");
-      firstButton?.focus();
-    } else {
-      // Remove keyboard listener
-      document.removeEventListener("keydown", handleKeyDown);
+			// Focus first element
+			await nextTick();
+			const firstButton = sidebarRef.value?.querySelector("button");
+			firstButton?.focus();
+		} else {
+			// Remove keyboard listener
+			document.removeEventListener("keydown", handleKeyDown);
 
-      // Restore body scroll
-      document.body.style.overflow = "";
+			// Restore body scroll
+			document.body.style.overflow = "";
 
-      // Reset states
-      selectedShopId.value = null;
-      isClosing.value = false;
-    }
-  },
+			// Reset states
+			selectedShopId.value = null;
+			isClosing.value = false;
+		}
+	},
 );
 
 onUnmounted(() => {
-  document.removeEventListener("keydown", handleKeyDown);
-  document.body.style.overflow = "";
+	document.removeEventListener("keydown", handleKeyDown);
+	document.body.style.overflow = "";
 });
 </script>
 
@@ -205,7 +210,8 @@ onUnmounted(() => {
     <transition name="fade">
       <div
         v-if="isOpen"
-        class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[4500] pointer-events-auto sm:hidden"
+        class="fixed inset-0 bg-black/60 backdrop-blur-sm pointer-events-auto sm:hidden"
+        :style="{ zIndex: Z.SIDEBAR_BACKDROP }"
         @click="emit('close')"
         aria-hidden="true"
       ></div>
@@ -213,13 +219,14 @@ onUnmounted(() => {
 
     <!-- Sidebar Panel -->
     <transition name="slide">
-      <aside
+      <div
         v-if="isOpen"
         ref="sidebarRef"
         role="dialog"
         aria-modal="true"
         aria-labelledby="sidebar-title"
-        class="fixed inset-y-0 left-0 w-[290px] bg-zinc-950/95 backdrop-blur-2xl border-r border-white/10 z-[5000] pointer-events-auto flex flex-col shadow-2xl"
+        class="fixed inset-y-0 left-0 w-[290px] bg-zinc-950/95 backdrop-blur-2xl border-r border-white/10 pointer-events-auto flex flex-col shadow-2xl p-0 m-0"
+        :style="{ zIndex: Z.SIDEBAR }"
       >
         <!-- Header -->
         <div
@@ -229,7 +236,7 @@ onUnmounted(() => {
             id="sidebar-title"
             class="text-white font-black uppercase tracking-tighter text-xl leading-none"
           >
-            VibesCity.live
+            {{ t("sidebar.title") }}
           </h2>
           <button
             ref="firstFocusableRef"
@@ -269,7 +276,7 @@ onUnmounted(() => {
                 <span
                   class="text-[10px] text-white/30 font-black uppercase tracking-[0.2em]"
                 >
-                  Active Filters
+                  {{ t("sidebar.active_filters") }}
                   <span v-if="activeFilterCount > 0" class="ml-1 text-white/50"
                     >({{ activeFilterCount }})</span
                   >
@@ -324,7 +331,7 @@ onUnmounted(() => {
                     id="status-filter-label"
                     class="text-[9px] text-white/20 font-black uppercase tracking-[0.2em]"
                   >
-                    Quick Status
+                    {{ t("sidebar.quick_status") }}
                   </span>
                   <div class="grid grid-cols-2 gap-2">
                     <button
@@ -356,7 +363,7 @@ onUnmounted(() => {
                       id="category-filter-label"
                       class="text-[9px] text-white/20 font-black uppercase tracking-[0.2em]"
                     >
-                      Categories
+                      {{ t("sidebar.categories") }}
                     </span>
                     <button
                       @click="resetCategories"
@@ -369,7 +376,7 @@ onUnmounted(() => {
                       ]"
                       aria-label="Reset category filters"
                     >
-                      RESET
+                      {{ t("sidebar.reset") }}
                     </button>
                   </div>
                   <div class="flex flex-wrap gap-2">
@@ -400,7 +407,7 @@ onUnmounted(() => {
               <span
                 class="text-[10px] text-white/30 font-black uppercase tracking-[0.2em]"
               >
-                Trending Now
+                {{ t("sidebar.trending_now") }}
               </span>
               <div class="flex items-center gap-1.5" aria-live="polite">
                 <div
@@ -410,7 +417,7 @@ onUnmounted(() => {
                 <span
                   class="text-[9px] text-red-500 font-bold uppercase tracking-widest"
                 >
-                  {{ enrichedShops.length }} Live
+                  {{ t("sidebar.live_count", { count: liveShopsCount }) }}
                 </span>
               </div>
             </div>
@@ -497,10 +504,7 @@ onUnmounted(() => {
                   <button
                     @click.stop="
                       emit('select-shop', shop);
-                      /* Then logic to open ride? No, emit specific */ $emit(
-                        'open-ride-modal',
-                        shop,
-                      );
+                      emit('open-ride-modal', shop);
                     "
                     class="px-2 py-1 rounded bg-blue-600/20 text-blue-400 text-[10px] font-bold border border-blue-500/30 hover:bg-blue-600 hover:text-white transition-colors flex items-center gap-1"
                   >
@@ -543,12 +547,12 @@ onUnmounted(() => {
                   <p
                     class="text-sm text-white/40 font-bold uppercase tracking-wide"
                   >
-                    No Venues Found
+                    {{ t("sidebar.no_venues") }}
                   </p>
                   <p
                     class="text-[10px] text-white/20 font-medium max-w-[200px] mx-auto leading-relaxed"
                   >
-                    Try adjusting your filters to discover more vibes
+                    {{ t("sidebar.adjust_filters") }}
                   </p>
                 </div>
 
@@ -558,7 +562,7 @@ onUnmounted(() => {
                   class="mx-auto px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-[10px] font-black uppercase tracking-widest rounded-sm transition-all border border-white/10 hover:border-white/30 focus:outline-none focus:ring-2 focus:ring-white/30"
                   aria-label="Clear all filters"
                 >
-                  Clear All Filters
+                  {{ t("sidebar.clear_all") }}
                 </button>
               </div>
             </div>
@@ -570,10 +574,10 @@ onUnmounted(() => {
           <p
             class="text-[9px] text-white/20 font-medium uppercase tracking-widest text-center"
           >
-            © 2026 VibesCity • All Rights Reserved
+            {{ t("sidebar.footer", { year: new Date().getFullYear() }) }}
           </p>
         </div>
-      </aside>
+      </div>
     </transition>
   </div>
 </template>
@@ -600,7 +604,10 @@ onUnmounted(() => {
 
 .expand-enter-active,
 .expand-leave-active {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   max-height: 600px;
 }
 .expand-enter-from,

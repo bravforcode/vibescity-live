@@ -54,6 +54,11 @@ onUnmounted(() => {
 });
 
 const setupIntersectionObserver = () => {
+	const normalizeId = (value) => {
+		if (value === null || value === undefined) return "";
+		return String(value).trim();
+	};
+
 	const options = {
 		root: panelRef.value,
 		rootMargin: "-40% 0px -40% 0px",
@@ -64,8 +69,9 @@ const setupIntersectionObserver = () => {
 		if (isUserScrolling.value) {
 			entries.forEach((entry) => {
 				if (entry.isIntersecting) {
-					const shopId = parseInt(entry.target.dataset.shopId);
-					const shop = props.shops.find((s) => s.id === shopId);
+					const shopId = normalizeId(entry.target.dataset.shopId);
+					if (!shopId) return;
+					const shop = props.shops.find((s) => normalizeId(s.id) === shopId);
 					if (shop) {
 						emit("scroll-to-shop", shop);
 					}

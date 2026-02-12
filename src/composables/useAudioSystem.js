@@ -1,4 +1,4 @@
-import { onMounted, onUnmounted, ref, watch } from "vue";
+import { onUnmounted, ref } from "vue";
 
 export function useAudioSystem() {
 	const isMuted = ref(true); // Default muted (browser policy)
@@ -21,7 +21,8 @@ export function useAudioSystem() {
 
 	const initAudio = () => {
 		if (audioContext.value) return;
-		const AudioContext = window.AudioContext || window.webkitAudioContext;
+		const AudioContext =
+			globalThis.AudioContext || globalThis.webkitAudioContext;
 		audioContext.value = new AudioContext();
 		gainNode.value = audioContext.value.createGain();
 		gainNode.value.connect(audioContext.value.destination);

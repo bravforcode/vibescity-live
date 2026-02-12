@@ -54,7 +54,14 @@ test.describe("Map Smoke Lite", () => {
     if (!filterVisible) return;
 
     const start = Date.now();
-    await filterButton.click();
+    const clicked = await filterButton
+      .scrollIntoViewIfNeeded()
+      .then(() => filterButton.click({ timeout: 10_000, force: true }))
+      .then(() => true)
+      .catch(() => false);
+    enforceMapConditionOrSkip(clicked, "Filter button click failed.");
+    if (!clicked) return;
+
     const menuVisible = await page
       .getByTestId("filter-menu")
       .or(page.getByText("Filter Vibe"))

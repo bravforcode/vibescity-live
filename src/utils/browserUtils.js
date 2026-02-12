@@ -46,7 +46,7 @@ export const copyToClipboard = async (text) => {
 		const success = document.execCommand("copy");
 
 		// Cleanup
-		document.body.removeChild(textArea);
+		textArea.remove();
 		selection.removeAllRanges();
 
 		return success;
@@ -85,7 +85,7 @@ export const openGoogleMapsDir = (lat, lng) => {
 			// Fallback หลังจาก 500ms
 			setTimeout(() => {
 				if (document.visibilityState === "visible") {
-					window.open(`https://maps.apple.com/?daddr=${destination}`, "_blank");
+					openExternal(`https://maps.apple.com/?daddr=${destination}`);
 				}
 			}, 500);
 		} else if (isAndroid) {
@@ -96,18 +96,15 @@ export const openGoogleMapsDir = (lat, lng) => {
 			// Fallback หลังจาก 500ms
 			setTimeout(() => {
 				if (document.visibilityState === "visible") {
-					window.open(
+					openExternal(
 						`https://www.google.com/maps/dir/?api=1&destination=${destination}`,
-						"_blank",
 					);
 				}
 			}, 500);
 		} else {
 			// สำหรับ Desktop/Browser อื่นๆ
-			window.open(
+			openExternal(
 				`https://www.google.com/maps/dir/?api=1&destination=${destination}`,
-				"_blank",
-				"noopener,noreferrer",
 			);
 		}
 
@@ -115,13 +112,21 @@ export const openGoogleMapsDir = (lat, lng) => {
 	} catch (error) {
 		console.error("Failed to open Google Maps:", error);
 		// Fallback มาตรฐาน
-		window.open(
+		openExternal(
 			`https://www.google.com/maps/dir/?api=1&destination=${destination}`,
-			"_blank",
-			"noopener,noreferrer",
 		);
 		return false;
 	}
+};
+
+// เปิดลิงก์ภายนอกแบบปลอดภัย
+export const openExternal = (url, features = "") => {
+	const finalFeatures = ["noopener", "noreferrer", features]
+		.filter(Boolean)
+		.join(",");
+	const win = window.open(url, "_blank", finalFeatures);
+	if (win) win.opener = null;
+	return Boolean(win);
 };
 
 // ฟังก์ชันเช็คว่าอยู่บนมือถือหรือไม่
@@ -148,7 +153,6 @@ export const shareLocation = (shop) => {
 		// Fallback สำหรับ Desktop หรือเบราว์เซอร์ที่ไม่รองรับ
 		const shareUrl = `https://maps.google.com/?q=${shop.lat},${shop.lng}`;
 		copyToClipboard(shareUrl);
-		alert("ลิงก์ตำแหน่งถูกคัดลอกไปยังคลิปบอร์ดแล้ว!");
 		return true;
 	}
 };

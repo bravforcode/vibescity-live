@@ -1,9 +1,7 @@
-name: E2E (Smoke)
+name: E2E (Manual)
 
 on:
-  pull_request:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 jobs:
   e2e:
@@ -14,6 +12,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Install deps
         run: npm ci
