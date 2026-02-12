@@ -1,0 +1,349 @@
+## src/App.vue
+src/App.vue:62 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/assets/vibe-animations.css
+src/assets/vibe-animations.css:12 - animation ไม่มี prefers-reduced-motion citeturn0view0
+## src/assets/map-atmosphere.css
+src/assets/map-atmosphere.css:19 - animation ไม่มี prefers-reduced-motion citeturn0view0
+## src/views/HomeView.vue
+src/views/HomeView.vue:343 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/views/AdminView.vue
+src/views/AdminView.vue:9 - “Loading...” → “Loading…” citeturn0view0
+src/views/AdminView.vue:114 - input ไม่มี label/aria-label + autocomplete citeturn0view0
+## src/store/index.js
+src/store/index.js:93 - “...” → “…” citeturn0view0
+## src/i18n.js
+src/i18n.js:6 - “...” → “…” citeturn0view0
+src/i18n.js:43 - “...” → “…” citeturn0view0
+src/i18n.js:121 - “...” → “…” citeturn0view0
+src/i18n.js:130 - “...” → “…” citeturn0view0
+src/i18n.js:173 - “...” → “…” citeturn0view0
+src/i18n.js:251 - “...” → “…” citeturn0view0
+## src/services/redemptionService.js
+src/services/redemptionService.js:23 - “...” → “…” citeturn0view0
+## src/services/paymentService.js
+src/services/paymentService.js:37 - “...” → “…” citeturn0view0
+## src/services/eventService.js
+src/services/eventService.js:344 - “...” → “…” citeturn0view0
+src/services/eventService.js:384 - “...” → “…” citeturn0view0
+src/services/eventService.js:434 - “...” → “…” citeturn0view0
+## src/locales/en.json
+src/locales/en.json:3 - “...” → “…” citeturn0view0
+src/locales/en.json:4 - “...” → “…” citeturn0view0
+src/locales/en.json:43 - “...” → “…” citeturn0view0
+## src/locales/th.json
+src/locales/th.json:3 - “...” → “…” citeturn0view0
+src/locales/th.json:4 - “...” → “…” citeturn0view0
+src/locales/th.json:43 - “...” → “…” citeturn0view0
+## src/utils/mapRenderer.js
+src/utils/mapRenderer.js:108 - “...” → “…” citeturn0view0
+src/utils/mapRenderer.js:123 - img ไม่มี alt citeturn0view0
+src/utils/mapRenderer.js:133 - ปุ่มไอคอนไม่มี aria-label citeturn0view0
+src/utils/mapRenderer.js:161 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/utils/mapRenderer.js:165 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/utils/mapRenderer.js:221 - img ไม่มี alt citeturn0view0
+src/utils/mapRenderer.js:300 - img ไม่มี alt citeturn0view0
+## src/utils/osmRoads.js
+src/utils/osmRoads.js:47 - “...” → “…” citeturn0view0
+## src/components/ui/PhotoGallery.vue
+src/components/ui/PhotoGallery.vue:93 - โมดัลขาด role="dialog"/aria-modal citeturn0view0
+src/components/ui/PhotoGallery.vue:114 - ปุ่มไอคอนไม่มี aria-label citeturn0view0
+src/components/ui/PhotoGallery.vue:122 - ปุ่มไอคอนไม่มี aria-label citeturn0view0
+src/components/ui/PhotoGallery.vue:152 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/PhotoGallery.vue:158 - img ไม่มี alt citeturn0view0
+src/components/ui/PhotoGallery.vue:201 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/ui/OnboardingTour.vue
+src/components/ui/OnboardingTour.vue:99 - div คลิกได้ควรเป็น button/ลิงก์ + รองรับคีย์บอร์ด citeturn0view0
+src/components/ui/OnboardingTour.vue:99 - โมดัลขาด role="dialog"/aria-modal citeturn0view0
+src/components/ui/OnboardingTour.vue:109 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/OnboardingTour.vue:150 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/OnboardingTour.vue:162 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/OnboardingTour.vue:173 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/ui/LuckyWheel.vue
+src/components/ui/LuckyWheel.vue:127 - div คลิกได้ควรเป็น button/ลิงก์ + รองรับคีย์บอร์ด citeturn0view0
+src/components/ui/LuckyWheel.vue:127 - โมดัลขาด role="dialog"/aria-modal citeturn0view0
+src/components/ui/LuckyWheel.vue:186 - “...” → “…” citeturn0view0
+src/components/ui/LuckyWheel.vue:225 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/LuckyWheel.vue:331 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/ui/LanguageToggle.vue
+src/components/ui/LanguageToggle.vue:22 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/ui/FilterMenu.vue
+src/components/ui/FilterMenu.vue:231 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/FilterMenu.vue:250 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/FilterMenu.vue:261 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/FilterMenu.vue:294 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/FilterMenu.vue:303 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/FilterMenu.vue:388 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/FilterMenu.vue:409 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/FilterMenu.vue:417 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/FilterMenu.vue:449 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/ui/DailyCheckin.vue
+src/components/ui/DailyCheckin.vue:129 - div คลิกได้ควรเป็น button/ลิงก์ + รองรับคีย์บอร์ด citeturn0view0
+src/components/ui/DailyCheckin.vue:129 - โมดัลขาด role="dialog"/aria-modal citeturn0view0
+src/components/ui/DailyCheckin.vue:160 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/DailyCheckin.vue:181 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/DailyCheckin.vue:191 - “...” → “…” citeturn0view0
+src/components/ui/DailyCheckin.vue:191 - “Loading...” → “Loading…” citeturn0view0
+src/components/ui/DailyCheckin.vue:252 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/ui/CouponModal.vue
+src/components/ui/CouponModal.vue:2 - โมดัลขาด role="dialog"/aria-modal citeturn0view0
+src/components/ui/CouponModal.vue:26 - “...” → “…” citeturn0view0
+src/components/ui/CouponModal.vue:26 - “Claiming...” → “Claiming…” citeturn0view0
+## src/components/ui/ConsentBanner.vue
+src/components/ui/ConsentBanner.vue:3 - แบนเนอร์ขาด role="dialog"/aria-describedby citeturn0view0
+src/components/ui/ConsentBanner.vue:66 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/ui/BottomNav.vue
+src/components/ui/BottomNav.vue:51 - tab ต้องมี role="tablist" + aria-selected citeturn0view0
+src/components/ui/BottomNav.vue:67 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/ui/AchievementBadges.vue
+src/components/ui/AchievementBadges.vue:184 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/ui/SidebarDrawer.vue
+src/components/ui/SidebarDrawer.vue:137 - drawer ขาด role="dialog"/aria-modal citeturn0view0
+src/components/ui/SidebarDrawer.vue:170 - ปุ่มไอคอนไม่มี aria-label citeturn0view0
+src/components/ui/SidebarDrawer.vue:172 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/SidebarDrawer.vue:191 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/SidebarDrawer.vue:222 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/SidebarDrawer.vue:255 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/SidebarDrawer.vue:267 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/SidebarDrawer.vue:288 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/SidebarDrawer.vue:309 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/ui/SettingsPanel.vue
+src/components/ui/SettingsPanel.vue:87 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/SettingsPanel.vue:98 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/SettingsPanel.vue:109 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/SettingsPanel.vue:137 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/SettingsPanel.vue:148 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/SettingsPanel.vue:159 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/ui/SafetyPanel.vue
+src/components/ui/SafetyPanel.vue:91 - โมดัลขาด role="dialog"/aria-modal citeturn0view0
+src/components/ui/SafetyPanel.vue:238 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/ui/ReviewSystem.vue
+src/components/ui/ReviewSystem.vue:136 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/ReviewSystem.vue:144 - ปุ่มดาวไม่มี aria-label/aria-pressed citeturn0view0
+src/components/ui/ReviewSystem.vue:148 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/ReviewSystem.vue:148 - outline-none ไม่มี focus-visible citeturn0view0
+src/components/ui/ReviewSystem.vue:163 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/ReviewSystem.vue:178 - “...” → “…” citeturn0view0
+src/components/ui/ReviewSystem.vue:178 - “Share the vibe...” → “Share the vibe…” citeturn0view0
+src/components/ui/ReviewSystem.vue:187 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/ReviewSystem.vue:286 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/ReviewSystem.vue:299 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/ui/RelatedShopsDrawer.vue
+src/components/ui/RelatedShopsDrawer.vue:39 - drawer ขาด role="dialog"/aria-modal citeturn0view0
+src/components/ui/RelatedShopsDrawer.vue:55 - ปุ่มไอคอนไม่มี aria-label citeturn0view0
+src/components/ui/RelatedShopsDrawer.vue:65 - div คลิกได้ควรเป็น button + รองรับคีย์บอร์ด citeturn0view0
+src/components/ui/RelatedShopsDrawer.vue:72 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/ui/ReferralShare.vue
+src/components/ui/ReferralShare.vue:129 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/ui/PullToRefresh.vue
+src/components/ui/PullToRefresh.vue:117 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/ui/SwipeCard.vue
+src/components/ui/SwipeCard.vue:322 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/SwipeCard.vue:404 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/SwipeCard.vue:437 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/SwipeCard.vue:449 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/SwipeCard.vue:515 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/ui/SOSPanel.vue
+src/components/ui/SOSPanel.vue:32 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/SOSPanel.vue:35 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/SOSPanel.vue:52 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/SOSPanel.vue:71 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/ui/VibeNotification.vue
+src/components/ui/VibeNotification.vue:65 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/ui/VibeNotification.vue:66 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/ui/VibeError.vue
+src/components/ui/VibeError.vue:45 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/modal/FavoritesModal.vue
+src/components/modal/FavoritesModal.vue:51 - โมดัลขาด role="dialog"/aria-modal citeturn0view0
+src/components/modal/FavoritesModal.vue:158 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/modal/EditVenueModal.vue
+src/components/modal/EditVenueModal.vue:50 - โมดัลขาด role="dialog"/aria-modal citeturn0view0
+src/components/modal/EditVenueModal.vue:63 - ปุ่มไอคอนไม่มี aria-label citeturn0view0
+src/components/modal/EditVenueModal.vue:113 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/EditVenueModal.vue:117 - “...” → “…” citeturn0view0
+src/components/modal/EditVenueModal.vue:117 - “Saving...” → “Saving…” citeturn0view0
+## src/components/modal/VibeModal.vue
+src/components/modal/VibeModal.vue:716 - โมดัลขาด role="dialog"/aria-modal citeturn0view0
+src/components/modal/VibeModal.vue:746 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/VibeModal.vue:758 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/VibeModal.vue:1034 - div คลิกได้ควรเป็น button + รองรับคีย์บอร์ด citeturn0view0
+src/components/modal/VibeModal.vue:1059 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/VibeModal.vue:1081 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/VibeModal.vue:1090 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/VibeModal.vue:1166 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/VibeModal.vue:1178 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/VibeModal.vue:1190 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/VibeModal.vue:1228 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/VibeModal.vue:1241 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/VibeModal.vue:1257 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/VibeModal.vue:1312 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/VibeModal.vue:1320 - “...” → “…” citeturn0view0
+src/components/modal/VibeModal.vue:1330 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/VibeModal.vue:1338 - “...” → “…” citeturn0view0
+src/components/modal/VibeModal.vue:1348 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/VibeModal.vue:1356 - “...” → “…” citeturn0view0
+src/components/modal/VibeModal.vue:1420 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/VibeModal.vue:1441 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/VibeModal.vue:1533 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/modal/ProfileDrawer.vue
+src/components/modal/ProfileDrawer.vue:155 - drawer ขาด role="dialog"/aria-modal citeturn0view0
+src/components/modal/ProfileDrawer.vue:180 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/ProfileDrawer.vue:276 - “Loading...” → “Loading…” citeturn0view0
+src/components/modal/ProfileDrawer.vue:369 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/ProfileDrawer.vue:373 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/ProfileDrawer.vue:405 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/ProfileDrawer.vue:431 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/modal/MallDrawer.vue
+src/components/modal/MallDrawer.vue:269 - โมดัลขาด role="dialog"/aria-modal citeturn0view0
+src/components/modal/MallDrawer.vue:278 - img ไม่มี alt citeturn0view0
+src/components/modal/MallDrawer.vue:292 - ปุ่มไอคอนไม่มี aria-label citeturn0view0
+src/components/modal/MallDrawer.vue:294 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/MallDrawer.vue:327 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/MallDrawer.vue:356 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/MallDrawer.vue:407 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/MallDrawer.vue:422 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/MallDrawer.vue:436 - input ไม่มี label/aria-label citeturn0view0
+src/components/modal/MallDrawer.vue:441 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/MallDrawer.vue:486 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/MallDrawer.vue:520 - img ไม่มี alt citeturn0view0
+src/components/modal/MallDrawer.vue:556 - img ไม่มี alt citeturn0view0
+src/components/modal/MallDrawer.vue:570 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/MallDrawer.vue:577 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/MallDrawer.vue:599 - div คลิกได้ควรเป็น button + รองรับคีย์บอร์ด citeturn0view0
+src/components/modal/MallDrawer.vue:608 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/MallDrawer.vue:622 - img ไม่มี alt citeturn0view0
+src/components/modal/MallDrawer.vue:676 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/modal/MallDrawer.vue:693 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/composables/map/useMapMarkers.js
+src/composables/map/useMapMarkers.js:64 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/assets/css/main.postcss
+src/assets/css/main.postcss:140 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/assets/css/main.postcss:437 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/feed/BottomFeed.vue
+src/components/feed/BottomFeed.vue:345 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/feed/BottomFeed.vue:395 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/feed/BottomFeed.vue:495 - div คลิกได้ควรเป็น button/ลิงก์ + รองรับคีย์บอร์ด citeturn0view0
+src/components/feed/BottomFeed.vue:498 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/feed/BottomFeed.vue:544 - ปุ่มไอคอนไม่มี aria-label citeturn0view0
+src/components/feed/BottomFeed.vue:645 - div คลิกได้ควรเป็น button/ลิงก์ + รองรับคีย์บอร์ด citeturn0view0
+src/components/feed/BottomFeed.vue:646 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/feed/BottomFeed.vue:699 - div คลิกได้ควรเป็น button/ลิงก์ + รองรับคีย์บอร์ด citeturn0view0
+src/components/feed/BottomFeed.vue:700 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/feed/BottomFeed.vue:813 - div คลิกได้ควรเป็น button/ลิงก์ + รองรับคีย์บอร์ด citeturn0view0
+src/components/feed/BottomFeed.vue:814 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/feed/BottomFeed.vue:836 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/feed/BottomFeed.vue:864 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/feed/BottomFeed.vue:920 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/feed/BottomFeed.vue:974 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/feed/BottomFeed.vue:988 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/feed/BottomFeed.vue:994 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/feed/BottomFeed.vue:1000 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/feed/BottomFeed.vue:1290 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/feed/ImmersiveFeed.vue
+src/components/feed/ImmersiveFeed.vue:100 - overlay/โมดัลขาด role="dialog"/aria-modal citeturn0view0
+src/components/feed/ImmersiveFeed.vue:106 - img ไม่มี alt citeturn0view0
+src/components/feed/ImmersiveFeed.vue:130 - ปุ่มไอคอนไม่มี aria-label citeturn0view0
+src/components/feed/ImmersiveFeed.vue:145 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/feed/ImmersiveFeed.vue:148 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/feed/ImmersiveFeed.vue:166 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/feed/ImmersiveFeed.vue:179 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/ugc/AddShopModal.vue
+src/components/ugc/AddShopModal.vue:2 - โมดัลขาด role="dialog"/aria-modal citeturn0view0
+src/components/ugc/AddShopModal.vue:17 - ปุ่มไอคอนไม่มี aria-label citeturn0view0
+src/components/ugc/AddShopModal.vue:110 - input URL ควรใช้ type="url" + autocomplete citeturn0view0
+src/components/ugc/AddShopModal.vue:113 - “...” → “…” citeturn0view0
+## src/components/ugc/EditShopModal.vue
+src/components/ugc/EditShopModal.vue:2 - โมดัลขาด role="dialog"/aria-modal citeturn0view0
+src/components/ugc/EditShopModal.vue:17 - ปุ่มไอคอนไม่มี aria-label citeturn0view0
+src/components/ugc/EditShopModal.vue:105 - input URL ควรใช้ type="url" + autocomplete citeturn0view0
+## src/components/panel/MerchantStats.vue
+src/components/panel/MerchantStats.vue:71 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/panel/MerchantStats.vue:89 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/panel/MerchantStats.vue:107 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/panel/MerchantStats.vue:122 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/panel/MerchantRegister.vue
+src/components/panel/MerchantRegister.vue:3 - โมดัลขาด role="dialog"/aria-modal citeturn0view0
+src/components/panel/MerchantRegister.vue:21 - ปุ่มไอคอนไม่มี aria-label citeturn0view0
+src/components/panel/MerchantRegister.vue:34 - input ไม่มี label/aria-label + autocomplete citeturn0view0
+src/components/panel/MerchantRegister.vue:92 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/panel/MerchantRegister.vue:104 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/panel/MerchantRegister.vue:121 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/panel/MerchantRegister.vue:155 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/panel/MerchantRegister.vue:177 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/panel/MerchantRegister.vue:186 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/panel/MerchantRegister.vue:240 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/panel/MerchantRegister.vue:258 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/panel/MerchantRegister.vue:262 - “Uploading...” → “Uploading…” citeturn0view0
+src/components/panel/MerchantRegister.vue:271 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/panel/MerchantRegister.vue:273 - “...” → “…” citeturn0view0
+src/components/panel/MerchantRegister.vue:273 - “Submitting...” → “Submitting…” citeturn0view0
+## src/components/panel/ShopCard.vue
+src/components/panel/ShopCard.vue:124 - div คลิกได้ควรเป็น button/ลิงก์ + รองรับคีย์บอร์ด citeturn0view0
+src/components/panel/ShopCard.vue:127 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/panel/ShopCard.vue:244 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/panel/ShopCard.vue:261 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/panel/ShopCard.vue:325 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/panel/ShopCard.vue:333 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/panel/ShopCard.vue:339 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/panel/VideoPanel.vue
+src/components/panel/VideoPanel.vue:186 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/map/MapboxContainer.vue
+src/components/map/MapboxContainer.vue:1952 - “...” → “…” citeturn0view0
+src/components/map/MapboxContainer.vue:2575 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/map/MapboxContainer.vue:2581 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/map/MapboxContainer.vue:2589 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/map/MapboxContainer.vue:2675 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/map/MapboxContainer.vue:2756 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/dashboard/OwnerDashboard.vue
+src/components/dashboard/OwnerDashboard.vue:148 - “Loading...” → “Loading…” citeturn0view0
+## src/components/dashboard/BuyPinsPanel.vue
+src/components/dashboard/BuyPinsPanel.vue:20 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/dashboard/BuyPinsPanel.vue:31 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/dashboard/BuyPinsPanel.vue:51 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/dashboard/BuyPinsPanel.vue:140 - ปุ่มไอคอนไม่มี aria-label citeturn0view0
+src/components/dashboard/BuyPinsPanel.vue:172 - input ไม่มี label/aria-label + autocomplete/type citeturn0view0
+src/components/dashboard/BuyPinsPanel.vue:347 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/dashboard/BuyPinsPanel.vue:361 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/dashboard/BuyPinsPanel.vue:364 - “...” → “…” citeturn0view0
+## src/components/dashboard/SubscriptionManager.vue
+src/components/dashboard/SubscriptionManager.vue:71 - “Loading...” → “Loading…” citeturn0view0
+## src/components/transport/RideComparisonModal.vue
+src/components/transport/RideComparisonModal.vue:45 - โมดัลขาด role="dialog"/aria-modal citeturn0view0
+src/components/transport/RideComparisonModal.vue:69 - ปุ่มไอคอนไม่มี aria-label citeturn0view0
+src/components/transport/RideComparisonModal.vue:88 - “Finding drivers...” → “Finding drivers…” citeturn0view0
+src/components/transport/RideComparisonModal.vue:104 - div คลิกได้ควรเป็น button + รองรับคีย์บอร์ด citeturn0view0
+src/components/transport/RideComparisonModal.vue:107 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/system/AppModals.vue
+src/components/system/AppModals.vue:161 - loading overlay ขาด role="status"/aria-live citeturn0view0
+src/components/system/AppModals.vue:184 - “Synchronizing Vibe Engine...” → “Synchronizing Vibe Engine…” citeturn0view0
+src/components/system/AppModals.vue:214 - ปุ่มไอคอนไม่มี aria-label citeturn0view0
+src/components/system/AppModals.vue:264 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/system/AppModals.vue:267 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/layout/SideBar.vue
+src/components/layout/SideBar.vue:235 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/layout/SideBar.vue:264 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/layout/SideBar.vue:283 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/layout/SideBar.vue:335 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/layout/SideBar.vue:381 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/layout/SideBar.vue:428 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/layout/SideBar.vue:556 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/layout/SideBar.vue:601 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/layout/SmartHeader.vue
+src/components/layout/SmartHeader.vue:137 - “...” → “…” citeturn0view0
+src/components/layout/SmartHeader.vue:500 - “...” → “…” citeturn0view0
+src/components/layout/SmartHeader.vue:1192 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/layout/SmartHeader.vue:1196 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/layout/SmartHeader.vue:1207 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/layout/SmartHeader.vue:1211 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/layout/SmartHeader.vue:1243 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/design-system/compositions/PlaceCard.vue
+src/components/design-system/compositions/PlaceCard.vue:5 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/design-system/compositions/PlaceCard.vue:24 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/design-system/compositions/PlaceCard.vue:56 - ปุ่มไอคอนไม่มี aria-label citeturn0view0
+src/components/design-system/compositions/PlaceCard.vue:58 - transition: all → ระบุ property เฉพาะ citeturn0view0
+src/components/design-system/compositions/PlaceCard.vue:114 - div คลิกได้ควรเป็น button/ลิงก์ + รองรับคีย์บอร์ด citeturn0view0
+src/components/design-system/compositions/PlaceCard.vue:114 - div คลิกได้ควรเป็น button + รองรับคีย์บอร์ด citeturn0view0
+## src/components/design-system/primitives/ActionBtn.vue
+src/components/design-system/primitives/ActionBtn.vue:3 - transition: all → ระบุ property เฉพาะ citeturn0view0
+## src/components/design-system/primitives/GlassCard.vue
+src/components/design-system/primitives/GlassCard.vue:3 - transition: all → ระบุ property เฉพาะ citeturn0view0
+ citeturn0view0
