@@ -77,6 +77,11 @@ class Settings(BaseSettings):
     OTEL_EXPORTER_OTLP_ENDPOINT: str = ""
     OTEL_TRACES_SAMPLER_ARG: float = 0.1
 
+    # Memory (mem0 + pgvector)
+    MEMORY_ENABLED: bool = False
+    OPENAI_API_KEY: Optional[str] = None
+    MEMORY_DATABASE_URL: Optional[str] = None  # postgres://... (Supabase direct DB URL)
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
 @lru_cache()

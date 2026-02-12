@@ -20,3 +20,4 @@ opentelemetry-sdk>=1.26.0
 opentelemetry-exporter-otlp>=1.26.0
 opentelemetry-instrumentation-fastapi>=0.47b0
 opentelemetry-instrumentation-httpx>=0.47b0
+mem0ai
