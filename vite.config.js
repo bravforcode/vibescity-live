@@ -3,6 +3,7 @@ import vue from "@vitejs/plugin-vue";
 import { visualizer } from "rollup-plugin-visualizer";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
+import Sitemap from "vite-plugin-sitemap";
 
 export default defineConfig({
   plugins: [
@@ -110,6 +111,27 @@ export default defineConfig({
         enabled: true,
         type: "module",
       },
+    }),
+    Sitemap({
+      hostname: "https://vibecity.live",
+      dynamicRoutes: [
+        "/",
+        "/en",
+        "/th",
+        "/en/privacy",
+        "/th/privacy",
+        "/en/terms",
+        "/th/terms",
+        "/en/partner",
+        "/th/partner",
+        "/privacy",
+        "/terms",
+        "/partner",
+      ],
+      exclude: ["/admin", "/merchant"],
+      changefreq: "daily",
+      priority: 0.8,
+      lastmod: new Date(),
     }),
   ],
 
