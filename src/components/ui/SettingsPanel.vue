@@ -16,7 +16,9 @@ import {
 	X,
 	Zap,
 } from "lucide-vue-next";
+import { ref } from "vue";
 import { useI18n } from "vue-i18n";
+import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
 import { useUserPreferencesStore } from "@/store/userPreferencesStore";
 
 const props = defineProps({
@@ -27,12 +29,33 @@ const emit = defineEmits(["close"]);
 
 const prefs = useUserPreferencesStore();
 const { t } = useI18n();
+const showClearDataConfirm = ref(false);
+
+const clearOwnedLocalData = () => {
+	const ownedPrefixes = ["vibe_", "pinia-", "vibecity_"];
+	const ownedKeys = ["locale"];
+	const keysToRemove = [];
+	for (let i = 0; i < localStorage.length; i += 1) {
+		const key = localStorage.key(i);
+		if (!key) continue;
+		if (
+			ownedKeys.includes(key) ||
+			ownedPrefixes.some((prefix) => key.startsWith(prefix))
+		) {
+			keysToRemove.push(key);
+		}
+	}
+	for (const key of keysToRemove) localStorage.removeItem(key);
+};
 
 const handleClearData = () => {
-	if (confirm(t("settings.confirm_clear_data"))) {
-		localStorage.clear();
-		location.reload();
-	}
+	showClearDataConfirm.value = true;
+};
+
+const confirmClearData = () => {
+	showClearDataConfirm.value = false;
+	clearOwnedLocalData();
+	location.reload();
 };
 </script>
 
@@ -512,6 +535,7 @@ const handleClearData = () => {
         <div class="pt-4 border-t border-white/10">
           <button
             @click="handleClearData"
+            data-testid="settings-clear-data"
             class="w-full flex items-center gap-3 p-4 rounded-2xl bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-colors border border-red-500/20"
           >
             <Trash2 class="w-5 h-5" />
@@ -541,4 +565,19 @@ const handleClearData = () => {
       </div>
     </div>
   </div>
+
+  <ConfirmDialog
+    :is-open="showClearDataConfirm"
+    :title="t('settings.clear_data') || 'Clear local app data'"
+    :message="
+      t('settings.confirm_clear_data') ||
+      'This will remove local app cache and preferences on this device.'
+    "
+    :confirm-label="t('common.confirm') || 'Clear data'"
+    :cancel-label="t('common.cancel') || 'Cancel'"
+    variant="danger"
+    @confirm="confirmClearData"
+    @cancel="showClearDataConfirm = false"
+    @close="showClearDataConfirm = false"
+  />
 </template>

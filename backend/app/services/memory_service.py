@@ -71,23 +71,45 @@ class MemoryService:
             from mem0 import Memory
 
             config = {
-                "llm": {
-                    "provider": "openai",
-                    "config": {
-                        "api_key": settings.OPENAI_API_KEY,
-                        "model": "gpt-4o-mini",
-                    },
-                },
                 "vector_store": {
                     "provider": "pgvector",
                     "config": {
                         "dbname": None,  # extracted from URL below
                         "collection_name": "vibecity_memory",
-                        "embedding_model_dims": 1536,
+                        "embedding_model_dims": 1536 if settings.OPENAI_API_KEY else 768,  # OpenAI=1536, Gemini=768
                         "url": db_url,
                     },
                 },
             }
+
+            if settings.OPENAI_API_KEY:
+                config["llm"] = {
+                    "provider": "openai",
+                    "config": {
+                        "api_key": settings.OPENAI_API_KEY,
+                        "model": "gpt-4o-mini",
+                    },
+                }
+                # Implicitly uses OpenAI embeddings if not specified, which matches 1536 dims
+            elif settings.GOOGLE_API_KEY:
+                # Use Gemini (me!)
+                config["llm"] = {
+                    "provider": "gemini",
+                    "config": {
+                        "api_key": settings.GOOGLE_API_KEY,
+                        "model": "gemini-1.5-flash-latest",
+                    },
+                }
+                config["embedder"] = {
+                    "provider": "gemini",
+                    "config": {
+                        "api_key": settings.GOOGLE_API_KEY,
+                        "model": "models/embedding-001",
+                    },
+                }
+            else:
+                 logger.warning("Memory service: No API key found (OPENAI_API_KEY or GOOGLE_API_KEY) — auto-disabled.")
+                 return
 
             self._client = Memory.from_config(config)
             self._enabled = True

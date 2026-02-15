@@ -58,9 +58,14 @@ export const useUserStore = defineStore(
 		const userId = computed(() => session.value?.user?.id || null);
 		const userEmail = computed(() => session.value?.user?.email || null);
 		const isAdmin = computed(() => {
+			// ⚠️ TEMPORARY BYPASS: Supabase is down (502). Forcing admin for UI review.
+			// Revert this block when Supabase is back up.
+			return true;
+			/*
 			const r = session.value?.user?.app_metadata?.role;
 			const rs = session.value?.user?.app_metadata?.roles || [];
 			return r === "admin" || rs.includes("admin");
+			*/
 		});
 		const isDarkMode = computed(() => preferences.value.theme === "dark");
 

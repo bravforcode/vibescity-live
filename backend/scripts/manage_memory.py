@@ -48,11 +48,14 @@ def print_setup_instructions():
 ║  VibeCity Memory Service is DISABLED                        ║
 ╠══════════════════════════════════════════════════════════════╣
 ║                                                              ║
-║  To enable, set these environment variables:                 ║
+║  To enable, set these in backend/.env:                       ║
 ║                                                              ║
 ║    MEMORY_ENABLED=true                                       ║
-║    OPENAI_API_KEY=sk-your-key-here                           ║
 ║    MEMORY_DATABASE_URL=postgres://user:pass@host:port/db     ║
+║                                                              ║
+║    And ONE of the following API keys:                        ║
+║    GOOGLE_API_KEY=AIzaSy... (For Gemini/Vertex AI)           ║
+║    OPENAI_API_KEY=sk-...    (For OpenAI)                     ║
 ║                                                              ║
 ║  Then run in Supabase SQL Editor:                            ║
 ║    CREATE EXTENSION IF NOT EXISTS vector;                    ║

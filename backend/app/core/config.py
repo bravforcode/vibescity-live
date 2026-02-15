@@ -81,6 +81,7 @@ class Settings(BaseSettings):
     MEMORY_ENABLED: bool = False
     OPENAI_API_KEY: Optional[str] = None
     MEMORY_DATABASE_URL: Optional[str] = None  # postgres://... (Supabase direct DB URL)
+    GOOGLE_API_KEY: Optional[str] = None  # For Gemini support
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 

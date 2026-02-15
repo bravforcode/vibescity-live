@@ -5,6 +5,7 @@ from app.api.routers.vibes import manager
 from app.core.rate_limit import limiter
 from app.core.auth import verify_admin, verify_user
 from app.core.supabase import supabase, supabase_admin
+from app.services.venue_repository import VenueRepository
 
 router = APIRouter()
 
@@ -33,14 +34,44 @@ async def get_shop_stats(
     if shop_id in manager.room_connections:
         live_count = len(manager.room_connections[shop_id])
 
-    # 2. Mock Persistent Stats
-    # In a real app, these would come from DB
+    client = supabase_admin or supabase
+    venue_data = {}
+    try:
+        response = (
+            client.table("venues")
+            .select("rating,total_views,view_count,pin_type")
+            .eq("id", shop_id)
+            .single()
+            .execute()
+        )
+        venue_data = response.data or {}
+    except Exception:
+        # Compatibility fallback for legacy envs.
+        try:
+            response = (
+                client.table("shops")
+                .select("rating,total_views,view_count,pin_type")
+                .eq("id", shop_id)
+                .single()
+                .execute()
+            )
+            venue_data = response.data or {}
+        except Exception:
+            venue_data = {}
+
+    total_views = venue_data.get("total_views")
+    if total_views is None:
+        total_views = venue_data.get("view_count")
+
+    pin_type = str(venue_data.get("pin_type") or "").lower()
+    is_promoted = pin_type in {"giant", "boost", "boosted"}
+
     return {
         "shop_id": shop_id,
         "live_visitors": live_count,
-        "total_views": 1543 + (live_count * 12), # Mock dynamicism
-        "rating": 4.8,
-        "is_promoted": False # Mock default
+        "total_views": int(total_views or 0),
+        "rating": float(venue_data.get("rating") or 0),
+        "is_promoted": is_promoted,
     }
 
 @router.post("/promote/{shop_id}")
@@ -68,9 +99,9 @@ async def _ensure_owner_or_admin(shop_id: str, user: dict):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     client = supabase_admin or supabase
+    repository = VenueRepository(client)
     try:
-        res = client.table("shops").select("owner_id").eq("id", shop_id).single().execute()
-        owner_id = res.data.get("owner_id") if res and res.data else None
+        owner_id = repository.get_owner(shop_id)
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to verify ownership")
 

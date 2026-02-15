@@ -1,6 +1,7 @@
 const LOCALHOST_PATTERN = /(localhost|127\.0\.0\.1)/i;
 const PLACEHOLDER_PATTERN = /<[^>]+>/; // Detects <api-app>, <your-key>, etc.
 const IS_E2E = import.meta.env?.VITE_E2E === "true";
+const WS_REQUIRED = import.meta.env?.VITE_WS_REQUIRED === "true";
 const IS_LOCAL_HOST =
 	typeof window !== "undefined" &&
 	LOCALHOST_PATTERN.test(window.location.hostname);
@@ -10,6 +11,26 @@ const trimTrailingSlash = (value) => value.replace(/\/+$/, "");
 const sanitize = (value) => {
 	if (typeof value !== "string") return "";
 	return value.trim();
+};
+
+const rewriteLocalhostHostnameForDev = (rawValue) => {
+	if (!import.meta.env.DEV) return rawValue;
+	if (typeof window === "undefined") return rawValue;
+
+	const currentHost = sanitize(window.location?.hostname);
+	if (!currentHost || LOCALHOST_PATTERN.test(currentHost)) return rawValue;
+
+	try {
+		const url = new URL(rawValue);
+		if (LOCALHOST_PATTERN.test(url.hostname)) {
+			url.hostname = currentHost;
+			return url.toString();
+		}
+	} catch {
+		// ignore
+	}
+
+	return rawValue;
 };
 
 /**
@@ -60,11 +81,16 @@ export const requireClientEnv = (name, options = {}) => {
 };
 
 export const getApiBaseUrl = () => {
-	return trimTrailingSlash(
-		requireClientEnv("VITE_API_URL", {
-			message: "VITE_API_URL is required for API calls.",
-		}),
-	);
+	// Prefer static access for bundler compatibility
+	const explicit = import.meta.env.VITE_API_URL;
+	if (explicit) {
+		return trimTrailingSlash(rewriteLocalhostHostnameForDev(explicit));
+	}
+
+	const raw = requireClientEnv("VITE_API_URL", {
+		message: "VITE_API_URL is required for API calls.",
+	});
+	return trimTrailingSlash(rewriteLocalhostHostnameForDev(raw));
 };
 
 export const getApiV1BaseUrl = () => {
@@ -113,6 +139,9 @@ export const getWebSocketUrl = () => {
 
 	// Empty check
 	if (!ws) {
+		if (WS_REQUIRED) {
+			throw new Error("VITE_WS_URL is required when VITE_WS_REQUIRED=true");
+		}
 		if (import.meta.env.DEV) {
 			console.warn("⚠️ VITE_WS_URL not set - realtime features disabled");
 		}
@@ -121,6 +150,9 @@ export const getWebSocketUrl = () => {
 
 	// Placeholder check (critical for production safety)
 	if (PLACEHOLDER_PATTERN.test(ws)) {
+		if (WS_REQUIRED) {
+			throw new Error(`VITE_WS_URL contains placeholder value: ${ws}`);
+		}
 		console.warn(
 			`⚠️ VITE_WS_URL contains placeholder: ${ws} - realtime disabled`,
 		);
@@ -129,6 +161,9 @@ export const getWebSocketUrl = () => {
 
 	// Protocol check
 	if (!ws.startsWith("ws://") && !ws.startsWith("wss://")) {
+		if (WS_REQUIRED) {
+			throw new Error(`VITE_WS_URL has invalid protocol: ${ws}`);
+		}
 		console.warn(
 			`⚠️ VITE_WS_URL has invalid protocol: ${ws} - realtime disabled`,
 		);
@@ -142,11 +177,14 @@ export const getWebSocketUrl = () => {
 		!IS_LOCAL_HOST &&
 		LOCALHOST_PATTERN.test(ws)
 	) {
+		if (WS_REQUIRED) {
+			throw new Error("VITE_WS_URL points to localhost in production");
+		}
 		console.warn(
 			"⚠️ VITE_WS_URL points to localhost in production - realtime disabled",
 		);
 		return "";
 	}
 
-	return ws;
+	return rewriteLocalhostHostnameForDev(ws);
 };

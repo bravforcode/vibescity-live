@@ -1,8 +1,8 @@
 <script setup>
+import { useNotifications } from "@/composables/useNotifications";
 import { BarChart, Clock, Heart, MapPin, Share2 } from "lucide-vue-next";
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useNotifications } from "@/composables/useNotifications";
 import { useSmartVideo } from "../../composables/useSmartVideo";
 import { useCoinStore } from "../../store/coinStore";
 import { openExternal } from "../../utils/browserUtils";
@@ -17,35 +17,35 @@ const { notifySuccess } = useNotifications();
 const { t } = useI18n();
 
 const props = defineProps({
-	shop: {
-		type: Object,
-		required: true,
-	},
-	isActive: {
-		type: Boolean,
-		default: false,
-	},
-	isDarkMode: {
-		type: Boolean,
-		default: true,
-	},
-	favorites: {
-		type: Array,
-		default: () => [],
-	},
-	useRideButton: {
-		type: Boolean,
-		default: false,
-	},
+  shop: {
+    type: Object,
+    required: true,
+  },
+  isActive: {
+    type: Boolean,
+    default: false,
+  },
+  isDarkMode: {
+    type: Boolean,
+    default: true,
+  },
+  favorites: {
+    type: Array,
+    default: () => [],
+  },
+  useRideButton: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits([
-	"click",
-	"open-detail",
-	"hover",
-	"toggle-favorite",
-	"open-ride",
-	"share",
+  "click",
+  "open-detail",
+  "hover",
+  "toggle-favorite",
+  "open-ride",
+  "share",
 ]);
 
 const showStats = ref(false);
@@ -53,74 +53,74 @@ let lastTapTime = 0;
 
 // ✅ Double-click to favorite
 const handleCardTap = (e) => {
-	const now = Date.now();
-	const timeSinceLastTap = now - lastTapTime;
+  const now = Date.now();
+  const timeSinceLastTap = now - lastTapTime;
 
-	if (timeSinceLastTap < 300) {
-		// Double tap detected - toggle favorite
-		e.stopPropagation();
-		emit("toggle-favorite", props.shop.id);
-		coinStore.awardCoins(1); // Gamification
-	}
-	lastTapTime = now;
+  if (timeSinceLastTap < 300) {
+    // Double tap detected - toggle favorite
+    e.stopPropagation();
+    emit("toggle-favorite", props.shop.id);
+    coinStore.awardCoins(1); // Gamification
+  }
+  lastTapTime = now;
 };
 
 // ✅ Share functionality with deep link
 const handleShare = async (e) => {
-	e.stopPropagation();
+  e.stopPropagation();
 
-	const shopUrl = `${globalThis.location.origin}?shop=${props.shop.id}`;
-	const shareData = {
-		title: props.shop.name,
-		text: `Check out ${props.shop.name} on VibeCity! 🎉`,
-		url: shopUrl,
-	};
+  const shopUrl = `${globalThis.location.origin}?shop=${props.shop.id}`;
+  const shareData = {
+    title: props.shop.name,
+    text: `Check out ${props.shop.name} on VibeCity! 🎉`,
+    url: shopUrl,
+  };
 
-	try {
-		if (navigator.share) {
-			await navigator.share(shareData);
-		} else {
-			// Fallback: copy to clipboard
-			await navigator.clipboard.writeText(shopUrl);
-			notifySuccess("Link copied to clipboard!");
-		}
-		emit("share", props.shop);
-		coinStore.awardCoins(5); // Higher reward for sharing
-	} catch (err) {
-		// User cancelled or error
-	}
+  try {
+    if (navigator.share) {
+      await navigator.share(shareData);
+    } else {
+      // Fallback: copy to clipboard
+      await navigator.clipboard.writeText(shopUrl);
+      notifySuccess("Link copied to clipboard!");
+    }
+    emit("share", props.shop);
+    coinStore.awardCoins(5); // Higher reward for sharing
+  } catch (err) {
+    // User cancelled or error
+  }
 };
 
 // Open Google Maps for directions
 const openGoogleMaps = (e) => {
-	e.stopPropagation();
-	const url = `https://www.google.com/maps/dir/?api=1&destination=${props.shop.lat},${props.shop.lng}`;
-	openExternal(url);
+  e.stopPropagation();
+  const url = `https://www.google.com/maps/dir/?api=1&destination=${props.shop.lat},${props.shop.lng}`;
+  openExternal(url);
 };
 
 // Check if favorited - normalize types for comparison
 const isFavorited = computed(() => {
-	const shopId =
-		props.shop?.id === null || props.shop?.id === undefined
-			? ""
-			: String(props.shop.id).trim();
-	if (!shopId) return false;
-	return props.favorites.some((fav) => String(fav).trim() === shopId);
+  const shopId =
+    props.shop?.id === null || props.shop?.id === undefined
+      ? ""
+      : String(props.shop.id).trim();
+  if (!shopId) return false;
+  return props.favorites.some((fav) => String(fav).trim() === shopId);
 });
 
 // Helper to optimize Supabase/remote images
 const getOptimizedUrl = (url, width) => {
-	if (!url) return "";
-	if (url.includes("supabase.co")) {
-		const separator = url.includes("?") ? "&" : "?";
-		return `${url}${separator}width=${width}&format=webp&quality=80`;
-	}
-	return url;
+  if (!url) return "";
+  if (url.includes("supabase.co")) {
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}width=${width}&format=webp&quality=80`;
+  }
+  return url;
 };
 
 // Handle mouse enter for hover sync
 const handleMouseEnter = () => {
-	emit("hover", props.shop);
+  emit("hover", props.shop);
 };
 </script>
 
@@ -229,11 +229,13 @@ const handleMouseEnter = () => {
             class="text-[10px] font-black text-blue-300 flex items-center gap-1"
           >
             <MapPin class="w-3 h-3" stroke-width="2.5" />
-            <template v-if="shop.distance != null && typeof shop.distance === 'number'">
+            <template
+              v-if="shop.distance != null && typeof shop.distance === 'number'"
+            >
               {{ shop.distance.toFixed(1) }}km
             </template>
             <template v-else>
-              {{ t('shop.nearby') }}
+              {{ t("shop.nearby") }}
             </template>
           </span>
         </div>
@@ -324,7 +326,7 @@ const handleMouseEnter = () => {
                 v-else
                 class="px-1.5 py-0.5 rounded-md bg-purple-500/30 backdrop-blur-sm border border-purple-400/30"
               >
-                {{ t('shop.new') }}
+                {{ t("shop.new") }}
               </span>
               <span class="flex items-center gap-1"
                 ><Clock class="w-2.5 h-2.5" /> {{ shop.openTime || "--" }} -
@@ -342,7 +344,9 @@ const handleMouseEnter = () => {
               v-if="shop.promotionInfo"
               class="mb-2 px-2 py-1 rounded-lg bg-gradient-to-r from-orange-500/20 to-red-500/20 border border-orange-400/30"
             >
-              <span class="text-[9px] font-black text-orange-300 uppercase tracking-wide">
+              <span
+                class="text-[9px] font-black text-orange-300 uppercase tracking-wide"
+              >
                 🔥 {{ shop.promotionInfo }}
               </span>
             </div>
@@ -354,7 +358,7 @@ const handleMouseEnter = () => {
                 @click.stop="emit('open-ride', shop)"
                 class="col-span-2 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white text-[10px] font-black shadow-lg border border-blue-400/30 flex items-center justify-center gap-2 active:scale-95 transition-all"
               >
-                🚗 เรียกรถ
+                {{ t("shop.call_ride") }}
               </button>
 
               <template v-else>
@@ -362,13 +366,13 @@ const handleMouseEnter = () => {
                   @click.stop="emit('open-detail', shop)"
                   class="py-2.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-white text-[10px] font-bold hover:bg-white/20 transition-all"
                 >
-                  รายละเอียด
+                  {{ t("shop.details") }}
                 </button>
                 <button
                   @click.stop="openGoogleMaps"
                   class="py-2.5 rounded-xl bg-green-500/20 backdrop-blur-md border border-green-500/30 text-green-300 text-[10px] font-bold hover:bg-green-500/30 transition-all"
                 >
-                  นำทาง
+                  {{ t("shop.navigate") }}
                 </button>
               </template>
             </div>

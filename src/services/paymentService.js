@@ -90,14 +90,16 @@ export const paymentService = {
 
 	/**
 	 * Poll Order Status
-	 * @param {string} orderId
+	 * @param {string} sessionId
 	 */
-	async getOrderStatus(orderId) {
+	async getOrderStatus(sessionId) {
 		const edgeUrl = getSupabaseEdgeBaseUrl();
 		const {
 			data: { session },
 		} = await supabase.auth.getSession();
 		if (!session) return { status: "unknown" };
+		const lookupId = String(sessionId || "").trim();
+		if (!lookupId) return { status: "unknown" };
 
 		const res = await fetch(`${edgeUrl}/get-order-status`, {
 			method: "POST",
@@ -105,7 +107,11 @@ export const paymentService = {
 				"Content-Type": "application/json",
 				Authorization: `Bearer ${session.access_token}`,
 			},
-			body: JSON.stringify({ orderId }),
+			body: JSON.stringify({
+				session_id: lookupId,
+				// Backward compatibility for one release cycle.
+				orderId: lookupId,
+			}),
 		});
 
 		if (!res.ok) return { status: "unknown" };

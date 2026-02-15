@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
+import { setClientCookie } from "../lib/cookies";
 
 // Lazy load views for performance
 const HomeView = () => import("../views/HomeView.vue");
@@ -157,8 +158,9 @@ const readCookie = (name) => {
 };
 
 const setLocaleCookie = (locale) => {
-	if (typeof document === "undefined") return;
-	document.cookie = `${LOCALE_COOKIE}=${locale}; Path=/; Max-Age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+	setClientCookie(LOCALE_COOKIE, locale, {
+		maxAgeSeconds: 60 * 60 * 24 * 365,
+	});
 };
 
 const getPreferredLocale = () => {

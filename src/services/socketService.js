@@ -5,6 +5,7 @@ class SocketService {
 	constructor() {
 		this.socket = null;
 		this.isConnected = ref(false);
+		this.onlineCount = ref(0);
 		this.reconnectAttempts = 0;
 		this.maxReconnects = 10; // Circuit breaker: stop after 10 attempts
 		this.listeners = new Set();
@@ -52,11 +53,17 @@ class SocketService {
 			if (import.meta.env.DEV) console.log("✅ VibeStream Connected");
 			this.isConnected.value = true;
 			this.reconnectAttempts = 0;
+			// Request current online count from server
+			this.sendVibe({ action: "presence:join" });
 		};
 
 		this.socket.onmessage = (event) => {
 			try {
 				const data = JSON.parse(event.data);
+				// Handle global presence updates
+				if (data.type === "global_presence" && typeof data.count === "number") {
+					this.onlineCount.value = data.count;
+				}
 				this.notifyListeners(data);
 			} catch (e) {
 				if (import.meta.env.DEV)

@@ -6,6 +6,9 @@ export function useMapCore(containerRef, _options = {}) {
 	const isMapReady = ref(false);
 	const isMapLoaded = ref(false);
 	const isStrictMapE2E = import.meta.env.VITE_E2E_MAP_REQUIRED === "true";
+	const FALLBACK_STYLE_URL = "mapbox://styles/mapbox/dark-v11";
+	let lastRequestedStyleUrl = "";
+	let styleFallbackInProgress = false;
 
 	// Access Token from environment - no hardcoded fallback for security
 	const token = (import.meta.env.VITE_MAPBOX_TOKEN || "")
@@ -51,16 +54,48 @@ export function useMapCore(containerRef, _options = {}) {
 		}
 	};
 
+	const isStyleNotFoundError = (err) => {
+		const status = err?.status;
+		const url = typeof err?.url === "string" ? err.url : "";
+		return status === 404 && url.includes("/styles/v1/");
+	};
+
+	const applyFallbackStyle = (reason = "") => {
+		if (!map.value) return;
+		if (styleFallbackInProgress) return;
+		if (!FALLBACK_STYLE_URL) return;
+		if (lastRequestedStyleUrl === FALLBACK_STYLE_URL) return;
+
+		styleFallbackInProgress = true;
+		if (import.meta.env.DEV) {
+			console.warn(
+				`Mapbox style unavailable${reason ? ` (${reason})` : ""}; falling back to ${FALLBACK_STYLE_URL}`,
+			);
+		}
+
+		try {
+			map.value.setStyle(FALLBACK_STYLE_URL);
+		} catch {
+			styleFallbackInProgress = false;
+			return;
+		}
+
+		map.value.once("style.load", () => {
+			styleFallbackInProgress = false;
+		});
+	};
+
 	const initMap = (
 		initialCenter = [98.968, 18.7985],
 		initialZoom = 15,
-		style = "mapbox://styles/phirrr/cml87cidg005101s9229k6083",
+		style = "mapbox://styles/phirrr/cmlkql2fl002101sfarlm0ptr",
 	) => {
 		if (!containerRef.value) return;
 
 		// ✅ Clear container to prevent "should be empty" warnings and duplicate canvases on hot reload
 		containerRef.value.innerHTML = "";
 
+		lastRequestedStyleUrl = style;
 		map.value = new mapboxgl.Map({
 			container: containerRef.value,
 			style: style,
@@ -95,6 +130,13 @@ export function useMapCore(containerRef, _options = {}) {
 		map.value.on("style.load", markMapReady);
 		map.value.on("idle", markMapReady);
 
+		// Track last requested style even when callers use map.value.setStyle directly.
+		const baseSetStyle = map.value.setStyle.bind(map.value);
+		map.value.setStyle = (nextStyle, options) => {
+			lastRequestedStyleUrl = nextStyle;
+			return baseSetStyle(nextStyle, options);
+		};
+
 		map.value.on("load", ensurePinImagesLoaded);
 		map.value.on("style.load", ensurePinImagesLoaded);
 		if (isStrictMapE2E) {
@@ -109,6 +151,9 @@ export function useMapCore(containerRef, _options = {}) {
 		// Error handling
 		map.value.on("error", (e) => {
 			console.error("Mapbox Error:", e);
+			if (isStyleNotFoundError(e?.error)) {
+				applyFallbackStyle(e?.error?.url || "");
+			}
 		});
 
 		// Handle missing images (loaded on demand for symbol layers)

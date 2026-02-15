@@ -5,7 +5,7 @@ const MAP_SHELL_SELECTOR = '[data-testid="map-shell"]';
 const MAP_READY_SELECTOR = '[data-testid="map-shell"][data-map-ready="true"]';
 
 test.describe("Map Smoke Lite", () => {
-  test("map shell is present and map reaches ready state @smoke-map-lite", async ({
+  test("map shell is present and map reaches ready state @smoke-map-lite @map-required", async ({
     page,
   }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -25,7 +25,7 @@ test.describe("Map Smoke Lite", () => {
     enforceMapConditionOrSkip(mapReady, "Map shell did not become ready.");
   });
 
-  test("map controls respond without freeze @smoke-map-lite", async ({ page }) => {
+  test("map controls respond without freeze @smoke-map-lite @map-required", async ({ page }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
 
     const mapShell = page.locator(MAP_SHELL_SELECTOR).first();

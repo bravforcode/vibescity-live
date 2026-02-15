@@ -1,16 +1,23 @@
 <script setup>
 import { Calendar, CheckCircle, CreditCard, XCircle } from "lucide-vue-next";
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
+import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
 import { useNotifications } from "@/composables/useNotifications";
+import { getSupabaseEdgeBaseUrl } from "@/lib/runtimeConfig";
 import { supabase } from "@/lib/supabase";
 
 const props = defineProps({
-	venueId: Number,
+	venueId: [String, Number],
 });
 
 const subscriptions = ref([]);
 const loading = ref(true);
 const processing = ref(null);
+const confirmState = ref({
+	isOpen: false,
+	subscriptionId: "",
+	action: "cancel",
+});
 const { notifyError, notifySuccess } = useNotifications();
 
 const fetchSubscriptions = async () => {
@@ -26,27 +33,28 @@ const fetchSubscriptions = async () => {
 };
 
 const manageSub = async (subId, action) => {
-	if (
-		!confirm(
-			action === "cancel"
-				? "Stop auto-renewal at end of period?"
-				: "Resume auto-renewal?",
-		)
-	)
-		return;
-
 	processing.value = subId;
 	try {
-		const edgeUrl =
-			import.meta.env.VITE_SUPABASE_EDGE_URL ||
-			"http://localhost:54321/functions/v1";
+		const {
+			data: { session },
+		} = await supabase.auth.getSession();
+		if (!session?.access_token)
+			throw new Error("Please sign in to manage subscriptions.");
+
+		const edgeUrl = getSupabaseEdgeBaseUrl();
 		const res = await fetch(`${edgeUrl}/manage-subscription`, {
 			method: "POST",
-			headers: { "Content-Type": "application/json" },
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${session.access_token}`,
+			},
 			body: JSON.stringify({ action, subscriptionId: subId }),
 		});
 
-		if (!res.ok) throw new Error("Action failed");
+		const payload = await res.json().catch(() => ({}));
+		if (!res.ok || payload?.success === false) {
+			throw new Error(payload?.error || "Action failed");
+		}
 
 		await fetchSubscriptions(); // Refresh
 		notifySuccess("Subscription updated");
@@ -55,6 +63,41 @@ const manageSub = async (subId, action) => {
 	} finally {
 		processing.value = null;
 	}
+};
+
+const openManageConfirmation = (subId, action) => {
+	confirmState.value = {
+		isOpen: true,
+		subscriptionId: String(subId || ""),
+		action,
+	};
+};
+
+const closeManageConfirmation = () => {
+	confirmState.value.isOpen = false;
+};
+
+const confirmTitle = computed(() =>
+	confirmState.value.action === "cancel"
+		? "Stop auto-renewal?"
+		: "Resume subscription?",
+);
+
+const confirmMessage = computed(() =>
+	confirmState.value.action === "cancel"
+		? "Your plan stays active until the end of the billing period."
+		: "Auto-renewal will be turned back on for this subscription.",
+);
+
+const confirmAction = computed(() =>
+	confirmState.value.action === "cancel" ? "Stop Renewal" : "Resume",
+);
+
+const submitManageAction = async () => {
+	const { subscriptionId, action } = confirmState.value;
+	closeManageConfirmation();
+	if (!subscriptionId) return;
+	await manageSub(subscriptionId, action);
 };
 
 const formatDate = (date) => new Date(date).toLocaleDateString();
@@ -117,7 +160,7 @@ onMounted(fetchSubscriptions);
       <!-- Actions -->
       <button
         v-if="!sub.cancel_at_period_end"
-        @click="manageSub(sub.stripe_subscription_id, 'cancel')"
+        @click="openManageConfirmation(sub.stripe_subscription_id, 'cancel')"
         :disabled="!!processing"
         class="w-full py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-2"
       >
@@ -125,12 +168,25 @@ onMounted(fetchSubscriptions);
       </button>
       <button
         v-else
-        @click="manageSub(sub.stripe_subscription_id, 'resume')"
+        @click="openManageConfirmation(sub.stripe_subscription_id, 'resume')"
         :disabled="!!processing"
         class="w-full py-2 bg-green-500/10 hover:bg-green-500/20 text-green-500 border border-green-500/30 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-2"
       >
         <CheckCircle class="w-3 h-3" /> Resume Subscription
       </button>
     </div>
+
+    <ConfirmDialog
+      :is-open="confirmState.isOpen"
+      :title="confirmTitle"
+      :message="confirmMessage"
+      :confirm-label="confirmAction"
+      cancel-label="Cancel"
+      variant="primary"
+      :loading="!!processing"
+      @confirm="submitManageAction"
+      @cancel="closeManageConfirmation"
+      @close="closeManageConfirmation"
+    />
   </div>
 </template>

@@ -143,9 +143,9 @@ const displayCoins = computed(() => {
 	if (coins < 1000) {
 		return coins.toString();
 	} else if (coins < 1000000) {
-		return (coins / 1000).toFixed(1).replace(/\.0$/, "") + "K";
+		return `${(coins / 1000).toFixed(1).replace(/\.0$/, "")}K`;
 	} else {
-		return (coins / 1000000).toFixed(1).replace(/\.0$/, "") + "M";
+		return `${(coins / 1000000).toFixed(1).replace(/\.0$/, "")}M`;
 	}
 });
 

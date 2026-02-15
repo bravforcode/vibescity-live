@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from typing import Any, Dict, Optional
 import hashlib
 import json
+import uuid
 import stripe
 import requests
 from urllib.parse import urlparse
@@ -290,7 +291,33 @@ async def create_manual_order(request: Request, body: ManualOrderRequest):
 
     try:
         enqueue_ocr_job(order.get("id"))
+        return {"success": True, "order": order, "ocr_enqueued": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to enqueue OCR: {e}")
+        # Do not fail the entire request after order creation.
+        retry_token = str(uuid.uuid4())
+        fallback_metadata = {**(order.get("metadata") or {})}
+        fallback_metadata.update(
+            {
+                "ocr_enqueue_error": str(e),
+                "ocr_retry_token": retry_token,
+            }
+        )
+        try:
+            supabase_admin.table("orders").update(
+                {
+                    "metadata": fallback_metadata,
+                }
+            ).eq("id", order.get("id")).execute()
+            order["metadata"] = fallback_metadata
+        except Exception:
+            # Best-effort fallback only.
+            pass
 
-    return {"success": True, "order": order}
+        return {
+            "success": True,
+            "order": order,
+            "ocr_enqueued": False,
+            "retryable": True,
+            "retry_token": retry_token,
+            "message": "Order created. OCR queue retry is pending.",
+        }

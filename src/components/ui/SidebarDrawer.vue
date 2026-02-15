@@ -1,23 +1,23 @@
 <script setup>
+import { useHaptics } from "@/composables/useHaptics";
 import {
-	CalendarDays,
-	ChevronRight,
-	Coffee,
-	Crown,
-	Gift,
-	Handshake,
-	Heart,
-	LogOut,
-	Music,
-	Settings,
-	ShoppingBag,
-	Star,
-	Volume2,
-	VolumeX,
+  CalendarDays,
+  ChevronRight,
+  Coffee,
+  Crown,
+  Gift,
+  Handshake,
+  Heart,
+  LogOut,
+  Music,
+  Settings,
+  ShoppingBag,
+  Star,
+  Volume2,
+  VolumeX,
 } from "lucide-vue-next";
 import { computed, ref } from "vue"; // ✅ Added computed
 import { useI18n } from "vue-i18n"; // ✅ Added i18n
-import { useHaptics } from "@/composables/useHaptics";
 
 import LanguageToggle from "./LanguageToggle.vue"; // ✅ Reusing LanguageToggle component
 import SettingsPanel from "./SettingsPanel.vue"; // ✅ New Settings Panel
@@ -26,80 +26,81 @@ import SOSPanel from "./SOSPanel.vue";
 const { t } = useI18n(); // ✅ Hook
 
 const props = defineProps({
-	isOpen: {
-		type: Boolean,
-		default: false,
-	},
-	userStats: {
-		type: Object,
-		default: () => ({
-			name: "Explorer",
-			level: 1,
-			coins: 0,
-			avatar: null,
-		}),
-	},
-	isMuted: {
-		type: Boolean,
-		default: false,
-	},
-	currentLanguage: {
-		type: String,
-		default: "en",
-	},
-	showPartnerProgram: {
-		type: Boolean,
-		default: false,
-	},
+  isOpen: {
+    type: Boolean,
+    default: false,
+  },
+  userStats: {
+    type: Object,
+    default: () => ({
+      name: "Explorer",
+      level: 1,
+      coins: 0,
+      avatar: null,
+    }),
+  },
+  isMuted: {
+    type: Boolean,
+    default: false,
+  },
+  currentLanguage: {
+    type: String,
+    default: "en",
+  },
+  showPartnerProgram: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits([
-	"close",
-	"navigate",
-	"toggle-mute",
-	"toggle-language",
-	"open-merchant",
-	"open-sos",
-	"take-me-home",
-	"open-dashboard",
-	"open-partner",
-	"open-daily-checkin",
-	"open-lucky-wheel",
+  "close",
+  "navigate",
+  "toggle-mute",
+  "toggle-language",
+  "open-merchant",
+  "open-sos",
+  "take-me-home",
+  "open-dashboard",
+  "open-partner",
+  "open-daily-checkin",
+  "open-lucky-wheel",
+  "logout",
 ]);
 const { selectFeedback, successFeedback } = useHaptics();
 
 // ✅ Computed Navigation Items for Reactivity
 const menuItems = computed(() => [
-	{
-		id: "favorites",
-		label: t("menu.favorites") || "My Favorites",
-		icon: Heart,
-		color: "bg-pink-600",
-	},
-	{
-		id: "nightlife",
-		label: t("menu.nightlife") || "Nightlife",
-		icon: Music,
-		color: "bg-purple-500",
-	},
-	{
-		id: "cafe",
-		label: t("menu.cafe") || "Cafe & Bistro",
-		icon: Coffee,
-		color: "bg-orange-400",
-	},
-	{
-		id: "fashion",
-		label: t("menu.fashion") || "Fashion",
-		icon: ShoppingBag,
-		color: "bg-pink-500",
-	},
-	{
-		id: "events",
-		label: t("menu.events") || "Events",
-		icon: Star,
-		color: "bg-yellow-400",
-	},
+  {
+    id: "favorites",
+    label: t("menu.favorites") || "My Favorites",
+    icon: Heart,
+    color: "bg-pink-600",
+  },
+  {
+    id: "nightlife",
+    label: t("menu.nightlife") || "Nightlife",
+    icon: Music,
+    color: "bg-purple-500",
+  },
+  {
+    id: "cafe",
+    label: t("menu.cafe") || "Cafe & Bistro",
+    icon: Coffee,
+    color: "bg-orange-400",
+  },
+  {
+    id: "fashion",
+    label: t("menu.fashion") || "Fashion",
+    icon: ShoppingBag,
+    color: "bg-pink-500",
+  },
+  {
+    id: "events",
+    label: t("menu.events") || "Events",
+    icon: Star,
+    color: "bg-yellow-400",
+  },
 ]);
 
 // SOS & Settings State
@@ -107,26 +108,26 @@ const showSOSPanel = ref(false);
 const showSettingsPanel = ref(false);
 
 const handleSOS = () => {
-	selectFeedback();
-	showSOSPanel.value = true;
-	emit("open-sos");
+  selectFeedback();
+  showSOSPanel.value = true;
+  emit("open-sos");
 };
 
 const handleTakeMeHome = () => {
-	successFeedback();
-	emit("take-me-home");
-	emit("close");
+  successFeedback();
+  emit("take-me-home");
+  emit("close");
 };
 
 const handleClose = () => {
-	selectFeedback();
-	emit("close");
+  selectFeedback();
+  emit("close");
 };
 
 const handleNavigate = (id) => {
-	successFeedback();
-	emit("navigate", id);
-	emit("close");
+  successFeedback();
+  emit("navigate", id);
+  emit("close");
 };
 </script>
 
@@ -172,7 +173,10 @@ const handleNavigate = (id) => {
               </div>
             </div>
             <div>
-              <h3 id="sidebar-title" class="text-sm font-bold text-white leading-tight">
+              <h3
+                id="sidebar-title"
+                class="text-sm font-bold text-white leading-tight"
+              >
                 {{ userStats.name }}
               </h3>
               <p class="text-[10px] text-white/50">
@@ -183,7 +187,7 @@ const handleNavigate = (id) => {
           <button
             @click="emit('close')"
             aria-label="Close sidebar"
-            class="p-2 rounded-full bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors transition-transform"
+            class="p-2 rounded-full bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-[color,background-color,border-color,transform]"
           >
             <ChevronRight class="w-4 h-4 rotate-180" />
           </button>
@@ -206,7 +210,7 @@ const handleNavigate = (id) => {
                 emit('open-daily-checkin');
                 emit('close');
               "
-              class="w-full flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-purple-700/40 to-fuchsia-700/40 hover:from-purple-700/60 hover:to-fuchsia-700/60 text-white border border-purple-400/30 shadow-lg transition-colors transition-transform active:scale-95"
+              class="w-full flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-purple-700/40 to-fuchsia-700/40 hover:from-purple-700/60 hover:to-fuchsia-700/60 text-white border border-purple-400/30 shadow-lg transition-[color,background-color,border-color,transform] active:scale-95"
             >
               <div class="flex items-center gap-3">
                 <div
@@ -215,8 +219,12 @@ const handleNavigate = (id) => {
                   <CalendarDays class="w-4 h-4 text-white" />
                 </div>
                 <div class="text-left">
-                  <div class="text-sm font-black text-white">Daily Check-in</div>
-                  <div class="text-[10px] text-purple-200">Claim streak rewards</div>
+                  <div class="text-sm font-black text-white">
+                    Daily Check-in
+                  </div>
+                  <div class="text-[10px] text-purple-200">
+                    Claim streak rewards
+                  </div>
                 </div>
               </div>
               <ChevronRight class="w-4 h-4 text-white/40" />
@@ -230,7 +238,7 @@ const handleNavigate = (id) => {
                 emit('open-lucky-wheel');
                 emit('close');
               "
-              class="w-full flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-amber-600/40 to-orange-600/40 hover:from-amber-600/60 hover:to-orange-600/60 text-white border border-amber-400/30 shadow-lg transition-colors transition-transform active:scale-95"
+              class="w-full flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-amber-600/40 to-orange-600/40 hover:from-amber-600/60 hover:to-orange-600/60 text-white border border-amber-400/30 shadow-lg transition-[color,background-color,border-color,transform] active:scale-95"
             >
               <div class="flex items-center gap-3">
                 <div
@@ -240,7 +248,9 @@ const handleNavigate = (id) => {
                 </div>
                 <div class="text-left">
                   <div class="text-sm font-black text-white">Lucky Wheel</div>
-                  <div class="text-[10px] text-amber-200">Spin for bonus prizes</div>
+                  <div class="text-[10px] text-amber-200">
+                    Spin for bonus prizes
+                  </div>
                 </div>
               </div>
               <ChevronRight class="w-4 h-4 text-white/40" />
@@ -259,7 +269,7 @@ const handleNavigate = (id) => {
               :key="item.id"
               @click="handleNavigate(item.id)"
               :aria-label="item.label"
-              class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 active:scale-95 transition-colors transition-transform group"
+              class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 active:scale-95 transition-[color,background-color,border-color,transform] group"
             >
               <div
                 :class="[
@@ -290,7 +300,7 @@ const handleNavigate = (id) => {
                 emit('toggle-mute');
                 selectFeedback();
               "
-              class="w-full flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 transition-colors transition-transform text-white border border-white/5"
+              class="w-full flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 transition-[color,background-color,border-color,transform] text-white border border-white/5"
             >
               <div class="flex items-center gap-3">
                 <VolumeX v-if="isMuted" class="w-4 h-4 text-white/50" />
@@ -324,7 +334,8 @@ const handleNavigate = (id) => {
             <button
               @click="showSettingsPanel = true"
               aria-label="Open settings panel"
-              class="w-full flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 transition-colors transition-transform text-white border border-white/5"
+              data-testid="sidebar-open-settings"
+              class="w-full flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 transition-[color,background-color,border-color,transform] text-white border border-white/5"
             >
               <div class="flex items-center gap-3">
                 <Settings class="w-4 h-4 text-white/70" />
@@ -337,7 +348,7 @@ const handleNavigate = (id) => {
             <button
               @click="$emit('open-merchant')"
               aria-label="Open merchant promotion"
-              class="w-full flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-blue-900/40 to-purple-900/40 hover:from-blue-900/60 transition-colors transition-transform text-white border border-blue-500/30 mb-2 shadow-lg group"
+              class="w-full flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-blue-900/40 to-purple-900/40 hover:from-blue-900/60 transition-[color,background-color,border-color,transform] text-white border border-blue-500/30 mb-2 shadow-lg group"
             >
               <div class="flex items-center gap-3">
                 <div
@@ -359,7 +370,7 @@ const handleNavigate = (id) => {
             <button
               @click="$emit('open-dashboard')"
               aria-label="Open owner dashboard"
-              class="w-full flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-amber-600/40 to-orange-600/40 hover:from-amber-600/60 transition-colors transition-transform text-white border border-amber-500/30 mb-2 shadow-lg group"
+              class="w-full flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-amber-600/40 to-orange-600/40 hover:from-amber-600/60 transition-[color,background-color,border-color,transform] text-white border border-amber-500/30 mb-2 shadow-lg group"
             >
               <div class="flex items-center gap-3">
                 <div
@@ -383,7 +394,7 @@ const handleNavigate = (id) => {
               v-if="showPartnerProgram"
               @click="$emit('open-partner')"
               aria-label="Open partner dashboard"
-              class="w-full flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-cyan-600/40 to-blue-700/40 hover:from-cyan-600/60 transition-colors transition-transform text-white border border-cyan-400/30 mb-2 shadow-lg group"
+              class="w-full flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-cyan-600/40 to-blue-700/40 hover:from-cyan-600/60 transition-[color,background-color,border-color,transform] text-white border border-cyan-400/30 mb-2 shadow-lg group"
             >
               <div class="flex items-center gap-3">
                 <div
@@ -404,8 +415,14 @@ const handleNavigate = (id) => {
             </button>
 
             <button
+              @click="
+                successFeedback();
+                emit('logout');
+                emit('close');
+              "
               aria-label="Logout"
-              class="w-full flex items-center justify-between p-3 rounded-xl bg-white/5 active:scale-95 transition-colors transition-transform text-red-500 hover:bg-red-500/10 border border-white/5"
+              data-testid="sidebar-logout"
+              class="w-full flex items-center justify-between p-3 rounded-xl bg-white/5 active:scale-95 transition-[color,background-color,border-color,transform] text-red-500 hover:bg-red-500/10 border border-white/5"
             >
               <div class="flex items-center gap-3">
                 <LogOut class="w-4 h-4" />

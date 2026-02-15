@@ -1,34 +1,5 @@
 {
   "version": 1,
-  "updated_at": "2026-02-08",
-  "tests": [
-    {
-      "id": "tests/e2e/map_flow.spec.ts::Map User Flow › Map Load -> Click Shop -> Open Drawer @map-quarantine",
-      "owner": "@team-map",
-      "ticket": "MAP-1201",
-      "expires_on": "2026-03-31",
-      "reason": "Map marker click->drawer path remains flaky in headless WebGL CI and is under active stabilization."
-    },
-    {
-      "id": "tests/e2e/smoke.spec.ts::VibeCity – Smoke Tests › WebGL-dependent tests @map-quarantine › shop carousel loads with cards",
-      "owner": "@team-map",
-      "ticket": "MAP-1202",
-      "expires_on": "2026-03-31",
-      "reason": "Carousel hydration depends on map data and can intermittently miss readiness timing under CI load."
-    },
-    {
-      "id": "tests/e2e/smoke.spec.ts::VibeCity – Smoke Tests › WebGL-dependent tests @map-quarantine › clicking a card opens modal",
-      "owner": "@team-map",
-      "ticket": "MAP-1203",
-      "expires_on": "2026-03-31",
-      "reason": "Card-to-modal interaction occasionally races with map render completion in low-resource runners."
-    },
-    {
-      "id": "tests/e2e/vibe_check.spec.js::VibeCity Core User Journey › Search and Open Shop Detail @map-quarantine",
-      "owner": "@team-search",
-      "ticket": "MAP-1204",
-      "expires_on": "2026-03-31",
-      "reason": "Search-result to detail-open sequence is flaky when map readiness and list hydration timing diverge."
-    }
-  ]
+  "updated_at": "2026-02-12",
+  "tests": []
 }

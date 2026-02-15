@@ -42,6 +42,11 @@ coverage/
 # Sentry Config Auth Token
 .env.sentry-build-plugin
 
+# Local MCP config files
+.mcp.json
+mcp_config_ready_to_copy.json
+mcp_config*.local.json
+
 # ----------------------------------------
 # 5. Editor & OS Files
 # ----------------------------------------
@@ -171,4 +176,3 @@ findings.md
 progress.md
 task_plan.md
 observability/
-

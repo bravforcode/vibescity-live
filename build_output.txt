@@ -1,0 +1,28 @@
+[sentry-vite-plugin] Info: Using environment variables configured in ".env.sentry-build-plugin".
+[36mvite v7.3.1 [32mbuilding client environment for production...[36m[39m
+[sentry-vite-plugin] Info: Sending telemetry data on issues and performance to Sentry. To disable telemetry, set `options.telemetry` to `false`.
+transforming...
+[32mΓ£ô[39m 2387 modules transformed.
+Γ£ù Build failed in 6.50s
+error during build:
+[vite-plugin-pwa:build] There was an error during the build:
+  node_modules/vue-virtual-scroller/dist/vue-virtual-scroller.esm.js (4:7): "default" is not exported by "node_modules/vue/dist/vue.runtime.esm-bundler.js", imported by "node_modules/vue-virtual-scroller/dist/vue-virtual-scroller.esm.js".
+Additionally, handling the error in the 'buildEnd' hook caused the following error:
+  node_modules/vue-virtual-scroller/dist/vue-virtual-scroller.esm.js (4:7): "default" is not exported by "node_modules/vue/dist/vue.runtime.esm-bundler.js", imported by "node_modules/vue-virtual-scroller/dist/vue-virtual-scroller.esm.js".
+file: C:/vibecity.live/node_modules/vue-virtual-scroller/dist/vue-virtual-scroller.esm.js:4:7
+
+2: import { ObserveVisibility } from 'vue-observe-visibility';
+3: import ScrollParent from 'scrollparent';
+4: import Vue from 'vue';
+          ^
+5: 
+6: var config = {
+
+    at getRollupError (file:///C:/vibecity.live/node_modules/rollup/dist/es/shared/parseAst.js:400:41)
+    at file:///C:/vibecity.live/node_modules/rollup/dist/es/shared/node-entry.js:23423:39
+    at async catchUnfinishedHookActions (file:///C:/vibecity.live/node_modules/rollup/dist/es/shared/node-entry.js:22881:16)
+    at async rollupInternal (file:///C:/vibecity.live/node_modules/rollup/dist/es/shared/node-entry.js:23406:5)
+    at async buildEnvironment (file:///C:/vibecity.live/node_modules/vite/dist/node/chunks/config.js:33541:12)
+    at async Object.build (file:///C:/vibecity.live/node_modules/vite/dist/node/chunks/config.js:33900:19)
+    at async Object.buildApp (file:///C:/vibecity.live/node_modules/vite/dist/node/chunks/config.js:33897:153)
+    at async CAC.<anonymous> (file:///C:/vibecity.live/node_modules/vite/dist/node/cli.js:629:3)

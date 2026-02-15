@@ -18,6 +18,17 @@ router = APIRouter()
 logger = logging.getLogger("app.vibes")
 
 
+@router.get("/status")
+async def get_vibes_status():
+    """Check the number of active websocket connections."""
+    return {
+        "status": "online",
+        "global_connections": len(manager.global_connections),
+        "active_rooms": len(manager.room_connections),
+        "timestamp": time.time()
+    }
+
+
 def _supabase_client():
 	"""Prefer service role client when available."""
 	return supabase_admin or supabase

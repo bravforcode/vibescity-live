@@ -1,14 +1,21 @@
 <template>
   <div class="admin-view p-6 bg-gray-900 min-h-screen text-white">
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-6">
+    <div
+      class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-6"
+    >
       <div>
         <h1 class="text-3xl font-bold">Admin Dashboard</h1>
         <p class="text-sm text-gray-400">
-          Review submissions, audit manual transfers, and present usage analytics.
+          Review submissions, audit manual transfers, and present usage
+          analytics.
         </p>
       </div>
 
-      <div class="flex flex-wrap gap-2" role="tablist" aria-label="Admin sections">
+      <div
+        class="flex flex-wrap gap-2"
+        role="tablist"
+        aria-label="Admin sections"
+      >
         <button
           type="button"
           role="tab"
@@ -65,6 +72,20 @@
         >
           PII Audit
         </button>
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="activeTab === 'ads'"
+          :class="[
+            'px-3 py-2 rounded-lg border text-sm font-semibold transition-colors duration-150',
+            activeTab === 'ads'
+              ? 'bg-white/10 border-white/20 text-white'
+              : 'bg-gray-800 border-gray-700 text-gray-300 hover:text-white hover:border-gray-600',
+          ]"
+          @click="activeTab = 'ads'"
+        >
+          📍 Local Ads
+        </button>
       </div>
     </div>
 
@@ -74,7 +95,9 @@
         {{ error }}
       </div>
 
-      <div v-if="loading" class="text-center py-8">Loading pending items...</div>
+      <div v-if="loading" class="text-center py-8">
+        Loading pending items...
+      </div>
 
       <div v-else>
         <h2 class="text-xl font-semibold mb-4">Pending Shops</h2>
@@ -90,7 +113,9 @@
             class="bg-gray-800 p-4 rounded-lg shadow-md border border-gray-700 flex flex-col md:flex-row gap-4"
           >
             <!-- Image Preview -->
-            <div class="w-full md:w-48 h-32 bg-gray-700 rounded overflow-hidden">
+            <div
+              class="w-full md:w-48 h-32 bg-gray-700 rounded overflow-hidden"
+            >
               <img
                 v-if="shop.images && shop.images.length"
                 :src="shop.images[0]"
@@ -143,7 +168,9 @@
 
     <!-- Slip Verification Dashboard -->
     <div v-if="activeTab === 'slips'" class="mt-6">
-      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+      <div
+        class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4"
+      >
         <div>
           <h2 class="text-xl font-semibold">Slip Verification Logs</h2>
           <p class="text-sm text-gray-400">
@@ -165,15 +192,21 @@
         </div>
         <div class="bg-gray-800 border border-gray-700 rounded-lg p-3">
           <div class="text-xs text-gray-400">Paid</div>
-          <div class="text-lg font-bold text-green-400">{{ slipSummary.paid }}</div>
+          <div class="text-lg font-bold text-green-400">
+            {{ slipSummary.paid }}
+          </div>
         </div>
         <div class="bg-gray-800 border border-gray-700 rounded-lg p-3">
           <div class="text-xs text-gray-400">Rejected</div>
-          <div class="text-lg font-bold text-red-400">{{ slipSummary.rejected }}</div>
+          <div class="text-lg font-bold text-red-400">
+            {{ slipSummary.rejected }}
+          </div>
         </div>
         <div class="bg-gray-800 border border-gray-700 rounded-lg p-3">
           <div class="text-xs text-gray-400">Pending</div>
-          <div class="text-lg font-bold text-yellow-400">{{ slipSummary.pending }}</div>
+          <div class="text-lg font-bold text-yellow-400">
+            {{ slipSummary.pending }}
+          </div>
         </div>
       </div>
 
@@ -227,7 +260,9 @@
         </button>
       </div>
 
-      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+      <div
+        class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4"
+      >
         <div class="flex items-center gap-2">
           <button
             @click="prevSlipPage"
@@ -287,10 +322,14 @@
             :key="order.id"
             class="bg-gray-800 p-4 rounded-lg border border-gray-700"
           >
-            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+            <div
+              class="flex flex-col md:flex-row md:items-center md:justify-between gap-2"
+            >
               <div>
                 <div class="text-xs text-gray-400">Order ID</div>
-                <div class="text-xs font-mono text-gray-200 break-all">{{ order.id }}</div>
+                <div class="text-xs font-mono text-gray-200 break-all">
+                  {{ order.id }}
+                </div>
               </div>
               <span
                 class="px-2 py-1 rounded text-xs font-bold uppercase tracking-wide"
@@ -302,14 +341,19 @@
 
             <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-4">
               <div class="md:col-span-1">
-                <div class="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden h-40">
+                <div
+                  class="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden h-40"
+                >
                   <img
                     v-if="order.slip_url"
                     :src="order.slip_url"
                     alt="Slip"
                     class="w-full h-full object-cover"
                   />
-                  <div v-else class="h-full flex items-center justify-center text-gray-500 text-xs">
+                  <div
+                    v-else
+                    class="h-full flex items-center justify-center text-gray-500 text-xs"
+                  >
                     No slip image
                   </div>
                 </div>
@@ -326,9 +370,22 @@
 
               <div class="md:col-span-2 space-y-2 text-sm text-gray-300">
                 <div class="flex flex-wrap gap-4 text-xs text-gray-400">
-                  <span>SKU: <span class="text-gray-200">{{ order.sku }}</span></span>
-                  <span>Amount: <span class="text-gray-200">฿{{ formatAmount(order.amount) }}</span></span>
-                  <span>Venue: <span class="text-gray-200">{{ order.venue_id || "N/A" }}</span></span>
+                  <span
+                    >SKU:
+                    <span class="text-gray-200">{{ order.sku }}</span></span
+                  >
+                  <span
+                    >Amount:
+                    <span class="text-gray-200"
+                      >฿{{ formatAmount(order.amount) }}</span
+                    ></span
+                  >
+                  <span
+                    >Venue:
+                    <span class="text-gray-200">{{
+                      order.venue_id || "N/A"
+                    }}</span></span
+                  >
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
@@ -336,7 +393,10 @@
                     <div class="text-gray-500">Verification</div>
                     <div class="text-gray-200">
                       {{ getSlipMeta(order).status || "unknown" }}
-                      <span v-if="getSlipMeta(order).reason" class="text-gray-400">
+                      <span
+                        v-if="getSlipMeta(order).reason"
+                        class="text-gray-400"
+                      >
                         ({{ getSlipMeta(order).reason }})
                       </span>
                     </div>
@@ -346,7 +406,9 @@
                   </div>
                   <div>
                     <div class="text-gray-500">Transaction</div>
-                    <div class="text-gray-200">Ref: {{ getSlipMeta(order).trans_ref || "N/A" }}</div>
+                    <div class="text-gray-200">
+                      Ref: {{ getSlipMeta(order).trans_ref || "N/A" }}
+                    </div>
                     <div class="text-gray-500 mt-1">
                       Date: {{ getSlipMeta(order).trans_date || "N/A" }}
                     </div>
@@ -356,7 +418,9 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                   <div>
                     <div class="text-gray-500">Receiver</div>
-                    <div class="text-gray-200">{{ getSlipMeta(order).receiver?.name || "N/A" }}</div>
+                    <div class="text-gray-200">
+                      {{ getSlipMeta(order).receiver?.name || "N/A" }}
+                    </div>
                     <div class="text-gray-400">
                       {{ getSlipMeta(order).receiver?.bank || "N/A" }}
                       · {{ getSlipMeta(order).receiver?.account || "N/A" }}
@@ -364,31 +428,48 @@
                   </div>
                   <div>
                     <div class="text-gray-500">Sender</div>
-                    <div class="text-gray-200">{{ getSlipMeta(order).sender?.name || "N/A" }}</div>
-                    <div class="text-gray-400">{{ getSlipMeta(order).sender?.bank || "N/A" }}</div>
+                    <div class="text-gray-200">
+                      {{ getSlipMeta(order).sender?.name || "N/A" }}
+                    </div>
+                    <div class="text-gray-400">
+                      {{ getSlipMeta(order).sender?.bank || "N/A" }}
+                    </div>
                   </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                   <div>
                     <div class="text-gray-500">Buyer Info</div>
-                    <div class="text-gray-200">{{ getSlipAudit(order).buyer_full_name || "N/A" }}</div>
+                    <div class="text-gray-200">
+                      {{ getSlipAudit(order).buyer_full_name || "N/A" }}
+                    </div>
                     <div class="text-gray-400">
-                      {{ getSlipAudit(order).buyer_phone || "N/A" }} · {{ getSlipAudit(order).buyer_email || "N/A" }}
+                      {{ getSlipAudit(order).buyer_phone || "N/A" }} ·
+                      {{ getSlipAudit(order).buyer_email || "N/A" }}
                     </div>
                     <div class="text-gray-400 mt-1">
                       {{ getSlipAudit(order).buyer_address_line1 || "N/A" }}
-                      <span v-if="getSlipAudit(order).buyer_address_line2">, {{ getSlipAudit(order).buyer_address_line2 }}</span>
+                      <span v-if="getSlipAudit(order).buyer_address_line2"
+                        >, {{ getSlipAudit(order).buyer_address_line2 }}</span
+                      >
                     </div>
                     <div class="text-gray-400">
-                      {{ getSlipAudit(order).buyer_country || "N/A" }} · {{ getSlipAudit(order).buyer_province || "N/A" }} · {{ getSlipAudit(order).buyer_district || "N/A" }} · {{ getSlipAudit(order).buyer_postal || "N/A" }}
+                      {{ getSlipAudit(order).buyer_country || "N/A" }} ·
+                      {{ getSlipAudit(order).buyer_province || "N/A" }} ·
+                      {{ getSlipAudit(order).buyer_district || "N/A" }} ·
+                      {{ getSlipAudit(order).buyer_postal || "N/A" }}
                     </div>
                   </div>
                   <div>
                     <div class="text-gray-500">IP + Geo</div>
-                    <div class="text-gray-200">{{ getSlipAudit(order).ip_address || "N/A" }}</div>
+                    <div class="text-gray-200">
+                      {{ getSlipAudit(order).ip_address || "N/A" }}
+                    </div>
                     <div class="text-gray-400">
-                      {{ getSlipAudit(order).geo_country || "N/A" }} · {{ getSlipAudit(order).geo_region || "N/A" }} · {{ getSlipAudit(order).geo_city || "N/A" }} · {{ getSlipAudit(order).geo_postal || "N/A" }}
+                      {{ getSlipAudit(order).geo_country || "N/A" }} ·
+                      {{ getSlipAudit(order).geo_region || "N/A" }} ·
+                      {{ getSlipAudit(order).geo_city || "N/A" }} ·
+                      {{ getSlipAudit(order).geo_postal || "N/A" }}
                     </div>
                     <div class="text-gray-400 mt-1">
                       UA: {{ getSlipAudit(order).user_agent || "N/A" }}
@@ -403,8 +484,13 @@
                 </div>
 
                 <details class="mt-2">
-                  <summary class="cursor-pointer text-xs text-blue-300">Audit Metadata</summary>
-                  <pre class="text-xs bg-gray-900 border border-gray-700 rounded-lg p-3 mt-2 overflow-auto whitespace-pre-wrap">{{ formatMetadata(order.metadata) }}</pre>
+                  <summary class="cursor-pointer text-xs text-blue-300">
+                    Audit Metadata
+                  </summary>
+                  <pre
+                    class="text-xs bg-gray-900 border border-gray-700 rounded-lg p-3 mt-2 overflow-auto whitespace-pre-wrap"
+                    >{{ formatMetadata(order.metadata) }}</pre
+                  >
                 </details>
               </div>
             </div>
@@ -415,11 +501,14 @@
 
     <!-- Usage Analytics -->
     <div v-if="activeTab === 'usage'" class="mt-6">
-      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+      <div
+        class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4"
+      >
         <div>
           <h2 class="text-xl font-semibold">Usage Analytics</h2>
           <p class="text-sm text-gray-400">
-            Sessions, visitors, and activity summary for demos and reporting (no raw IPs).
+            Sessions, visitors, and activity summary for demos and reporting (no
+            raw IPs).
           </p>
         </div>
         <div class="flex flex-col sm:flex-row gap-2">
@@ -481,19 +570,21 @@
             <span class="text-gray-200">{{ analyticsData.range.to }}</span>
             <span class="mx-2">•</span>
             Column:
-            <span class="text-gray-200">{{ analyticsData.range.sessions_time_column }}</span>
+            <span class="text-gray-200">{{
+              analyticsData.range.sessions_time_column
+            }}</span>
             <span v-if="analyticsData?.request_id" class="mx-2">•</span>
             <span v-if="analyticsData?.request_id">
               Request:
               <span class="text-gray-200">{{ analyticsData.request_id }}</span>
             </span>
           </div>
-          <div
-            v-if="analyticsData?.range?.truncated"
-            class="text-yellow-300"
-          >
-            Truncated at {{ analyticsData.range.max_session_rows }} sessions. Increase
-            <code class="text-yellow-200">ANALYTICS_DASHBOARD_MAX_SESSION_ROWS</code>
+          <div v-if="analyticsData?.range?.truncated" class="text-yellow-300">
+            Truncated at {{ analyticsData.range.max_session_rows }} sessions.
+            Increase
+            <code class="text-yellow-200"
+              >ANALYTICS_DASHBOARD_MAX_SESSION_ROWS</code
+            >
             to fetch more.
           </div>
         </div>
@@ -511,15 +602,21 @@
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <div class="bg-gray-800 border border-gray-700 rounded-lg p-3">
             <div class="text-xs text-gray-400">Sessions</div>
-            <div class="text-lg font-bold">{{ analyticsData.kpis.sessions_total }}</div>
+            <div class="text-lg font-bold">
+              {{ analyticsData.kpis.sessions_total }}
+            </div>
           </div>
           <div class="bg-gray-800 border border-gray-700 rounded-lg p-3">
             <div class="text-xs text-gray-400">Unique Visitors</div>
-            <div class="text-lg font-bold">{{ analyticsData.kpis.unique_visitors_total }}</div>
+            <div class="text-lg font-bold">
+              {{ analyticsData.kpis.unique_visitors_total }}
+            </div>
           </div>
           <div class="bg-gray-800 border border-gray-700 rounded-lg p-3">
             <div class="text-xs text-gray-400">Live (15m)</div>
-            <div class="text-lg font-bold">{{ analyticsData.kpis.live_visitors_15m }}</div>
+            <div class="text-lg font-bold">
+              {{ analyticsData.kpis.live_visitors_15m }}
+            </div>
           </div>
           <div class="bg-gray-800 border border-gray-700 rounded-lg p-3">
             <div class="text-xs text-gray-400">DAU</div>
@@ -559,8 +656,12 @@
                     class="border-b border-gray-800"
                   >
                     <td class="py-2 pr-4 text-gray-200">{{ row.day }}</td>
-                    <td class="py-2 pr-4 text-right text-gray-200">{{ row.sessions }}</td>
-                    <td class="py-2 text-right text-gray-200">{{ row.unique_visitors }}</td>
+                    <td class="py-2 pr-4 text-right text-gray-200">
+                      {{ row.sessions }}
+                    </td>
+                    <td class="py-2 text-right text-gray-200">
+                      {{ row.unique_visitors }}
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -587,9 +688,15 @@
                     :key="row.country"
                     class="border-b border-gray-800"
                   >
-                    <td class="py-2 pr-4 text-gray-200">{{ row.country || "N/A" }}</td>
-                    <td class="py-2 pr-4 text-right text-gray-200">{{ row.sessions }}</td>
-                    <td class="py-2 text-right text-gray-200">{{ row.unique_visitors }}</td>
+                    <td class="py-2 pr-4 text-gray-200">
+                      {{ row.country || "N/A" }}
+                    </td>
+                    <td class="py-2 pr-4 text-right text-gray-200">
+                      {{ row.sessions }}
+                    </td>
+                    <td class="py-2 text-right text-gray-200">
+                      {{ row.unique_visitors }}
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -605,7 +712,10 @@
             </div>
           </div>
 
-          <div v-if="!analyticsData.recent_sessions?.length" class="text-xs text-gray-500 mt-3">
+          <div
+            v-if="!analyticsData.recent_sessions?.length"
+            class="text-xs text-gray-500 mt-3"
+          >
             N/A
           </div>
 
@@ -628,7 +738,12 @@
                   class="border-b border-gray-800"
                 >
                   <td class="py-2 pr-4 text-gray-200">
-                    {{ formatDate(row.last_seen_at || row?.[analyticsData.range.sessions_time_column]) }}
+                    {{
+                      formatDate(
+                        row.last_seen_at ||
+                          row?.[analyticsData.range.sessions_time_column],
+                      )
+                    }}
                   </td>
                   <td class="py-2 pr-4 text-gray-200 font-mono text-xs">
                     {{ row.visitor_id || "N/A" }}
@@ -636,9 +751,15 @@
                   <td class="py-2 pr-4 text-gray-200 font-mono text-xs">
                     {{ row.user_id || "N/A" }}
                   </td>
-                  <td class="py-2 pr-4 text-gray-200">{{ row.country || "N/A" }}</td>
-                  <td class="py-2 pr-4 text-gray-200">{{ row.city || "N/A" }}</td>
-                  <td class="py-2 text-gray-200">{{ row.device_type || "N/A" }}</td>
+                  <td class="py-2 pr-4 text-gray-200">
+                    {{ row.country || "N/A" }}
+                  </td>
+                  <td class="py-2 pr-4 text-gray-200">
+                    {{ row.city || "N/A" }}
+                  </td>
+                  <td class="py-2 text-gray-200">
+                    {{ row.device_type || "N/A" }}
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -646,11 +767,16 @@
         </div>
 
         <div class="bg-gray-800 border border-gray-700 rounded-lg p-4">
-          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+          <div
+            class="flex flex-col md:flex-row md:items-center md:justify-between gap-2"
+          >
             <div>
               <h3 class="text-sm font-semibold">Events</h3>
               <div class="text-xs text-gray-500">
-                Source: <span class="text-gray-300">{{ analyticsData.events.source }}</span>
+                Source:
+                <span class="text-gray-300">{{
+                  analyticsData.events.source
+                }}</span>
               </div>
             </div>
           </div>
@@ -658,7 +784,10 @@
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-3">
             <div class="bg-gray-900 border border-gray-700 rounded-lg p-3">
               <div class="text-xs text-gray-400 mb-2">Events by day</div>
-              <div v-if="!analyticsData.events.events_by_day?.length" class="text-xs text-gray-500">
+              <div
+                v-if="!analyticsData.events.events_by_day?.length"
+                class="text-xs text-gray-500"
+              >
                 N/A
               </div>
               <div v-else class="overflow-x-auto">
@@ -676,7 +805,9 @@
                       class="border-b border-gray-800"
                     >
                       <td class="py-2 pr-4 text-gray-200">{{ row.day }}</td>
-                      <td class="py-2 text-right text-gray-200">{{ row.events }}</td>
+                      <td class="py-2 text-right text-gray-200">
+                        {{ row.events }}
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -685,7 +816,10 @@
 
             <div class="bg-gray-900 border border-gray-700 rounded-lg p-3">
               <div class="text-xs text-gray-400 mb-2">Top venues</div>
-              <div v-if="!analyticsData.events.top_venues?.length" class="text-xs text-gray-500">
+              <div
+                v-if="!analyticsData.events.top_venues?.length"
+                class="text-xs text-gray-500"
+              >
                 N/A
               </div>
               <div v-else class="overflow-x-auto">
@@ -705,7 +839,11 @@
                     >
                       <td class="py-2 pr-4 text-gray-200">
                         <a
-                          :href="row.venue_ref?.startsWith('/') ? row.venue_ref : `/venue/${encodeURIComponent(row.venue_ref)}`"
+                          :href="
+                            row.venue_ref?.startsWith('/')
+                              ? row.venue_ref
+                              : `/venue/${encodeURIComponent(row.venue_ref)}`
+                          "
                           target="_blank"
                           rel="noopener noreferrer"
                           class="underline decoration-white/20 hover:decoration-white/60"
@@ -713,8 +851,12 @@
                           {{ row.venue_name || row.venue_ref }}
                         </a>
                       </td>
-                      <td class="py-2 pr-4 text-right text-gray-200">{{ row.events }}</td>
-                      <td class="py-2 text-right text-gray-200">{{ row.unique_visitors || 0 }}</td>
+                      <td class="py-2 pr-4 text-right text-gray-200">
+                        {{ row.events }}
+                      </td>
+                      <td class="py-2 text-right text-gray-200">
+                        {{ row.unique_visitors || 0 }}
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -726,9 +868,14 @@
             <div class="bg-gray-900 border border-gray-700 rounded-lg p-3">
               <div class="flex items-center justify-between gap-2">
                 <div class="text-xs text-gray-400">Top pages</div>
-                <div class="text-[11px] text-gray-500">event_type: page_view</div>
+                <div class="text-[11px] text-gray-500">
+                  event_type: page_view
+                </div>
               </div>
-              <div v-if="!analyticsData.events.top_pages?.length" class="text-xs text-gray-500 mt-3">
+              <div
+                v-if="!analyticsData.events.top_pages?.length"
+                class="text-xs text-gray-500 mt-3"
+              >
                 N/A
               </div>
               <div v-else class="overflow-x-auto mt-3">
@@ -756,8 +903,12 @@
                           {{ row.path }}
                         </a>
                       </td>
-                      <td class="py-2 pr-4 text-right text-gray-200">{{ row.events }}</td>
-                      <td class="py-2 text-right text-gray-200">{{ row.unique_visitors || 0 }}</td>
+                      <td class="py-2 pr-4 text-right text-gray-200">
+                        {{ row.events }}
+                      </td>
+                      <td class="py-2 text-right text-gray-200">
+                        {{ row.unique_visitors || 0 }}
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -769,13 +920,23 @@
                 <div>
                   <div class="text-xs text-gray-400">Funnel</div>
                   <div class="text-[11px] text-gray-500">
-                    Source: <span class="text-gray-300">{{ analyticsData.funnel?.source || "none" }}</span>
-                    <span v-if="analyticsData.funnel?.truncated" class="text-yellow-300 ml-2">truncated</span>
+                    Source:
+                    <span class="text-gray-300">{{
+                      analyticsData.funnel?.source || "none"
+                    }}</span>
+                    <span
+                      v-if="analyticsData.funnel?.truncated"
+                      class="text-yellow-300 ml-2"
+                      >truncated</span
+                    >
                   </div>
                 </div>
               </div>
 
-              <div v-if="!analyticsData.funnel?.steps?.length" class="text-xs text-gray-500 mt-3">
+              <div
+                v-if="!analyticsData.funnel?.steps?.length"
+                class="text-xs text-gray-500 mt-3"
+              >
                 N/A
               </div>
 
@@ -787,19 +948,30 @@
                     class="flex items-center justify-between gap-2 text-xs"
                   >
                     <span class="text-gray-300 font-mono">{{ step.step }}</span>
-                    <span class="text-gray-200 font-bold">{{ step.unique_visitors }}</span>
+                    <span class="text-gray-200 font-bold">{{
+                      step.unique_visitors
+                    }}</span>
                   </div>
                 </div>
 
-                <div v-if="analyticsData.funnel.intersections?.length" class="pt-2 border-t border-gray-800">
-                  <div class="text-[11px] text-gray-500 mb-2">Conversions (approx)</div>
+                <div
+                  v-if="analyticsData.funnel.intersections?.length"
+                  class="pt-2 border-t border-gray-800"
+                >
+                  <div class="text-[11px] text-gray-500 mb-2">
+                    Conversions (approx)
+                  </div>
                   <div
                     v-for="edge in analyticsData.funnel.intersections"
                     :key="`${edge.from}:${edge.to}`"
                     class="flex items-center justify-between gap-2 text-xs"
                   >
-                    <span class="text-gray-300 font-mono">{{ edge.from }} → {{ edge.to }}</span>
-                    <span class="text-gray-200">{{ formatPercent(edge.conversion_rate) }}</span>
+                    <span class="text-gray-300 font-mono"
+                      >{{ edge.from }} → {{ edge.to }}</span
+                    >
+                    <span class="text-gray-200">{{
+                      formatPercent(edge.conversion_rate)
+                    }}</span>
                   </div>
                 </div>
               </div>
@@ -814,7 +986,10 @@
               </div>
             </div>
 
-            <div v-if="!analyticsData.retention?.cohorts?.length" class="text-xs text-gray-500 mt-3">
+            <div
+              v-if="!analyticsData.retention?.cohorts?.length"
+              class="text-xs text-gray-500 mt-3"
+            >
               N/A
             </div>
 
@@ -835,11 +1010,21 @@
                     :key="cohort.cohort_day"
                     class="border-b border-gray-800"
                   >
-                    <td class="py-2 pr-4 text-gray-200 font-mono text-xs">{{ cohort.cohort_day }}</td>
-                    <td class="py-2 pr-4 text-right text-gray-200">{{ cohort.size }}</td>
-                    <td class="py-2 pr-4 text-right text-gray-200">{{ formatPercent(getRetentionRate(cohort, 1)) }}</td>
-                    <td class="py-2 pr-4 text-right text-gray-200">{{ formatPercent(getRetentionRate(cohort, 3)) }}</td>
-                    <td class="py-2 text-right text-gray-200">{{ formatPercent(getRetentionRate(cohort, 7)) }}</td>
+                    <td class="py-2 pr-4 text-gray-200 font-mono text-xs">
+                      {{ cohort.cohort_day }}
+                    </td>
+                    <td class="py-2 pr-4 text-right text-gray-200">
+                      {{ cohort.size }}
+                    </td>
+                    <td class="py-2 pr-4 text-right text-gray-200">
+                      {{ formatPercent(getRetentionRate(cohort, 1)) }}
+                    </td>
+                    <td class="py-2 pr-4 text-right text-gray-200">
+                      {{ formatPercent(getRetentionRate(cohort, 3)) }}
+                    </td>
+                    <td class="py-2 text-right text-gray-200">
+                      {{ formatPercent(getRetentionRate(cohort, 7)) }}
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -849,17 +1034,21 @@
       </div>
 
       <div v-else class="text-gray-400">
-        No analytics loaded yet. Click <span class="text-gray-200">Refresh</span>.
+        No analytics loaded yet. Click
+        <span class="text-gray-200">Refresh</span>.
       </div>
     </div>
 
     <!-- PII Audit -->
     <div v-if="activeTab === 'pii'" class="mt-6">
-      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+      <div
+        class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4"
+      >
         <div>
           <h2 class="text-xl font-semibold">PII Audit (Raw IP)</h2>
           <p class="text-sm text-gray-400">
-            Raw IP retention: 90 days. Access requires admin (or pii_audit_viewer) + PIN.
+            Raw IP retention: 90 days. Access requires admin (or
+            pii_audit_viewer) + PIN.
           </p>
         </div>
         <div class="flex flex-col sm:flex-row gap-2">
@@ -922,7 +1111,8 @@
         </div>
 
         <div class="mt-3 text-xs text-yellow-300">
-          Warning: This panel contains sensitive data. Do not share screenshots externally.
+          Warning: This panel contains sensitive data. Do not share screenshots
+          externally.
         </div>
       </div>
 
@@ -938,21 +1128,31 @@
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <div class="bg-gray-800 border border-gray-700 rounded-lg p-3">
             <div class="text-xs text-gray-400">Sessions</div>
-            <div class="text-lg font-bold">{{ piiData.kpis.sessions_total }}</div>
+            <div class="text-lg font-bold">
+              {{ piiData.kpis.sessions_total }}
+            </div>
           </div>
           <div class="bg-gray-800 border border-gray-700 rounded-lg p-3">
             <div class="text-xs text-gray-400">Unique Visitors</div>
-            <div class="text-lg font-bold">{{ piiData.kpis.unique_visitors_total }}</div>
+            <div class="text-lg font-bold">
+              {{ piiData.kpis.unique_visitors_total }}
+            </div>
           </div>
           <div class="bg-gray-800 border border-gray-700 rounded-lg p-3">
             <div class="text-xs text-gray-400">Live (15m)</div>
-            <div class="text-lg font-bold">{{ piiData.kpis.live_visitors_15m }}</div>
+            <div class="text-lg font-bold">
+              {{ piiData.kpis.live_visitors_15m }}
+            </div>
           </div>
-          <div class="bg-gray-800 border border-gray-700 rounded-lg p-3 md:col-span-3">
+          <div
+            class="bg-gray-800 border border-gray-700 rounded-lg p-3 md:col-span-3"
+          >
             <div class="text-xs text-gray-400">Range</div>
             <div class="text-sm text-gray-200 font-mono">
               {{ piiData.range.from }} → {{ piiData.range.to }}
-              <span v-if="piiData.request_id" class="text-gray-500 ml-2">({{ piiData.request_id }})</span>
+              <span v-if="piiData.request_id" class="text-gray-500 ml-2"
+                >({{ piiData.request_id }})</span
+              >
             </div>
           </div>
         </div>
@@ -1016,9 +1216,15 @@
                   <td class="py-2 pr-4 text-gray-200 text-xs">
                     {{ row.email || "N/A" }}
                   </td>
-                  <td class="py-2 pr-4 text-right text-gray-200">{{ row.views || 0 }}</td>
-                  <td class="py-2 pr-4 text-right text-gray-200">{{ row.exports || 0 }}</td>
-                  <td class="py-2 pr-4 text-right text-gray-200">{{ row.actions || 0 }}</td>
+                  <td class="py-2 pr-4 text-right text-gray-200">
+                    {{ row.views || 0 }}
+                  </td>
+                  <td class="py-2 pr-4 text-right text-gray-200">
+                    {{ row.exports || 0 }}
+                  </td>
+                  <td class="py-2 pr-4 text-right text-gray-200">
+                    {{ row.actions || 0 }}
+                  </td>
                   <td class="py-2 text-gray-200 text-xs">
                     {{ formatDate(row.last_seen_at) }}
                   </td>
@@ -1054,9 +1260,15 @@
                     :key="row.country"
                     class="border-b border-gray-800"
                   >
-                    <td class="py-2 pr-4 text-gray-200">{{ row.country || "N/A" }}</td>
-                    <td class="py-2 pr-4 text-right text-gray-200">{{ row.sessions }}</td>
-                    <td class="py-2 text-right text-gray-200">{{ row.unique_visitors }}</td>
+                    <td class="py-2 pr-4 text-gray-200">
+                      {{ row.country || "N/A" }}
+                    </td>
+                    <td class="py-2 pr-4 text-right text-gray-200">
+                      {{ row.sessions }}
+                    </td>
+                    <td class="py-2 text-right text-gray-200">
+                      {{ row.unique_visitors }}
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -1071,7 +1283,10 @@
               </div>
             </div>
 
-            <div v-if="!piiData.recent_sessions?.length" class="text-xs text-gray-500 mt-3">
+            <div
+              v-if="!piiData.recent_sessions?.length"
+              class="text-xs text-gray-500 mt-3"
+            >
               N/A
             </div>
 
@@ -1106,8 +1321,12 @@
                     <td class="py-2 pr-4 text-gray-200 font-mono text-xs">
                       {{ row.ip_raw || "N/A" }}
                     </td>
-                    <td class="py-2 pr-4 text-gray-200">{{ row.country || "N/A" }}</td>
-                    <td class="py-2 pr-4 text-gray-200">{{ row.city || "N/A" }}</td>
+                    <td class="py-2 pr-4 text-gray-200">
+                      {{ row.country || "N/A" }}
+                    </td>
+                    <td class="py-2 pr-4 text-gray-200">
+                      {{ row.city || "N/A" }}
+                    </td>
                     <td class="py-2 text-gray-200 text-xs">
                       {{ String(row.user_agent || "N/A").slice(0, 80) }}
                     </td>
@@ -1120,8 +1339,30 @@
       </div>
 
       <div v-else class="text-gray-400">
-        No PII audit loaded yet. Enter PIN and click <span class="text-gray-200">Refresh</span>.
+        No PII audit loaded yet. Enter PIN and click
+        <span class="text-gray-200">Refresh</span>.
       </div>
+    </div>
+
+    <!-- 📍 Local Ads Management -->
+    <div v-if="activeTab === 'ads'">
+      <LocalAdManager />
+    </div>
+
+    <!-- 🟢 Online Now KPI (floating badge) -->
+    <div
+      v-if="isConnected"
+      class="fixed bottom-4 right-4 z-40 flex items-center gap-2 bg-gray-800/90 backdrop-blur border border-gray-700 rounded-full px-3 py-1.5 text-xs font-semibold text-gray-200 shadow-lg"
+    >
+      <span class="relative flex h-2 w-2">
+        <span
+          class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"
+        ></span>
+        <span
+          class="relative inline-flex rounded-full h-2 w-2 bg-green-500"
+        ></span>
+      </span>
+      {{ onlineCount }} online
     </div>
 
     <!-- Promote Modal -->
@@ -1203,13 +1444,18 @@
 
 <script setup>
 import { useHead } from "@unhead/vue";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, defineAsyncComponent, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useNotifications } from "@/composables/useNotifications";
+import { usePresence } from "@/composables/usePresence";
 import { adminAnalyticsService } from "../services/adminAnalyticsService";
 import { adminPiiAuditService } from "../services/adminPiiAuditService";
 import { adminService } from "../services/adminService";
 import { useUserStore } from "../store/userStore";
+
+const LocalAdManager = defineAsyncComponent(
+	() => import("../components/admin/LocalAdManager.vue"),
+);
 
 const userStore = useUserStore();
 const router = useRouter();
@@ -1219,7 +1465,9 @@ const loading = ref(true);
 const error = ref(null);
 const pendingLoaded = ref(false);
 
-const activeTab = ref("review"); // review | slips | usage | pii
+const activeTab = ref("review"); // review | slips | usage | pii | ads
+
+const { onlineCount, isConnected } = usePresence();
 
 const slipLogs = ref([]);
 const slipLoading = ref(false);

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, BackgroundTasks
+from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 from app.core.supabase import supabase
@@ -42,18 +42,20 @@ async def get_dashboard_stats(user: dict = Depends(verify_admin)):
     Get aggregated stats for Admin Dashboard.
     """
     try:
-        # Example stats - in real app, use optimized SQL queries or materialized views
         count_users = supabase.table("profiles").select("id", count="exact").execute().count
-        count_shops = supabase.table("shops").select("id", count="exact").execute().count
+        # Canonical source of truth: public.venues
+        count_venues = supabase.table("venues").select("id", count="exact").execute().count
         count_reviews = supabase.table("reviews").select("id", count="exact").execute().count
 
         return {
             "success": True,
             "stats": {
                 "total_users": count_users,
-                "total_shops": count_shops,
+                "total_venues": count_venues,
+                # Backward compatibility for existing consumers.
+                "total_shops": count_venues,
                 "total_reviews": count_reviews
             }
         }
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        raise HTTPException(status_code=500, detail=f"Failed to fetch dashboard stats: {e}")

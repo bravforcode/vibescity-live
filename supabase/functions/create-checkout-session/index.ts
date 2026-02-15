@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { z } from "https://deno.land/x/zod@v3.21.4/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Stripe from "https://esm.sh/stripe@12.0.0?target=deno";
+import { buildCorsHeaders, isOriginAllowed } from "../_shared/cors.ts";
 
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
 	apiVersion: "2022-11-15",
@@ -118,19 +119,29 @@ const resolvePartnerAttribution = async (
 	return { partnerId: "", partnerCode: "" };
 };
 
-const jsonHeaders = {
-	"Content-Type": "application/json",
-	"Access-Control-Allow-Origin": "*",
-};
-
 serve(async (req) => {
+	const origin = req.headers.get("Origin");
+	const jsonHeaders = {
+		...buildCorsHeaders(origin),
+		"Content-Type": "application/json",
+	};
+
 	if (req.method === "OPTIONS") {
+		if (!isOriginAllowed(origin)) {
+			return new Response("forbidden", {
+				status: 403,
+				headers: buildCorsHeaders(origin),
+			});
+		}
 		return new Response("ok", {
-			headers: {
-				"Access-Control-Allow-Origin": "*",
-				"Access-Control-Allow-Headers":
-					"authorization, x-client-info, apikey, content-type",
-			},
+			headers: buildCorsHeaders(origin),
+		});
+	}
+
+	if (!isOriginAllowed(origin)) {
+		return new Response(JSON.stringify({ error: "Origin not allowed" }), {
+			status: 403,
+			headers: jsonHeaders,
 		});
 	}
 

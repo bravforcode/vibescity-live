@@ -5,6 +5,7 @@ from app.core.supabase import supabase_admin
 from app.core.auth import verify_admin
 from app.core.rate_limit import limiter
 from app.services.notifications import notify_shop_approved
+from app.services.venue_repository import VenueRepository
 
 router = APIRouter()
 
@@ -23,18 +24,15 @@ async def list_pending_shops(user: dict = Depends(verify_admin)):
         raise HTTPException(500, "Admin client not configured")
 
     try:
-        response = supabase_admin.table("shops")\
-            .select("*")\
-            .eq("status", "pending")\
-            .order("created_at", desc=True)\
-            .execute()
+        repository = VenueRepository(supabase_admin)
+        response = repository.list_pending()
 
         return {"success": True, "data": response.data}
     except Exception as e:
         raise HTTPException(500, str(e))
 
 @router.post("/shops/{shop_id}/approve")
-async def approve_shop(shop_id: int, user: dict = Depends(verify_admin)):
+async def approve_shop(shop_id: str, user: dict = Depends(verify_admin)):
     """
     Approve a shop and award the submitter.
     """
@@ -42,19 +40,15 @@ async def approve_shop(shop_id: int, user: dict = Depends(verify_admin)):
         raise HTTPException(500, "Admin client not configured")
 
     try:
+        repository = VenueRepository(supabase_admin)
         # 1. Get the shop to find the submitter (owner_id)
         # Note: In our schema, `owner_id` is the submitter
-        shop_res = supabase_admin.table("shops").select("owner_id").eq("id", shop_id).single().execute()
-        if not shop_res.data:
+        owner_id = repository.get_owner(shop_id)
+        if not owner_id:
             raise HTTPException(404, "Shop not found")
 
-        owner_id = shop_res.data.get("owner_id")
-
         # 2. Update status to active
-        update_res = supabase_admin.table("shops")\
-            .update({"status": "active", "is_verified": True})\
-            .eq("id", shop_id)\
-            .execute()
+        update_res = repository.approve(shop_id)
 
         if not update_res.data:
              raise HTTPException(500, "Failed to update shop status")
@@ -85,7 +79,7 @@ async def approve_shop(shop_id: int, user: dict = Depends(verify_admin)):
         raise HTTPException(500, str(e))
 
 @router.post("/shops/{shop_id}/reject")
-async def reject_shop(shop_id: int, action: ReviewAction, user: dict = Depends(verify_admin)):
+async def reject_shop(shop_id: str, action: ReviewAction, user: dict = Depends(verify_admin)):
     """
     Reject a shop.
     """
@@ -93,12 +87,12 @@ async def reject_shop(shop_id: int, action: ReviewAction, user: dict = Depends(v
         raise HTTPException(500, "Admin client not configured")
 
     try:
+        repository = VenueRepository(supabase_admin)
         # Update status to rejected
         # Optionally delete or just mark rejected
-        update_res = supabase_admin.table("shops")\
-            .update({"status": "rejected", "metadata": {"rejection_reason": action.reason}})\
-            .eq("id", shop_id)\
-            .execute()
+        update_res = repository.reject(shop_id, action.reason)
+        if not update_res.data:
+            raise HTTPException(500, "Failed to reject shop")
 
         return {"success": True, "message": "Shop rejected"}
 

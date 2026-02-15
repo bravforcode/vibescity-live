@@ -17,7 +17,6 @@ import { useMapCore } from "../../composables/map/useMapCore"; // ✅ New Compos
 import { useMapLayers } from "../../composables/map/useMapLayers";
 import { useMapMarkers } from "../../composables/map/useMapMarkers";
 import { useHaptics } from "../../composables/useHaptics";
-import { useTimeTheme } from "../../composables/useTimeTheme";
 import { useShopStore } from "../../store/shopStore";
 import { useUserPreferencesStore } from "../../store/userPreferencesStore";
 import { openExternal } from "../../utils/browserUtils";
@@ -29,7 +28,7 @@ if (typeof mapboxgl.setTelemetryEnabled === "function") {
 	mapboxgl.setTelemetryEnabled(false);
 }
 
-const DARK_STYLE = "mapbox://styles/mapbox/dark-v11";
+const DARK_STYLE = "mapbox://styles/phirrr/cmlkql2fl002101sfarlm0ptr";
 const LIGHT_STYLE = "mapbox://styles/mapbox/light-v11";
 const PIN_SOURCE_ID = "pins_source";
 const PIN_LAYER_ID = "unclustered-pins";
@@ -46,9 +45,8 @@ const tt = (key, fallback) => (te(key) ? t(key) : fallback);
 
 const shopStore = useShopStore();
 const prefs = useUserPreferencesStore();
-
-// ✅ Phase 2: Dynamic Vibe Shifting
-const { isNightMode, mapStyle, currentHour } = useTimeTheme();
+const styleUrlForTheme = (isDarkMode) =>
+	isDarkMode ? DARK_STYLE : LIGHT_STYLE;
 
 // ✅ Vibe Effects
 import { useVibeEffects } from "../../composables/useVibeEffects";
@@ -136,6 +134,14 @@ const removeHeatmapLayer = () => {
 	}
 };
 
+const getFirstExistingLayerId = (candidateIds = []) => {
+	if (!map.value) return null;
+	for (const id of candidateIds) {
+		if (id && map.value.getLayer(id)) return id;
+	}
+	return null;
+};
+
 // Add Heatmap Layer
 const addHeatmapLayer = () => {
 	if (!map.value) return;
@@ -154,58 +160,63 @@ const addHeatmapLayer = () => {
 
 	// Layer
 	if (!map.value.getLayer("heatmap-layer")) {
-		map.value.addLayer(
-			{
-				id: "heatmap-layer",
-				type: "heatmap",
-				source: "heatmap-source",
-				maxzoom: 15,
-				paint: {
-					// Increase weight based on density
-					"heatmap-weight": [
-						"interpolate",
-						["linear"],
-						["get", "density"],
-						0,
-						0,
-						10,
-						1,
-					],
-					// Increase intensity as zoom level increases
-					"heatmap-intensity": [
-						"interpolate",
-						["linear"],
-						["zoom"],
-						0,
-						1,
-						15,
-						3,
-					],
-					// Color ramp
-					"heatmap-color": [
-						"interpolate",
-						["linear"],
-						["heatmap-density"],
-						0,
-						"rgba(33,102,172,0)",
-						0.2,
-						"rgb(103,169,207)",
-						0.4,
-						"rgb(209,229,240)",
-						0.6,
-						"rgb(253,219,199)",
-						0.8,
-						"rgb(239,138,98)",
-						1,
-						"rgb(178,24,43)",
-					],
-					// Radius
-					"heatmap-radius": ["interpolate", ["linear"], ["zoom"], 0, 2, 15, 20],
-					"heatmap-opacity": 0.7,
-				},
-			},
+		const beforeId = getFirstExistingLayerId([
 			"waterway-label",
-		); // Place below labels
+			"road-label",
+			"poi-label",
+			"settlement-label",
+			"place-label",
+		]);
+		const layer = {
+			id: "heatmap-layer",
+			type: "heatmap",
+			source: "heatmap-source",
+			maxzoom: 15,
+			paint: {
+				// Increase weight based on density
+				"heatmap-weight": [
+					"interpolate",
+					["linear"],
+					["get", "density"],
+					0,
+					0,
+					10,
+					1,
+				],
+				// Increase intensity as zoom level increases
+				"heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 0, 1, 15, 3],
+				// Color ramp
+				"heatmap-color": [
+					"interpolate",
+					["linear"],
+					["heatmap-density"],
+					0,
+					"rgba(33,102,172,0)",
+					0.2,
+					"rgb(103,169,207)",
+					0.4,
+					"rgb(209,229,240)",
+					0.6,
+					"rgb(253,219,199)",
+					0.8,
+					"rgb(239,138,98)",
+					1,
+					"rgb(178,24,43)",
+				],
+				// Radius
+				"heatmap-radius": ["interpolate", ["linear"], ["zoom"], 0, 2, 15, 20],
+				"heatmap-opacity": 0.7,
+			},
+		};
+		try {
+			if (beforeId) {
+				map.value.addLayer(layer, beforeId);
+			} else {
+				map.value.addLayer(layer);
+			}
+		} catch (e) {
+			console.warn("Heatmap layer insertion failed:", e);
+		}
 	}
 };
 
@@ -263,21 +274,6 @@ const shouldRunAtmosphere = computed(
 	() => allowAmbientFx.value || allowNeonPulse.value,
 );
 
-// Watch for Theme Changes and update Mapbox Style dynamically
-watch(mapStyle, (newStyle) => {
-	if (map.value && isMapReady.value) {
-		// Preserve layers before switching style (optional advanced logic, for MVP we reload style)
-		// Mapbox GL JS setStyle removes custom layers. We need to re-add them.
-		map.value.setStyle(newStyle);
-		map.value.once("style.load", () => {
-			setupMapLayers();
-			setupMapInteractions();
-			updateMapSources();
-			updateEventMarkers(); // Restore markers
-		});
-	}
-});
-
 const emit = defineEmits([
 	"select-shop",
 	"open-detail",
@@ -290,6 +286,8 @@ const emit = defineEmits([
 const mapContainer = ref(null);
 const { map, isMapReady, initMap, setMapStyle } = useMapCore(mapContainer);
 const mapReadyFallbackArmed = ref(false);
+const currentStyleUrl = ref(null);
+let styleApplySeq = 0;
 
 const initMapOnce = (styleOverride = null) => {
 	if (mapInitRequested.value) return;
@@ -307,17 +305,11 @@ const initMapOnce = (styleOverride = null) => {
 
 	if (!ensureMapboxLoaded()) return;
 
-	initMap(
-		center.value,
-		zoom.value,
-		styleOverride ?? (props.isDarkMode ? DARK_STYLE : LIGHT_STYLE),
-	);
+	const initialStyleUrl =
+		styleOverride ?? styleUrlForTheme(Boolean(props.isDarkMode));
+	currentStyleUrl.value = initialStyleUrl;
+	initMap(center.value, zoom.value, initialStyleUrl);
 };
-
-// ✅ Force 3D Camera View & Setup Layers on Load
-onMounted(() => {
-	initMapOnce();
-});
 
 onMounted(() => {
 	if (!IS_STRICT_MAP_E2E) return;
@@ -330,7 +322,8 @@ onMounted(() => {
 			webGLSupported.value &&
 			!isTokenInvalid.value
 		) {
-			isMapReady.value = true;
+			// Never force-ready map state; keep failures visible in strict E2E.
+			console.warn("Map did not become ready within strict E2E timeout");
 		}
 	}, 12_000);
 });
@@ -366,7 +359,8 @@ const bearing = ref(-17.6);
 const mapLoaded = ref(false);
 const activePopup = shallowRef(null);
 const mapInitRequested = ref(false);
-let hourInterval = null;
+const nowTick = ref(Date.now());
+let nowTickInterval = null;
 let mapHapticAt = 0;
 const MAP_HAPTIC_COOLDOWN_MS = 220;
 
@@ -781,6 +775,7 @@ const startRouteTrailAnimation = () => {
 
 // ✅ Dynamic Data Fetching State
 let rafToken = null;
+let pinsRefreshSeq = 0;
 
 // Schedule fetching pins based on map movement
 const scheduleMapRefresh = () => {
@@ -794,39 +789,152 @@ const scheduleMapRefresh = () => {
 const refreshPins = async () => {
 	if (!map.value || !isMapReady.value) return;
 
+	const seq = ++pinsRefreshSeq;
 	const b = map.value.getBounds();
 	const currentZoom = map.value.getZoom();
 
-	const setPinsSourceFromShops = (shops) => {
-		if (!map.value?.getSource(PIN_SOURCE_ID) || !shops?.length) return;
-		const features = shops
-			.map((shop) => {
-				const lat = Number(shop.lat ?? shop.latitude);
-				const lng = Number(shop.lng ?? shop.longitude);
-				if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-				return {
-					type: "Feature",
-					geometry: { type: "Point", coordinates: [lng, lat] },
-					properties: {
-						id: shop.id,
-						name: shop.name,
-						pin_type: shop.is_giant_active ? "giant" : "normal",
-						verified: shop.is_verified || shop.verifiedActive,
-						glow: shop.is_glowing || shop.glowActive,
-						boost: shop.is_boost_active || shop.boostActive,
-						giant: shop.is_giant_active || shop.giantActive,
-						visibility_score: shop.visibility_score ?? shop.visibilityScore,
-						is_live: liveVenueRefs.value.has(String(shop.id)),
-						vibe_score: shop.visibility_score ?? shop.visibilityScore ?? 0,
-					},
-				};
-			})
-			.filter(Boolean);
+	const shops = Array.isArray(props.shops) ? props.shops : null;
+	const allowedIds =
+		shops === null
+			? null
+			: shops.length === 0
+				? new Set()
+				: new Set(shops.map((s) => String(s?.id ?? "")).filter(Boolean));
 
-		map.value.getSource(PIN_SOURCE_ID).setData({
-			type: "FeatureCollection",
-			features,
+	const isAllowedId = (id) => {
+		if (allowedIds === null) return true;
+		return allowedIds.has(String(id));
+	};
+
+	const toPinFeature = ({
+		id,
+		name,
+		lat,
+		lng,
+		pin_type,
+		verified,
+		glow,
+		boost,
+		giant,
+		visibility_score,
+		image,
+	}) => {
+		const latNum = Number(lat);
+		const lngNum = Number(lng);
+		if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) return null;
+
+		const idStr = String(id ?? "").trim();
+		if (!idStr) return null;
+
+		return {
+			type: "Feature",
+			geometry: { type: "Point", coordinates: [lngNum, latNum] },
+			properties: {
+				id: idStr,
+				name: name || "",
+				pin_type: pin_type || "normal",
+				verified: Boolean(verified),
+				glow: Boolean(glow),
+				boost: Boolean(boost),
+				giant: Boolean(giant),
+				visibility_score: Number(visibility_score ?? 0) || 0,
+				is_live: liveVenueRefs.value.has(idStr),
+				vibe_score: Number(visibility_score ?? 0) || 0,
+				image: image || null,
+			},
+		};
+	};
+
+	const pinFeatureFromShop = (shop) => {
+		if (!shop) return null;
+		return toPinFeature({
+			id: shop.id,
+			name: shop.name,
+			lat: shop.lat ?? shop.latitude,
+			lng: shop.lng ?? shop.longitude,
+			pin_type: shop.is_giant_active ? "giant" : "normal",
+			verified: shop.is_verified || shop.verifiedActive,
+			glow: shop.is_glowing || shop.glowActive,
+			boost: shop.is_boost_active || shop.boostActive,
+			giant: shop.is_giant_active || shop.giantActive,
+			visibility_score: shop.visibility_score ?? shop.visibilityScore,
+			image: shop.Image_URL1 || shop.coverImage || shop.image_urls?.[0],
 		});
+	};
+
+	const pinFeatureFromRpc = (p) => {
+		if (!p) return null;
+		return toPinFeature({
+			id: p.id,
+			name: p.name,
+			lat: p.lat,
+			lng: p.lng,
+			pin_type: p.pinType,
+			verified: p.verifiedActive,
+			glow: p.glowActive,
+			boost: p.boostActive,
+			giant: p.giantActive,
+			visibility_score: p.visibilityScore,
+			image: p.coverImage,
+		});
+	};
+
+	const ensureHighlightedShop = (features) => {
+		const highlightedId =
+			props.highlightedShopId != null ? String(props.highlightedShopId) : null;
+		if (!highlightedId) return features;
+		if (!shops?.length) return features;
+		if (allowedIds !== null && !allowedIds.has(highlightedId)) return features;
+
+		const shop = shops.find((s) => String(s?.id ?? "") === highlightedId);
+		const feature = pinFeatureFromShop(shop);
+		if (!feature) return features;
+
+		const next = [...features];
+		const idx = next.findIndex(
+			(f) => String(f?.properties?.id ?? "") === highlightedId,
+		);
+		if (idx >= 0) {
+			next[idx] = feature;
+		} else {
+			next.unshift(feature);
+		}
+		return next;
+	};
+
+	const buildFallbackFeaturesFromShopsInBounds = () => {
+		if (!shops?.length) return [];
+		const south = b.getSouth();
+		const west = b.getWest();
+		const north = b.getNorth();
+		const east = b.getEast();
+
+		const limit =
+			currentZoom < 13 ? 120 : currentZoom < 15 ? 320 : Math.min(1200, 2000);
+
+		const features = [];
+		for (const shop of shops) {
+			if (!isAllowedId(shop?.id)) continue;
+
+			const lat = Number(shop?.lat ?? shop?.latitude);
+			const lng = Number(shop?.lng ?? shop?.longitude);
+			if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+			if (lat < south || lat > north || lng < west || lng > east) continue;
+
+			const feature = pinFeatureFromShop(shop);
+			if (!feature) continue;
+			features.push(feature);
+			if (features.length >= limit) break;
+		}
+		return features;
+	};
+
+	const applyFeatures = (features) => {
+		if (seq !== pinsRefreshSeq) return;
+		if (!map.value) return;
+		const source = map.value.getSource(PIN_SOURCE_ID);
+		if (!source) return;
+		source.setData({ type: "FeatureCollection", features });
 		refreshSmartPulseTargets();
 	};
 
@@ -839,38 +947,24 @@ const refreshPins = async () => {
 			p_zoom: currentZoom,
 		});
 
-		const geojson = {
-			type: "FeatureCollection",
-			features: pins.map((p) => ({
-				type: "Feature",
-				geometry: { type: "Point", coordinates: [p.lng, p.lat] },
-				properties: {
-					id: p.id,
-					name: p.name,
-					pin_type: p.pinType,
-					verified: p.verifiedActive,
-					glow: p.glowActive,
-					boost: p.boostActive,
-					giant: p.giantActive,
-					visibility_score: p.visibilityScore,
-					is_live: liveVenueRefs.value.has(String(p.id)),
-					vibe_score: p.visibilityScore ?? 0,
-					image: p.coverImage,
-				},
-			})),
-		};
+		if (seq !== pinsRefreshSeq) return;
 
-		// Update Source (guard against unmounted component)
-		if (!map.value) return;
-		const source = map.value.getSource(PIN_SOURCE_ID);
-		if (source) {
-			source.setData(geojson);
-			refreshSmartPulseTargets();
+		const rpcFeatures = (pins || [])
+			.filter((p) => isAllowedId(p?.id))
+			.map(pinFeatureFromRpc)
+			.filter(Boolean);
+
+		let features = ensureHighlightedShop(rpcFeatures);
+		if (!features.length) {
+			features = ensureHighlightedShop(
+				buildFallbackFeaturesFromShopsInBounds(),
+			);
 		}
+		applyFeatures(features);
 	} catch (err) {
 		console.error("Failed to refresh map pins:", err);
-		// Fallback to local data if available
-		setPinsSourceFromShops(props.shops);
+		const fallback = buildFallbackFeaturesFromShopsInBounds();
+		applyFeatures(ensureHighlightedShop(fallback));
 	}
 };
 
@@ -1782,60 +1876,6 @@ const updateMapSources = () => {
 			},
 		});
 	}
-
-	// 2. Shops Source (Fallback) - Keep pins_source updated when props change
-	const pinsSource = map.value.getSource(PIN_SOURCE_ID);
-
-	const validShops =
-		props.shops?.filter((s) => {
-			const lat = s.lat ?? s.latitude;
-			const lng = s.lng ?? s.longitude;
-			return (
-				lat !== undefined &&
-				lng !== undefined &&
-				!Number.isNaN(Number(lat)) &&
-				!Number.isNaN(Number(lng))
-			);
-		}) || [];
-
-	const features = validShops.map((shop) => {
-		// ✅ FIX: Use normalized coordinates to handle both lat/lng and latitude/longitude
-		const lat = Number(shop.lat ?? shop.latitude);
-		const lng = Number(shop.lng ?? shop.longitude);
-
-		return {
-			type: "Feature",
-			geometry: {
-				type: "Point",
-				coordinates: [lng, lat], // Mapbox uses [lng, lat]
-			},
-			properties: {
-				id: shop.id,
-				name: shop.name,
-				category: shop.category,
-				status: shop.status,
-				pin_type: shop.is_giant_active ? "giant" : "normal",
-				boost: shop.is_boost_active || shop.boostActive || false,
-				verified: shop.is_verified || shop.verifiedActive || false,
-				glow: shop.is_glowing || shop.glowActive || false,
-				giant: shop.is_giant_active || shop.giantActive || false,
-				visibility_score: shop.visibility_score ?? shop.visibilityScore ?? 0,
-				vibe_score: shop.visibility_score ?? shop.visibilityScore ?? 0,
-				is_live: liveVenueRefs.value.has(String(shop.id)),
-				is_event: shop.category === "Event" || shop.type === "Event", // ✅ Added Event Pin logic
-				has_coin: !(shopStore.collectedCoins?.has?.(shop.id) ?? false),
-				is_glowing: shop.is_glowing || false,
-			},
-		};
-	});
-
-	if (pinsSource) {
-		pinsSource.setData({
-			type: "FeatureCollection",
-			features,
-		});
-		refreshSmartPulseTargets();
-	}
 };
 
 const COLLECT_DISTANCE_KM = 0.05; // 50 meters to collect
@@ -1851,8 +1891,9 @@ const checkCoinCollection = (shop) => {
 
 // ✅ Active Events (Timed Giant Pins)
 const activeEvents = computed(() => {
+	void nowTick.value;
 	if (!props.buildings || !Array.isArray(props.buildings)) return [];
-	const now = new Date();
+	const now = new Date(nowTick.value);
 	return props.buildings.filter((event) => {
 		if (!event.startTime || !event.endTime) return true; // Always show if no time limits
 		const start = new Date(event.startTime);
@@ -1861,30 +1902,16 @@ const activeEvents = computed(() => {
 	});
 });
 
-// ✅ Legacy: Day/Night computed property removed or kept for overlay background logic.
-// We kept `useTimeTheme` for map style. The gradient overlay for map can still use `currentHour`.
-const dayNightStyle = computed(() => {
-	const h = currentHour.value;
-	if (h >= 5 && h < 7)
+const mapOverlayStyle = computed(() => {
+	if (props.isDarkMode) {
 		return {
 			background:
-				"linear-gradient(to bottom, rgba(251,146,60,0.15), rgba(236,72,153,0.1))",
+				"linear-gradient(to bottom, rgba(30,58,138,0.32), rgba(15,23,42,0.42))",
 		};
-	if (h >= 7 && h < 17)
-		return {
-			background:
-				"linear-gradient(to bottom, rgba(255,255,255,0.05), transparent)",
-		};
-	if (h >= 17 && h < 19)
-		return {
-			background:
-				"linear-gradient(to bottom, rgba(168,85,247,0.15), rgba(251,146,60,0.1))",
-		};
+	}
 	return {
 		background:
-			h >= 19 || h < 5
-				? "linear-gradient(to bottom, rgba(30,58,138,0.35), rgba(15,23,42,0.45))" // Deeper night
-				: "linear-gradient(to bottom, rgba(30,58,138,0.25), rgba(15,23,42,0.3))",
+			"linear-gradient(to bottom, rgba(255,255,255,0.08), transparent)",
 	};
 });
 
@@ -1979,7 +2006,7 @@ onMounted(() => {
 	if (import.meta.env.DEV) {
 		console.log("🗺️ Initializing Mapbox Core...");
 	}
-	initMapOnce(props.isDarkMode ? DARK_STYLE : LIGHT_STYLE);
+	initMapOnce();
 });
 
 // ✅ Watch for Map Ready
@@ -2181,11 +2208,6 @@ const setupMapInteractions = () => {
 	safeBind("mouseenter", PIN_LAYER_ID, setPointer);
 	safeBind("mouseleave", PIN_LAYER_ID, resetPointer);
 
-	// Optional coin layer (only if exists)
-	safeBind("click", "unclustered-coins", handlePointClick);
-	safeBind("mouseenter", "unclustered-coins", setPointer);
-	safeBind("mouseleave", "unclustered-coins", resetPointer);
-
 	// Clusters
 	safeBind("click", CLUSTER_LAYER_ID, handleClusterClick);
 	safeBind("mouseenter", CLUSTER_LAYER_ID, setPointer);
@@ -2323,22 +2345,43 @@ const centerOnUser = () => {
 	}
 };
 
+const applyStyleIfNeeded = (isDarkMode) => {
+	if (!map.value) return;
+
+	const nextStyleUrl = styleUrlForTheme(Boolean(isDarkMode));
+	if (currentStyleUrl.value === nextStyleUrl) return;
+
+	currentStyleUrl.value = nextStyleUrl;
+	styleApplySeq += 1;
+	const seq = styleApplySeq;
+
+	try {
+		map.value.setStyle(nextStyleUrl);
+	} catch (e) {
+		console.error("Map style switch failed:", e);
+		return;
+	}
+
+	map.value.once("style.load", () => {
+		if (!map.value) return;
+		if (seq !== styleApplySeq) return;
+		setupMapLayers();
+		setupMapInteractions();
+		updateMapSources();
+		updateMarkers();
+		updateEventMarkers();
+		updateDistanceLine();
+		updateUserLocation();
+		refreshSmartPulseTargets();
+		scheduleMapRefresh();
+	});
+};
+
 // ✅ Watchers
 watch(
 	() => props.isDarkMode,
 	(newVal) => {
-		if (map.value) {
-			map.value.setStyle(newVal ? DARK_STYLE : LIGHT_STYLE);
-			map.value.once("style.load", () => {
-				setupMapLayers();
-				setupMapInteractions(); // ✅ Re-bind interactions after style change
-				updateMapSources();
-				updateMarkers();
-				updateEventMarkers();
-				updateDistanceLine();
-				updateUserLocation();
-			});
-		}
+		applyStyleIfNeeded(newVal);
 	},
 );
 
@@ -2388,10 +2431,12 @@ watch(
 				!oldShops?.some((s) => String(s.id) === highlightedId)
 			) {
 				updateMarkers();
+				scheduleMapRefresh();
 				return;
 			}
 		}
 		requestUpdateMarkers();
+		scheduleMapRefresh();
 	},
 	{ deep: true },
 );
@@ -2402,6 +2447,7 @@ watch(
 		await nextTick();
 		updateMarkers();
 		refreshSmartPulseTargets();
+		scheduleMapRefresh();
 		if (!newId) {
 			closeActivePopup();
 			return;
@@ -2454,11 +2500,10 @@ onMounted(async () => {
 	}
 
 	// ✅ FIX: initMap is called in the onMounted at line ~950.
-	// This block only sets up the hourly interval.
+	// This block only ticks time-driven computed state.
 
-	hourInterval = setInterval(() => {
-		currentHour.value = new Date().getHours();
-		updateEventMarkers();
+	nowTickInterval = setInterval(() => {
+		nowTick.value = Date.now();
 	}, 60000);
 });
 
@@ -2469,9 +2514,9 @@ onUnmounted(() => {
 		motionMediaQuery = null;
 	}
 
-	if (hourInterval) {
-		clearInterval(hourInterval);
-		hourInterval = null;
+	if (nowTickInterval) {
+		clearInterval(nowTickInterval);
+		nowTickInterval = null;
 	}
 
 	stopAtmosphereLoop();
@@ -2500,9 +2545,6 @@ onUnmounted(() => {
 		map.value.off("click", PIN_LAYER_ID, handlePointClick);
 		map.value.off("mouseenter", PIN_LAYER_ID, setPointer);
 		map.value.off("mouseleave", PIN_LAYER_ID, resetPointer);
-		map.value.off("click", "unclustered-coins", handlePointClick);
-		map.value.off("mouseenter", "unclustered-coins", setPointer);
-		map.value.off("mouseleave", "unclustered-coins", resetPointer);
 		map.value.off("click", CLUSTER_LAYER_ID, handleClusterClick);
 		map.value.off("mouseenter", CLUSTER_LAYER_ID, setPointer);
 		map.value.off("mouseleave", CLUSTER_LAYER_ID, resetPointer);
@@ -2645,8 +2687,13 @@ defineExpose({
     </div>
 
     <!-- ✅ Entertainment Atmosphere Effects (simplified) -->
+    <div
+      class="absolute inset-0 z-[1] pointer-events-none transition-colors duration-500"
+      :style="mapOverlayStyle"
+    ></div>
+
     <div class="absolute inset-0 z-[1] pointer-events-none overflow-hidden">
-      <!-- Fireflies only (removed day/night overlay for cleaner map) -->
+      <!-- Fireflies -->
       <div v-if="allowAmbientFx" class="firefly-container">
         <div
           v-for="ff in fireflies"
@@ -2790,12 +2837,6 @@ defineExpose({
 
 .vibe-popup button:active {
   transform: scale(0.95);
-}
-
-/* Mapbox Logo & Attribution Hiding */
-.mapboxgl-ctrl-logo,
-.mapboxgl-ctrl-attrib {
-  display: none !important;
 }
 
 /* Custom Marker Styles - GPU Optimized for 60fps */

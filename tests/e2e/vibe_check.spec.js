@@ -35,7 +35,7 @@ test.describe('VibeCity Core User Journey', () => {
     consoleGate.assertClean();
   });
 
-  test('Search and Open Shop Detail @map-quarantine', async ({ page }) => {
+  test('Search and Open Shop Detail @map-required', async ({ page }) => {
     const mapReady = await waitForMapReadyOrSkip(page, 25_000);
     if (!mapReady) {
       return;

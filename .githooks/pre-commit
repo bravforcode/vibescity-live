@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+echo "[pre-commit] Running gitleaks scan..."
+GITLEAKS_MODE=staged node scripts/ci/secret-scan-gitleaks.mjs
+
+echo "[pre-commit] Running Stripe-specific secret scan..."
+node scripts/ci/secret-scan.mjs

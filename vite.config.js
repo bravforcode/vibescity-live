@@ -1,11 +1,17 @@
 import { sentryVitePlugin } from "@sentry/vite-plugin";
 import vue from "@vitejs/plugin-vue";
+import path from "path";
 import { visualizer } from "rollup-plugin-visualizer";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 import Sitemap from "vite-plugin-sitemap";
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "src"),
+    },
+  },
   plugins: [
     vue(),
     visualizer({ open: true, filename: "dist/stats.html", gzipSize: true }),

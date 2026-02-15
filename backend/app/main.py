@@ -4,6 +4,7 @@ from app.core.config import get_settings, validate_settings
 from app.core.logging import setup_logging
 from app.core.observability import setup_observability
 from starlette.middleware.base import BaseHTTPMiddleware
+from contextlib import asynccontextmanager
 import logging
 import time
 import uuid
@@ -21,10 +22,20 @@ setup_logging(settings.ENV)
 request_logger = logging.getLogger("app.request")
 
 # ✅ Rate Limiting
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    await vibes.start_background_tasks()
+    try:
+        yield
+    finally:
+        await vibes.stop_background_tasks()
+
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json"
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    lifespan=lifespan,
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -32,9 +43,21 @@ app.add_middleware(SlowAPIMiddleware)
 
 # Set all CORS enabled origins
 if settings.BACKEND_CORS_ORIGINS:
+    allow_origin_regex = None
+    if settings.ENV.lower() != "production":
+        # Allow common LAN dev origins (e.g. phone testing via http://10.x.x.x:5173)
+        allow_origin_regex = (
+            r"^https?://("
+            r"localhost|127\.0\.0\.1|"
+            r"10\.\d{1,3}\.\d{1,3}\.\d{1,3}|"
+            r"192\.168\.\d{1,3}\.\d{1,3}|"
+            r"172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}"
+            r")(?::\d+)?$"
+        )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
+        allow_origin_regex=allow_origin_regex,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "Accept"],
@@ -82,15 +105,6 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(RequestIdMiddleware)
 
-
-@app.on_event("startup")
-async def _startup_background_tasks():
-    await vibes.start_background_tasks()
-
-
-@app.on_event("shutdown")
-async def _shutdown_background_tasks():
-    await vibes.stop_background_tasks()
 
 @app.get("/health")
 async def health_check():

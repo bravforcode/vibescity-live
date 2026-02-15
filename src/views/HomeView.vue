@@ -15,6 +15,7 @@ import SmartHeader from "../components/layout/SmartHeader.vue";
 import AppModals from "../components/system/AppModals.vue";
 import SidebarDrawer from "../components/ui/SidebarDrawer.vue"; // ✅ Sync Import to fix loading
 import { useAppLogic } from "../composables/useAppLogic";
+import { useLocalAds } from "../composables/useLocalAds";
 import { useFeatureFlagStore } from "../store/featureFlagStore";
 
 // ✅ Async Components (Preserved)
@@ -58,9 +59,16 @@ const DailyCheckin = defineAsyncComponent(
 const LuckyWheel = defineAsyncComponent(
 	() => import("../components/ui/LuckyWheel.vue"),
 );
+const LocalAdBanner = defineAsyncComponent(
+	() => import("../components/ads/LocalAdBanner.vue"),
+);
 
 const showMerchantModal = ref(false);
 const showAddShopModal = ref(false);
+
+// ✅ Geofenced Local Ads
+const { visibleAds, dismissAd } = useLocalAds();
+const currentAd = computed(() => visibleAds.value?.[0] ?? null);
 
 const FilterMenu = defineAsyncComponent(
 	() => import("../components/ui/FilterMenu.vue"),
@@ -619,6 +627,7 @@ const sanitizePartnerToken = (value) =>
 
 const setPartnerCookie = (token) => {
 	if (typeof document === "undefined") return;
+	// biome-ignore lint/suspicious/noDocumentCookie: partner referral token persistence
 	document.cookie = `vibe_partner_ref=${encodeURIComponent(token)}; Path=/; Max-Age=${60 * 60 * 24 * 30}; SameSite=Lax`;
 };
 
@@ -839,16 +848,16 @@ if (import.meta.env.DEV) {
       />
     </Transition>
 
+    <!-- ✅ Geofenced Local Ad Banner -->
+    <LocalAdBanner v-if="currentAd" :ad="currentAd" @dismiss="dismissAd" />
+
     <!-- ✅ Landscape Wrapper -->
     <div
       class="relative h-full w-full transition-[grid-template-columns,transform,opacity] duration-500"
       :class="isLandscape ? 'grid grid-cols-[60%_40%]' : ''"
     >
       <!-- Desktop Layout: Map (65%) + Panel (35%) -->
-      <div
-        v-if="!isMobileView"
-        class="grid grid-cols-[65%_35%] h-full"
-      >
+      <div v-if="!isMobileView" class="grid grid-cols-[65%_35%] h-full">
         <!-- Map Container -->
         <div data-testid="map-shell-wrapper" class="relative">
           <MapContainer
@@ -959,7 +968,7 @@ if (import.meta.env.DEV) {
           <MapContainer
             ref="mapRef"
             :shops="shops"
-            :active-shop-id="activeShopId"
+            :highlighted-shop-id="activeShopId"
             :is-dark-mode="isDarkMode"
             :ui-bottom-offset="0"
             @select-shop="handleMarkerClick"

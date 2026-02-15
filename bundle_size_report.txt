@@ -1,0 +1,7 @@
+Debugger listening on ws://127.0.0.1:51810/f38cf61d-ea7c-4d40-b915-fae2d6cbbc8e
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger attached.
+Bundle size summary (raw / gzip):
+- JS:  1.0 MB / 305.0 KB
+- CSS: 116.7 KB / 18.2 KB
+Waiting for the debugger to disconnect...

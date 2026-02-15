@@ -36,7 +36,14 @@ jobs:
       - name: Check for env placeholders
         run: node scripts/ci/check-env-placeholders.mjs
 
-      - name: Secret scan (Stripe)
+      - name: Install gitleaks
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/install.sh | sh -s -- -b /usr/local/bin v8.24.2
+
+      - name: Secret scan (gitleaks)
+        run: npm run ci:secret-scan:gitleaks
+
+      - name: Secret scan (Stripe patterns)
         run: npm run ci:secret-scan
 
       - name: Guard SQL runlist safety rules
@@ -148,7 +155,7 @@ jobs:
           retention-days: 30
 
   e2e-map-required:
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
     needs: [frontend, backend-tests, map-quarantine-sla, e2e-map-preflight]
     runs-on: ubuntu-latest
     steps:
@@ -191,7 +198,7 @@ jobs:
           retention-days: 30
 
   e2e-map-preflight:
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
     needs: [frontend, backend-tests, map-quarantine-sla]
     runs-on: ubuntu-latest
     steps:

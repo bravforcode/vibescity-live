@@ -44,7 +44,7 @@
           class="flex bg-black/40 rounded-xl p-1 border border-white/10 backdrop-blur-md"
         >
           <button
-            v-for="method in ['stripe', 'paypal', 'manual']"
+            v-for="method in paymentMethods"
             :key="method"
             @click="paymentMethod = method"
             :class="
@@ -375,6 +375,42 @@
                   placeholder="Phone"
                   class="input-dark"
                 />
+                <input
+                  v-model="buyerProfile.email"
+                  type="email"
+                  placeholder="Email"
+                  class="input-dark"
+                />
+                <input
+                  v-model="buyerProfile.address_line1"
+                  type="text"
+                  placeholder="Address Line 1"
+                  class="input-dark"
+                />
+                <input
+                  v-model="buyerProfile.country"
+                  type="text"
+                  placeholder="Country"
+                  class="input-dark"
+                />
+                <input
+                  v-model="buyerProfile.province"
+                  type="text"
+                  placeholder="Province"
+                  class="input-dark"
+                />
+                <input
+                  v-model="buyerProfile.district"
+                  type="text"
+                  placeholder="District"
+                  class="input-dark"
+                />
+                <input
+                  v-model="buyerProfile.postal_code"
+                  type="text"
+                  placeholder="Postal Code"
+                  class="input-dark"
+                />
               </div>
 
               <div class="relative">
@@ -427,6 +463,7 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { useCurrency } from "@/composables/useCurrency";
 import { useNotifications } from "@/composables/useNotifications";
 import { usePayPal } from "@/composables/usePayPal";
+import { featureFlags } from "@/config/featureFlags";
 import { supabase } from "../../lib/supabase";
 import { paymentService } from "../../services/paymentService";
 
@@ -445,6 +482,14 @@ const paypal = usePayPal();
 const loading = ref(false);
 const uploading = ref(false);
 const paymentMethod = ref("stripe"); // stripe, paypal, manual
+const isPayPalPinsEnabled = featureFlags.enablePayPalPins;
+const isManualPinsEnabled = featureFlags.enableManualPins;
+const paymentMethods = computed(() => {
+	const methods = ["stripe"];
+	if (isPayPalPinsEnabled) methods.push("paypal");
+	if (isManualPinsEnabled) methods.push("manual");
+	return methods;
+});
 const activeTier = ref("all");
 const selectedPkg = ref(null);
 const successMessage = ref(null);
@@ -629,6 +674,15 @@ const filteredPackages = computed(() => {
 	if (activeTier.value === "all") return packages;
 	return packages.filter((p) => p.tier === activeTier.value);
 });
+watch(
+	paymentMethods,
+	(methods) => {
+		if (!methods.includes(paymentMethod.value)) {
+			paymentMethod.value = "stripe";
+		}
+	},
+	{ immediate: true },
+);
 
 const getPrice = (pkg) => {
 	if (!pkg) return 0;
@@ -720,6 +774,10 @@ const handleBuy = (pkg) => {
 	const sku = getSku(pkg);
 
 	if (paymentMethod.value === "manual") {
+		if (!isManualPinsEnabled) {
+			notifyError("Manual transfer is temporarily unavailable.");
+			return;
+		}
 		showManualModal.value = true;
 		const amount = getPrice(pkg);
 		qrPayload.value = generatePayload(PROMPTPAY_ID, { amount });
@@ -768,6 +826,22 @@ const handleFileUpload = async (event) => {
 
 const confirmManualPayment = async () => {
 	if (!slipUrl.value) return notifyError("Please upload a slip");
+	const required = [
+		"full_name",
+		"phone",
+		"email",
+		"address_line1",
+		"country",
+		"province",
+		"district",
+		"postal_code",
+	];
+	for (const field of required) {
+		if (!String(buyerProfile[field] || "").trim()) {
+			return notifyError(`Missing required field: ${field}`);
+		}
+	}
+
 	uploading.value = true;
 	try {
 		await paymentService.createManualOrder({
@@ -776,7 +850,7 @@ const confirmManualPayment = async () => {
 			amount: getPrice(selectedPkg.value),
 			slip_url: slipUrl.value,
 			consent_personal_data: true,
-			buyer_profile: { ...buyerProfile, consent: true },
+			buyer_profile: { ...buyerProfile },
 		});
 		notifySuccess("Transfer submitted! Pending verification.");
 		showManualModal.value = false;

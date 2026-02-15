@@ -392,7 +392,7 @@ test.describe("VibeCity – Smoke Tests", { tag: "@smoke" }, () => {
   });
 
   // These tests are skipped in CI when WebGL is not available
-  test.describe("WebGL-dependent tests @map-quarantine", () => {
+  test.describe("WebGL-dependent tests @map-required", () => {
     test.beforeEach(async ({ page }) => {
       await page.goto("/", { waitUntil: "domcontentloaded" });
       await waitForAppLoad(page);

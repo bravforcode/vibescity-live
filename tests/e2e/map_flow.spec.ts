@@ -27,7 +27,7 @@ test.describe("Map User Flow", () => {
     consoleGate.assertClean();
   });
 
-  test("Map Load -> Click Shop -> Open Drawer @map-quarantine", async ({ page }) => {
+  test("Map Load -> Click Shop -> Open Drawer @map-required", async ({ page }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
 
     const mapReady = await waitForMapReadyOrSkip(page, 60_000);

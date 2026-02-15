@@ -1,0 +1,21 @@
+title = "VibeCity Secret Scanning Rules"
+
+[allowlist]
+description = "Allow placeholders and non-sensitive local artifacts"
+regexes = [
+  '''\$\{TESTSPRITE_API_KEY\}''',
+  '''\$\{SUPABASE_ACCESS_TOKEN\}''',
+  '''your-testsprite-api-key''',
+]
+paths = [
+  '''(^|/)reports/''',
+  '''(^|/)playwright-report''',
+  '''(^|/)test-results/''',
+  '''(^|/)node_modules/''',
+  '''(^|/)\.venv/''',
+  '''(^|/)venv/''',
+  '''(^|/)\.worktrees/''',
+  '''(^|/)\.git/''',
+  '''(^|/)dist/''',
+  '''(^|/)coverage/''',
+]

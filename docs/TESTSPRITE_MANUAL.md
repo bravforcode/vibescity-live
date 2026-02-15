@@ -38,7 +38,7 @@ npm -v
         "@testsprite/testsprite-mcp@latest"
       ],
       "env": {
-        "API_KEY": "sk-user-AhUK-RlfQPbWxzKt9a2O3Z5zv2XY6YzVGfpqxdIZQmhbH1KXFLiikWULV1wNsTA0vnMco7T8N8gc9_DHy04mu3puPDtEciRuCxqfLORXy5S2OF-2tCjBuYY1WRLYEI71BHE"
+        "API_KEY": "your-testsprite-api-key"
       }
     }
   }

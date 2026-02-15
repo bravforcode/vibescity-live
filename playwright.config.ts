@@ -37,6 +37,15 @@ const mapboxToken = sanitizeEnvToken(
   process.env.VITE_MAPBOX_TOKEN || readMapboxTokenFromDotEnv(),
 );
 
+if (
+  (process.env.E2E_MAP_REQUIRED === "1" || (process.env.PW_GREP || "").includes("@map-required")) &&
+  !mapboxToken
+) {
+  throw new Error(
+    "VITE_MAPBOX_TOKEN is required for @map-required Playwright runs.",
+  );
+}
+
 export default defineConfig({
   testDir: "./tests/e2e",
 

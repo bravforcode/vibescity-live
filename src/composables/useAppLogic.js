@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import i18n from "../i18n.js";
+import { setClientCookie } from "../lib/cookies";
 import { supabase } from "../lib/supabase";
 import { openRideApp as openRideAppService } from "../services/DeepLinkService";
 // ✅ Utils
@@ -35,7 +36,7 @@ import { useShopFilters } from "./useShopFilters";
 import { useUILogic } from "./useUILogic";
 
 export function useAppLogic() {
-	const { t } = useI18n();
+	const { t, locale } = useI18n();
 	const getLocaleValue = () => {
 		try {
 			const globalLocale = i18n?.global?.locale;
@@ -881,7 +882,9 @@ export function useAppLogic() {
 				const nextPath =
 					normalized === "/" ? `/${newLang}` : `/${newLang}${normalized}`;
 				window.history.replaceState({}, "", nextPath);
-				document.cookie = `vibe_locale=${newLang}; Path=/; Max-Age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+				setClientCookie("vibe_locale", newLang, {
+					maxAgeSeconds: 60 * 60 * 24 * 365,
+				});
 				localStorage.setItem("locale", newLang);
 				router.replace(nextPath).catch(() => {});
 			} catch {
