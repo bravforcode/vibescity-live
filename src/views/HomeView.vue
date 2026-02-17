@@ -3,6 +3,8 @@
 import {
 	computed,
 	defineAsyncComponent,
+	defineComponent,
+	h,
 	nextTick,
 	onMounted,
 	ref,
@@ -13,24 +15,52 @@ import { useRoute, useRouter } from "vue-router";
 import BottomFeed from "../components/feed/BottomFeed.vue";
 import SmartHeader from "../components/layout/SmartHeader.vue";
 import AppModals from "../components/system/AppModals.vue";
+import FilterMenuSync from "../components/ui/FilterMenu.vue";
 import SidebarDrawer from "../components/ui/SidebarDrawer.vue"; // ✅ Sync Import to fix loading
 import { useAppLogic } from "../composables/useAppLogic";
 import { useLocalAds } from "../composables/useLocalAds";
+import { getSiteOrigin } from "../lib/runtimeConfig";
+import { setClientCookie } from "../lib/cookies";
 import { useFeatureFlagStore } from "../store/featureFlagStore";
 
 // ✅ Async Components (Preserved)
 // E2E strict lane can flake if the map component chunk fails to load.
-// Use eager mode in strict map E2E to remove async chunk races while keeping
-// lazy loading for normal runtime.
+// Use eager mode + a loading shell in strict map E2E to remove async chunk races
+// (Playwright checks map-shell immediately after DOMContentLoaded).
 const IS_STRICT_MAP_E2E = import.meta.env.VITE_E2E_MAP_REQUIRED === "true";
-const MapContainer = IS_STRICT_MAP_E2E
-	? defineAsyncComponent(
-			() =>
-				import(
-					/* webpackMode: "eager" */ "../components/map/MapboxContainer.vue"
-				),
-		)
-	: defineAsyncComponent(() => import("../components/map/MapboxContainer.vue"));
+const MapE2ELoadingShell = defineComponent({
+	name: "MapE2ELoadingShell",
+	setup() {
+		return () =>
+			h(
+				"div",
+				{
+					"data-testid": "map-shell",
+					"data-map-ready": "false",
+					class: "relative w-full h-full z-0 bg-[#09090b]",
+				},
+				[
+					h("div", {
+						"data-testid": "map-canvas",
+						class: "w-full h-full absolute inset-0",
+					}),
+				],
+			);
+	},
+});
+const MapContainer = defineAsyncComponent(
+	IS_STRICT_MAP_E2E
+		? {
+				loader: () =>
+					import(
+						/* webpackMode: "eager" */ "../components/map/MapboxContainer.vue"
+					),
+				loadingComponent: MapE2ELoadingShell,
+				delay: 0,
+				suspensible: false,
+			}
+		: () => import("../components/map/MapboxContainer.vue"),
+);
 const VideoPanel = defineAsyncComponent(
 	() => import("../components/panel/VideoPanel.vue"),
 );
@@ -70,9 +100,9 @@ const showAddShopModal = ref(false);
 const { visibleAds, dismissAd } = useLocalAds();
 const currentAd = computed(() => visibleAds.value?.[0] ?? null);
 
-const FilterMenu = defineAsyncComponent(
-	() => import("../components/ui/FilterMenu.vue"),
-);
+const FilterMenu = IS_STRICT_MAP_E2E
+	? FilterMenuSync
+	: defineAsyncComponent(() => import("../components/ui/FilterMenu.vue"));
 const RelatedShopsDrawer = defineAsyncComponent(
 	() => import("../components/ui/RelatedShopsDrawer.vue"),
 );
@@ -88,7 +118,7 @@ const showRelatedDrawer = ref(false); // Stack View Logic
 const route = useRoute();
 const router = useRouter();
 const featureFlagStore = useFeatureFlagStore();
-const SITE_ORIGIN = "https://vibecity.live";
+const SITE_ORIGIN = getSiteOrigin({ allowDevWindowFallback: true });
 
 import { useHead } from "@unhead/vue";
 
@@ -132,6 +162,18 @@ const resolveCategoryParam = (value) => {
 	return slug || null;
 };
 
+const clampText = (value, maxLen) => {
+	const s = String(value || "")
+		.replace(/\s+/g, " ")
+		.trim();
+	if (!s) return "";
+	const limit = Number(maxLen || 0);
+	if (!Number.isFinite(limit) || limit <= 0) return s;
+	if (s.length <= limit) return s;
+	// Keep ASCII for meta fields.
+	return `${s.slice(0, Math.max(0, limit - 3)).trim()}...`;
+};
+
 // ✅ Initialize Logic
 const {
 	// Refs
@@ -172,7 +214,6 @@ const {
 	globalSearchResults,
 	legendHeight,
 	isLowPowerMode,
-	currentTime,
 	activeStatus,
 	isRefreshing,
 	isImmersive,
@@ -337,8 +378,7 @@ const resolveVenueUrl = (shopOrId) => {
 			? `/venue/${encodeURIComponent(id)}`
 			: "/";
 	const path = buildLocalePath(basePath, currentLocale.value);
-	if (typeof window === "undefined") return `${SITE_ORIGIN}${path}`;
-	return `${window.location.origin}${path}`;
+	return `${SITE_ORIGIN}${path}`;
 };
 
 const activeVenue = computed(() => {
@@ -380,9 +420,15 @@ const seoDescription = computed(() => {
 	if (!activeVenue.value) {
 		if (route.params.category) {
 			const category = String(route.params.category);
-			return `Explore ${category} venues in Chiang Mai with VibeCity.`;
+			return clampText(
+				`Explore ${category} venues in Chiang Mai with VibeCity.`,
+				155,
+			);
 		}
-		return "Discover the best nightlife, cafes, and events in Chiang Mai. Real-time vibes, exclusive deals, and local secrets.";
+		return clampText(
+			"Discover the best nightlife, cafes, and events in Chiang Mai. Real-time vibes, exclusive deals, and local secrets.",
+			155,
+		);
 	}
 
 	const venueName = activeVenue.value.name || "Venue";
@@ -390,14 +436,13 @@ const seoDescription = computed(() => {
 	const venueDescription =
 		activeVenue.value.description ||
 		"Plan your next vibe with live local insights.";
-	return `${venueName} (${venueCategory}) on VibeCity. ${venueDescription}`;
+	return clampText(
+		`${venueName} (${venueCategory}) on VibeCity. ${venueDescription}`,
+		155,
+	);
 });
 
-const seoCanonicalUrl = computed(() =>
-	typeof window === "undefined"
-		? `${SITE_ORIGIN}${canonicalPath.value}`
-		: `${window.location.origin}${canonicalPath.value}`,
-);
+const seoCanonicalUrl = computed(() => `${SITE_ORIGIN}${canonicalPath.value}`);
 
 const seoOgImageUrl = computed(() => {
 	const slug =
@@ -572,21 +617,51 @@ const hreflangLinks = computed(() => {
 	];
 });
 
+const isVenueIdRoute = computed(
+	() => route.name === "Venue" || route.name === "VenueLocale",
+);
+
+const isVenueRoute = computed(
+	() =>
+		route.name === "Venue" ||
+		route.name === "VenueLocale" ||
+		route.name === "VenueSlug" ||
+		route.name === "VenueSlugLocale",
+);
+
+const robotsContent = computed(() =>
+	isVenueIdRoute.value ? "noindex,follow" : "index,follow",
+);
+
+const ogLocale = computed(() =>
+	currentLocale.value === "en" ? "en_US" : "th_TH",
+);
+
+const ogLocaleAlternate = computed(() =>
+	currentLocale.value === "en" ? "th_TH" : "en_US",
+);
+
+const ogType = computed(() => (isVenueRoute.value ? "place" : "website"));
+
 useHead(() => ({
 	title: seoTitle.value,
+	htmlAttrs: { lang: currentLocale.value },
 	link: [
 		{ rel: "canonical", href: seoCanonicalUrl.value },
 		...hreflangLinks.value,
 	],
 	meta: [
 		{ name: "description", content: seoDescription.value },
+		{ name: "robots", content: robotsContent.value },
 		{ name: "theme-color", content: "#030305" },
 
 		{ property: "og:title", content: seoTitle.value },
 		{ property: "og:description", content: seoDescription.value },
 		{ property: "og:url", content: seoCanonicalUrl.value },
-		{ property: "og:type", content: "website" },
+		{ property: "og:type", content: ogType.value },
 		{ property: "og:site_name", content: "VibeCity" },
+		{ property: "og:locale", content: ogLocale.value },
+		{ property: "og:locale:alternate", content: ogLocaleAlternate.value },
 		{ property: "og:image", content: seoOgImageUrl.value },
 
 		{ name: "twitter:card", content: "summary_large_image" },
@@ -626,9 +701,9 @@ const sanitizePartnerToken = (value) =>
 		.slice(0, 64);
 
 const setPartnerCookie = (token) => {
-	if (typeof document === "undefined") return;
-	// biome-ignore lint/suspicious/noDocumentCookie: partner referral token persistence
-	document.cookie = `vibe_partner_ref=${encodeURIComponent(token)}; Path=/; Max-Age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+	setClientCookie("vibe_partner_ref", token, {
+		maxAgeSeconds: 60 * 60 * 24 * 30,
+	});
 };
 
 const persistPartnerRef = (refValue) => {
@@ -866,7 +941,6 @@ if (import.meta.env.DEV) {
             :uiBottomOffset="mapUiBottomOffset"
             :shops="filteredShops"
             :userLocation="userLocation"
-            :currentTime="currentTime"
             :highlightedShopId="activeShopId"
             :is-low-power-mode="isLowPowerMode"
             :priority-shop-ids="carouselShopIds"
@@ -888,7 +962,7 @@ if (import.meta.env.DEV) {
           <!-- Navigation Legend (Desktop) -->
           <div
             v-if="!isMobileView"
-            class="absolute top-4 right-4 z-[2000] flex flex-col gap-2"
+            class="absolute top-[88px] right-4 z-[2000] flex flex-col gap-2"
           >
             <div
               class="bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl p-3 shadow-2xl"
@@ -1000,7 +1074,7 @@ if (import.meta.env.DEV) {
       </div>
 
       <!-- Portrait Mobile Layout -->
-      <template v-else-if="!isLandscape">
+      <template v-else-if="isMobileView">
         <!-- Full Map (Hidden in Immersive Mode) -->
         <div
           data-testid="map-shell-wrapper"
@@ -1013,7 +1087,6 @@ if (import.meta.env.DEV) {
             :uiBottomOffset="mapUiBottomOffset"
             :shops="filteredShops"
             :userLocation="userLocation"
-            :currentTime="null"
             :highlightedShopId="activeShopId"
             :is-low-power-mode="false"
             :isDarkMode="isDarkMode"
