@@ -38,31 +38,44 @@ def _write_summary(lines: list[str]) -> None:
 
 
 def main() -> int:
-    supabase_url = _require("SUPABASE_URL").rstrip("/")
-    anon_key = _require("SUPABASE_ANON_KEY")
-    admin_email = _require("PROD_ADMIN_EMAIL")
-    admin_password = _require("PROD_ADMIN_PASSWORD")
     api_base = os.getenv("VIBECITY_API_BASE_URL", "https://vibecity-api.fly.dev").rstrip("/")
     min_expected_venues = int(os.getenv("MIN_EXPECTED_VENUES", "1000"))
+    fallback_token = os.getenv("PROD_ADMIN_BEARER_TOKEN", "").strip()
 
-    auth_url = f"{supabase_url}/auth/v1/token?grant_type=password"
-    auth_headers = {
-        "apikey": anon_key,
-        "Authorization": f"Bearer {anon_key}",
-        "Content-Type": "application/json",
-    }
-    auth_payload = {"email": admin_email, "password": admin_password}
+    supabase_url = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
+    anon_key = os.getenv("SUPABASE_ANON_KEY", "").strip()
+    admin_email = os.getenv("PROD_ADMIN_EMAIL", "").strip()
+    admin_password = os.getenv("PROD_ADMIN_PASSWORD", "").strip()
 
-    auth_resp = requests.post(auth_url, headers=auth_headers, json=auth_payload, timeout=30)
-    if auth_resp.status_code != 200:
+    token = ""
+    if supabase_url and anon_key and admin_email and admin_password:
+        auth_url = f"{supabase_url}/auth/v1/token?grant_type=password"
+        auth_headers = {
+            "apikey": anon_key,
+            "Authorization": f"Bearer {anon_key}",
+            "Content-Type": "application/json",
+        }
+        auth_payload = {"email": admin_email, "password": admin_password}
+
+        auth_resp = requests.post(auth_url, headers=auth_headers, json=auth_payload, timeout=30)
+        if auth_resp.status_code != 200:
+            raise RuntimeError(
+                f"Token mint failed ({auth_resp.status_code}): {auth_resp.text[:500]}"
+            )
+        auth_json = auth_resp.json()
+        token = (auth_json.get("access_token") or "").strip()
+        if not token:
+            raise RuntimeError("Token mint returned no access_token")
+        print("auth_mode=fresh_token")
+    elif fallback_token:
+        token = fallback_token
+        print("auth_mode=fallback_secret_token")
+    else:
         raise RuntimeError(
-            f"Token mint failed ({auth_resp.status_code}): {auth_resp.text[:500]}"
+            "Missing auth inputs. Provide either "
+            "(SUPABASE_URL + SUPABASE_ANON_KEY + PROD_ADMIN_EMAIL + PROD_ADMIN_PASSWORD) "
+            "or PROD_ADMIN_BEARER_TOKEN."
         )
-
-    auth_json = auth_resp.json()
-    token = (auth_json.get("access_token") or "").strip()
-    if not token:
-        raise RuntimeError("Token mint returned no access_token")
 
     stats_url = f"{api_base}/api/v1/analytics/dashboard/stats"
     stats_resp = requests.get(
@@ -82,13 +95,13 @@ def main() -> int:
     total_osm_venues = int(stats.get("total_osm_venues") or 0)
     latest_osm_sync = stats.get("latest_osm_sync")
     project_ref = stats.get("supabase_project_ref")
-    expected_ref = _project_ref_from_supabase_url(supabase_url)
+    expected_ref = _project_ref_from_supabase_url(supabase_url) if supabase_url else ""
 
     if total_venues < min_expected_venues:
         raise RuntimeError(
             f"total_venues too low ({total_venues} < {min_expected_venues})"
         )
-    if project_ref and project_ref != expected_ref:
+    if expected_ref and project_ref and project_ref != expected_ref:
         raise RuntimeError(
             f"Project mismatch: stats={project_ref}, expected={expected_ref}"
         )
