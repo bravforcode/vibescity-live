@@ -9,6 +9,21 @@ from app.core.supabase import supabase
 
 router = APIRouter()
 
+
+def _count_estimated(table: str, columns: tuple[str, ...] = ("id", "*")) -> int:
+    last_exc: Exception | None = None
+    for column in columns:
+        try:
+            result = supabase.table(table).select(column, count="estimated").execute().count
+            return int(result or 0)
+        except Exception as exc:  # pragma: no cover - fallback path
+            last_exc = exc
+
+    if last_exc:
+        raise last_exc
+    return 0
+
+
 class AnalyticsEvent(BaseModel):
     event_type: str
     data: dict[str, Any] = Field(default_factory=dict)
@@ -41,8 +56,8 @@ async def get_dashboard_stats(user: dict = Depends(verify_admin)):
     """
     try:
         # Use 'estimated' or 'planned' count for speed
-        count_users = supabase.table("user_profiles").select("id", count="estimated").execute().count
-        count_venues = supabase.table("venues").select("id", count="estimated").execute().count
+        count_users = _count_estimated("user_profiles", ("id", "user_id", "*"))
+        count_venues = _count_estimated("venues")
         count_osm_venues = (
             supabase.table("venues")
             .select("id", count="estimated")
@@ -50,7 +65,7 @@ async def get_dashboard_stats(user: dict = Depends(verify_admin)):
             .execute()
             .count
         )
-        count_reviews = supabase.table("reviews").select("id", count="estimated").execute().count
+        count_reviews = _count_estimated("reviews")
         latest_osm_sync_rows = (
             supabase.table("venues")
             .select("last_osm_sync")
