@@ -1,0 +1,153 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: #0a0015;
+  overflow: hidden;
+}
+
+#map { width: 100vw; height: 100vh; }
+
+/* ── Control Panel ── */
+#controls {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  width: 272px;
+  max-height: calc(100vh - 20px);
+  overflow-y: auto;
+  background: rgba(10, 0, 21, 0.92);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 12px;
+  padding: 16px;
+  color: #e2e8f0;
+  backdrop-filter: blur(12px);
+  z-index: 10;
+  font-size: 13px;
+}
+
+.controls-header h2 {
+  font-size: 18px;
+  margin-bottom: 4px;
+  background: linear-gradient(90deg, #a855f7, #ec4899);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.controls-header p {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-bottom: 10px;
+}
+
+.controls-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.btn {
+  background: rgba(168, 85, 247, 0.18);
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  color: #e2e8f0;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s;
+}
+.btn:hover { background: rgba(168, 85, 247, 0.35); }
+.btn.active {
+  background: rgba(168, 85, 247, 0.45);
+  border-color: #a855f7;
+}
+
+select.btn {
+  appearance: auto;
+  padding-right: 6px;
+}
+
+.effect-group { margin-bottom: 10px; }
+.effect-group h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #a855f7;
+  letter-spacing: 0.8px;
+  margin-bottom: 6px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid rgba(168, 85, 247, 0.15);
+}
+
+.effect-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  cursor: pointer;
+  user-select: none;
+}
+.effect-toggle input[type="checkbox"] {
+  accent-color: #a855f7;
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+.effect-toggle .heavy { color: #facc15; font-size: 11px; }
+
+/* ── Pulsing Dot Markers ── */
+.vibe-pulse-marker {
+  width: 14px;
+  height: 14px;
+  background: #ec4899;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.8);
+  box-shadow: 0 0 10px #ec4899, 0 0 20px rgba(236, 72, 153, 0.4);
+  animation: vibe-pulse 2s ease-in-out infinite;
+}
+
+@keyframes vibe-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.4); opacity: 0.7; }
+}
+
+/* ── Video Billboard Markers ── */
+.vibe-billboard {
+  width: 120px;
+  height: 72px;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 0 18px rgba(168, 85, 247, 0.5);
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  background: linear-gradient(135deg, #7c3aed, #ec4899);
+}
+.vibe-billboard video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.billboard-text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-weight: 700;
+  font-size: 13px;
+  color: #fff;
+  text-shadow: 0 0 8px #a855f7;
+  letter-spacing: 2px;
+}
+
+/* ── Scrollbar ── */
+#controls::-webkit-scrollbar { width: 4px; }
+#controls::-webkit-scrollbar-track { background: transparent; }
+#controls::-webkit-scrollbar-thumb {
+  background: rgba(168, 85, 247, 0.35);
+  border-radius: 4px;
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .vibe-pulse-marker { animation: none; }
+}

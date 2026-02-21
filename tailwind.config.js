@@ -9,7 +9,24 @@ export default {
   ],
   theme: {
     extend: {
-      // Project specific overrides if any (Preset handles core system)
+      // Runtime typography tokens (Entertainment map theme)
+      fontFamily: {
+        sans: ["var(--font-body)", "Prompt", "Sarabun", "system-ui", "sans-serif"],
+        display: [
+          "var(--font-display)",
+          "Chakra Petch",
+          "Prompt",
+          "Sarabun",
+          "sans-serif",
+        ],
+        mono: [
+          "var(--font-mono)",
+          "JetBrains Mono",
+          "Fira Code",
+          "IBM Plex Mono",
+          "monospace",
+        ],
+      },
     },
   },
   plugins: [],

@@ -4,6 +4,7 @@
  * Feature #32: Referral System UI
  */
 import { computed, ref } from "vue";
+import { openExternal } from "../../utils/browserUtils";
 
 const props = defineProps({
 	isDarkMode: {
@@ -69,7 +70,7 @@ const shareToApp = (app) => {
 		whatsapp: `https://wa.me/?text=${text}%20${url}`,
 	};
 
-	window.open(urls[app], "_blank", "width=600,height=400");
+	openExternal(urls[app], "width=600,height=400");
 	emit("share", app);
 };
 </script>

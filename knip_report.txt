@@ -1,0 +1,93 @@
+Debugger listening on ws://127.0.0.1:52237/4c6ffc6e-416d-4470-aea4-d9ccf9c5a92c
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger attached.
+
+> vibescity-live@0.0.0 knip
+> knip -c knip.json --no-progress
+
+Debugger listening on ws://127.0.0.1:51618/310d7a59-0de8-4bb3-81b6-d56f08e43967
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger attached.
+[sentry-vite-plugin] Info: Using environment variables configured in ".env.sentry-build-plugin".
+[93m[4mUnused files[24m[39m (35)
+src/composables/useAnalytics.js                            src/composables/useAnalytics.js                          
+src/composables/useFeedV2.js                               src/composables/useFeedV2.js                             
+src/composables/useLocation.js                             src/composables/useLocation.js                           
+src/composables/useSearchV2.js                             src/composables/useSearchV2.js                           
+src/composables/useStripe.js                               src/composables/useStripe.js                             
+src/composables/useVirtualList.js                          src/composables/useVirtualList.js                        
+src/i18n/index.js                                          src/i18n/index.js                                        
+src/schemas/index.js                                       src/schemas/index.js                                     
+src/services/geoService.js                                 src/services/geoService.js                               
+src/services/placesService.js                              src/services/placesService.js                            
+src/services/realTimeDataService.js                        src/services/realTimeDataService.js                      
+src/services/redemptionService.js                          src/services/redemptionService.js                        
+src/services/sheetsService.js                              src/services/sheetsService.js                            
+src/store/index.js                                         src/store/index.js                                       
+src/utils/osmRoads.js                                      src/utils/osmRoads.js                                    
+src/components/dashboard/SubscriptionManager.vue           src/components/dashboard/SubscriptionManager.vue         
+src/components/layout/SideBar.vue                          src/components/layout/SideBar.vue                        
+src/components/system/RuntimeStatusPanel.vue               src/components/system/RuntimeStatusPanel.vue             
+src/components/ugc/EditShopModal.vue                       src/components/ugc/EditShopModal.vue                     
+src/components/ui/BottomNav.vue                            src/components/ui/BottomNav.vue                          
+src/components/ui/CouponModal.vue                          src/components/ui/CouponModal.vue                        
+src/components/ui/HeartPop.vue                             src/components/ui/HeartPop.vue                           
+src/components/ui/Leaderboard.vue                          src/components/ui/Leaderboard.vue                        
+src/components/ui/LottieCoin.vue                           src/components/ui/LottieCoin.vue                         
+src/components/ui/OnboardingTour.vue                       src/components/ui/OnboardingTour.vue                     
+src/components/ui/PhotoGallery.vue                         src/components/ui/PhotoGallery.vue                       
+src/components/ui/ReferralShare.vue                        src/components/ui/ReferralShare.vue                      
+src/components/ui/SplashScreen.vue                         src/components/ui/SplashScreen.vue                       
+src/components/ui/TiltCard.vue                             src/components/ui/TiltCard.vue                           
+src/composables/map/useMapHotspots.js                      src/composables/map/useMapHotspots.js                    
+src/composables/map/useMapNavigation.js                    src/composables/map/useMapNavigation.js                  
+src/components/design-system/compositions/BottomSheet.vue  src/components/design-system/compositions/BottomSheet.vue
+src/components/design-system/compositions/PlaceCard.vue    src/components/design-system/compositions/PlaceCard.vue  
+src/components/design-system/primitives/ActionBtn.vue      src/components/design-system/primitives/ActionBtn.vue    
+src/components/design-system/primitives/GlassCard.vue      src/components/design-system/primitives/GlassCard.vue    
+[93m[4mUnused dependencies[24m[39m (11)
+@mapbox/mapbox-gl-geocoder  package.json:51:6
+@turf/helpers               package.json:57:6
+@turf/line-offset           package.json:58:6
+@vercel/speed-insights      package.json:59:6
+@vueuse/core                package.json:60:6
+aos                         package.json:62:6
+axios                       package.json:63:6
+csv-parser                  package.json:65:6
+dayjs                       package.json:66:6
+papaparse                   package.json:71:6
+zod                         package.json:81:6
+[93m[4mUnused devDependencies[24m[39m (2)
+@vue/compiler-sfc  package.json:95:6
+@vue/test-utils    package.json:96:6
+[93m[4mUnused exports[24m[39m (21)
+HapticPlugin                     src/directives/vHaptic.js:67:14        
+isValidCategoryId                src/constants/filterCategories.js:81:14
+checkAppInstalled                src/services/DeepLinkService.js:14:14  
+default                          src/composables/useHaptics.js:87:16    
+default                          src/composables/useDragScroll.js:212:16
+getEventsByProvince    function  src/services/eventService.js:479:23    
+getTodaysEvents        function  src/services/eventService.js:486:23    
+getThisWeeksEvents     function  src/services/eventService.js:503:23    
+formatEventForDisplay  function  src/services/eventService.js:519:17    
+EVENT_CATEGORIES                 src/services/eventService.js:540:10    
+RECURRING_EVENTS                 src/services/eventService.js:540:28    
+requireClientEnv                 src/lib/runtimeConfig.js:32:14         
+getApiBaseUrl                    src/lib/runtimeConfig.js:62:14         
+CHIANG_MAI_HOSPITALS             src/services/emergencyService.js:33:14 
+CHIANG_MAI_POLICE                src/services/emergencyService.js:72:14 
+getShops                         src/services/shopService.js:73:14      
+getLiveEverywhere                src/services/shopService.js:95:14      
+getBuildings                     src/services/shopService.js:113:14     
+getReviews                       src/services/shopService.js:138:14     
+postReview                       src/services/shopService.js:171:14     
+getFeedCards                     src/services/shopService.js:196:14     
+[93m[4mDuplicate exports[24m[39m (2)
+useHaptics|default     src/composables/useHaptics.js   
+useDragScroll|default  src/composables/useDragScroll.js
+[33m[4mConfiguration hints[24m (3)[39m
+. (root)              knip.json  Add entry and/or refine project files (35 unused files)
+src/main.js           knip.json  Remove redundant entry pattern                         
+.storybook/main.js    knip.json  Remove redundant entry pattern                         
+Waiting for the debugger to disconnect...
+Waiting for the debugger to disconnect...

@@ -1,0 +1,46 @@
+{
+  "pptx": {
+    "tools": [
+      { "type": "code_execution_20250825", "name": "code_execution" }
+    ],
+    "container": {
+      "type": "auto",
+      "skills": [
+        { "type": "anthropic", "id": "pptx", "version": "latest" }
+      ]
+    }
+  },
+  "xlsx": {
+    "tools": [
+      { "type": "code_execution_20250825", "name": "code_execution" }
+    ],
+    "container": {
+      "type": "auto",
+      "skills": [
+        { "type": "anthropic", "id": "xlsx", "version": "latest" }
+      ]
+    }
+  },
+  "docx": {
+    "tools": [
+      { "type": "code_execution_20250825", "name": "code_execution" }
+    ],
+    "container": {
+      "type": "auto",
+      "skills": [
+        { "type": "anthropic", "id": "docx", "version": "latest" }
+      ]
+    }
+  },
+  "pdf": {
+    "tools": [
+      { "type": "code_execution_20250825", "name": "code_execution" }
+    ],
+    "container": {
+      "type": "auto",
+      "skills": [
+        { "type": "anthropic", "id": "pdf", "version": "latest" }
+      ]
+    }
+  }
+}

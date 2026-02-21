@@ -1,3 +1,39 @@
 {
-  "rewrites": [{ "source": "/api/(.*)", "destination": "/api/index.py" }]
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index.py" },
+    { "source": "/", "destination": "/api/v1/seo/redirect/root" },
+    {
+      "source": "/r/:code([A-Za-z2-7]{7})",
+      "destination": "/api/v1/seo/redirect/venue/:code"
+    },
+    {
+      "source": "/v/:code([A-Z2-7]{7})",
+      "destination": "/api/v1/seo/redirect/venue/:code"
+    },
+    {
+      "source": "/v/:slug",
+      "destination": "/api/v1/seo/redirect/public?path=/v/:slug"
+    },
+    {
+      "source": "/venue/:id",
+      "destination": "/api/v1/seo/redirect/public?path=/venue/:id"
+    },
+    {
+      "source": "/c/:category",
+      "destination": "/api/v1/seo/redirect/public?path=/c/:category"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/api/v1/seo/redirect/public?path=/privacy"
+    },
+    {
+      "source": "/terms",
+      "destination": "/api/v1/seo/redirect/public?path=/terms"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "https://nluuvnttweesnkrmgzsm.supabase.co/functions/v1/seo-sitemap"
+    },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }

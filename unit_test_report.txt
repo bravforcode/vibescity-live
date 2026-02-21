@@ -1,0 +1,30 @@
+Debugger listening on ws://127.0.0.1:58676/54fda7a5-804f-4e30-bf5f-6b94597fe95d
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger attached.
+
+> vibescity-live@0.0.0 test:unit
+> vitest
+
+Debugger listening on ws://127.0.0.1:54363/13d3f46e-8031-42b4-9e75-7b2773776daa
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger attached.
+
+[1m[44m DEV [49m[22m [34mv4.0.18 [39m[90mC:/vibecity.live[39m
+
+Debugger listening on ws://127.0.0.1:54365/b571cc43-5e44-45f2-a2c6-1d9fb592b588
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger attached.
+ [32mΓ£ô[39m tests/unit/shopUtils.spec.js [2m([22m[2m25 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+Waiting for the debugger to disconnect...
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m25 passed[39m[22m[90m (25)[39m
+[2m   Start at [22m 01:15:24
+[2m   Duration [22m 4.17s[2m (transform 1.95s, setup 0ms, import 2.02s, tests 10ms, environment 898ms)[22m
+
+[1m[42m PASS [49m[22m [32mWaiting for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m
+[31mCancelling test run. Press CTRL+c again to exit forcefully.
+[39m
+Waiting for the debugger to disconnect...
+Waiting for the debugger to disconnect...

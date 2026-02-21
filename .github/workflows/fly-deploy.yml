@@ -1,0 +1,84 @@
+name: Fly Deploy
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fly-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy-fly:
+    if: >-
+      ${{
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main'
+      }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy to Fly
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl deploy --remote-only -a vibecity-api -c fly.toml
+
+  postdeploy-healthcheck:
+    if: >-
+      ${{
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main'
+      }}
+    needs: [deploy-fly]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Post-deploy healthcheck
+        env:
+          POSTDEPLOY_API_BASE_URL: "https://vibecity-api.fly.dev"
+          POSTDEPLOY_EDGE_BASE_URL: "${{ vars.POSTDEPLOY_EDGE_BASE_URL || 'https://nluuvnttweesnkrmgzsm.supabase.co/functions/v1' }}"
+          POSTDEPLOY_SUPABASE_JWT: "${{ secrets.POSTDEPLOY_SUPABASE_JWT }}"
+          POSTDEPLOY_CHECKOUT_VENUE_ID: "${{ vars.POSTDEPLOY_CHECKOUT_VENUE_ID || secrets.POSTDEPLOY_CHECKOUT_VENUE_ID }}"
+          POSTDEPLOY_ORDER_ID: "${{ vars.POSTDEPLOY_ORDER_ID || secrets.POSTDEPLOY_ORDER_ID }}"
+          POSTDEPLOY_MAX_RETRIES: "8"
+          POSTDEPLOY_RETRY_DELAY_MS: "5000"
+          POSTDEPLOY_FETCH_TIMEOUT_MS: "10000"
+        run: npm run healthcheck:postdeploy
+
+      - name: Postdeploy summary
+        if: ${{ always() }}
+        run: |
+          {
+            echo "## Fly Postdeploy Healthcheck"
+            echo "- Job status: ${{ job.status }}"
+            echo "- API base: https://vibecity-api.fly.dev"
+            echo "- Read-only mode: disabled (deploy gate)"
+            echo "- Edge base: ${{ vars.POSTDEPLOY_EDGE_BASE_URL || 'https://nluuvnttweesnkrmgzsm.supabase.co/functions/v1' }}"
+          } >> "$GITHUB_STEP_SUMMARY"

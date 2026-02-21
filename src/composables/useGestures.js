@@ -33,12 +33,12 @@ export function useEdgeSwipe(onOpenDrawer) {
 	};
 
 	onMounted(() => {
-		window.addEventListener("touchstart", onTouchStart, { passive: true });
-		window.addEventListener("touchend", onTouchEnd, { passive: true });
+		globalThis.addEventListener("touchstart", onTouchStart, { passive: true });
+		globalThis.addEventListener("touchend", onTouchEnd, { passive: true });
 	});
 
 	onUnmounted(() => {
-		window.removeEventListener("touchstart", onTouchStart);
-		window.removeEventListener("touchend", onTouchEnd);
+		globalThis.removeEventListener("touchstart", onTouchStart);
+		globalThis.removeEventListener("touchend", onTouchEnd);
 	});
 }

@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Blue VibeCity Pin">
+  <defs>
+    <linearGradient id="blueGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3b82f6"></stop>
+      <stop offset="100%" stop-color="#2563eb"></stop>
+    </linearGradient>
+    <filter id="dropShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
+      <feOffset dx="0" dy="4" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.3"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <path d="
+    M 64 24
+    C 46 24, 32 38, 32 56
+    C 32 70, 41 82, 53 88
+    L 100 228
+    C 103 236, 110 242, 120 242
+    C 130 242, 137 236, 140 228
+    L 187 88
+    C 199 82, 208 70, 208 56
+    C 208 38, 194 24, 176 24
+    C 163 24, 152 32, 146 43
+    L 120 92
+    L 94 43
+    C 88 32, 77 24, 64 24
+    Z
+    M 64 56
+    C 71 56, 77 62, 77 69
+    C 77 76, 71 82, 64 82
+    C 57 82, 51 76, 51 69
+    C 51 62, 57 56, 64 56
+    Z
+  " fill="url(#blueGrad)" filter="url(#dropShadow)" stroke="white" stroke-width="4"></path>
+
+</svg>

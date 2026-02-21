@@ -1,0 +1,99 @@
+Debugger listening on ws://127.0.0.1:53312/f111fcdc-3d23-44b6-99c2-af8c65c2a573
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger attached.
+
+> vibescity-live@0.0.0 lint
+> biome lint src
+
+Debugger listening on ws://127.0.0.1:57352/c96b3bbc-e080-4873-9b94-6f2286c5cb94
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger attached.
+src\components\layout\SmartHeader.vue:146:10 lint/style/useTemplate  FIXABLE  ΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöü
+
+  i Template literals are preferred over string concatenation.
+  
+    144 Γöé 		return coins.toString();
+    145 Γöé 	} else if (coins < 1000000) {
+  > 146 Γöé 		return (coins / 1000).toFixed(1).replace(/\.0$/, "") + "K";
+        Γöé 		       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    147 Γöé 	} else {
+    148 Γöé 		return (coins / 1000000).toFixed(1).replace(/\.0$/, "") + "M";
+  
+  i Unsafe fix: Use a template literal.
+  
+    118 118 Γöé   		return coins.toString();
+    119 119 Γöé   	} else if (coins < 1000000) {
+    120     Γöé - ΓåÆ ΓåÆ return┬╖(coins┬╖/┬╖1000).toFixed(1).replace(/\.0$/,┬╖"")┬╖+┬╖"K";
+        120 Γöé + ΓåÆ ΓåÆ return┬╖`${(coins┬╖/┬╖1000).toFixed(1).replace(/\.0$/,┬╖"")}K`;
+    121 121 Γöé   	} else {
+    122 122 Γöé   		return (coins / 1000000).toFixed(1).replace(/\.0$/, "") + "M";
+  
+
+src\components\layout\SmartHeader.vue:148:10 lint/style/useTemplate  FIXABLE  ΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöü
+
+  i Template literals are preferred over string concatenation.
+  
+    146 Γöé 		return (coins / 1000).toFixed(1).replace(/\.0$/, "") + "K";
+    147 Γöé 	} else {
+  > 148 Γöé 		return (coins / 1000000).toFixed(1).replace(/\.0$/, "") + "M";
+        Γöé 		       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    149 Γöé 	}
+    150 Γöé });
+  
+  i Unsafe fix: Use a template literal.
+  
+    120 120 Γöé   		return (coins / 1000).toFixed(1).replace(/\.0$/, "") + "K";
+    121 121 Γöé   	} else {
+    122     Γöé - ΓåÆ ΓåÆ return┬╖(coins┬╖/┬╖1000000).toFixed(1).replace(/\.0$/,┬╖"")┬╖+┬╖"M";
+        122 Γöé + ΓåÆ ΓåÆ return┬╖`${(coins┬╖/┬╖1000000).toFixed(1).replace(/\.0$/,┬╖"")}M`;
+    123 123 Γöé   	}
+    124 124 Γöé   });
+  
+
+src\composables\useAppLogic.js:884:5 lint/suspicious/noDocumentCookie ΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöü
+
+  ! Direct assigning to document.cookie is not recommended.
+  
+    882 Γöé 					normalized === "/" ? `/${newLang}` : `/${newLang}${normalized}`;
+    883 Γöé 				window.history.replaceState({}, "", nextPath);
+  > 884 Γöé 				document.cookie = `vibe_locale=${newLang}; Path=/; Max-Age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+        Γöé 				^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    885 Γöé 				localStorage.setItem("locale", newLang);
+    886 Γöé 				router.replace(nextPath).catch(() => {});
+  
+  i Consider using the Cookie Store API.
+  
+
+src\router\index.js:161:2 lint/suspicious/noDocumentCookie ΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöü
+
+  ! Direct assigning to document.cookie is not recommended.
+  
+    159 Γöé const setLocaleCookie = (locale) => {
+    160 Γöé 	if (typeof document === "undefined") return;
+  > 161 Γöé 	document.cookie = `${LOCALE_COOKIE}=${locale}; Path=/; Max-Age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+        Γöé 	^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    162 Γöé };
+    163 Γöé 
+  
+  i Consider using the Cookie Store API.
+  
+
+src\views\HomeView.vue:622:2 lint/suspicious/noDocumentCookie ΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöü
+
+  ! Direct assigning to document.cookie is not recommended.
+  
+    620 Γöé const setPartnerCookie = (token) => {
+    621 Γöé 	if (typeof document === "undefined") return;
+  > 622 Γöé 	document.cookie = `vibe_partner_ref=${encodeURIComponent(token)}; Path=/; Max-Age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+        Γöé 	^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    623 Γöé };
+    624 Γöé 
+  
+  i Consider using the Cookie Store API.
+  
+
+Checked 166 files in 406ms. No fixes applied.
+Found 3 warnings.
+Found 2 infos.
+Waiting for the debugger to disconnect...
+Waiting for the debugger to disconnect...

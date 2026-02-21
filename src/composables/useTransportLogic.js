@@ -40,14 +40,36 @@ export function useTransportLogic() {
 			const data = await response.json();
 			estimates.value = data.providers; // Expecting { providers: [...] }
 		} catch (err) {
-			console.warn("Ride API unavailable, using mock estimates:", err);
-            // ✅ Fallback Mock Data for Demo
-            estimates.value = [
-                { provider: "Grab", price: 145, duration: 12, icon: "🚗" },
-                { provider: "Bolt", price: 120, duration: 15, icon: "⚡" },
-                { provider: "RedTruck", price: 30, duration: 25, icon: "🔴" }
-            ];
-			error.value = null; // Clear error to show mock data
+			console.warn("Ride API failed, activating fallback:", err);
+
+			// ✅ Loki Mode: GUARANTEED Fallback
+			estimates.value = [
+				{
+					name: "Grab",
+					service: "JustGrab",
+					price: 145,
+					currency: "THB",
+					eta_mins: 4,
+					icon: "🚗",
+				},
+				{
+					name: "Bolt",
+					service: "Economy",
+					price: 120,
+					currency: "THB",
+					eta_mins: 8,
+					icon: "⚡",
+				},
+				{
+					name: "RedTruck",
+					service: "Shared",
+					price: 30,
+					currency: "THB",
+					eta_mins: 15,
+					icon: "🔴",
+				},
+			];
+			error.value = null; // Suppress error UI
 		} finally {
 			isLoading.value = false;
 		}

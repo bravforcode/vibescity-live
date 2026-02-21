@@ -11,6 +11,11 @@ export function useTimeTheme() {
 	const currentHour = ref(new Date().getHours());
 	const intervalId = ref(null);
 
+	// Source-of-truth: Night Neon default (custom style), day falls back to Mapbox light.
+	// Keep as constants to avoid accidental string drift across the app.
+	const NIGHT_STYLE = "mapbox://styles/phirrr/cml87cidg005101s9229k6083";
+	const DAY_STYLE = "mapbox://styles/mapbox/light-v11";
+
 	const updateTime = () => {
 		currentHour.value = new Date().getHours();
 	};
@@ -30,11 +35,7 @@ export function useTimeTheme() {
 	});
 
 	const mapStyle = computed(() => {
-		// Mapbox Style URIs (Replace with your actual style URLs)
-		// Using standard Mapbox styles as placeholders if custom ones aren't defined
-		return isNightMode.value
-			? "mapbox://styles/mapbox/dark-v11" // Night: Dark/Neon
-			: "mapbox://styles/mapbox/light-v11"; // Day: Standard
+		return isNightMode.value ? NIGHT_STYLE : DAY_STYLE;
 	});
 
 	return {

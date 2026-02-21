@@ -58,8 +58,15 @@ const handleBack = () => {
 	emit("toggle-immersive");
 };
 
+const normalizeId = (value) => {
+	if (value === null || value === undefined) return "";
+	return String(value).trim();
+};
+
 const isFavorited = (shopId) => {
-	return props.favorites.includes(Number(shopId));
+	const id = normalizeId(shopId);
+	if (!id) return false;
+	return (props.favorites || []).some((fav) => normalizeId(fav) === id);
 };
 
 const handleFavorite = (shopId) => {
@@ -97,7 +104,16 @@ const getDistance = (shop) => {
 </script>
 
 <template>
-  <div class="fixed inset-0 z-[6000] bg-black w-full h-full overflow-hidden">
+  <div
+    class="fixed inset-0 z-[6000] bg-black w-full h-full overflow-hidden"
+    role="dialog"
+    aria-modal="true"
+    :aria-label="
+      activeShop?.name
+        ? `Immersive view: ${activeShop.name}`
+        : 'Immersive feed view'
+    "
+  >
     <!-- 1. Background Media (Full Screen) -->
     <div class="absolute inset-0">
       <!-- Transition for smooth background switching -->
@@ -109,6 +125,8 @@ const getDistance = (shop) => {
               'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1000&auto=format&fit=crop'
             "
             class="w-full h-full object-cover"
+            alt=""
+            aria-hidden="true"
           />
           <div
             class="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/90"
@@ -129,6 +147,7 @@ const getDistance = (shop) => {
     <!-- 3. Back Button (Custom for Immersive) -->
     <button
       @click="handleBack"
+      aria-label="Exit immersive mode"
       class="fixed top-4 left-4 z-[7000] w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center text-white active:scale-90 transition-transform shadow-lg"
     >
       <ArrowLeft class="w-5 h-5" />
@@ -142,10 +161,11 @@ const getDistance = (shop) => {
       <div class="flex flex-col items-center gap-1">
         <button
           @click.stop="handleFavorite(activeShop?.id)"
-          class="w-12 h-12 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center active:scale-95 transition-all"
+          aria-label="Like this venue"
+          class="w-12 h-12 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center active:scale-95 transition-transform transition-colors"
         >
           <Heart
-            class="w-6 h-6 transition-all duration-300"
+            class="w-6 h-6 transition-[transform,color,fill] duration-300"
             :class="
               isFavorited(activeShop?.id)
                 ? 'fill-red-500 text-red-500 scale-110'
@@ -163,7 +183,8 @@ const getDistance = (shop) => {
       <div class="flex flex-col items-center gap-1">
         <button
           @click.stop="handleShare(activeShop)"
-          class="w-12 h-12 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center active:scale-95 transition-all"
+          aria-label="Share this venue"
+          class="w-12 h-12 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center active:scale-95 transition-transform transition-colors"
         >
           <Share2 class="w-6 h-6 text-white" />
         </button>
@@ -176,7 +197,8 @@ const getDistance = (shop) => {
       <!-- Profile/More -->
       <div class="flex flex-col items-center gap-1">
         <button
-          class="w-12 h-12 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center active:scale-95 transition-all"
+          aria-label="Open venue profile"
+          class="w-12 h-12 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center active:scale-95 transition-transform transition-colors"
         >
           <User class="w-6 h-6 text-white" />
         </button>
@@ -214,5 +236,12 @@ const getDistance = (shop) => {
 .fade-slow-enter-from,
 .fade-slow-leave-to {
   opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-slow-enter-active,
+  .fade-slow-leave-active {
+    transition-duration: 0.01ms !important;
+  }
 }
 </style>

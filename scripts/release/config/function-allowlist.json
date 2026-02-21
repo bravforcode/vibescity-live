@@ -1,0 +1,15 @@
+{
+  "functions": [
+    { "name": "webhook-handler", "verify_jwt": false },
+    { "name": "stripe-webhook", "verify_jwt": false },
+    { "name": "create-checkout-session", "verify_jwt": false },
+    { "name": "create-manual-order", "verify_jwt": false },
+    { "name": "analytics-ingest", "verify_jwt": false },
+    { "name": "easyslip-healthcheck", "verify_jwt": false },
+    { "name": "admin-slip-dashboard", "verify_jwt": true },
+    { "name": "admin-slip-export", "verify_jwt": true },
+    { "name": "coin-action", "verify_jwt": true },
+    { "name": "get-order-status", "verify_jwt": true },
+    { "name": "manage-subscription", "verify_jwt": true }
+  ]
+}

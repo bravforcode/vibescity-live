@@ -2,3 +2,54 @@ project_id = "vibe-city-live"
 
 [functions.webhook-handler]
 verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.create-checkout-session]
+verify_jwt = false
+
+[functions.create-manual-order]
+verify_jwt = false
+
+[functions.analytics-ingest]
+verify_jwt = false
+
+[functions.pii-audit-ingest]
+verify_jwt = false
+
+[functions.easyslip-healthcheck]
+verify_jwt = false # Deprecated: EasySlip no longer used
+
+[functions.admin-slip-dashboard]
+verify_jwt = true
+
+[functions.admin-slip-export]
+verify_jwt = true
+
+[functions.admin-analytics-dashboard]
+verify_jwt = true
+
+[functions.admin-analytics-export]
+verify_jwt = true
+
+[functions.admin-pii-audit-dashboard]
+verify_jwt = true
+
+[functions.admin-pii-audit-export]
+verify_jwt = true
+
+[functions.admin-pii-audit-access-export]
+verify_jwt = true
+
+[functions.seo-sitemap]
+verify_jwt = false
+
+[functions.coin-action]
+verify_jwt = true
+
+[functions.get-order-status]
+verify_jwt = true
+
+[functions.manage-subscription]
+verify_jwt = true

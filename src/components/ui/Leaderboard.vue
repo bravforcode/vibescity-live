@@ -7,77 +7,77 @@ import { onMounted, ref } from "vue";
 import { supabase } from "../../lib/supabase";
 
 const props = defineProps({
-  isDarkMode: {
-    type: Boolean,
-    default: true,
-  },
-  currentUser: {
-    type: Object,
-    default: () => ({ name: "You", coins: 0, rank: 99 }),
-  },
+	isDarkMode: {
+		type: Boolean,
+		default: true,
+	},
+	currentUser: {
+		type: Object,
+		default: () => ({ name: "You", coins: 0, rank: 99 }),
+	},
 });
 
 const leaders = ref([]);
 const loading = ref(true);
 
 const fetchLeaderboard = async () => {
-  try {
-    loading.value = true;
-    // Query the view created in v6 script
-    const { data, error } = await supabase
-      .from("leaderboard_view")
-      .select("*")
-      .limit(10); // Check top 10
+	try {
+		loading.value = true;
+		// Query the view created in v6 script
+		const { data, error } = await supabase
+			.from("leaderboard_view")
+			.select("*")
+			.limit(10); // Check top 10
 
-    if (error) throw error;
+		if (error) throw error;
 
-    // Map to UI format
-    leaders.value = data.map((user, index) => ({
-      rank: index + 1,
-      name: user.email
-        ? user.email.split("@")[0]
-        : `User ${user.id.slice(0, 4)}`, // Mask email
-      coins: user.xp, // We display XP as "Coins" or just XP
-      avatar: getAvatarForRank(index + 1),
-      id: user.id,
-    }));
-  } catch (e) {
-    console.error("Error fetching leaderboard:", e);
-    // Fallback to mock if empty or error (for demo)
-    if (leaders.value.length === 0) {
-      leaders.value = [
-        { rank: 1, name: "NightOwl_CM", coins: 2450, avatar: "🦉" },
-        { rank: 2, name: "PartyKing", coins: 2120, avatar: "👑" },
-        { rank: 3, name: "VibeHunter", coins: 1890, avatar: "🎯" },
-      ];
-    }
-  } finally {
-    loading.value = false;
-  }
+		// Map to UI format
+		leaders.value = data.map((user, index) => ({
+			rank: index + 1,
+			name: user.email
+				? user.email.split("@")[0]
+				: `User ${user.id.slice(0, 4)}`, // Mask email
+			coins: user.xp, // We display XP as "Coins" or just XP
+			avatar: getAvatarForRank(index + 1),
+			id: user.id,
+		}));
+	} catch (e) {
+		console.error("Error fetching leaderboard:", e);
+		// Fallback to mock if empty or error (for demo)
+		if (leaders.value.length === 0) {
+			leaders.value = [
+				{ rank: 1, name: "NightOwl_CM", coins: 2450, avatar: "🦉" },
+				{ rank: 2, name: "PartyKing", coins: 2120, avatar: "👑" },
+				{ rank: 3, name: "VibeHunter", coins: 1890, avatar: "🎯" },
+			];
+		}
+	} finally {
+		loading.value = false;
+	}
 };
 
 const getAvatarForRank = (rank) => {
-  // Fun avatars based on rank
-  const avatars = ["🦉", "👑", "🎯", "🏔️", "🎧", "🌙", "🍻", "💃", "🌃", "✨"];
-  return avatars[rank - 1] || "👤";
+	// Fun avatars based on rank
+	const avatars = ["🦉", "👑", "🎯", "🏔️", "🎧", "🌙", "🍻", "💃", "🌃", "✨"];
+	return avatars[rank - 1] || "👤";
 };
 
 onMounted(() => {
-  fetchLeaderboard();
+	fetchLeaderboard();
 });
 
 const getRankColor = (rank) => {
-  if (rank === 1) return "from-yellow-400 to-amber-500";
-  if (rank === 2) return "from-gray-300 to-gray-400";
-  if (rank === 3) return "from-amber-600 to-amber-700";
-  return "";
+	if (rank === 1) return "from-yellow-400 to-amber-500";
+	if (rank === 2) return "from-gray-300 to-gray-400";
+	if (rank === 3) return "from-amber-600 to-amber-700";
+	return "";
 };
 
 const getRankIcon = (rank) => {
-  if (rank === 1) return "🥇";
-  if (rank === 2) return "🥈";
-  if (rank === 3) return "🥉";
-  return rank;
+	if (rank === 1) return "🥇";
+	if (rank === 2) return "🥈";
+	if (rank === 3) return "🥉";
+	return rank;
 };
 </script>
 

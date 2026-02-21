@@ -4,6 +4,9 @@ import websockets
 import json
 import sys
 
+# Prevent pytest from collecting this file (manual smoke test script).
+__test__ = False
+
 # ✅ Windows Console Fix for Emojis
 if sys.platform == "win32":
     try:

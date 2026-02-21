@@ -1,1 +1,43 @@
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="500" zoomAndPan="magnify" viewBox="0 0 375 374.999991" height="500" preserveAspectRatio="xMidYMid meet" version="1.0"><defs><clipPath id="4da63ab886"><path d="M 75.484375 16.484375 L 299.734375 16.484375 L 299.734375 358.484375 L 75.484375 358.484375 Z M 75.484375 16.484375 " clip-rule="nonzero"/></clipPath></defs><g clip-path="url(#4da63ab886)"><path fill="#545454" d="M 187.5 16.484375 C 125.667969 16.484375 75.546875 66.605469 75.546875 128.4375 C 75.546875 209.609375 187.5 358.507812 187.5 358.507812 C 187.5 358.507812 299.453125 209.609375 299.453125 128.4375 C 299.453125 66.605469 249.328125 16.484375 187.5 16.484375 " fill-opacity="1" fill-rule="nonzero"/></g><path fill="#ffffff" d="M 255.09375 128.4375 C 255.09375 165.769531 224.828125 196.03125 187.5 196.03125 C 150.167969 196.03125 119.902344 165.769531 119.902344 128.4375 C 119.902344 91.105469 150.167969 60.84375 187.5 60.84375 C 224.828125 60.84375 255.09375 91.105469 255.09375 128.4375 " fill-opacity="1" fill-rule="nonzero"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Gray VibeCity Pin">
+  <defs>
+    <linearGradient id="grayGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#9CA3AF"></stop>
+      <stop offset="100%" stop-color="#4B5563"></stop>
+    </linearGradient>
+    <filter id="dropShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
+      <feOffset dx="0" dy="4" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.3"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <path d="
+    M 64 24
+    C 46 24, 32 38, 32 56
+    C 32 70, 41 82, 53 88
+    L 100 228
+    C 103 236, 110 242, 120 242
+    C 130 242, 137 236, 140 228
+    L 187 88
+    C 199 82, 208 70, 208 56
+    C 208 38, 194 24, 176 24
+    C 163 24, 152 32, 146 43
+    L 120 92
+    L 94 43
+    C 88 32, 77 24, 64 24
+    Z
+    M 64 56
+    C 71 56, 77 62, 77 69
+    C 77 76, 71 82, 64 82
+    C 57 82, 51 76, 51 69
+    C 51 62, 57 56, 64 56
+    Z
+  " fill="url(#grayGrad)" filter="url(#dropShadow)" stroke="white" stroke-width="4"></path>
+
+</svg>

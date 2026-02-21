@@ -9,7 +9,12 @@ import { supabase } from "../lib/supabase";
  * @param {number} radius - Radius in meters (default 5000)
  * @param {Array} categories - Optional filter categories
  */
-export async function getNearbyShops(lat, lng, radius = 5000, _categories = []) {
+export async function getNearbyShops(
+	lat,
+	lng,
+	radius = 5000,
+	_categories = [],
+) {
 	try {
 		// Use v6 'search_venues' RPC
 		const { data, error } = await supabase.rpc("search_venues", {

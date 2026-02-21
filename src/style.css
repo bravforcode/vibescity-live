@@ -3,8 +3,8 @@
 	line-height: 1.5;
 	font-weight: 400;
 
-    /* Base Theme handled by Tailwind Preset */
-    /* --bg-void: #030305; REMOVED */
+	/* Base Theme handled by Tailwind Preset */
+	/* --bg-void: #030305; REMOVED */
 
 	color-scheme: dark; /* Force Dark Mode Default */
 	color: rgba(255, 255, 255, 0.87);
