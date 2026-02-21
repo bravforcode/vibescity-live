@@ -2,9 +2,13 @@ name: VibeCity OSM Sync
 
 on:
   schedule:
-    # Run every 30 minutes
-    - cron: '*/30 * * * *'
+    # Run every 10 minutes
+    - cron: '*/10 * * * *'
   workflow_dispatch: # Allow manual trigger
+
+concurrency:
+  group: osm-sync
+  cancel-in-progress: false
 
 jobs:
   sync:
@@ -33,3 +37,13 @@ jobs:
         # Run loop=5 to do a batch of work and then stop (freeing up the runner)
         # The script is incremental, so next run picks up where it left off.
         run: python backend/scripts/osm_sync_ultimate.py --loop=5
+
+      - name: Verify ingestion stats with fresh admin token
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          PROD_ADMIN_EMAIL: ${{ secrets.PROD_ADMIN_EMAIL }}
+          PROD_ADMIN_PASSWORD: ${{ secrets.PROD_ADMIN_PASSWORD }}
+          VIBECITY_API_BASE_URL: https://vibecity-api.fly.dev
+          MIN_EXPECTED_VENUES: 1000
+        run: python scripts/ci/verify_osm_dashboard_stats.py
