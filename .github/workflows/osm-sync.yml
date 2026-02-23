@@ -2,8 +2,8 @@ name: VibeCity OSM Sync
 
 on:
   schedule:
-    # Run every 10 minutes
-    - cron: '*/10 * * * *'
+    # Run every 15 minutes — enterprise sync cadence
+    - cron: '*/15 * * * *'
   workflow_dispatch: # Allow manual trigger
 
 permissions:
@@ -36,13 +36,14 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           REDIS_URL: ${{ secrets.REDIS_URL }}
+          ALLOW_FAKE_REDIS: "false"
           WORKERS: 6
           TILE_Z: 9
-        # Run loop=5 to do a batch of work and then stop (freeing up the runner)
+        # Run loop=8 to compensate for 15-min interval (more tiles per run)
         # The script is incremental, so next run picks up where it left off.
         run: |
           set -euo pipefail
-          python backend/scripts/osm_sync_ultimate.py --loop=5 | tee osm_sync.log
+          python backend/scripts/osm_sync_ultimate.py --loop=8 | tee osm_sync.log
 
       - name: Contract Validation
         env:
@@ -50,6 +51,19 @@ jobs:
         run: |
           set -euo pipefail
           python scripts/ci/validate_osm_contract.py | tee osm_contract_validation.log
+
+      - name: Verify OSM Ingestion (Workflow DB vs Production API)
+        continue-on-error: true   # ⚠️ soft-fail: don't block the sync run
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PROD_ANALYTICS_STATS_URL: ${{ vars.PROD_ANALYTICS_STATS_URL || 'https://vibecity-api.fly.dev/api/v1/analytics/dashboard/stats' }}
+          PROD_ADMIN_BEARER_TOKEN: ${{ secrets.PROD_ADMIN_BEARER_TOKEN || '' }}
+          COUNT_DRIFT_TOLERANCE: "500"
+          MIN_EXPECTED_OSM_VENUES: "100"
+        run: |
+          set -euo pipefail
+          python scripts/ci/verify_osm_ingestion.py | tee osm_ingestion_verification.log
 
       - name: Append workflow summary
         if: always()
@@ -80,5 +94,15 @@ jobs:
               echo '```'
             else
               echo "- Validation log not found."
+            fi
+
+            echo ""
+            echo "### Ingestion Verification"
+            if [ -f osm_ingestion_verification.log ]; then
+              echo '```json'
+              tail -n 1 osm_ingestion_verification.log
+              echo '```'
+            else
+              echo "- Ingestion verification log not found."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
