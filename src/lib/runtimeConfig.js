@@ -2,6 +2,8 @@ const LOCALHOST_PATTERN = /(localhost|127\.0\.0\.1)/i;
 const PLACEHOLDER_PATTERN = /<[^>]+>/; // Detects <api-app>, <your-key>, etc.
 const IS_E2E = import.meta.env?.VITE_E2E === "true";
 const WS_REQUIRED = import.meta.env?.VITE_WS_REQUIRED === "true";
+const WS_DEV_AUTOCONNECT = import.meta.env?.VITE_WS_DEV_AUTOCONNECT !== "false";
+const WS_CONFIG_DEBUG = import.meta.env?.VITE_WS_CONFIG_DEBUG === "true";
 const IS_LOCAL_HOST =
 	typeof window !== "undefined" &&
 	LOCALHOST_PATTERN.test(window.location.hostname);
@@ -48,6 +50,31 @@ const validateUrl = (value, name) => {
 		};
 	}
 	return { valid: true };
+};
+
+export const getSiteOrigin = (options = {}) => {
+	const { allowDevWindowFallback = false } = options;
+	const explicit =
+		sanitize(import.meta.env?.VITE_SITE_ORIGIN) ||
+		sanitize(import.meta.env?.SITE_ORIGIN);
+
+	if (explicit) {
+		const check = validateUrl(explicit, "VITE_SITE_ORIGIN");
+		if (!check.valid) {
+			throw new Error(check.reason);
+		}
+		return trimTrailingSlash(explicit);
+	}
+
+	if (
+		allowDevWindowFallback &&
+		import.meta.env.DEV &&
+		typeof window !== "undefined"
+	) {
+		return trimTrailingSlash(window.location.origin);
+	}
+
+	return "https://vibecity.live";
 };
 
 export const requireClientEnv = (name, options = {}) => {
@@ -135,6 +162,9 @@ export const getSupabaseEdgeBaseUrl = () => {
  * Returns empty string if invalid/missing (app continues without realtime)
  */
 export const getWebSocketUrl = () => {
+	// E2E strict lane should not attempt realtime connections.
+	if (IS_E2E) return "";
+
 	const ws = sanitize(import.meta.env.VITE_WS_URL);
 
 	// Empty check
@@ -142,9 +172,18 @@ export const getWebSocketUrl = () => {
 		if (WS_REQUIRED) {
 			throw new Error("VITE_WS_URL is required when VITE_WS_REQUIRED=true");
 		}
-		if (import.meta.env.DEV) {
+		if (import.meta.env.DEV && WS_CONFIG_DEBUG) {
 			console.warn("⚠️ VITE_WS_URL not set - realtime features disabled");
 		}
+		return "";
+	}
+
+	// In local dev, only auto-connect WS when explicitly enabled.
+	if (
+		import.meta.env.DEV &&
+		LOCALHOST_PATTERN.test(ws) &&
+		!WS_DEV_AUTOCONNECT
+	) {
 		return "";
 	}
 
@@ -153,9 +192,10 @@ export const getWebSocketUrl = () => {
 		if (WS_REQUIRED) {
 			throw new Error(`VITE_WS_URL contains placeholder value: ${ws}`);
 		}
-		console.warn(
-			`⚠️ VITE_WS_URL contains placeholder: ${ws} - realtime disabled`,
-		);
+		if (WS_CONFIG_DEBUG)
+			console.warn(
+				`⚠️ VITE_WS_URL contains placeholder: ${ws} - realtime disabled`,
+			);
 		return "";
 	}
 
@@ -164,9 +204,10 @@ export const getWebSocketUrl = () => {
 		if (WS_REQUIRED) {
 			throw new Error(`VITE_WS_URL has invalid protocol: ${ws}`);
 		}
-		console.warn(
-			`⚠️ VITE_WS_URL has invalid protocol: ${ws} - realtime disabled`,
-		);
+		if (WS_CONFIG_DEBUG)
+			console.warn(
+				`⚠️ VITE_WS_URL has invalid protocol: ${ws} - realtime disabled`,
+			);
 		return "";
 	}
 
@@ -180,9 +221,10 @@ export const getWebSocketUrl = () => {
 		if (WS_REQUIRED) {
 			throw new Error("VITE_WS_URL points to localhost in production");
 		}
-		console.warn(
-			"⚠️ VITE_WS_URL points to localhost in production - realtime disabled",
-		);
+		if (WS_CONFIG_DEBUG)
+			console.warn(
+				"⚠️ VITE_WS_URL points to localhost in production - realtime disabled",
+			);
 		return "";
 	}
 
