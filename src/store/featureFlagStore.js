@@ -41,8 +41,11 @@ export const useFeatureFlagStore = defineStore("feature-flags", () => {
 			}
 			flags.value = next;
 			loadedAt.value = Date.now();
-		} catch {
+		} catch (e) {
 			// Fail-open with defaults to protect app startup.
+			if (import.meta.env.DEV) {
+				console.warn("⚠️ feature_flags_public fetch failed (using defaults):", e?.message || e);
+			}
 			flags.value = { ...DEFAULT_FLAGS };
 		} finally {
 			isLoading.value = false;

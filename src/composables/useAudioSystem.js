@@ -3,9 +3,11 @@ import { onUnmounted, ref } from "vue";
 export function useAudioSystem() {
 	const isMuted = ref(true); // Default muted (browser policy)
 	const currentZone = ref("default");
+	const currentWeather = ref(null);
 	const audioContext = ref(null);
 	const activeSource = ref(null);
 	const gainNode = ref(null);
+	const started = ref(false);
 
 	// Map Zones to Audio Files
 	// TODO: Replace with real assets or CDN links
@@ -23,6 +25,7 @@ export function useAudioSystem() {
 		if (audioContext.value) return;
 		const AudioContext =
 			globalThis.AudioContext || globalThis.webkitAudioContext;
+		if (!AudioContext) return;
 		audioContext.value = new AudioContext();
 		gainNode.value = audioContext.value.createGain();
 		gainNode.value.connect(audioContext.value.destination);
@@ -99,12 +102,64 @@ export function useAudioSystem() {
 		}
 	};
 
+	/** Stop all audio playback and reset state */
+	const stop = () => {
+		if (activeSource.value) {
+			try {
+				activeSource.value.stop();
+				activeSource.value.disconnect();
+			} catch {
+				// Ignore errors during stop
+			}
+			activeSource.value = null;
+		}
+	};
+
+	/** Set weather condition for ambient audio adjustments */
+	const setWeather = (condition) => {
+		currentWeather.value = condition;
+		// Weather-based audio adjustments could go here in the future
+		// For now this is a no-op stub to prevent runtime errors
+	};
+
+	/** Set audio volume (0.0 - 1.0) */
+	const setVolume = (vol) => {
+		if (!gainNode.value || !audioContext.value) return;
+		const clamped = Math.max(0, Math.min(1, vol));
+		try {
+			gainNode.value.gain.setTargetAtTime(
+				isMuted.value ? 0 : clamped,
+				audioContext.value.currentTime,
+				0.1,
+			);
+		} catch {
+			// Ignore if context is closed
+		}
+	};
+
+	/** Ensure audio context is started (call on user gesture) */
+	const ensureStarted = () => {
+		if (started.value) return;
+		started.value = true;
+		if (!audioContext.value) {
+			initAudio();
+		}
+		if (audioContext.value?.state === "suspended") {
+			audioContext.value.resume().catch(() => {});
+		}
+		if (!isMuted.value && !activeSource.value) {
+			playZoneTrack(currentZone.value);
+		}
+	};
+
 	const toggleMute = () => {
 		isMuted.value = !isMuted.value;
 
 		if (!audioContext.value) {
 			initAudio();
 		}
+
+		if (!audioContext.value) return;
 
 		if (isMuted.value) {
 			if (gainNode.value)
@@ -134,15 +189,7 @@ export function useAudioSystem() {
 	// ✅ Cleanup on unmount
 	onUnmounted(() => {
 		// Stop active source
-		if (activeSource.value) {
-			try {
-				activeSource.value.stop();
-				activeSource.value.disconnect();
-			} catch (e) {
-				// Ignore errors during cleanup
-			}
-			activeSource.value = null;
-		}
+		stop();
 
 		// Close audio context
 		if (audioContext.value && audioContext.value.state !== "closed") {
@@ -157,5 +204,9 @@ export function useAudioSystem() {
 		isMuted,
 		toggleMute,
 		setZone,
+		stop,
+		setWeather,
+		setVolume,
+		ensureStarted,
 	};
 }

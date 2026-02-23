@@ -24,7 +24,16 @@ async function fetchFeedPage({ lat, lng, pageParam = 0 }) {
 		p_offset: pageParam,
 	});
 
-	if (error) throw error;
+	if (error) {
+		// RPC function may not exist yet – return empty instead of crashing
+		if (error.code === "PGRST202") {
+			if (import.meta.env.DEV) {
+				console.warn("⚠️ get_feed_cards_v2 RPC not found, returning empty feed");
+			}
+			return [];
+		}
+		throw error;
+	}
 	return data || [];
 }
 

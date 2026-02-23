@@ -325,8 +325,15 @@ export const useShopStore = defineStore(
 			try {
 				await featureFlagStore.refreshFlags();
 				if (featureFlagStore.isEnabled("use_v2_feed")) {
-					await fetchShopsV2(force);
-					return;
+					try {
+						await fetchShopsV2(force);
+						return;
+					} catch (v2Err) {
+						// V2 feed RPC may not exist yet – fall through to standard query
+						if (import.meta.env.DEV) {
+							console.warn("🏪 V2 feed failed, falling back to standard query:", v2Err?.message || v2Err);
+						}
+					}
 				}
 
 				const fetchWithSelect = async (select) =>
