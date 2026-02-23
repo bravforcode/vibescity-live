@@ -123,7 +123,7 @@ const buildE2eShops = () => {
 // Keep initial payload lean; fall back to `*` if the schema drifts.
 // Note: include `location` for robust lat/lng extraction (PostGIS).
 const LITE_VENUE_COLUMNS =
-	"id,slug,short_code,name,category,description,province,district,building,floor,phone,open_time,close_time,status,created_at,total_views,rating,review_count,location,latitude,longitude,image_urls,images,video_url,social_links,pin_type,pin_metadata,is_verified,verified_until,glow_until,boost_until,giant_until,visibility_score";
+	"id,slug,short_code,name,category,province,building,floor,phone,open_time,close_time,status,created_at,total_views,rating,review_count,location,latitude,longitude,image_urls,images,video_url,social_links,pin_type,pin_metadata,is_verified,verified_until,glow_until,boost_until,giant_until,visibility_score";
 
 // ═══════════════════════════════════════════
 // 🏪 Store Definition

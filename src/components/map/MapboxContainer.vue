@@ -34,7 +34,6 @@ import { calculateDistance } from "../../utils/shopUtils";
 // import { WeatherLayer } from "./layers/WeatherLayer"; // Moved
 import LiveActivityChips from "./LiveActivityChips.vue";
 
-
 const DARK_STYLE = "mapbox://styles/phirrr/cmlktq68u002601se295iazmm";
 const LIGHT_STYLE = "mapbox://styles/mapbox/light-v11";
 const PIN_SOURCE_ID = "pins_source";
@@ -156,6 +155,7 @@ const allowMapFog = computed(
 const allowViewportGlow = computed(
   () => prefs.isViewportGlowEnabled && !isPerfRestricted.value,
 );
+const viewportGlowOpacity = ref(allowViewportGlow.value ? 0.5 : 0);
 const allowWeatherFx = computed(() => prefs.isWeatherFxEnabled && !IS_E2E);
 const effectiveMotionBudget = computed(() => {
   if (isPerfRestricted.value) return "micro";
@@ -167,6 +167,25 @@ const shouldRunAtmosphere = computed(
 const isDocumentHidden = ref(
   typeof document !== "undefined" ? document.hidden : false,
 );
+
+// ── Traffic dash / fireflies stubs ──────────────────
+// These functions are called from map lifecycle hooks but were
+// extracted into future composables. Define no-op stubs until
+// the composables are wired in, so the component boots cleanly.
+const resetTrafficDashState = () => {
+  /* noop — traffic dash composable WIP */
+};
+const removeFirefliesLayer = () => {
+  if (!map.value) return;
+  try {
+    if (map.value.getLayer("fireflies-layer"))
+      map.value.removeLayer("fireflies-layer");
+    if (map.value.getSource("fireflies-source"))
+      map.value.removeSource("fireflies-source");
+  } catch {
+    /* layer may not exist */
+  }
+};
 
 const emit = defineEmits([
   "select-shop",
@@ -386,10 +405,29 @@ const {
   buildingPopupCategoryIcon,
   buildingPopupVisitors,
   buildingPopupShop,
+  selectedShopVisitors: selectedShopVisitorsById,
   hideBuildingInfoPopup,
+  syncBuildingPopupContent: syncBuildingPopupContentCore,
   updateBuildingInfoPopupPosition,
-  syncBuildingInfoPopupFromSelection,
+  syncBuildingInfoPopupFromSelection: syncBuildingInfoPopupFromSelectionCore,
 } = useMapPopups(map, mapContainer);
+
+const selectedShopVisitors = computed(() =>
+  selectedShopVisitorsById(props.highlightedShopId),
+);
+const syncBuildingPopupContent = (shop) => {
+  syncBuildingPopupContentCore(shop, props.highlightedShopId);
+};
+const syncBuildingInfoPopupFromSelection = () => {
+  syncBuildingInfoPopupFromSelectionCore(props.shops, props.highlightedShopId);
+};
+const showPopupScanline = computed(
+  () =>
+    buildingPopupVisible.value &&
+    allowNeonPulse.value &&
+    !prefs.isReducedMotion &&
+    !prefersReducedMotion.value,
+);
 
 // Realtime composable
 const {
