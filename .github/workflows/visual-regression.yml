@@ -59,7 +59,7 @@ jobs:
 
       - name: Skip visual regression (missing GCS credentials)
         if: ${{ steps.gcp_auth.outputs.enabled != 'true' }}
-        run: echo "Skipping visual regression: GOOGLE_CREDENTIALS is not available for this run."
+        run: echo "Skipping visual regression because GOOGLE_CREDENTIALS is not available for this run."
 
       - name: Authenticate to Google Cloud
         if: ${{ steps.gcp_auth.outputs.enabled == 'true' }}
