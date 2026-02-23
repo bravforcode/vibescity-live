@@ -619,13 +619,50 @@ class DensityPrewarmer:
 # -----------------------------
 # Main App
 # -----------------------------
+def connect_redis_with_scheme_fallback(redis_url: str) -> redis.Redis:
+    """
+    Connect to Redis and auto-retry with swapped URL scheme when TLS mode is mismatched.
+    This keeps scheduled jobs resilient to redis:// vs rediss:// configuration drift.
+    """
+    candidates = [redis_url]
+    if redis_url.startswith("rediss://"):
+        candidates.append(f"redis://{redis_url[len('rediss://'):]}")
+    elif redis_url.startswith("redis://"):
+        candidates.append(f"rediss://{redis_url[len('redis://'):]}")
+
+    last_error: Exception | None = None
+    for idx, candidate in enumerate(candidates):
+        try:
+            client = redis.from_url(candidate, decode_responses=True)
+            client.ping()
+            if candidate != redis_url:
+                logger.warning(f"⚠️ Redis connected using fallback URL scheme: {candidate.split(':', 1)[0]}://")
+            return client
+        except Exception as exc:
+            last_error = exc
+            is_ssl_mismatch = "WRONG_VERSION_NUMBER" in str(exc)
+            has_next = idx < len(candidates) - 1
+            if has_next:
+                if is_ssl_mismatch:
+                    logger.warning(
+                        "⚠️ Redis SSL mismatch detected; retrying with alternate URL scheme."
+                    )
+                else:
+                    logger.warning(
+                        f"⚠️ Redis connect attempt failed ({exc}); retrying alternate URL scheme."
+                    )
+
+    if last_error:
+        raise last_error
+    raise RuntimeError("Redis connection failed before any candidate URL was attempted.")
+
+
 class UltimateSync:
     def __init__(self):
         conf.validate()
 
         try:
-            self.redis = redis.from_url(conf.REDIS_URL, decode_responses=True)
-            self.redis.ping()
+            self.redis = connect_redis_with_scheme_fallback(conf.REDIS_URL)
             logger.info("🔌 Connected to Real Redis")
         except Exception as e:
             if not conf.ALLOW_FAKE_REDIS:
