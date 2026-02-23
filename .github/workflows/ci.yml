@@ -37,9 +37,15 @@ jobs:
 
       - name: Install gitleaks
         run: |
-          curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/install.sh | sh -s -- -b /usr/local/bin v8.24.2
+          mkdir -p "$HOME/.local/bin"
+          curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/install.sh | sh -s -- -b "$HOME/.local/bin" v8.24.2
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "GITLEAKS_BIN=$HOME/.local/bin/gitleaks" >> "$GITHUB_ENV"
+          "$HOME/.local/bin/gitleaks" version
 
       - name: Secret scan (gitleaks)
+        env:
+          GITLEAKS_BIN: ${{ env.GITLEAKS_BIN }}
         run: npm run ci:secret-scan:gitleaks
 
       - name: Secret scan (Stripe patterns)
