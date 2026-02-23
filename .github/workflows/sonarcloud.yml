@@ -92,10 +92,21 @@ jobs:
             reports/e2e/junit.xml \
             reports/e2e/sonar-generic.xml
 
+      - name: Detect Sonar token
+        id: sonar_token
+        run: |
+          if [ -n "${{ secrets.SONAR_TOKEN }}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::SONAR_TOKEN is not configured. Skipping SonarCloud quality gate step."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
       # =========================
       # 🔒 SONARCLOUD
       # =========================
       - name: SonarCloud Scan (Quality Gate)
+        if: ${{ steps.sonar_token.outputs.enabled == 'true' }}
         uses: SonarSource/sonarcloud-github-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
