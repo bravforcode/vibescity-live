@@ -4,7 +4,7 @@ on:
   schedule:
     # Run every 5 minutes for near-real-time updates.
     - cron: '*/5 * * * *'
-  workflow_dispatch: # Allow manual trigger
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -79,7 +79,7 @@ jobs:
 
       - name: Verify OSM Ingestion (Workflow DB vs Production API)
         if: ${{ steps.preflight.outputs.can_run == 'true' }}
-        continue-on-error: true   # ⚠️ soft-fail: don't block the sync run
+        continue-on-error: true
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
