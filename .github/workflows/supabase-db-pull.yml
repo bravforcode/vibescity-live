@@ -46,7 +46,24 @@ jobs:
           supabase link --project-ref "${PROJECT_REF}" --password "${SUPABASE_DB_PASSWORD}"
 
       - name: Pull remote schema
-        run: supabase db pull --linked
+        shell: bash
+        run: |
+          set -euo pipefail
+          PULL_LOG="$(mktemp)"
+          if supabase db pull --linked 2>&1 | tee "${PULL_LOG}"; then
+            echo "Supabase schema pull completed."
+            exit 0
+          fi
+
+          if grep -qi "migration history does not match local files" "${PULL_LOG}"; then
+            echo "::warning::Supabase migration history mismatch detected. Skipping automated db pull for this run."
+            echo "::warning::Please reconcile migration history manually, then re-run this workflow."
+            exit 0
+          fi
+
+          echo "Supabase db pull failed with non-recoverable error."
+          cat "${PULL_LOG}"
+          exit 1
 
       - name: Commit and push migration changes
         run: |

@@ -8,11 +8,9 @@ import PortalLayer from "./PortalLayer.vue";
 const { t } = useI18n();
 
 const {
-	activeShopId,
 	closeShopDetail,
 	activeBuildingId,
 	closeBuildingDetail,
-	activeUserCount,
 	isOwnerDashboardOpen,
 	toggleOwnerDashboard,
 } = useAppLogic();
@@ -31,7 +29,7 @@ const RideComparisonModal = defineAsyncComponent(
 	() => import("../transport/RideComparisonModal.vue"),
 );
 
-defineProps({
+const props = defineProps({
 	selectedShop: Object,
 	rideModalShop: Object,
 	showMallDrawer: Boolean,
@@ -91,10 +89,10 @@ onMounted(() => {
 <template>
   <PortalLayer>
     <transition name="modal-fade">
-      <div v-if="selectedShop">
+      <div v-if="props.selectedShop">
         <VibeModal
-          :shop="selectedShop"
-          :userCount="activeUserCount"
+          :shop="props.selectedShop"
+          :userCount="props.activeUserCount"
           @close="emit('close-vibe-modal')"
           @toggle-favorite="(id) => emit('toggle-favorite', id)"
         />
@@ -102,31 +100,31 @@ onMounted(() => {
     </transition>
 
     <RideComparisonModal
-      :isOpen="!!rideModalShop"
-      :shop="rideModalShop"
-      :userLocation="userLocation"
+      :isOpen="!!props.rideModalShop"
+      :shop="props.rideModalShop"
+      :userLocation="props.userLocation"
       @close="emit('close-ride-modal')"
       @open-app="(appName) => emit('open-ride-app', appName)"
     />
 
     <MallDrawer
-      v-if="showMallDrawer"
-      :is-open="showMallDrawer"
-      :building="activeMall"
-      :shops="mallShops"
-      :is-dark-mode="isDarkMode"
-      :selected-shop-id="activeShopId"
+      v-if="props.showMallDrawer"
+      :is-open="props.showMallDrawer"
+      :building="props.activeMall"
+      :shops="props.mallShops"
+      :is-dark-mode="props.isDarkMode"
+      :selected-shop-id="props.activeShopId"
       @close="emit('close-mall-drawer')"
       @select-shop="(shop) => emit('select-mall-shop', shop)"
       @open-ride-modal="(shop) => emit('open-ride-modal', shop)"
       @toggle-favorite="(id) => emit('toggle-favorite', id)"
-      :favorites="favorites"
+      :favorites="props.favorites"
     />
 
     <ProfileDrawer
-      v-if="showProfileDrawer"
-      :is-open="showProfileDrawer"
-      :is-dark-mode="isDarkMode"
+      v-if="props.showProfileDrawer"
+      :is-open="props.showProfileDrawer"
+      :is-dark-mode="props.isDarkMode"
       @close="emit('close-profile-drawer')"
       @toggle-language="emit('toggle-language')"
     />
@@ -140,7 +138,7 @@ onMounted(() => {
       leave-to-class="opacity-0 scale-105"
     >
       <div
-        v-if="isInitialLoad"
+        v-if="props.isInitialLoad"
         role="status"
         aria-live="polite"
         aria-busy="true"
@@ -179,7 +177,7 @@ onMounted(() => {
       leave-to-class="opacity-0 translate-y-10"
     >
       <div
-        v-if="errorMessage"
+        v-if="props.errorMessage"
         class="fixed top-20 left-1/2 -translate-x-1/2 z-[8000] w-[90%] max-w-md"
       >
         <div
@@ -192,7 +190,7 @@ onMounted(() => {
           </div>
           <div class="flex-1">
             <h4 class="text-white font-bold text-sm">{{ t("app.system_alert") }}</h4>
-            <p class="text-white/60 text-xs">{{ errorMessage }}</p>
+            <p class="text-white/60 text-xs">{{ props.errorMessage }}</p>
           </div>
           <button
             @click="emit('clear-error')"
@@ -205,7 +203,7 @@ onMounted(() => {
       </div>
     </Transition>
 
-    <ConfettiEffect v-if="showConfetti" />
+    <ConfettiEffect v-if="props.showConfetti" />
   </PortalLayer>
 </template>
 

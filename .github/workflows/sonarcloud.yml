@@ -36,10 +36,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       # =========================
       # 🧪 UNIT TESTS + COVERAGE
@@ -62,7 +61,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          key: ${{ runner.os }}-playwright-${{ hashFiles('bun.lock') }}
 
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps

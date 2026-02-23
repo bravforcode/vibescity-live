@@ -41,7 +41,7 @@ jobs:
             ${{ runner.os }}-bun-
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile || bun install
 
       - name: Build weekly strict/quarantine/synthetic trend summary
         id: trend

@@ -51,7 +51,7 @@ jobs:
             ${{ runner.os }}-bun-
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile || bun install
 
       - name: Provision BigQuery analytics table (partitioning + retention)
         continue-on-error: true

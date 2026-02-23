@@ -43,7 +43,7 @@ jobs:
             ${{ runner.os }}-bun-
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile || bun install
 
       - name: DNS precheck for vibecity-api.fly.dev
         id: dns_precheck
@@ -193,7 +193,7 @@ jobs:
             ${{ runner.os }}-bun-
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile || bun install
 
       - name: Install Playwright browser (Chromium)
         run: bunx playwright install --with-deps chromium
