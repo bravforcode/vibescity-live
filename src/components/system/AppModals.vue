@@ -1,20 +1,20 @@
 <!-- src/components/system/AppModals.vue -->
 <script setup>
-import { defineAsyncComponent } from "vue";
+import { defineAsyncComponent, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { useAppLogic } from "../../composables/useAppLogic";
-import PortalLayer from "./PortalLayer.vue"; // Adjust relative path if needed
+import PortalLayer from "./PortalLayer.vue";
+
+const { t } = useI18n();
 
 const {
-	activeShopId,
 	closeShopDetail,
 	activeBuildingId,
 	closeBuildingDetail,
-	activeUserCount,
 	isOwnerDashboardOpen,
 	toggleOwnerDashboard,
 } = useAppLogic();
 
-// ✅ Async load heavy modals
 const MallDrawer = defineAsyncComponent(
 	() => import("../modal/MallDrawer.vue"),
 );
@@ -29,7 +29,7 @@ const RideComparisonModal = defineAsyncComponent(
 	() => import("../transport/RideComparisonModal.vue"),
 );
 
-defineProps({
+const props = defineProps({
 	selectedShop: Object,
 	rideModalShop: Object,
 	showMallDrawer: Boolean,
@@ -46,7 +46,10 @@ defineProps({
 	showProfileDrawer: Boolean,
 	isDarkMode: Boolean,
 	isDataLoading: Boolean,
-
+	isInitialLoad: {
+		type: Boolean,
+		default: false,
+	},
 	errorMessage: String,
 	showConfetti: Boolean,
 	userLocation: {
@@ -73,83 +76,59 @@ const emit = defineEmits([
 	"retry",
 ]);
 
-// ✅ Smart Prefetching
-import { onMounted } from "vue";
-
 onMounted(() => {
-	// Prefetch heavy modals after initial rendering (5s delay)
 	setTimeout(() => {
-		const prefetch = (componentFactory) => {
-			if (componentFactory && typeof componentFactory === "function") {
-				try {
-					componentFactory();
-				} catch (e) {
-					/* ignore */
-				}
-			}
-		};
-
-		// Trigger import()
 		import("../modal/MallDrawer.vue");
 		import("../modal/ProfileDrawer.vue");
 		import("../modal/VibeModal.vue");
 		import("../ui/ConfettiEffect.vue");
-
-		console.log("🚀 Smart Prefetch: Heavy components loaded in background");
 	}, 5000);
 });
 </script>
 
 <template>
-  <!-- ✅ PORTAL: ย้ายทุก Modal/Drawer/Overlay มาอยู่บนสุดของ DOM -->
   <PortalLayer>
-    <!-- ✅ VIBE MODAL (รายละเอียดร้าน) -->
     <transition name="modal-fade">
-      <div data-testid="vibe-modal" v-if="selectedShop">
+      <div v-if="props.selectedShop">
         <VibeModal
-          :shop="selectedShop"
-          :userCount="activeUserCount"
+          :shop="props.selectedShop"
+          :userCount="props.activeUserCount"
           @close="emit('close-vibe-modal')"
           @toggle-favorite="(id) => emit('toggle-favorite', id)"
         />
       </div>
     </transition>
 
-    <!-- ✅ Ride Service Modal Popup (ของเดิมคุณ) -->
-    <!-- ✅ Ride Service Modal (New) -->
     <RideComparisonModal
-      :isOpen="!!rideModalShop"
-      :shop="rideModalShop"
-      :userLocation="userLocation"
+      :isOpen="!!props.rideModalShop"
+      :shop="props.rideModalShop"
+      :userLocation="props.userLocation"
       @close="emit('close-ride-modal')"
       @open-app="(appName) => emit('open-ride-app', appName)"
     />
 
-    <!-- ✅ MALL DRAWER -->
     <MallDrawer
-      v-if="showMallDrawer"
-      :is-open="showMallDrawer"
-      :building="activeMall"
-      :shops="mallShops"
-      :is-dark-mode="isDarkMode"
-      :selected-shop-id="activeShopId"
+      v-if="props.showMallDrawer"
+      :is-open="props.showMallDrawer"
+      :building="props.activeMall"
+      :shops="props.mallShops"
+      :is-dark-mode="props.isDarkMode"
+      :selected-shop-id="props.activeShopId"
       @close="emit('close-mall-drawer')"
       @select-shop="(shop) => emit('select-mall-shop', shop)"
       @open-ride-modal="(shop) => emit('open-ride-modal', shop)"
       @toggle-favorite="(id) => emit('toggle-favorite', id)"
-      :favorites="favorites"
+      :favorites="props.favorites"
     />
 
-    <!-- ✅ PROFILE DRAWER -->
     <ProfileDrawer
-      v-if="showProfileDrawer"
-      :is-open="showProfileDrawer"
-      :is-dark-mode="isDarkMode"
+      v-if="props.showProfileDrawer"
+      :is-open="props.showProfileDrawer"
+      :is-dark-mode="props.isDarkMode"
       @close="emit('close-profile-drawer')"
       @toggle-language="emit('toggle-language')"
     />
 
-    <!-- ✅ Global Loading State -->
     <Transition
       enter-active-class="transition duration-500 ease-out"
       enter-from-class="opacity-0 scale-95"
@@ -159,7 +138,10 @@ onMounted(() => {
       leave-to-class="opacity-0 scale-105"
     >
       <div
-        v-if="isDataLoading"
+        v-if="props.isInitialLoad"
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
         class="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#09090b]"
       >
         <div class="relative w-24 h-24">
@@ -176,17 +158,16 @@ onMounted(() => {
         <h2
           class="mt-8 text-xl font-black text-white tracking-[0.2em] animate-pulse"
         >
-          VIBECITY
+          {{ t("app.brand") }}
         </h2>
         <p
           class="mt-2 text-zinc-500 text-xs uppercase tracking-widest font-bold"
         >
-          Synchronizing Vibe Engine...
+          {{ t("app.syncing") }}
         </p>
       </div>
     </Transition>
 
-    <!-- ✅ Global Error Feedback -->
     <Transition
       enter-active-class="transition duration-500 ease-out"
       enter-from-class="opacity-0 translate-y-10"
@@ -196,7 +177,7 @@ onMounted(() => {
       leave-to-class="opacity-0 translate-y-10"
     >
       <div
-        v-if="errorMessage"
+        v-if="props.errorMessage"
         class="fixed top-20 left-1/2 -translate-x-1/2 z-[8000] w-[90%] max-w-md"
       >
         <div
@@ -208,11 +189,12 @@ onMounted(() => {
             ⚠️
           </div>
           <div class="flex-1">
-            <h4 class="text-white font-bold text-sm">System Alert</h4>
-            <p class="text-white/60 text-xs">{{ errorMessage }}</p>
+            <h4 class="text-white font-bold text-sm">{{ t("app.system_alert") }}</h4>
+            <p class="text-white/60 text-xs">{{ props.errorMessage }}</p>
           </div>
           <button
             @click="emit('clear-error')"
+            aria-label="Dismiss system alert"
             class="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-white/40"
           >
             ✕
@@ -221,8 +203,7 @@ onMounted(() => {
       </div>
     </Transition>
 
-    <!-- ✅ Confetti -->
-    <ConfettiEffect v-if="showConfetti" />
+    <ConfettiEffect v-if="props.showConfetti" />
   </PortalLayer>
 </template>
 
@@ -261,10 +242,11 @@ onMounted(() => {
 }
 
 .modal-scale-enter-active {
-  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: opacity 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .modal-scale-leave-active {
-  transition: all 0.2s ease-in;
+  transition: opacity 0.2s ease-in, transform 0.2s ease-in;
 }
 .modal-scale-enter-from {
   opacity: 0;
@@ -273,5 +255,19 @@ onMounted(() => {
 .modal-scale-leave-to {
   opacity: 0;
   transform: scale(0.9) translateY(10px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin-slow,
+  .animate-pulse {
+    animation: none !important;
+  }
+
+  .modal-fade-enter-active,
+  .modal-fade-leave-active,
+  .modal-scale-enter-active,
+  .modal-scale-leave-active {
+    transition-duration: 0.01ms !important;
+  }
 }
 </style>

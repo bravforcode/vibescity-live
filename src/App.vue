@@ -1,5 +1,77 @@
+<script setup>
+import { onMounted, watch } from "vue";
+import ReloadPrompt from "@/components/pwa/ReloadPrompt.vue";
+import ConsentBanner from "@/components/ui/ConsentBanner.vue";
+import VibeNotification from "@/components/ui/VibeNotification.vue";
+import { useHomeBase } from "@/composables/useHomeBase";
+import { useLocationStore } from "@/store/locationStore";
+
+const locationStore = useLocationStore();
+const { setHomeBase, hasHomeBase } = useHomeBase();
+
+const parseEnvBool = (value) => {
+	const raw = String(value ?? "")
+		.trim()
+		.toLowerCase();
+	if (!raw) return null;
+	if (["1", "true", "yes", "on"].includes(raw)) return true;
+	if (["0", "false", "no", "off"].includes(raw)) return false;
+	return null;
+};
+
+// Default: disabled in dev, enabled in prod (unless explicitly overridden).
+const analyticsEnabled =
+	parseEnvBool(import.meta.env.VITE_ANALYTICS_ENABLED) ?? !import.meta.env.DEV;
+
+const hasAnalyticsConsent = () => {
+	try {
+		// Respect Do Not Track as a hard deny.
+		if (typeof navigator !== "undefined" && navigator.doNotTrack === "1") {
+			return false;
+		}
+		return localStorage.getItem("vibe_analytics_consent") === "granted";
+	} catch {
+		return false;
+	}
+};
+
+const trackSessionIfAllowed = () => {
+	if (!analyticsEnabled) return;
+	if (!hasAnalyticsConsent()) return;
+	void import("@/services/analyticsService")
+		.then(({ analyticsService }) => analyticsService.trackSession())
+		.catch(() => {});
+};
+
+onMounted(() => {
+	trackSessionIfAllowed();
+
+	// Start tracking location for Home Base
+	locationStore.startWatching();
+});
+
+// Auto-set Home Base on first location fix
+watch(
+	() => locationStore.userLocation,
+	(newLoc) => {
+		if (newLoc && !hasHomeBase.value) {
+			setHomeBase(newLoc[0], newLoc[1]);
+			if (import.meta.env.DEV) {
+				console.log("📍 Home Base set automatically:", newLoc);
+			}
+		}
+	},
+	{ once: true }, // Only run once
+);
+</script>
+
 <template>
+  <!-- Skip Link for Keyboard Accessibility -->
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <ReloadPrompt />
+  <ConsentBanner />
   <router-view />
+  <VibeNotification />
 </template>
 
 <style>
@@ -20,7 +92,9 @@
 .ui-slide-down-leave-active,
 .ui-slide-up-enter-active,
 .ui-slide-up-leave-active {
-  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1); /* iOS Ease */
+  transition:
+    transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1); /* iOS Ease */
 }
 
 .ui-slide-down-enter-from,

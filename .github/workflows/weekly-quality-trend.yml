@@ -1,0 +1,183 @@
+name: Weekly Quality Trend
+
+on:
+  schedule:
+    - cron: "15 0 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+concurrency:
+  group: weekly-quality-trend
+  cancel-in-progress: true
+
+jobs:
+  weekly-quality-trend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "latest"
+
+      - name: Cache Bun install
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile || bun install
+
+      - name: Build weekly strict/quarantine/synthetic trend summary
+        id: trend
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TREND_DAYS: "7"
+          TREND_STRICT_MIN_PASS_RATE: "95"
+          TREND_SYNTHETIC_OVERALL_MIN_PASS_RATE: "95"
+        run: node scripts/ci/weekly-quality-trend.mjs
+
+      - name: Alert on threshold breach
+        if: ${{ always() && steps.trend.outputs.breach == 'true' }}
+        continue-on-error: true
+        env:
+          SYNTHETIC_ALERT_WEBHOOK_URL: "${{ secrets.SYNTHETIC_ALERT_WEBHOOK_URL }}"
+          ALERT_TYPE: "weekly_quality_threshold_breach"
+          ALERT_TEXT: "Weekly quality trend threshold breached"
+          ALERT_LANE: "weekly-quality-trend"
+          ALERT_RUN_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          ALERT_MAX_RETRIES: "4"
+          ALERT_RETRY_DELAY_MS: "2000"
+          ALERT_DEDUP_WINDOW_MINUTES: "180"
+          ALERT_DEDUP_KEY: "weekly_quality_threshold_breach"
+        run: |
+          {
+            echo "## Weekly Trend Alert"
+            echo "- Type: weekly_quality_threshold_breach"
+            echo "- Breaches: ${{ steps.trend.outputs.breach_message }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+          node scripts/ci/send-alert-webhook.mjs
+
+      - name: Upload weekly quality trend snapshot
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-quality-trend
+          path: reports/ci/weekly-quality-trend.json
+          retention-days: 30
+
+      - name: Provision BigQuery observability tables (partitioning + retention)
+        if: ${{ always() }}
+        continue-on-error: true
+        env:
+          BIGQUERY_PROJECT_ID: "${{ vars.BIGQUERY_PROJECT_ID }}"
+          BIGQUERY_DATASET: "${{ vars.BIGQUERY_DATASET }}"
+          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON }}"
+          BIGQUERY_ALLOW_CREATE_DATASET: "0"
+          BIGQUERY_ALLOW_CREATE_TABLES: "1"
+          BIGQUERY_APPLY_PARTITION_RETENTION: "1"
+          BIGQUERY_OBS_PARTITION_RETENTION_DAYS: "365"
+          BIGQUERY_SET_DATASET_DEFAULTS: "0"
+          BIGQUERY_PROVISION_OUTPUT_PATH: "reports/ci/bigquery-provision-log.json"
+          BIGQUERY_PROVISION_FAIL_ON_ERROR: "0"
+        run: node scripts/ci/provision-bigquery-observability.mjs
+
+      - name: Publish observability metrics (weekly trend)
+        if: ${{ always() }}
+        continue-on-error: true
+        env:
+          OBS_LANE: "weekly-quality-trend"
+          OBS_WEEKLY_TREND_PATH: "reports/ci/weekly-quality-trend.json"
+          OBS_SYNTHETIC_TREND_PATH: "reports/ci/synthetic-trend-7d.json"
+          OBS_METRICS_OUTPUT_PATH: "reports/ci/metrics-export-log.json"
+          OBS_METRICS_FAIL_ON_ERROR: "0"
+          BIGQUERY_PROJECT_ID: "${{ vars.BIGQUERY_PROJECT_ID }}"
+          BIGQUERY_DATASET: "${{ vars.BIGQUERY_DATASET }}"
+          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON }}"
+          GRAFANA_LOKI_URL: "${{ vars.GRAFANA_LOKI_URL }}"
+          GRAFANA_LOKI_USER: "${{ vars.GRAFANA_LOKI_USER }}"
+          GRAFANA_LOKI_TOKEN: "${{ secrets.GRAFANA_LOKI_TOKEN }}"
+        run: node scripts/ci/publish-observability-metrics.mjs
+
+      - name: Manage incidents (weekly trend)
+        if: ${{ always() }}
+        continue-on-error: true
+        env:
+          INCIDENT_WEEKLY_TREND_PATH: "reports/ci/weekly-quality-trend.json"
+          INCIDENT_OUTPUT_PATH: "reports/ci/incident-manager-log.json"
+          INCIDENT_CONSECUTIVE_THRESHOLD: "3"
+          INCIDENT_RECOVERY_THRESHOLD: "3"
+          INCIDENT_DRY_RUN: "0"
+          INCIDENT_FAIL_ON_ERROR: "0"
+          INCIDENT_SUPPRESS: "${{ vars.INCIDENT_SUPPRESS }}"
+          INCIDENT_SUPPRESS_UNTIL_UTC: "${{ vars.INCIDENT_SUPPRESS_UNTIL_UTC }}"
+          INCIDENT_SUPPRESS_START_UTC: "${{ vars.INCIDENT_SUPPRESS_START_UTC }}"
+          INCIDENT_SUPPRESS_END_UTC: "${{ vars.INCIDENT_SUPPRESS_END_UTC }}"
+          INCIDENT_SUPPRESS_WINDOWS_UTC: "${{ vars.INCIDENT_SUPPRESS_WINDOWS_UTC }}"
+          INCIDENT_SUPPRESS_REASON: "${{ vars.INCIDENT_SUPPRESS_REASON }}"
+          BIGQUERY_PROJECT_ID: "${{ vars.BIGQUERY_PROJECT_ID }}"
+          BIGQUERY_DATASET: "${{ vars.BIGQUERY_DATASET }}"
+          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON }}"
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          GITHUB_REPOSITORY: "${{ github.repository }}"
+          GITHUB_SERVER_URL: "${{ github.server_url }}"
+          GITHUB_RUN_ID: "${{ github.run_id }}"
+        run: node scripts/ci/manage-incidents.mjs
+
+      - name: Upload BigQuery provision log
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-bigquery-provision-log
+          path: reports/ci/bigquery-provision-log.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Upload metrics export log
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-metrics-export-log
+          path: reports/ci/metrics-export-log.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Upload incident manager log
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-incident-manager-log
+          path: reports/ci/incident-manager-log.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Save Step Summary
+        if: ${{ always() && !cancelled() }}
+        run: |
+          mkdir -p reports/ci
+          cp "$GITHUB_STEP_SUMMARY" reports/ci/step-summary-weekly-quality-trend.md || true
+
+      - name: Upload Step Summary
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: step-summary-weekly-quality-trend
+          path: reports/ci/step-summary-weekly-quality-trend.md
+          retention-days: 30
+          if-no-files-found: ignore

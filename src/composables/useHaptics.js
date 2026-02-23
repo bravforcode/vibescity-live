@@ -1,18 +1,22 @@
-/**
- * useHaptics.js - Haptic Feedback Composable
- * Provides vibration feedback for mobile devices
- */
+import { useUserPreferencesStore } from "../store/userPreferencesStore";
 
 export const useHaptics = () => {
-	// Check if vibration API is supported
-	const isSupported =
-		typeof navigator !== "undefined" && "vibrate" in navigator;
+	const prefs = useUserPreferencesStore();
+
+	// Check if vibration API is supported AND enabled
+	const isSupported = () => {
+		return (
+			typeof navigator !== "undefined" &&
+			"vibrate" in navigator &&
+			prefs.isHapticsEnabled
+		);
+	};
 
 	/**
 	 * Light tap feedback - for minor interactions
 	 */
 	const tapFeedback = () => {
-		if (isSupported) {
+		if (isSupported()) {
 			navigator.vibrate(10);
 		}
 	};
@@ -21,7 +25,7 @@ export const useHaptics = () => {
 	 * Selection feedback - for selecting items
 	 */
 	const selectFeedback = () => {
-		if (isSupported) {
+		if (isSupported()) {
 			navigator.vibrate([10, 30, 10]);
 		}
 	};
@@ -30,7 +34,7 @@ export const useHaptics = () => {
 	 * Success feedback - for completing actions
 	 */
 	const successFeedback = () => {
-		if (isSupported) {
+		if (isSupported()) {
 			navigator.vibrate([10, 50, 20, 50, 30]);
 		}
 	};
@@ -39,7 +43,7 @@ export const useHaptics = () => {
 	 * Error feedback - for errors
 	 */
 	const errorFeedback = () => {
-		if (isSupported) {
+		if (isSupported()) {
 			navigator.vibrate([50, 100, 50]);
 		}
 	};
@@ -48,7 +52,7 @@ export const useHaptics = () => {
 	 * Heavy impact - for important actions
 	 */
 	const heavyFeedback = () => {
-		if (isSupported) {
+		if (isSupported()) {
 			navigator.vibrate(50);
 		}
 	};
@@ -57,7 +61,7 @@ export const useHaptics = () => {
 	 * Impact feedback with levels (light | medium | heavy)
 	 */
 	const impactFeedback = (level = "light") => {
-		if (!isSupported) return;
+		if (!isSupported()) return;
 
 		const patterns = {
 			light: 12,
@@ -70,7 +74,7 @@ export const useHaptics = () => {
 	};
 
 	return {
-		isSupported,
+		isSupported: isSupported(),
 		tapFeedback,
 		selectFeedback,
 		successFeedback,

@@ -1,66 +1,113 @@
 <script setup>
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
+import { useNotifications } from "@/composables/useNotifications";
 import { supabase } from "../../lib/supabase";
+import EditVenueModal from "../modal/EditVenueModal.vue";
+import BuyPinsPanel from "./BuyPinsPanel.vue";
 
 const router = useRouter();
 const loading = ref(true);
 const venues = ref([]);
-const user = ref(null);
+const visitorId = ref(null);
+const dashboardError = ref(null);
 const stats = ref({
 	live_visitors: 0,
 	total_views: 0,
-	rating: 0,
+	rating: 5.0,
 	is_promoted: false,
 });
+const { notifyError } = useNotifications();
 
-onMounted(async () => {
-	// Check Auth
-	const {
-		data: { user: currentUser },
-	} = await supabase.auth.getUser();
-	if (!currentUser) {
-		alert("Please sign in to access Merchant Portal");
-		router.push("/");
-		return;
-	}
-	user.value = currentUser;
+const promotingVenue = ref(null);
+const editingVenue = ref(null); // ✅ Edit State
 
+const openPromote = (venue) => {
+	promotingVenue.value = venue;
+};
+
+const closePromote = () => {
+	promotingVenue.value = null;
+};
+
+const openEdit = (venue) => {
+	editingVenue.value = venue;
+};
+
+const safeExit = async () => {
 	try {
-		// Fetch Owned Venues (using user_submissions for MVP claiming logic)
-		const { data, error } = await supabase
-			.from("user_submissions")
+		await router.push("/");
+		setTimeout(() => {
+			if (window.location.pathname.startsWith("/merchant")) {
+				window.location.href = "/";
+			}
+		}, 200);
+	} catch {
+		window.location.href = "/";
+	}
+};
+
+const closeEdit = (shouldRefresh = false) => {
+	editingVenue.value = null;
+	if (shouldRefresh) fetchDashboardData();
+};
+
+const fetchDashboardData = async () => {
+	loading.value = true;
+	dashboardError.value = null;
+	try {
+		// 1. Get Visitor ID
+		const vid = localStorage.getItem("vibe_visitor_id");
+		if (!vid) {
+			notifyError("No Visitor ID found. Please browse the map first.");
+			router.push("/");
+			return;
+		}
+		visitorId.value = vid;
+
+		// 2. Fetch Owned Venues via Visitor ID
+		const { data: ownedVenues, error } = await supabase
+			.from("venues")
 			.select("*")
-			.eq("user_id", currentUser.id);
+			.eq("owner_visitor_id", vid);
 
 		if (error) throw error;
-		venues.value = data || [];
+		venues.value = ownedVenues || [];
 
-		// Mock Stats Logic (Aggregate from venues later)
-		// For MVP, we just sum up some random numbers or use real fields if available
+		// 3. Aggregate Real Stats
+		let totalLive = 0;
+		let totalViews = 0;
+
+		for (const venue of venues.value) {
+			const { data: stat } = await supabase.rpc("get_venue_stats", {
+				p_shop_id: venue.id,
+			});
+			if (stat) {
+				totalLive += stat.live_visitors;
+				totalViews += stat.total_views;
+				// Assign to venue object for list display if needed
+				venue.stats = stat;
+			}
+		}
+
 		stats.value = {
-			live_visitors: Math.floor(Math.random() * 50) + 10, // Mock real-time
-			total_views: venues.value.length * 125, // Mock views based on count
-			rating: 4.8, // Default high rating
+			live_visitors: totalLive,
+			total_views: totalViews,
+			rating: 5.0, // Default for positive vibes
 			is_promoted: false,
 		};
 	} catch (e) {
-		console.error("Error fetching merchant data:", e);
+		console.error("Error fetching dashboard:", e);
+		dashboardError.value = e?.message || "Failed to load merchant dashboard.";
+		notifyError("Could not load Merchant Dashboard. Please try again.");
 	} finally {
 		loading.value = false;
 	}
-});
-
-const isBoosting = ref(false);
-const toggleBoost = async () => {
-	isBoosting.value = true;
-	// Simulate API call for boost
-	setTimeout(() => {
-		stats.value.is_promoted = true;
-		isBoosting.value = false;
-		alert("Boost Activated! Your venue is now highlighted.");
-	}, 1500);
 };
+
+onMounted(() => {
+	fetchDashboardData();
+});
 </script>
 
 <template>
@@ -82,7 +129,7 @@ const toggleBoost = async () => {
         </div>
         <div class="flex gap-3 items-center">
           <button
-            @click="router.push('/')"
+            @click="safeExit"
             class="text-sm font-bold text-zinc-500 hover:text-white transition"
           >
             Exit
@@ -102,11 +149,31 @@ const toggleBoost = async () => {
       <div v-if="loading" class="py-20 text-center text-zinc-500 animate-pulse">
         Loading dashboard...
       </div>
+      <div
+        v-else-if="dashboardError"
+        class="p-6 rounded-xl border border-red-500/30 bg-red-500/10 text-center space-y-4"
+      >
+        <div class="text-red-300 font-bold">Merchant Dashboard Error</div>
+        <div class="text-sm text-red-100/90">{{ dashboardError }}</div>
+        <div class="flex justify-center gap-3">
+          <button
+            @click="fetchDashboardData"
+            class="px-4 py-2 rounded-lg bg-red-500/20 border border-red-400/30 text-red-100 font-bold"
+          >
+            Retry
+          </button>
+          <button
+            @click="safeExit"
+            class="px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white font-bold"
+          >
+            Exit
+          </button>
+        </div>
+      </div>
 
       <div v-else>
         <!-- Stats Grid -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <!-- Card 1: Live Visitors -->
           <div
             class="glass-card p-6 rounded-2xl relative overflow-hidden group"
           >
@@ -129,7 +196,6 @@ const toggleBoost = async () => {
             </div>
           </div>
 
-          <!-- Card 2: Total Views -->
           <div class="glass-card p-6 rounded-2xl relative overflow-hidden">
             <h3 class="text-white/60 text-sm font-medium mb-2">
               Total Page Views
@@ -142,7 +208,6 @@ const toggleBoost = async () => {
             </div>
           </div>
 
-          <!-- Card 3: Rating -->
           <div class="glass-card p-6 rounded-2xl relative overflow-hidden">
             <h3 class="text-white/60 text-sm font-medium mb-2">Reputation</h3>
             <div class="text-4xl font-bold text-white flex items-center gap-2">
@@ -187,16 +252,25 @@ const toggleBoost = async () => {
               </div>
             </div>
             <div class="flex gap-2">
-              <span
-                v-if="venue.status === 'PENDING'"
-                class="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 py-1 rounded"
-                >PENDING REVIEW</span
-              >
-              <button
-                class="px-4 py-2 bg-zinc-800 rounded-lg text-xs font-bold hover:bg-zinc-700 text-white"
-              >
-                Edit
-              </button>
+              <div class="flex gap-2">
+                <span
+                  v-if="venue.status === 'PENDING'"
+                  class="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 py-1 rounded"
+                  >PENDING REVIEW</span
+                >
+                <button
+                  @click="openPromote(venue)"
+                  class="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg text-xs font-bold hover:opacity-90 text-white shadow-lg shadow-purple-500/20"
+                >
+                  Promote 🚀
+                </button>
+                <button
+                  @click="openEdit(venue)"
+                  class="px-4 py-2 bg-zinc-800 rounded-lg text-xs font-bold hover:bg-zinc-700 text-white transition-colors"
+                >
+                  Edit
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -207,31 +281,31 @@ const toggleBoost = async () => {
           You haven't added any venues yet.
         </div>
 
-        <!-- Actions -->
+        <!-- Buy Pins Modal -->
         <div
-          class="glass-card p-6 rounded-2xl flex items-center justify-between"
+          v-if="promotingVenue"
+          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          @click.self="closePromote"
         >
-          <div>
-            <h3 class="text-xl font-bold text-white mb-1">
-              Boost Visibility 🚀
-            </h3>
-            <p class="text-white/60 text-sm">
-              Activate a Giant 3D Pin on the map to attract 3x more visitors.
-            </p>
-          </div>
-          <button
-            @click="toggleBoost"
-            :disabled="isBoosting || stats?.is_promoted"
-            class="px-6 py-3 rounded-xl font-bold transition-all transform hover:scale-105 active:scale-95"
-            :class="
-              stats?.is_promoted
-                ? 'bg-gray-500/50 text-white/50 cursor-not-allowed'
-                : 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-purple-500/30'
-            "
+          <div
+            class="w-full max-w-5xl relative animate-in fade-in zoom-in duration-200"
           >
-            {{ stats?.is_promoted ? "Boost Active ✨" : "Activate Boost ($5)" }}
-          </button>
+            <button
+              @click="closePromote"
+              class="absolute -top-12 right-0 text-white/50 hover:text-white"
+            >
+              Close [ESC]
+            </button>
+            <BuyPinsPanel :shop-id="promotingVenue.id" />
+          </div>
         </div>
+
+        <!-- ✅ Edit Venue Modal -->
+        <EditVenueModal
+          v-if="editingVenue"
+          :venue="editingVenue"
+          @close="closeEdit"
+        />
       </div>
     </div>
   </div>

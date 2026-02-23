@@ -8,12 +8,24 @@ export function useScrollSync({
 	selectFeedback,
 	mobileCardScrollRef,
 }) {
+	const normalizeId = (value) => {
+		if (value === null || value === undefined) return null;
+		const str = String(value).trim();
+		return str ? str : null;
+	};
+
 	// --- ⚙️ SCROLL & STATE MANAGEMENT ---
 	const isUserScrolling = ref(false); // Checking if User is swiping
 	const isProgrammaticScroll = ref(false); // Checking if App is scrolling (e.g. from Map click)
 
 	let scrollTimeout = null;
 	let ticking = false;
+	let lastHapticAt = 0;
+	const HAPTIC_INTERVAL_MS = 300;
+	let cachedCardWidth = 0;
+	let cachedCardGap = 0;
+	let cachedFirstCardOffset = 0;
+	let cachedCardIds = [];
 
 	// Optional: hooks
 	const onScrollStart = () => {
@@ -24,44 +36,61 @@ export function useScrollSync({
 		isUserScrolling.value = false;
 	};
 
-	// 1. 🎯 Find centered card ID
+	const refreshCardMetrics = () => {
+		const container = mobileCardScrollRef.value;
+		if (!container) return false;
+		const cards = container.querySelectorAll("[data-shop-id]");
+		if (cards.length === 0) {
+			cachedCardIds = [];
+			return false;
+		}
+
+		const firstCard = cards[0];
+		const secondCard = cards[1];
+		const firstWidth = firstCard.offsetWidth || firstCard.clientWidth || 1;
+		const firstOffset = firstCard.offsetLeft || 0;
+		const secondOffset = secondCard?.offsetLeft ?? firstOffset + firstWidth;
+		const gap = Math.max(0, secondOffset - firstOffset - firstWidth);
+
+		cachedCardWidth = firstWidth;
+		cachedCardGap = gap;
+		cachedFirstCardOffset = firstOffset;
+		cachedCardIds = Array.from(cards)
+			.map((card) => normalizeId(card.getAttribute("data-shop-id")))
+			.filter(Boolean);
+		return true;
+	};
+
+	// 1. 🎯 Find centered card ID (fast path, no full-card loop per frame)
 	const getCenteredCardId = () => {
 		const container = mobileCardScrollRef.value;
 		if (!container) return null;
+		if (!cachedCardIds.length || !cachedCardWidth) {
+			if (!refreshCardMetrics()) return null;
+		}
 
-		const containerRect = container.getBoundingClientRect();
-		const containerCenter = containerRect.left + containerRect.width / 2;
-
-		const cards = container.querySelectorAll("[data-shop-id]");
-		let closestCard = null;
-		let minDiff = Infinity;
-
-		cards.forEach((card) => {
-			const cardRect = card.getBoundingClientRect();
-			const cardCenter = cardRect.left + cardRect.width / 2;
-			const diff = Math.abs(containerCenter - cardCenter);
-
-			if (diff < minDiff && diff < 100) {
-				minDiff = diff;
-				closestCard = card;
-			}
-		});
-
-		return closestCard
-			? Number(closestCard.getAttribute("data-shop-id"))
-			: null;
+		const step = cachedCardWidth + cachedCardGap || 1;
+		const centerX = container.scrollLeft + container.clientWidth / 2;
+		const relative = centerX - cachedFirstCardOffset - cachedCardWidth / 2;
+		const rawIndex = Math.round(relative / step);
+		const maxIndex = cachedCardIds.length - 1;
+		const index = Math.min(Math.max(rawIndex, 0), maxIndex);
+		return cachedCardIds[index] ?? null;
 	};
 
 	// 2. 🤖 Scroll to specific card
 	const scrollToCard = (shopId) => {
 		const container = mobileCardScrollRef.value;
-		if (!container || !shopId) return;
+		const normalizedId = normalizeId(shopId);
+		if (!container || !normalizedId) return;
+		refreshCardMetrics();
 
-		const card = container.querySelector(`[data-shop-id="${shopId}"]`);
+		const card = container.querySelector(`[data-shop-id="${normalizedId}"]`);
 		if (!card) return;
 
 		const currentCenterId = getCenteredCardId();
-		if (currentCenterId === Number(shopId)) return;
+		if (currentCenterId && normalizeId(currentCenterId) === normalizedId)
+			return;
 
 		isProgrammaticScroll.value = true;
 
@@ -85,6 +114,7 @@ export function useScrollSync({
 	// 3. 🖐️ Main Scroll Listener
 	const handleHorizontalScroll = () => {
 		if (isProgrammaticScroll.value) return;
+		if (!cachedCardIds.length) refreshCardMetrics();
 
 		isUserScrolling.value = true;
 
@@ -97,17 +127,26 @@ export function useScrollSync({
 			window.requestAnimationFrame(() => {
 				const centerId = getCenteredCardId();
 
-				if (centerId && centerId !== Number(activeShopId.value)) {
+				if (
+					centerId &&
+					normalizeId(centerId) !== normalizeId(activeShopId.value)
+				) {
 					// Update ID directly (parent should bind this)
 					activeShopId.value = centerId;
 
 					// Sync Map
 					const shop = shops.value.find(
-						(s) => Number(s.id) === Number(centerId),
+						(s) => normalizeId(s.id) === normalizeId(centerId),
 					);
 					if (shop && mapRef.value && typeof smoothFlyTo === "function") {
 						smoothFlyTo([shop.lat, shop.lng]);
-						if (selectFeedback) selectFeedback(); // Optional haptic
+						if (
+							selectFeedback &&
+							Date.now() - lastHapticAt >= HAPTIC_INTERVAL_MS
+						) {
+							selectFeedback();
+							lastHapticAt = Date.now();
+						}
 					}
 				}
 				ticking = false;
@@ -118,20 +157,21 @@ export function useScrollSync({
 
 	// 4. 👀 Watcher: Active ID Change
 	watch(activeShopId, (newId) => {
-		if (newId) {
+		const normalizedId = normalizeId(newId);
+		if (normalizedId) {
 			const url = new URL(window.location);
-			url.searchParams.set("shop", newId);
+			url.searchParams.set("shop", normalizedId);
 			window.history.replaceState({}, "", url);
 		}
 
 		if (isUserScrolling.value) return;
 		if (isProgrammaticScroll.value) return;
 
-		if (newId) {
+		if (normalizedId) {
 			nextTick(() => {
 				const currentCenter = getCenteredCardId();
-				if (currentCenter !== Number(newId)) {
-					scrollToCard(newId);
+				if (normalizeId(currentCenter) !== normalizedId) {
+					scrollToCard(normalizedId);
 				}
 			});
 		}

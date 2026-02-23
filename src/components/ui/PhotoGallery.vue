@@ -198,7 +198,7 @@ onUnmounted(() => {
 
 .slide-enter-active,
 .slide-leave-active {
-  transition: all 0.2s ease;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 .slide-enter-from {

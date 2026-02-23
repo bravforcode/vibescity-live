@@ -1,0 +1,82 @@
+name: SEO Data Quality Alert
+
+on:
+  schedule:
+    - cron: "30 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seo-data-quality-alert
+  cancel-in-progress: false
+
+jobs:
+  seo-data-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "latest"
+
+      - name: Cache Bun install
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile || bun install
+
+      - name: Run SEO data quality check
+        id: quality
+        env:
+          SUPABASE_URL: "${{ secrets.SUPABASE_URL }}"
+          SUPABASE_SERVICE_ROLE_KEY: "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+          SEO_QUALITY_OUTPUT_PATH: "reports/ci/seo-data-quality.json"
+          SEO_QUALITY_FAIL_ON_ALERT: "0"
+          SEO_QUALITY_MAX_MISSING_SLUGS: "0"
+          SEO_QUALITY_MAX_MISSING_SHORT_CODES: "0"
+          SEO_QUALITY_MAX_DUPLICATE_SLUGS: "0"
+          SEO_QUALITY_MAX_DUPLICATE_SHORT_CODES: "0"
+          SEO_QUALITY_MAX_INVALID_SHORT_CODES: "0"
+        run: node scripts/ci/check-seo-data-quality.mjs
+
+      - name: Send alert webhook
+        if: ${{ steps.quality.outputs.alert == 'true' }}
+        env:
+          ALERT_TYPE: "seo_data_quality"
+          ALERT_TEXT: "${{ steps.quality.outputs.alert_text }}"
+          ALERT_LANE: "ci"
+          ALERT_TARGET: "seo-data-quality"
+          ALERT_RUN_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          ALERT_WEBHOOK_URL: "${{ secrets.ALERT_WEBHOOK_URL }}"
+          ALERT_DEDUP_WINDOW_MINUTES: "60"
+          ALERT_DEDUP_KEY: "seo-data-quality"
+        run: node scripts/ci/send-alert-webhook.mjs
+
+      - name: Upload SEO data quality report
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: seo-data-quality-report
+          path: reports/ci/seo-data-quality.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Fail on alert
+        if: ${{ steps.quality.outputs.alert == 'true' }}
+        run: exit 1

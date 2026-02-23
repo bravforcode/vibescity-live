@@ -1,0 +1,128 @@
+name: Visual Regression (GCS)
+
+on:
+  pull_request:
+    branches: ["**"]
+  workflow_dispatch:
+    inputs:
+      update_baseline:
+        description: "Update baseline snapshots in GCS (main only)"
+        required: false
+        default: "false"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: visual-regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  visual-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GCS_BUCKET: vibecity-visual-artifacts
+      GCP_PROJECT: festive-dolphin-473113-n9
+      PLAYWRIGHT_BASE_URL: http://localhost:5417
+      PW_GREP: "@visual"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Detect Google credentials
+        id: gcp_auth
+        run: |
+          if [ -n "${{ secrets.GOOGLE_CREDENTIALS }}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::GOOGLE_CREDENTIALS is not configured. Skipping GCS-backed visual regression lane."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile || bun install
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Skip visual regression (missing GCS credentials)
+        if: ${{ steps.gcp_auth.outputs.enabled != 'true' }}
+        run: echo "Skipping visual regression because GOOGLE_CREDENTIALS is not available for this run."
+
+      - name: Authenticate to Google Cloud
+        if: ${{ steps.gcp_auth.outputs.enabled == 'true' }}
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GOOGLE_CREDENTIALS }}
+
+      - name: Setup gcloud
+        if: ${{ steps.gcp_auth.outputs.enabled == 'true' }}
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT }}
+
+      - name: Resolve baseline key
+        if: ${{ steps.gcp_auth.outputs.enabled == 'true' }}
+        shell: bash
+        run: |
+          BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          SAFE_BRANCH=$(echo "$BRANCH" | tr '/[:space:]' '--')
+          if [[ "$BRANCH" == "main" || "$BRANCH" == "master" ]]; then
+            SAFE_BRANCH="main"
+          fi
+          echo "VISUAL_BASELINE_KEY=$SAFE_BRANCH" >> "$GITHUB_ENV"
+
+      - name: Download baseline snapshots from GCS
+        if: ${{ steps.gcp_auth.outputs.enabled == 'true' }}
+        shell: bash
+        run: |
+          mkdir -p tests/visual/critical.spec.ts-snapshots
+          gsutil -m cp -r "gs://${GCS_BUCKET}/baseline/${VISUAL_BASELINE_KEY}/*" "tests/visual/critical.spec.ts-snapshots/" || true
+
+      - name: Run visual regression
+        if: ${{ steps.gcp_auth.outputs.enabled == 'true' }}
+        shell: bash
+        run: |
+          UPDATE="${{ github.event.inputs.update_baseline || 'false' }}"
+          if [[ "$UPDATE" == "true" ]]; then
+            npx playwright test --config=playwright.visual.config.ts --update-snapshots
+          else
+            npx playwright test --config=playwright.visual.config.ts
+          fi
+
+      - name: Upload run artifacts to GCS
+        if: ${{ always() && steps.gcp_auth.outputs.enabled == 'true' }}
+        shell: bash
+        run: |
+          gsutil -m cp -r playwright-report "gs://${GCS_BUCKET}/runs/${GITHUB_SHA}/playwright-report" || true
+          gsutil -m cp -r test-results "gs://${GCS_BUCKET}/runs/${GITHUB_SHA}/test-results" || true
+          gsutil -m cp -r tests/visual/critical.spec.ts-snapshots "gs://${GCS_BUCKET}/runs/${GITHUB_SHA}/snapshots" || true
+
+      - name: Publish baseline to GCS (main + manual only)
+        if: steps.gcp_auth.outputs.enabled == 'true' && github.event_name == 'workflow_dispatch' && github.event.inputs.update_baseline == 'true' && (github.ref_name == 'main' || github.ref_name == 'master')
+        shell: bash
+        run: |
+          gsutil -m rsync -r -d tests/visual/critical.spec.ts-snapshots "gs://${GCS_BUCKET}/baseline/main"
+
+      - name: Upload GitHub artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-regression-${{ github.sha }}
+          path: |
+            playwright-report/**
+            test-results/**
+            tests/visual/critical.spec.ts-snapshots/**
+          retention-days: 14

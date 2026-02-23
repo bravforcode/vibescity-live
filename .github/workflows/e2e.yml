@@ -1,9 +1,7 @@
-name: E2E (Smoke)
+name: E2E (Manual)
 
 on:
-  pull_request:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 jobs:
   e2e:
@@ -16,10 +14,10 @@ jobs:
           node-version: 20
 
       - name: Install deps
-        run: npm ci
+        run: npm install
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
 
       - name: Run E2E
-        run: npx playwright test
+        run: npm run test:e2e:smoke

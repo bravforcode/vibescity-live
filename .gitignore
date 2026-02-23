@@ -31,6 +31,7 @@ coverage/
 # Block all .env files to prevent token leaks
 .env
 .env.local
+.env.*
 .env.*.local
 .env.development.local
 .env.test.local
@@ -40,6 +41,11 @@ coverage/
 
 # Sentry Config Auth Token
 .env.sentry-build-plugin
+
+# Local MCP config files
+.mcp.json
+mcp_config_ready_to_copy.json
+mcp_config*.local.json
 
 # ----------------------------------------
 # 5. Editor & OS Files
@@ -69,6 +75,10 @@ Thumbs.db
 public/data/chiangmai-main-roads-lanes.geojson
 public/data/chiangmai-main-roads.geojson
 
+# Prevent accidental large extension bundles/assets from landing in public/
+*.vsix
+public/images/animation/*.vsix
+
 # ----------------------------------------
 # 8. Testing
 # ----------------------------------------
@@ -83,6 +93,7 @@ tests/e2e/screenshots/
 # ----------------------------------------
 # Temporary and system files that are not needed in version control
 .worktrees/
+.venv/
 *.bak
 *.swp
 *.swo
@@ -139,3 +150,29 @@ reports/
 junit.xml
 **/junit.xml
 sonar-report.xml
+
+# Python caches
+__pycache__/
+*.pyc
+
+# Virtual envs
+.venv*/
+venv*/
+
+# Playwright reports
+playwright-report*/
+
+# Temporary files
+.tmp*
+
+nul
+playwright-report*/
+AGENTS.md
+CLAUDE.md
+.claude/
+.tmp*
+# local notes / artifacts
+findings.md
+progress.md
+task_plan.md
+observability/

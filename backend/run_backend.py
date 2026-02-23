@@ -14,4 +14,6 @@ except Exception as e:
     sys.exit(1)
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8001)
+    host = os.getenv("BACKEND_HOST", "0.0.0.0").strip() or "0.0.0.0"
+    port = int(os.getenv("BACKEND_PORT", "8000"))
+    uvicorn.run(app, host=host, port=port)

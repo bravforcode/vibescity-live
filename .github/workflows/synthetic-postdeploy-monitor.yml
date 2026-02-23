@@ -1,0 +1,469 @@
+name: Synthetic Postdeploy Monitor
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+concurrency:
+  group: synthetic-postdeploy-monitor
+  cancel-in-progress: true
+
+jobs:
+  synthetic-postdeploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      api_classification: ${{ steps.synthetic_api_summary.outputs.classification }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "latest"
+
+      - name: Cache Bun install
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile || bun install
+
+      - name: DNS precheck for vibecity-api.fly.dev
+        id: dns_precheck
+        continue-on-error: true
+        run: node scripts/ci/dns-precheck.mjs vibecity-api.fly.dev
+
+      - name: Alert DNS precheck failure (infra)
+        if: ${{ steps.dns_precheck.outcome == 'failure' }}
+        continue-on-error: true
+        env:
+          SYNTHETIC_ALERT_WEBHOOK_URL: "${{ secrets.SYNTHETIC_ALERT_WEBHOOK_URL }}"
+          RUN_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          ALERT_TYPE: "dns_precheck_failed"
+          ALERT_TEXT: "Synthetic monitor infra issue: DNS precheck failed for vibecity-api.fly.dev"
+          ALERT_LANE: "synthetic-postdeploy"
+          ALERT_HOST: "vibecity-api.fly.dev"
+          ALERT_RUN_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          ALERT_MAX_RETRIES: "4"
+          ALERT_RETRY_DELAY_MS: "2000"
+          ALERT_DEDUP_WINDOW_MINUTES: "30"
+          ALERT_DEDUP_KEY: "dns_precheck_failed::vibecity-api.fly.dev"
+        run: |
+          echo "::error::Synthetic monitor infra issue: DNS precheck failed for vibecity-api.fly.dev"
+          {
+            echo "## Synthetic Alert: Infra DNS Failure"
+            echo "- Type: dns_precheck_failed"
+            echo "- Host: vibecity-api.fly.dev"
+            echo "- Run: $RUN_URL"
+          } >> "$GITHUB_STEP_SUMMARY"
+          node scripts/ci/send-alert-webhook.mjs
+
+      - name: Stop if DNS precheck failed
+        if: ${{ steps.dns_precheck.outcome == 'failure' }}
+        run: exit 1
+
+      - name: Run read-only synthetic healthcheck
+        id: api_healthcheck
+        env:
+          POSTDEPLOY_API_BASE_URL: "https://vibecity-api.fly.dev"
+          POSTDEPLOY_EDGE_BASE_URL: "${{ vars.POSTDEPLOY_EDGE_BASE_URL || 'https://nluuvnttweesnkrmgzsm.supabase.co/functions/v1' }}"
+          POSTDEPLOY_SUPABASE_JWT: "${{ secrets.POSTDEPLOY_SUPABASE_JWT }}"
+          POSTDEPLOY_ORDER_ID: "${{ vars.POSTDEPLOY_ORDER_ID || secrets.POSTDEPLOY_ORDER_ID }}"
+          POSTDEPLOY_READ_ONLY: "1"
+          POSTDEPLOY_MAX_RETRIES: "4"
+          POSTDEPLOY_RETRY_DELAY_MS: "3000"
+          POSTDEPLOY_FETCH_TIMEOUT_MS: "10000"
+          POSTDEPLOY_REPORT_PATH: "reports/ci/postdeploy-route-health.json"
+        run: bun run healthcheck:postdeploy
+
+      - name: Evaluate route-level SLO thresholds
+        id: route_slo_eval
+        if: ${{ always() && steps.dns_precheck.outcome != 'failure' }}
+        env:
+          ROUTE_HEALTH_REPORT_PATH: "reports/ci/postdeploy-route-health.json"
+          ROUTE_SLO_CONFIG_PATH: "scripts/ci/route-slo-thresholds.json"
+          ROUTE_SLO_OUTPUT_PATH: "reports/ci/route-slo-evaluation.json"
+          ROUTE_SLO_FAIL_ON_REQUIRED: "1"
+        run: node scripts/ci/evaluate-route-slo.mjs
+
+      - name: Synthetic API summary
+        id: synthetic_api_summary
+        if: ${{ always() }}
+        run: |
+          if [ "${{ steps.dns_precheck.outcome }}" = "failure" ]; then
+            CLASSIFICATION="INFRA (DNS precheck failed before route checks)"
+            CLASSIFICATION_CODE="INFRA_DNS"
+          elif [ "${{ steps.api_healthcheck.outcome }}" = "failure" ]; then
+            CLASSIFICATION="APP/API (DNS ok, route checks failed)"
+            CLASSIFICATION_CODE="APP_API_ROUTE"
+          elif [ "${{ steps.route_slo_eval.outcome }}" = "failure" ]; then
+            CLASSIFICATION="APP/API (route-level SLO breach)"
+            CLASSIFICATION_CODE="APP_API_ROUTE_SLO"
+          else
+            CLASSIFICATION="PASS"
+            CLASSIFICATION_CODE="PASS"
+          fi
+
+          {
+            echo "## Synthetic Monitor: API Read-Only"
+            echo "- Job status: ${{ job.status }}"
+            echo "- API base: https://vibecity-api.fly.dev"
+            echo "- DNS precheck: ${{ steps.dns_precheck.outcome }}"
+            echo "- API healthcheck: ${{ steps.api_healthcheck.outcome }}"
+            echo "- Route SLO evaluation: ${{ steps.route_slo_eval.outcome }}"
+            echo "- Read-only mode: enabled"
+            echo "- Classification: $CLASSIFICATION"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "classification=$CLASSIFICATION_CODE" >> "$GITHUB_OUTPUT"
+
+      - name: Upload synthetic API route report
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-api-route-report
+          path: reports/ci/postdeploy-route-health.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload route SLO evaluation
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: route-slo-evaluation
+          path: reports/ci/route-slo-evaluation.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Save Step Summary (synthetic-postdeploy)
+        if: ${{ always() && !cancelled() }}
+        run: |
+          mkdir -p reports/ci
+          cp "$GITHUB_STEP_SUMMARY" reports/ci/step-summary-synthetic-api.md || true
+
+      - name: Upload Step Summary (synthetic-postdeploy)
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: step-summary-synthetic-api
+          path: reports/ci/step-summary-synthetic-api.md
+          retention-days: 14
+          if-no-files-found: ignore
+
+  browser-smoke-map-lite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "latest"
+
+      - name: Cache Bun install
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile || bun install
+
+      - name: Install Playwright browser (Chromium)
+        run: bunx playwright install --with-deps chromium
+
+      - name: Validate MAPBOX_PUBLIC_TOKEN (synthetic browser)
+        run: |
+          if [ -z "${{ secrets.MAPBOX_PUBLIC_TOKEN }}" ]; then
+            echo "MAPBOX_PUBLIC_TOKEN is required for browser smoke synthetic."
+            exit 1
+          fi
+
+      - name: Validate SYNTHETIC_MAP_BASE_URL
+        run: |
+          TARGET_URL="${{ vars.SYNTHETIC_MAP_BASE_URL }}"
+          if [ -z "$TARGET_URL" ]; then
+            echo "SYNTHETIC_MAP_BASE_URL is required and must point to the deployed map web app URL."
+            exit 1
+          fi
+          if ! echo "$TARGET_URL" | grep -Eq '^https://'; then
+            echo "SYNTHETIC_MAP_BASE_URL must be an https URL. Got: $TARGET_URL"
+            exit 1
+          fi
+
+      - name: Validate synthetic target resolves to map app
+        id: target_preflight
+        continue-on-error: true
+        env:
+          SYNTHETIC_MAP_BASE_URL: "${{ vars.SYNTHETIC_MAP_BASE_URL }}"
+          SYNTHETIC_TARGET_MUST_CONTAIN: '<div id="app"'
+          SYNTHETIC_TARGET_FORBID: "avondale entertainment||wp-content||wordpress"
+        run: node scripts/ci/validate-synthetic-map-target.mjs
+
+      - name: Alert preflight target mismatch
+        if: ${{ steps.target_preflight.outcome == 'failure' }}
+        continue-on-error: true
+        env:
+          SYNTHETIC_ALERT_WEBHOOK_URL: "${{ secrets.SYNTHETIC_ALERT_WEBHOOK_URL }}"
+          SYNTHETIC_MAP_BASE_URL: "${{ vars.SYNTHETIC_MAP_BASE_URL }}"
+          RUN_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          ALERT_TYPE: "preflight_target_mismatch"
+          ALERT_TEXT: "Synthetic monitor target mismatch: preflight failed"
+          ALERT_LANE: "browser-smoke-map-lite"
+          ALERT_TARGET: "${{ vars.SYNTHETIC_MAP_BASE_URL }}"
+          ALERT_RUN_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          ALERT_MAX_RETRIES: "4"
+          ALERT_RETRY_DELAY_MS: "2000"
+          ALERT_DEDUP_WINDOW_MINUTES: "30"
+          ALERT_DEDUP_KEY: "preflight_target_mismatch::${{ vars.SYNTHETIC_MAP_BASE_URL }}"
+        run: |
+          echo "::error::Synthetic monitor target mismatch: preflight failed for ${SYNTHETIC_MAP_BASE_URL}"
+          {
+            echo "## Synthetic Alert: Preflight Target Mismatch"
+            echo "- Type: preflight_target_mismatch"
+            echo "- Target: ${SYNTHETIC_MAP_BASE_URL}"
+            echo "- Run: $RUN_URL"
+          } >> "$GITHUB_STEP_SUMMARY"
+          node scripts/ci/send-alert-webhook.mjs
+
+      - name: Stop if preflight mismatch detected
+        if: ${{ steps.target_preflight.outcome == 'failure' }}
+        run: exit 1
+
+      - name: Run smoke map lite on production
+        env:
+          PLAYWRIGHT_BASE_URL: "${{ vars.SYNTHETIC_MAP_BASE_URL }}"
+          PW_NO_WEBSERVER: "1"
+          PW_LOW_MEM: "1"
+          E2E_MAP_REQUIRED: "1"
+          VITE_MAPBOX_TOKEN: "${{ secrets.MAPBOX_PUBLIC_TOKEN }}"
+        run: bun run test:e2e:smoke-map-lite
+
+      - name: Synthetic browser summary
+        if: ${{ always() }}
+        run: node scripts/ci/e2e-summary.mjs --lane smoke-map-lite --junit reports/e2e/junit.xml
+
+      - name: Upload Playwright report (smoke-map-lite)
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-smoke-map-lite
+          path: playwright-report/
+          retention-days: 14
+
+      - name: Save Step Summary (browser-smoke-map-lite)
+        if: ${{ always() && !cancelled() }}
+        run: |
+          mkdir -p reports/ci
+          cp "$GITHUB_STEP_SUMMARY" reports/ci/step-summary-synthetic-browser.md || true
+
+      - name: Upload Step Summary (browser-smoke-map-lite)
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: step-summary-synthetic-browser
+          path: reports/ci/step-summary-synthetic-browser.md
+          retention-days: 14
+          if-no-files-found: ignore
+
+  release-health-snapshot:
+    if: ${{ always() }}
+    needs: [synthetic-postdeploy, browser-smoke-map-lite]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Download synthetic API route report
+        if: ${{ always() }}
+        uses: actions/download-artifact@v4
+        with:
+          name: synthetic-api-route-report
+          path: reports/ci
+          if-no-artifact-found: warn
+
+      - name: Download route SLO evaluation
+        if: ${{ always() }}
+        uses: actions/download-artifact@v4
+        with:
+          name: route-slo-evaluation
+          path: reports/ci
+          if-no-artifact-found: warn
+
+      - name: Build release health snapshot
+        env:
+          SYNTHETIC_API_RESULT: "${{ needs.synthetic-postdeploy.result }}"
+          SYNTHETIC_BROWSER_RESULT: "${{ needs.browser-smoke-map-lite.result }}"
+          SYNTHETIC_API_CLASSIFICATION: "${{ needs.synthetic-postdeploy.outputs.api_classification }}"
+          SYNTHETIC_API_ROUTE_REPORT_PATH: "reports/ci/postdeploy-route-health.json"
+        run: node scripts/ci/build-release-health-snapshot.mjs
+
+      - name: Append 7-day trend summary (strict/quarantine/synthetic)
+        if: ${{ always() }}
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TREND_DAYS: "7"
+          TREND_STRICT_MIN_PASS_RATE: "95"
+          TREND_SYNTHETIC_OVERALL_MIN_PASS_RATE: "95"
+          TREND_TITLE: "7-Day Quality Trend Snapshot"
+          TREND_OUTPUT_PATH: "reports/ci/synthetic-trend-7d.json"
+        run: node scripts/ci/weekly-quality-trend.mjs
+
+      - name: Provision BigQuery observability tables (partitioning + retention)
+        if: ${{ always() }}
+        continue-on-error: true
+        env:
+          BIGQUERY_PROJECT_ID: "${{ vars.BIGQUERY_PROJECT_ID }}"
+          BIGQUERY_DATASET: "${{ vars.BIGQUERY_DATASET }}"
+          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON }}"
+          BIGQUERY_ALLOW_CREATE_DATASET: "0"
+          BIGQUERY_ALLOW_CREATE_TABLES: "1"
+          BIGQUERY_APPLY_PARTITION_RETENTION: "1"
+          BIGQUERY_OBS_PARTITION_RETENTION_DAYS: "365"
+          BIGQUERY_SET_DATASET_DEFAULTS: "0"
+          BIGQUERY_PROVISION_OUTPUT_PATH: "reports/ci/bigquery-provision-log.json"
+          BIGQUERY_PROVISION_FAIL_ON_ERROR: "0"
+        run: node scripts/ci/provision-bigquery-observability.mjs
+
+      - name: Publish observability metrics (BigQuery + Loki)
+        if: ${{ always() }}
+        continue-on-error: true
+        env:
+          OBS_LANE: "synthetic-postdeploy-monitor"
+          OBS_ROUTE_REPORT_PATH: "reports/ci/postdeploy-route-health.json"
+          OBS_ROUTE_SLO_PATH: "reports/ci/route-slo-evaluation.json"
+          OBS_RELEASE_SNAPSHOT_PATH: "reports/ci/release-health-snapshot.json"
+          OBS_SYNTHETIC_TREND_PATH: "reports/ci/synthetic-trend-7d.json"
+          OBS_WEEKLY_TREND_PATH: "reports/ci/weekly-quality-trend.json"
+          OBS_MONTHLY_TREND_PATH: "reports/ci/monthly-quality-trend.json"
+          OBS_LIGHTHOUSE_SUMMARY_PATH: "reports/ci/weekly-lighthouse-summary.json"
+          OBS_METRICS_OUTPUT_PATH: "reports/ci/metrics-export-log.json"
+          OBS_METRICS_FAIL_ON_ERROR: "0"
+          BIGQUERY_PROJECT_ID: "${{ vars.BIGQUERY_PROJECT_ID }}"
+          BIGQUERY_DATASET: "${{ vars.BIGQUERY_DATASET }}"
+          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON }}"
+          GRAFANA_LOKI_URL: "${{ vars.GRAFANA_LOKI_URL }}"
+          GRAFANA_LOKI_USER: "${{ vars.GRAFANA_LOKI_USER }}"
+          GRAFANA_LOKI_TOKEN: "${{ secrets.GRAFANA_LOKI_TOKEN }}"
+        run: node scripts/ci/publish-observability-metrics.mjs
+
+      - name: Manage incidents (consecutive breach automation)
+        if: ${{ always() }}
+        continue-on-error: true
+        env:
+          INCIDENT_ROUTE_SLO_PATH: "reports/ci/route-slo-evaluation.json"
+          INCIDENT_SYNTHETIC_TREND_PATH: "reports/ci/synthetic-trend-7d.json"
+          INCIDENT_WEEKLY_TREND_PATH: "reports/ci/weekly-quality-trend.json"
+          INCIDENT_MONTHLY_TREND_PATH: "reports/ci/monthly-quality-trend.json"
+          INCIDENT_OUTPUT_PATH: "reports/ci/incident-manager-log.json"
+          INCIDENT_CONSECUTIVE_THRESHOLD: "3"
+          INCIDENT_RECOVERY_THRESHOLD: "3"
+          INCIDENT_DRY_RUN: "0"
+          INCIDENT_FAIL_ON_ERROR: "0"
+          INCIDENT_SUPPRESS: "${{ vars.INCIDENT_SUPPRESS }}"
+          INCIDENT_SUPPRESS_UNTIL_UTC: "${{ vars.INCIDENT_SUPPRESS_UNTIL_UTC }}"
+          INCIDENT_SUPPRESS_START_UTC: "${{ vars.INCIDENT_SUPPRESS_START_UTC }}"
+          INCIDENT_SUPPRESS_END_UTC: "${{ vars.INCIDENT_SUPPRESS_END_UTC }}"
+          INCIDENT_SUPPRESS_WINDOWS_UTC: "${{ vars.INCIDENT_SUPPRESS_WINDOWS_UTC }}"
+          INCIDENT_SUPPRESS_REASON: "${{ vars.INCIDENT_SUPPRESS_REASON }}"
+          BIGQUERY_PROJECT_ID: "${{ vars.BIGQUERY_PROJECT_ID }}"
+          BIGQUERY_DATASET: "${{ vars.BIGQUERY_DATASET }}"
+          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON }}"
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          GITHUB_REPOSITORY: "${{ github.repository }}"
+          GITHUB_SERVER_URL: "${{ github.server_url }}"
+          GITHUB_RUN_ID: "${{ github.run_id }}"
+        run: node scripts/ci/manage-incidents.mjs
+
+      - name: Upload release health snapshot
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-health-snapshot
+          path: reports/ci/release-health-snapshot.json
+          retention-days: 30
+
+      - name: Upload synthetic trend snapshot (7d)
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-trend-7d
+          path: reports/ci/synthetic-trend-7d.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload metrics export log
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: metrics-export-log
+          path: reports/ci/metrics-export-log.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload BigQuery provision log
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bigquery-provision-log
+          path: reports/ci/bigquery-provision-log.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload incident manager log
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: incident-manager-log
+          path: reports/ci/incident-manager-log.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Save Step Summary (release-health-snapshot)
+        if: ${{ always() && !cancelled() }}
+        run: |
+          mkdir -p reports/ci
+          cp "$GITHUB_STEP_SUMMARY" reports/ci/step-summary-release-health.md || true
+
+      - name: Upload Step Summary (release-health-snapshot)
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: step-summary-release-health
+          path: reports/ci/step-summary-release-health.md
+          retention-days: 14
+          if-no-files-found: ignore

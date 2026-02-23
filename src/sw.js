@@ -1,3 +1,5 @@
+// NOTE: Rsbuild serves `/public/sw.js` in production.
+// This module is kept for legacy bundlers that inject __WB_MANIFEST.
 import { clientsClaim } from "workbox-core";
 import { ExpirationPlugin } from "workbox-expiration";
 import { cleanupOutdatedCaches, precacheAndRoute } from "workbox-precaching";

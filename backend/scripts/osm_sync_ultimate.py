@@ -110,6 +110,13 @@ class Config:
         self.SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 
         self.REDIS_URL = os.getenv("REDIS_URL", "")
+        env_name = os.getenv("ENV", "").strip().lower()
+        ci_mode = os.getenv("CI", "").strip().lower() == "true"
+        default_allow_fake_redis = "false" if ci_mode or env_name == "production" else "true"
+        self.ALLOW_FAKE_REDIS = (
+            os.getenv("ALLOW_FAKE_REDIS", default_allow_fake_redis).strip().lower()
+            in ("1", "true", "yes", "on")
+        )
 
         self.OVERPASS_URLS = [
             "https://overpass-api.de/api/interpreter",
@@ -147,6 +154,8 @@ class Config:
         self.STREAM_CREATED = "venues:created"
         self.STREAM_UPDATED = "venues:updated"
         self.STREAM_HEATMAP_INVALIDATE = "heatmap:invalidate"
+        # Keep Redis Streams bounded; unlimited streams will OOM small Redis plans.
+        self.STREAM_MAXLEN = int(os.getenv("STREAM_MAXLEN", "20000"))
 
     def validate(self):
         if not self.SUPABASE_URL or not self.SUPABASE_SERVICE_ROLE_KEY:
@@ -156,6 +165,28 @@ class Config:
 
 
 conf = Config()
+
+REQUIRED_VENUES_COLUMNS = (
+    "id",
+    "name",
+    "category",
+    "location",
+    "province",
+    "status",
+    "source",
+    "vibe_info",
+    "open_time",
+    "social_links",
+    "legacy_shop_id",
+    "osm_type",
+    "h3_cell",
+    "content_hash",
+    "source_hash",
+    "osm_version",
+    "osm_timestamp",
+    "last_seen_at",
+    "last_osm_sync",
+)
 
 
 # -----------------------------
@@ -368,7 +399,8 @@ def transform_element(el: Dict[str, Any], tile_id: str) -> Optional[ProcessedVen
         "category": category,
         "location": f"SRID=4326;POINT({lon} {lat})",
         "province": province[:32],
-        "status": "LIVE",
+        "status": "active",
+        "source": "osm",
         "vibe_info": vibe_info,
         "open_time": open_time,
         "social_links": {
@@ -422,6 +454,9 @@ class EventBus:
                 else:
                     msg[k] = str(v)
             pipe.xadd(stream, msg)
+        # Prevent unbounded streams from filling Redis memory (common cause of OutOfMemoryError).
+        if getattr(conf, "STREAM_MAXLEN", 0):
+            pipe.xtrim(stream, maxlen=conf.STREAM_MAXLEN, approximate=True)
         pipe.execute()
 
 class Scheduler:
@@ -482,6 +517,16 @@ class Scheduler:
 class DBManager:
     def __init__(self, sb: Client):
         self.sb = sb
+
+    def validate_required_columns(self) -> None:
+        """Fail fast when venues contract does not include required OSM columns."""
+        try:
+            self.sb.table("venues").select(",".join(REQUIRED_VENUES_COLUMNS)).limit(1).execute()
+        except Exception as e:
+            raise RuntimeError(
+                "Missing required public.venues columns for OSM sync. "
+                f"Expected columns: {', '.join(REQUIRED_VENUES_COLUMNS)}"
+            ) from e
 
     def fetch_existing(self, type_id_pairs: List[Tuple[str, int]]) -> Dict[Tuple[str, int], Dict[str, Any]]:
         if not type_id_pairs:
@@ -574,15 +619,56 @@ class DensityPrewarmer:
 # -----------------------------
 # Main App
 # -----------------------------
+def connect_redis_with_scheme_fallback(redis_url: str) -> redis.Redis:
+    """
+    Connect to Redis and auto-retry with swapped URL scheme when TLS mode is mismatched.
+    This keeps scheduled jobs resilient to redis:// vs rediss:// configuration drift.
+    """
+    candidates = [redis_url]
+    if redis_url.startswith("rediss://"):
+        candidates.append(f"redis://{redis_url[len('rediss://'):]}")
+    elif redis_url.startswith("redis://"):
+        candidates.append(f"rediss://{redis_url[len('redis://'):]}")
+
+    last_error: Exception | None = None
+    for idx, candidate in enumerate(candidates):
+        try:
+            client = redis.from_url(candidate, decode_responses=True)
+            client.ping()
+            if candidate != redis_url:
+                logger.warning(f"⚠️ Redis connected using fallback URL scheme: {candidate.split(':', 1)[0]}://")
+            return client
+        except Exception as exc:
+            last_error = exc
+            is_ssl_mismatch = "WRONG_VERSION_NUMBER" in str(exc)
+            has_next = idx < len(candidates) - 1
+            if has_next:
+                if is_ssl_mismatch:
+                    logger.warning(
+                        "⚠️ Redis SSL mismatch detected; retrying with alternate URL scheme."
+                    )
+                else:
+                    logger.warning(
+                        f"⚠️ Redis connect attempt failed ({exc}); retrying alternate URL scheme."
+                    )
+
+    if last_error:
+        raise last_error
+    raise RuntimeError("Redis connection failed before any candidate URL was attempted.")
+
+
 class UltimateSync:
     def __init__(self):
         conf.validate()
 
         try:
-            self.redis = redis.from_url(conf.REDIS_URL, decode_responses=True)
-            self.redis.ping()
+            self.redis = connect_redis_with_scheme_fallback(conf.REDIS_URL)
             logger.info("🔌 Connected to Real Redis")
         except Exception as e:
+            if not conf.ALLOW_FAKE_REDIS:
+                raise RuntimeError(
+                    f"Redis connection failed and ALLOW_FAKE_REDIS=false: {e}"
+                ) from e
             logger.warning(f"⚠️ Real Redis failed ({e}). Falling back to fakeredis.")
             try:
                 import fakeredis
@@ -594,6 +680,7 @@ class UltimateSync:
 
         self.sb = create_client(conf.SUPABASE_URL, conf.SUPABASE_SERVICE_ROLE_KEY)
         self.db = DBManager(self.sb)
+        self.db.validate_required_columns()
 
         self.bus = EventBus(self.redis)
         self.scheduler = Scheduler(self.redis)
@@ -606,6 +693,32 @@ class UltimateSync:
 
         self.tiles = generate_thailand_tiles()
         self.scheduler.ensure_initialized(self.tiles)
+
+    @staticmethod
+    def _new_summary(mode: str, iterations: int) -> Dict[str, Any]:
+        return {
+            "mode": mode,
+            "iterations": iterations,
+            "tiles_processed": 0,
+            "tiles_failed": 0,
+            "created": 0,
+            "updated": 0,
+            "unchanged": 0,
+            "elements": 0,
+            "incoming": 0,
+        }
+
+    @staticmethod
+    def _apply_summary(summary: Dict[str, Any], result: Dict[str, Any]) -> None:
+        summary["tiles_processed"] += 1
+        if not result.get("ok"):
+            summary["tiles_failed"] += 1
+            return
+        summary["created"] += int(result.get("created", 0))
+        summary["updated"] += int(result.get("updated", 0))
+        summary["unchanged"] += int(result.get("unchanged", 0))
+        summary["elements"] += int(result.get("elements", 0))
+        summary["incoming"] += int(result.get("incoming", 0))
 
     def sync_tile(self, tid: str, full: bool) -> Dict[str, Any]:
         started = utc_now()
@@ -755,23 +868,29 @@ class UltimateSync:
             self.scheduler.schedule_next(tid, success=False)
             return {"tile": tid, "ok": False, "error": str(e)}
 
-    def run_full(self) -> None:
+    def run_full(self) -> Dict[str, Any]:
         logger.info("🚀 FULL SYNC START (all tiles)")
         self.prewarmer.prewarm()
+        summary = self._new_summary(mode="full", iterations=1)
 
         with ThreadPoolExecutor(max_workers=conf.WORKERS) as ex:
             futures = [ex.submit(self.sync_tile, t.str(), True) for t in self.tiles]
             for f in as_completed(futures):
                 r = f.result()
+                self._apply_summary(summary, r)
                 if r.get("ok"):
                     logger.info(f"✅ {r['tile']} | +{r['created']} ~{r['updated']} ={r['unchanged']} | {r['elapsed_s']}s")
                 else:
                     logger.warning(f"❌ {r['tile']} | {r.get('error')}")
 
         logger.info("🏁 FULL SYNC DONE")
+        summary["ok"] = summary["tiles_failed"] == 0
+        logger.info("OSM_SYNC_SUMMARY=%s", json.dumps(summary, ensure_ascii=False, sort_keys=True))
+        return summary
 
-    def run_loop(self, iterations: int) -> None:
+    def run_loop(self, iterations: int) -> Dict[str, Any]:
         logger.info(f"⚡ INCREMENTAL LOOP START | iterations={iterations} workers={conf.WORKERS}")
+        summary = self._new_summary(mode="loop", iterations=iterations)
         for i in range(iterations):
             # prewarm every tick
             self.prewarmer.prewarm()
@@ -786,12 +905,16 @@ class UltimateSync:
                 futures = [ex.submit(self.sync_tile, tid, False) for tid in due]
                 for f in as_completed(futures):
                     r = f.result()
+                    self._apply_summary(summary, r)
                     if r.get("ok"):
                         logger.info(f"✅ {r['tile']} | +{r['created']} ~{r['updated']} ={r['unchanged']} | newer={r['used_newer']}")
                     else:
                         logger.warning(f"❌ {r['tile']} | {r.get('error')}")
 
         logger.info("🏁 LOOP DONE")
+        summary["ok"] = summary["tiles_failed"] == 0
+        logger.info("OSM_SYNC_SUMMARY=%s", json.dumps(summary, ensure_ascii=False, sort_keys=True))
+        return summary
 
 
 def main():

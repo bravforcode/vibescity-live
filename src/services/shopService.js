@@ -7,15 +7,9 @@ import { supabase } from "../lib/supabase";
 const mapShopData = (item, index) => {
 	// Handle array images from 'venues' or legacy individual columns
 	const img1 =
-		item.image_urls?.[0] ||
-		item.image_url_1 ||
-		item.Image_URL1 ||
-		"";
+		item.image_urls?.[0] || item.image_url_1 || item.Image_URL1 || "";
 	const img2 =
-		item.image_urls?.[1] ||
-		item.image_url_2 ||
-		item.Image_URL2 ||
-		"";
+		item.image_urls?.[1] || item.image_url_2 || item.Image_URL2 || "";
 
 	return {
 		id: item.id || index,
@@ -197,24 +191,70 @@ export const postReview = async (shopId, review) => {
 };
 
 /**
- * Real-time subscription helper (Optional enhancement)
+ * RPC: Get Feed Cards (20km radius, limit 30)
  */
-export const subscribeToShopUpdates = (callback) => {
-	return supabase
-		.channel("public:table_updates")
-		.on(
-			"postgres_changes",
-			{ event: "*", schema: "public", table: "venues" }, // Listen to venues
-			(payload) => {
-				callback({ type: "shop", payload });
-			},
-		)
-		.on(
-			"postgres_changes",
-			{ event: "INSERT", schema: "public", table: "reviews" },
-			(payload) => {
-				callback({ type: "review", payload });
-			},
-		)
-		.subscribe();
+export const getFeedCards = async (lat, lng) => {
+	try {
+		const { data, error } = await supabase.rpc("get_feed_cards", {
+			p_lat: lat,
+			p_lng: lng,
+		});
+
+		if (error) throw error;
+
+		return (data || []).map((item) => ({
+			...mapShopData(item),
+			distanceKm: item.distance_km,
+			pinType: item.pin_type,
+			pinMetadata: item.pin_metadata,
+			verifiedActive: item.verified_active, // Use this for UI badge
+			glowActive: item.glow_active,
+			boostActive: item.boost_active,
+			giantActive: item.giant_active,
+		}));
+	} catch (error) {
+		console.error("Error fetching feed cards:", error);
+		return [];
+	}
+};
+
+/**
+ * RPC: Get Map Pins (Bounds + Zoom Rules)
+ */
+export const getMapPins = async ({
+	p_min_lat,
+	p_min_lng,
+	p_max_lat,
+	p_max_lng,
+	p_zoom,
+}) => {
+	try {
+		const { data, error } = await supabase.rpc("get_map_pins", {
+			p_min_lat,
+			p_min_lng,
+			p_max_lat,
+			p_max_lng,
+			p_zoom: Math.round(p_zoom),
+		});
+
+		if (error) throw error;
+
+		return (data || []).map((item) => ({
+			id: item.id,
+			name: item.name,
+			lat: item.lat,
+			lng: item.lng,
+			pinType: item.pin_type,
+			pinMetadata: item.pin_metadata, // { giant_category, model_scale }
+			verifiedActive: item.verified_active,
+			glowActive: item.glow_active,
+			boostActive: item.boost_active,
+			giantActive: item.giant_active,
+			visibilityScore: item.visibility_score,
+			coverImage: item.cover_image,
+		}));
+	} catch (error) {
+		console.error("Error fetching map pins:", error);
+		return [];
+	}
 };

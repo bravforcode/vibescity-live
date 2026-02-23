@@ -55,7 +55,7 @@ export const checkAppInstalled = (appName) => {
 		const onVisibilityChange = () => {
 			if (document.visibilityState === "hidden" && !resolved) {
 				resolved = true;
-				document.body.removeChild(iframe);
+				iframe.remove();
 				resolve(true); // App likely opened
 			}
 		};
@@ -65,7 +65,7 @@ export const checkAppInstalled = (appName) => {
 			document.removeEventListener("visibilitychange", onVisibilityChange);
 			if (!resolved) {
 				resolved = true;
-				document.body.removeChild(iframe);
+				iframe.remove();
 				const elapsed = Date.now() - startTime;
 				// Best-effort heuristic: if elapsed > 100ms, maybe app responded
 				resolve(elapsed > 100);

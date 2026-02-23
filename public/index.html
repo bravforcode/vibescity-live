@@ -2,42 +2,20 @@
 <html lang="th">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/Vlive.svg" />
+    <link rel="icon" type="image/svg+xml" href="/images/pins/Vlive.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- PWA & Theme Color -->
-    <meta
-      name="theme-color"
-      content="#8B5CF6"
-      media="(prefers-color-scheme: light)"
-    />
-    <meta
-      name="theme-color"
-      content="#0f0f1a"
-      media="(prefers-color-scheme: dark)"
-    />
+    <meta name="theme-color" content="#8B5CF6" />
     <link rel="manifest" href="/manifest.json" />
-    <link rel="apple-touch-icon" href="/pwa-192x192.png" />
-    <title>Live City - Chiang Mai Entertainment</title>
-    <!-- Microsoft Clarity -->
-    <script type="text/javascript">
-      ((c, l, a, r, i, t, y) => {
-        c[a] =
-          c[a] ||
-          function () {
-            (c[a].q = c[a].q || []).push(arguments);
-          };
-        t = l.createElement(r);
-        t.async = 1;
-        t.src = "https://www.clarity.ms/tag/" + i;
-        y = l.getElementsByTagName(r)[0];
-        y.parentNode.insertBefore(t, y);
-      })(window, document, "clarity", "script", "v6esho1lqx");
-    </script>
+    <link rel="apple-touch-icon" href="/images/pins/Vlive.svg" />
+    <title>VibeCity - Chiang Mai Entertainment</title>
+    <link rel="canonical" href="https://vibecity.live/" />
     <!-- SEO & social media metadata -->
     <meta
       name="description"
       content="VibeCity.live - Discover Chiang Mai's best nightlife, bars, and entertainment in real-time."
     />
+    <meta name="robots" content="index,follow" />
     <meta
       property="og:title"
       content="VibeCity.live | Local Entertainment Map"
@@ -46,9 +24,37 @@
       property="og:description"
       content="Discover the hottest venues in Chiang Mai with real-time vibe updates and navigation."
     />
-    <meta property="og:image" content="/Vlive.svg" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="VibeCity" />
+    <meta property="og:locale" content="th_TH" />
+    <meta
+      property="og:image"
+      content="https://vibecity.live/api/v1/seo/og/site.png"
+    />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta property="og:url" content="https://vibecity.live" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="VibeCity.live | Local Entertainment Map" />
+    <meta
+      name="twitter:description"
+      content="Discover the hottest venues in Chiang Mai with real-time vibe updates and navigation."
+    />
+    <meta
+      name="twitter:image"
+      content="https://vibecity.live/api/v1/seo/og/site.png"
+    />
+
+    <!-- Structured Data (Website) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "VibeCity",
+        "url": "https://vibecity.live",
+        "inLanguage": ["th", "en"]
+      }
+    </script>
 
     <!-- Mobile Web App Capable -->
     <meta name="mobile-web-app-capable" content="yes" />
@@ -58,7 +64,7 @@
       content="black-translucent"
     />
     <meta name="apple-mobile-web-app-title" content="VibeCity" />
-    <link rel="apple-touch-icon" href="/Vlive.svg" />
+    <link rel="apple-touch-icon" href="/images/pins/Vlive.svg" />
 
     <!-- Accessibility Skip Link (for keyboard users) -->
     <style>
@@ -82,29 +88,27 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;900&family=Inter:wght@400;500;600;700;900&family=Sarabun:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@500;700&family=Prompt:wght@300;400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
 
     <style>
-      * {
-        font-family:
-          "Outfit",
-          "Inter",
-          "Sarabun",
-          -apple-system,
-          BlinkMacSystemFont,
-          "Segoe UI",
-          sans-serif;
+      :root {
+        --font-display:
+          "Chakra Petch", "Prompt", "Sarabun", system-ui, sans-serif;
+        --font-body: "Prompt", "Sarabun", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", "Fira Code", "IBM Plex Mono", monospace;
       }
       /* Prevent FOUC */
       html {
         background: #0f0f1a;
+        font-family: var(--font-body);
       }
     </style>
   </head>
   <body>
     <a href="#main-content" class="skip-link">Skip to Map Content</a>
     <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
   </body>
 </html>

@@ -6,6 +6,11 @@
 const STORAGE_KEY = "vibecity-favorites-v2";
 const DEFAULT_TTL_DAYS = 10;
 
+const normalizeId = (id) => {
+	if (id === null || id === undefined) return "";
+	return String(id).trim();
+};
+
 export const loadFavoritesWithTTL = (ttlDays = DEFAULT_TTL_DAYS) => {
 	try {
 		const raw = localStorage.getItem(STORAGE_KEY);
@@ -18,7 +23,7 @@ export const loadFavoritesWithTTL = (ttlDays = DEFAULT_TTL_DAYS) => {
 		// Filter valid items
 		const validItems = items.filter((item) => {
 			// Handle legacy format (simple numbers) -> migrate to object
-			if (typeof item === "number") return true;
+			if (typeof item === "number" || typeof item === "string") return true;
 			return now - item.timestamp < ttlMs;
 		});
 
@@ -28,9 +33,10 @@ export const loadFavoritesWithTTL = (ttlDays = DEFAULT_TTL_DAYS) => {
 		}
 
 		// Return just IDs for app usage
-		return validItems.map((item) =>
-			typeof item === "number" ? item : item.id,
-		);
+		return validItems
+			.map((item) => (typeof item === "object" ? item.id : item))
+			.map((id) => normalizeId(id))
+			.filter(Boolean);
 	} catch (e) {
 		console.error("Failed to load favorites", e);
 		return [];
@@ -38,17 +44,21 @@ export const loadFavoritesWithTTL = (ttlDays = DEFAULT_TTL_DAYS) => {
 };
 
 export const saveFavoriteItem = (id) => {
+	const normalized = normalizeId(id);
+	if (!normalized) return;
 	const current = loadRawFavorites();
 	// Check if exists
-	if (!current.some((i) => i.id === id)) {
-		current.push({ id, timestamp: Date.now() });
+	if (!current.some((i) => normalizeId(i.id) === normalized)) {
+		current.push({ id: normalized, timestamp: Date.now() });
 		saveFavorites(current);
 	}
 };
 
 export const removeFavoriteItem = (id) => {
+	const normalized = normalizeId(id);
+	if (!normalized) return;
 	const current = loadRawFavorites();
-	const filtered = current.filter((i) => i.id !== id);
+	const filtered = current.filter((i) => normalizeId(i.id) !== normalized);
 	saveFavorites(filtered);
 };
 
@@ -59,9 +69,11 @@ const loadRawFavorites = () => {
 		if (!raw) return [];
 		let items = JSON.parse(raw);
 		// Migration: Convert numbers to objects
-		if (items.some((i) => typeof i === "number")) {
+		if (items.some((i) => typeof i === "number" || typeof i === "string")) {
 			items = items.map((i) =>
-				typeof i === "number" ? { id: i, timestamp: Date.now() } : i,
+				typeof i === "number" || typeof i === "string"
+					? { id: normalizeId(i), timestamp: Date.now() }
+					: i,
 			);
 			saveFavorites(items);
 		}

@@ -1,0 +1,141 @@
+name: Weekly Lighthouse (Non-Blocking)
+
+on:
+  schedule:
+    - cron: "40 0 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: weekly-lighthouse
+  cancel-in-progress: true
+
+jobs:
+  lighthouse-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate SYNTHETIC_MAP_BASE_URL
+        run: |
+          TARGET_URL="${{ vars.SYNTHETIC_MAP_BASE_URL }}"
+          if [ -z "$TARGET_URL" ]; then
+            echo "SYNTHETIC_MAP_BASE_URL is required for weekly lighthouse."
+            exit 1
+          fi
+          if ! echo "$TARGET_URL" | grep -Eq '^https://'; then
+            echo "SYNTHETIC_MAP_BASE_URL must be an https URL. Got: $TARGET_URL"
+            exit 1
+          fi
+
+      - name: Validate synthetic target resolves to map app
+        env:
+          SYNTHETIC_MAP_BASE_URL: "${{ vars.SYNTHETIC_MAP_BASE_URL }}"
+          SYNTHETIC_TARGET_MUST_CONTAIN: '<div id="app"'
+          SYNTHETIC_TARGET_FORBID: "avondale entertainment||wp-content||wordpress"
+        run: node scripts/ci/validate-synthetic-map-target.mjs
+
+      - name: Run Lighthouse CI (non-blocking)
+        id: lighthouse
+        continue-on-error: true
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          urls: |
+            ${{ vars.SYNTHETIC_MAP_BASE_URL }}
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+          runs: 2
+
+      - name: Lighthouse summary
+        if: ${{ always() }}
+        run: |
+          {
+            echo "## Weekly Lighthouse Summary"
+            echo "- Target: ${{ vars.SYNTHETIC_MAP_BASE_URL }}"
+            echo "- Result: ${{ steps.lighthouse.outcome }}"
+            echo "- Mode: non-blocking"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Write weekly lighthouse summary JSON
+        if: ${{ always() }}
+        run: |
+          mkdir -p reports/ci
+          python3 - <<'PY'
+          import datetime
+          import json
+          from pathlib import Path
+
+          payload = {
+              "generated_at": datetime.datetime.utcnow().isoformat() + "Z",
+              "target_url": "${{ vars.SYNTHETIC_MAP_BASE_URL }}",
+              "result": "${{ steps.lighthouse.outcome }}",
+              "mode": "non-blocking",
+              "workflow": "${{ github.workflow }}",
+              "run_id": "${{ github.run_id }}",
+              "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+          }
+
+          Path("reports/ci/weekly-lighthouse-summary.json").write_text(
+              json.dumps(payload, indent=2),
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Publish observability metrics (lighthouse)
+        if: ${{ always() }}
+        continue-on-error: true
+        env:
+          OBS_LANE: "weekly-lighthouse"
+          OBS_LIGHTHOUSE_SUMMARY_PATH: "reports/ci/weekly-lighthouse-summary.json"
+          OBS_METRICS_OUTPUT_PATH: "reports/ci/metrics-export-log.json"
+          OBS_METRICS_FAIL_ON_ERROR: "0"
+          BIGQUERY_PROJECT_ID: "${{ vars.BIGQUERY_PROJECT_ID }}"
+          BIGQUERY_DATASET: "${{ vars.BIGQUERY_DATASET }}"
+          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON }}"
+          GRAFANA_LOKI_URL: "${{ vars.GRAFANA_LOKI_URL }}"
+          GRAFANA_LOKI_USER: "${{ vars.GRAFANA_LOKI_USER }}"
+          GRAFANA_LOKI_TOKEN: "${{ secrets.GRAFANA_LOKI_TOKEN }}"
+        run: node scripts/ci/publish-observability-metrics.mjs
+
+      - name: Upload weekly lighthouse summary
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-lighthouse-summary
+          path: reports/ci/weekly-lighthouse-summary.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Upload weekly lighthouse metrics export log
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-lighthouse-metrics-export-log
+          path: reports/ci/metrics-export-log.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Save Step Summary
+        if: ${{ always() && !cancelled() }}
+        run: |
+          mkdir -p reports/ci
+          cp "$GITHUB_STEP_SUMMARY" reports/ci/step-summary-weekly-lighthouse.md || true
+
+      - name: Upload Step Summary
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: step-summary-weekly-lighthouse
+          path: reports/ci/step-summary-weekly-lighthouse.md
+          retention-days: 30
+          if-no-files-found: ignore
