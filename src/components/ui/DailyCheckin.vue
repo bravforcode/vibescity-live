@@ -3,20 +3,20 @@
  * DailyCheckin.vue - Daily check-in bonus system
  * Feature #29: Daily Check-in Bonus (server-authoritative persistence)
  */
+import {
+  AUTH_REQUIRED_MESSAGE,
+  gamificationService,
+} from "@/services/gamificationService";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import {
-	AUTH_REQUIRED_MESSAGE,
-	gamificationService,
-} from "@/services/gamificationService";
 
 const { t } = useI18n();
 
 defineProps({
-	isDarkMode: {
-		type: Boolean,
-		default: true,
-	},
+  isDarkMode: {
+    type: Boolean,
+    default: true,
+  },
 });
 
 const emit = defineEmits(["claim", "close"]);
@@ -25,107 +25,107 @@ const isVisible = ref(false);
 const isLoading = ref(false);
 const errorMessage = ref("");
 const checkinData = ref({
-	streak: 0,
-	lastCheckin: null,
-	totalDays: 0,
-	balance: 0,
+  streak: 0,
+  lastCheckin: null,
+  totalDays: 0,
+  balance: 0,
 });
 const canClaimToday = ref(false);
 
 const rewards = [
-	{ day: 1, coins: 10, icon: "🪙" },
-	{ day: 2, coins: 15, icon: "🪙" },
-	{ day: 3, coins: 20, icon: "🪙" },
-	{ day: 4, coins: 25, icon: "🪙" },
-	{ day: 5, coins: 30, icon: "🪙" },
-	{ day: 6, coins: 40, icon: "🪙" },
-	{ day: 7, coins: 100, icon: "🎁" },
+  { day: 1, coins: 10, icon: "🪙" },
+  { day: 2, coins: 15, icon: "🪙" },
+  { day: 3, coins: 20, icon: "🪙" },
+  { day: 4, coins: 25, icon: "🪙" },
+  { day: 5, coins: 30, icon: "🪙" },
+  { day: 6, coins: 40, icon: "🪙" },
+  { day: 7, coins: 100, icon: "🎁" },
 ];
 
 const applyStatus = (status = {}) => {
-	checkinData.value = {
-		streak: Number(status.streak || 0),
-		lastCheckin: status.last_checkin_at || null,
-		totalDays: Number(status.total_days || 0),
-		balance: Number(status.balance || 0),
-	};
-	canClaimToday.value = Boolean(status.can_claim_today);
+  checkinData.value = {
+    streak: Number(status.streak || 0),
+    lastCheckin: status.last_checkin_at || null,
+    totalDays: Number(status.total_days || 0),
+    balance: Number(status.balance || 0),
+  };
+  canClaimToday.value = Boolean(status.can_claim_today);
 };
 
 const loadCheckinData = async () => {
-	isLoading.value = true;
-	errorMessage.value = "";
-	try {
-		const status = await gamificationService.getDailyCheckinStatus();
-		applyStatus(status);
-	} catch (error) {
-		errorMessage.value =
-			error?.message || "Failed to load daily check-in status.";
-		canClaimToday.value = false;
-	} finally {
-		isLoading.value = false;
-	}
+  isLoading.value = true;
+  errorMessage.value = "";
+  try {
+    const status = await gamificationService.getDailyCheckinStatus();
+    applyStatus(status);
+  } catch (error) {
+    errorMessage.value =
+      error?.message || "Failed to load daily check-in status.";
+    canClaimToday.value = false;
+  } finally {
+    isLoading.value = false;
+  }
 };
 
 onMounted(() => {
-	loadCheckinData();
+  loadCheckinData();
 });
 
 const claim = async () => {
-	if (!canClaimToday.value || isLoading.value) return;
+  if (!canClaimToday.value || isLoading.value) return;
 
-	isLoading.value = true;
-	errorMessage.value = "";
-	try {
-		const result = await gamificationService.claimDailyCheckin();
+  isLoading.value = true;
+  errorMessage.value = "";
+  try {
+    const result = await gamificationService.claimDailyCheckin();
 
-		if (result.already_claimed) {
-			applyStatus({
-				streak: result.streak,
-				total_days: result.total_days,
-				last_checkin_at: result.claimed_at,
-				balance: result.balance,
-				can_claim_today: false,
-			});
-			return;
-		}
+    if (result.already_claimed) {
+      applyStatus({
+        streak: result.streak,
+        total_days: result.total_days,
+        last_checkin_at: result.claimed_at,
+        balance: result.balance,
+        can_claim_today: false,
+      });
+      return;
+    }
 
-		applyStatus({
-			streak: result.streak,
-			total_days: result.total_days,
-			last_checkin_at: result.claimed_at,
-			balance: result.balance,
-			can_claim_today: false,
-		});
+    applyStatus({
+      streak: result.streak,
+      total_days: result.total_days,
+      last_checkin_at: result.claimed_at,
+      balance: result.balance,
+      can_claim_today: false,
+    });
 
-		emit("claim", {
-			coins: Number(result.reward_coins || 0),
-			streak: Number(result.streak || 0),
-			balance: Number(result.balance || 0),
-		});
-	} catch (error) {
-		errorMessage.value = error?.message || "Failed to claim daily reward.";
-	} finally {
-		isLoading.value = false;
-	}
+    emit("claim", {
+      coins: Number(result.reward_coins || 0),
+      streak: Number(result.streak || 0),
+      balance: Number(result.balance || 0),
+    });
+  } catch (error) {
+    errorMessage.value = error?.message || "Failed to claim daily reward.";
+  } finally {
+    isLoading.value = false;
+  }
 };
 
 const currentDayReward = computed(() => {
-	const dayIndex = checkinData.value.streak % 7;
-	return rewards[dayIndex];
+  const dayIndex = checkinData.value.streak % 7;
+  return rewards[dayIndex];
 });
 
 const show = async () => {
-	isVisible.value = true;
-	await loadCheckinData();
+  isVisible.value = true;
+  await loadCheckinData();
 };
 const hide = () => {
-	isVisible.value = false;
-	emit("close");
+  isVisible.value = false;
+  emit("close");
 };
 
 const isAuthRequired = computed(
-	() => errorMessage.value === AUTH_REQUIRED_MESSAGE,
+  () => errorMessage.value === AUTH_REQUIRED_MESSAGE,
 );
 
 defineExpose({ show, hide });
@@ -197,10 +197,10 @@ defineExpose({ show, hide });
           <!-- Claim button -->
           <button
             @click="claim"
-            :disabled="!canClaimToday || isLoading || isAuthRequired"
+            :disabled="!canClaimToday || isLoading"
             :class="[
               'w-full rounded-2xl py-4 text-lg font-black transition-[transform,background-color,color,box-shadow]',
-              canClaimToday && !isAuthRequired
+              canClaimToday
                 ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 active:scale-95'
                 : isDarkMode
                   ? 'bg-zinc-800 text-white/30 cursor-not-allowed'
@@ -210,11 +210,9 @@ defineExpose({ show, hide });
             {{
               isLoading
                 ? t("checkin.loading")
-                : isAuthRequired
-                  ? t("checkin.sign_in")
-                  : canClaimToday
-                ? t("checkin.claim", { coins: currentDayReward.coins })
-                : t("checkin.claimed")
+                : canClaimToday
+                  ? t("checkin.claim", { coins: currentDayReward.coins })
+                  : t("checkin.claimed")
             }}
           </button>
 
