@@ -43,13 +43,9 @@ const fetchLeaderboard = async () => {
 		}));
 	} catch (e) {
 		console.error("Error fetching leaderboard:", e);
-		// Fallback to mock if empty or error (for demo)
+		// No mock data in production — show empty state instead
 		if (leaders.value.length === 0) {
-			leaders.value = [
-				{ rank: 1, name: "NightOwl_CM", coins: 2450, avatar: "🦉" },
-				{ rank: 2, name: "PartyKing", coins: 2120, avatar: "👑" },
-				{ rank: 3, name: "VibeHunter", coins: 1890, avatar: "🎯" },
-			];
+			leaders.value = [];
 		}
 	} finally {
 		loading.value = false;

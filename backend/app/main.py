@@ -24,10 +24,15 @@ request_logger = logging.getLogger("app.request")
 # ✅ Rate Limiting
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    import asyncio
+    from app.jobs import triad_reconcile
+
     await vibes.start_background_tasks()
+    _reconcile_task = asyncio.create_task(triad_reconcile.run_forever())
     try:
         yield
     finally:
+        _reconcile_task.cancel()
         await vibes.stop_background_tasks()
 
 
@@ -108,7 +113,41 @@ app.add_middleware(RequestIdMiddleware)
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "version": settings.VERSION}
+    from app.core.supabase import supabase_admin
+    from app.services.cache.redis_client import get_redis
+
+    checks: dict = {}
+    overall = "ok"
+
+    # H2: Supabase — lightweight read to verify DB connectivity
+    if not supabase_admin:
+        checks["supabase"] = "not_configured"
+        overall = "degraded"
+    else:
+        try:
+            supabase_admin.table("orders").select("id").limit(1).execute()
+            checks["supabase"] = "ok"
+        except Exception:
+            checks["supabase"] = "degraded"
+            overall = "degraded"
+
+    # H2: Redis — ping to verify cache layer
+    try:
+        redis_conn = get_redis()
+        redis_conn.ping()
+        checks["redis"] = "ok"
+    except Exception:
+        checks["redis"] = "degraded"
+        overall = "degraded"
+
+    # H2: Qdrant — check via services module (optional, soft fail)
+    try:
+        from app.services.vector.places_vector_service import _is_circuit_open
+        checks["qdrant"] = "circuit_open" if _is_circuit_open() else "ok"
+    except Exception:
+        checks["qdrant"] = "unknown"
+
+    return {"status": overall, "version": settings.VERSION, "checks": checks}
 
 @app.get("/")
 async def root():
