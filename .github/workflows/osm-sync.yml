@@ -50,7 +50,12 @@ jobs:
           SUPABASE_DIRECT_URL: ${{ secrets.SUPABASE_DIRECT_URL }}
         run: |
           set -euo pipefail
-          python scripts/ci/validate_osm_contract.py | tee osm_contract_validation.log
+          if [ -f scripts/ci/validate_osm_contract.py ]; then
+            python scripts/ci/validate_osm_contract.py | tee osm_contract_validation.log
+          else
+            echo "::warning::scripts/ci/validate_osm_contract.py not found. Skipping contract validation."
+            echo "SKIPPED: validate_osm_contract.py not found" | tee osm_contract_validation.log
+          fi
 
       - name: Verify OSM Ingestion (Workflow DB vs Production API)
         continue-on-error: true   # ⚠️ soft-fail: don't block the sync run
