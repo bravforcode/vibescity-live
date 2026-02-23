@@ -11,6 +11,22 @@ import { supabase } from "../lib/supabase";
 const LEVEL_THRESHOLDS = [0, 100, 300, 600, 1000, 2000, 5000];
 const DEFAULT_AVATAR = (seed) =>
 	`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}`;
+const withTimeout = (promise, timeoutMs, label) =>
+	new Promise((resolve, reject) => {
+		const timer = setTimeout(
+			() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)),
+			timeoutMs,
+		);
+		promise
+			.then((value) => {
+				clearTimeout(timer);
+				resolve(value);
+			})
+			.catch((error) => {
+				clearTimeout(timer);
+				reject(error);
+			});
+	});
 
 export const useUserStore = defineStore(
 	"user",
@@ -59,7 +75,8 @@ export const useUserStore = defineStore(
 		const userEmail = computed(() => session.value?.user?.email || null);
 		const isAdmin = computed(() => {
 			const r = session.value?.user?.app_metadata?.role;
-			const rs = session.value?.user?.app_metadata?.roles || [];
+			const rsRaw = session.value?.user?.app_metadata?.roles;
+			const rs = Array.isArray(rsRaw) ? rsRaw : [];
 			return r === "admin" || rs.includes("admin");
 		});
 		const isDarkMode = computed(() => preferences.value.theme === "dark");
@@ -104,7 +121,11 @@ export const useUserStore = defineStore(
 			try {
 				const {
 					data: { session: s },
-				} = await supabase.auth.getSession();
+				} = await withTimeout(
+					supabase.auth.getSession(),
+					5000,
+					"supabase.auth.getSession",
+				);
 				session.value = s;
 				if (s?.user) await fetchProfile(s.user.id);
 			} catch (e) {

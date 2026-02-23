@@ -163,6 +163,13 @@ const setLocaleCookie = (locale) => {
 	});
 };
 
+const readBool = (value) => {
+	if (value && typeof value === "object" && "value" in value) {
+		return Boolean(value.value);
+	}
+	return Boolean(value);
+};
+
 const getPreferredLocale = () => {
 	if (typeof window !== "undefined") {
 		const stored = localStorage.getItem("locale") || readCookie(LOCALE_COOKIE);
@@ -277,7 +284,7 @@ router.beforeEach(async (to, _from, next) => {
 		} catch {
 			// fail closed below
 		}
-		if (!userStore.isAuthenticated) {
+		if (!readBool(userStore.isAuthenticated)) {
 			const { useNotifications } = await import(
 				"@/composables/useNotifications"
 			);
@@ -301,7 +308,7 @@ router.beforeEach(async (to, _from, next) => {
 			// fail closed below
 		}
 
-		if (!userStore.isAdmin) {
+		if (!readBool(userStore.isAdmin)) {
 			console.warn("Unauthorized Admin Access Attempt");
 			return next("/");
 		}
