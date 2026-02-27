@@ -4,14 +4,14 @@
  * A premium skeleton loader with a dark/purple pulse effect.
  */
 defineProps({
-  width: { type: String, default: "100%" },
-  height: { type: String, default: "20px" },
-  borderRadius: { type: String, default: "8px" },
-  variant: {
-    type: String,
-    default: "text", // 'text' | 'card' | 'circle'
-    validator: (val) => ["text", "card", "circle"].includes(val),
-  },
+	width: { type: String, default: "100%" },
+	height: { type: String, default: "20px" },
+	borderRadius: { type: String, default: "8px" },
+	variant: {
+		type: String,
+		default: "text", // 'text' | 'card' | 'circle'
+		validator: (val) => ["text", "card", "circle"].includes(val),
+	},
 });
 </script>
 

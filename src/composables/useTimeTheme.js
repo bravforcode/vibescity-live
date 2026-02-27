@@ -1,46 +1,46 @@
-
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from "vue";
 
 /**
  * useTimeTheme - Manages dynamic map styles based on time of day.
- * 
+ *
  * Logic:
  * - Day Mode (06:00 - 17:59): Light/Standard Map Style.
  * - Night Mode (18:00 - 05:59): Dark/Neon Map Style.
  */
 export function useTimeTheme() {
-  const currentHour = ref(new Date().getHours());
-  const intervalId = ref(null);
+	const currentHour = ref(new Date().getHours());
+	const intervalId = ref(null);
 
-  const updateTime = () => {
-    currentHour.value = new Date().getHours();
-  };
+	// Source-of-truth: Night Neon default (custom style), day falls back to Mapbox light.
+	// Keep as constants to avoid accidental string drift across the app.
+	const NIGHT_STYLE = "mapbox://styles/phirrr/cml87cidg005101s9229k6083";
+	const DAY_STYLE = "mapbox://styles/mapbox/light-v11";
 
-  onMounted(() => {
-    updateTime();
-    // Check every minute to be efficient
-    intervalId.value = setInterval(updateTime, 60000);
-  });
+	const updateTime = () => {
+		currentHour.value = new Date().getHours();
+	};
 
-  onUnmounted(() => {
-    if (intervalId.value) clearInterval(intervalId.value);
-  });
+	onMounted(() => {
+		updateTime();
+		// Check every minute to be efficient
+		intervalId.value = setInterval(updateTime, 60000);
+	});
 
-  const isNightMode = computed(() => {
-    return currentHour.value >= 18 || currentHour.value < 6;
-  });
+	onUnmounted(() => {
+		if (intervalId.value) clearInterval(intervalId.value);
+	});
 
-  const mapStyle = computed(() => {
-    // Mapbox Style URIs (Replace with your actual style URLs)
-    // Using standard Mapbox styles as placeholders if custom ones aren't defined
-    return isNightMode.value
-      ? 'mapbox://styles/mapbox/dark-v11' // Night: Dark/Neon
-      : 'mapbox://styles/mapbox/light-v11'; // Day: Standard
-  });
+	const isNightMode = computed(() => {
+		return currentHour.value >= 18 || currentHour.value < 6;
+	});
 
-  return {
-    isNightMode,
-    mapStyle,
-    currentHour
-  };
+	const mapStyle = computed(() => {
+		return isNightMode.value ? NIGHT_STYLE : DAY_STYLE;
+	});
+
+	return {
+		isNightMode,
+		mapStyle,
+		currentHour,
+	};
 }

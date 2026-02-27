@@ -1,9 +1,9 @@
 <script setup>
-import { X, Heart, MapPin, ChevronRight, Share2 } from "lucide-vue-next";
+import { ChevronRight, Heart, MapPin, Share2, X } from "lucide-vue-next";
 
 const props = defineProps({
-  isOpen: Boolean,
-  shops: { type: Array, default: () => [] },
+	isOpen: Boolean,
+	shops: { type: Array, default: () => [] },
 });
 
 const emit = defineEmits(["close", "select-shop"]);
@@ -29,10 +29,10 @@ const emit = defineEmits(["close", "select-shop"]);
 
     <!-- Side Panel -->
     <transition
-      enter-active-class="transition-transform duration-300 cubic-bezier(0.16, 1, 0.3, 1)"
+      enter-active-class="transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
       enter-from-class="translate-x-full"
       enter-to-class="translate-x-0"
-      leave-active-class="transition-transform duration-300 cubic-bezier(0.16, 1, 0.3, 1)"
+      leave-active-class="transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
       leave-from-class="translate-x-0"
       leave-to-class="translate-x-full"
     >
@@ -78,6 +78,7 @@ const emit = defineEmits(["close", "select-shop"]);
               <img
                 v-if="shop.Image_URL1"
                 :src="shop.Image_URL1"
+                :alt="shop.name || 'Shop image'"
                 class="w-full h-full object-cover"
               />
             </div>
