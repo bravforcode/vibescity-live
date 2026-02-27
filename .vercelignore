@@ -3,6 +3,9 @@
 # Redundant Nested Project
 vibecity.live/
 
+# Git worktrees (contain .venv and other large dirs that break Vercel scan)
+.worktrees/
+
 # Node Modules
 node_modules/
 
