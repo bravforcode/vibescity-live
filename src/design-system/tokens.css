@@ -15,8 +15,8 @@
 	--vc-theme: night;
 
 	/* Typography */
-	--vc-font-display: "Chakra Petch", "Prompt", "Sarabun", system-ui, sans-serif;
-	--vc-font-body: "Prompt", "Sarabun", system-ui, sans-serif;
+	--vc-font-display: "Inter", "Sarabun", system-ui, sans-serif;
+	--vc-font-body: "Inter", "Sarabun", system-ui, sans-serif;
 	--vc-font-mono: "JetBrains Mono", "Fira Code", "IBM Plex Mono", monospace;
 
 	/* Colors: Night Neon (Figma: color/*) */
@@ -90,7 +90,12 @@
 	:root .animate-bounce,
 	:root .animate-ping,
 	:root .animate-spin,
-	:root .animate-shimmer {
+	:root .animate-shimmer,
+	:root .animate-press-spring,
+	:root .animate-slide-up-fade,
+	:root .animate-glow-pulse,
+	:root .animate-scale-in,
+	:root .animate-wiggle {
 		animation: none;
 	}
 }

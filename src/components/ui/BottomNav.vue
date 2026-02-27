@@ -64,7 +64,7 @@ const getBadgeCount = (tabId) => {
         @click="handleTabClick(tab.id)"
         :class="[
           'relative flex flex-col items-center justify-center flex-1 h-full',
-          'transition-all duration-300 ease-out',
+          'transition duration-300 ease-out',
           activeTab === tab.id ? 'scale-110' : 'scale-100 opacity-60',
         ]"
         :aria-label="tab.label"

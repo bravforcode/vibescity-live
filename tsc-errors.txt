@@ -1,0 +1,2 @@
+src/ui/icons.ts(1,37): error TS2307: Cannot find module '@iconify/vue' or its corresponding type declarations.
+src/ui/icons.ts(2,28): error TS2307: Cannot find module '@iconify-json/flat-color-icons/icons.json' or its corresponding type declarations.

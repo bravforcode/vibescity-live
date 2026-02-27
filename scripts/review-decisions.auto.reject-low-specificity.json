@@ -1,0 +1,77 @@
+[
+  {
+    "id": 460,
+    "status": "rejected",
+    "review_note": "auto-reject: non-specific or non-video social URL"
+  },
+  {
+    "id": 72,
+    "status": "rejected",
+    "review_note": "auto-reject: non-specific or non-video social URL"
+  },
+  {
+    "id": 73,
+    "status": "rejected",
+    "review_note": "auto-reject: non-specific or non-video social URL"
+  },
+  {
+    "id": 74,
+    "status": "rejected",
+    "review_note": "auto-reject: non-specific or non-video social URL"
+  },
+  {
+    "id": 75,
+    "status": "rejected",
+    "review_note": "auto-reject: non-specific or non-video social URL"
+  },
+  {
+    "id": 76,
+    "status": "rejected",
+    "review_note": "auto-reject: non-specific or non-video social URL"
+  },
+  {
+    "id": 77,
+    "status": "rejected",
+    "review_note": "auto-reject: non-specific or non-video social URL"
+  },
+  {
+    "id": 78,
+    "status": "rejected",
+    "review_note": "auto-reject: non-specific or non-video social URL"
+  },
+  {
+    "id": 79,
+    "status": "rejected",
+    "review_note": "auto-reject: non-specific or non-video social URL"
+  },
+  {
+    "id": 95,
+    "status": "rejected",
+    "review_note": "auto-reject: non-specific or non-video social URL"
+  },
+  {
+    "id": 102,
+    "status": "rejected",
+    "review_note": "auto-reject: non-specific or non-video social URL"
+  },
+  {
+    "id": 111,
+    "status": "rejected",
+    "review_note": "auto-reject: non-specific or non-video social URL"
+  },
+  {
+    "id": 35,
+    "status": "rejected",
+    "review_note": "auto-reject: non-specific or non-video social URL"
+  },
+  {
+    "id": 39,
+    "status": "rejected",
+    "review_note": "auto-reject: non-specific or non-video social URL"
+  },
+  {
+    "id": 6,
+    "status": "rejected",
+    "review_note": "auto-reject: non-specific or non-video social URL"
+  }
+]

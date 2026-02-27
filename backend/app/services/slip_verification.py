@@ -3,14 +3,15 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from inspect import isawaitable
+from typing import Any
 
 import requests
 from google.auth.transport.requests import Request
 from google.oauth2 import service_account
 
 from app.core.config import get_settings
-
 
 settings = get_settings()
 
@@ -20,8 +21,12 @@ VISION_ENDPOINT = "https://vision.googleapis.com/v1/images:annotate"
 SUCCESS_PHRASES = [
     "โอนเงินสำเร็จ",
     "โอนสำเร็จ",
+    "ทำรายการสำเร็จ",
     "สำเร็จ",
+    "completed",
     "transfer successful",
+    "successful transfer",
+    "transaction successful",
     "payment successful",
 ]
 
@@ -29,6 +34,9 @@ AMOUNT_KEYWORDS = ["ยอดเงิน", "จำนวนเงิน", "amou
 RECEIVER_KEYWORDS = ["ชื่อผู้รับ", "ผู้รับ", "recipient", "to"]
 BANK_KEYWORDS = ["ธนาคาร", "bank"]
 ACCOUNT_KEYWORDS = ["บัญชี", "account"]
+AMOUNT_PATTERN = re.compile(
+    r"(?:฿|(?i:thb)\s*)?-?\d{1,3}(?:[,\s]\d{3})*(?:\.\d+)?|(?:฿|(?i:thb)\s*)?-?\d+(?:\.\d+)?"
+)
 
 
 def _normalize_compact(value: str) -> str:
@@ -53,37 +61,63 @@ def _digits_only(value: str) -> str:
     return re.sub(r"\D", "", value or "")
 
 
-def _parse_number(value: str) -> Optional[float]:
-    try:
-        return float(value.replace(",", ""))
-    except Exception:
-        return None
+def _to_decimal(value: Any) -> Decimal:
+    if isinstance(value, bool):
+        raise TypeError("Boolean is not a valid amount")
+
+    if isinstance(value, Decimal):
+        amount = value
+    elif isinstance(value, int):
+        amount = Decimal(value)
+    elif isinstance(value, float):
+        amount = Decimal(str(value))
+    elif isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            raise ValueError("Amount string is empty")
+        normalized = re.sub(r"(?i)\bthb\b", "", raw)
+        normalized = normalized.replace("฿", "")
+        normalized = normalized.replace(",", "")
+        normalized = normalized.replace(" ", "")
+        normalized = re.sub(r"[^\d.\-]", "", normalized)
+        if not normalized or normalized in {"-", ".", "-."}:
+            raise ValueError(f"Invalid amount: {value!r}")
+        try:
+            amount = Decimal(normalized)
+        except InvalidOperation as exc:
+            raise ValueError(f"Invalid amount: {value!r}") from exc
+    else:
+        raise TypeError(f"Unsupported amount type: {type(value).__name__}")
+
+    return amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
-def _extract_numbers(text: str) -> List[float]:
-    matches = re.findall(r"\d{1,3}(?:,\d{3})*(?:\.\d{2})?|\d+\.\d{2}|\d+", text)
-    numbers: List[float] = []
-    for match in matches:
-        parsed = _parse_number(match)
-        if parsed is not None:
-            numbers.append(parsed)
-    return numbers
+def to_decimal(value: Any) -> Decimal:
+    return _to_decimal(value)
 
 
-def _find_amount(lines: List[str]) -> Optional[float]:
+def _extract_amount_from_line(line: str) -> Decimal | None:
+    for candidate in AMOUNT_PATTERN.findall(line or ""):
+        try:
+            return _to_decimal(candidate)
+        except Exception:
+            continue
+    return None
+
+
+def _find_amount(lines: list[str]) -> Decimal | None:
+    # Anti-fraud: only trust numbers that appear on lines with amount keywords.
     for line in lines:
         lower = line.lower()
-        if any(keyword in lower for keyword in AMOUNT_KEYWORDS):
-            nums = _extract_numbers(line)
-            if nums:
-                return nums[0]
-    all_nums = _extract_numbers(" ".join(lines))
-    if not all_nums:
-        return None
-    return max(all_nums)
+        if not any(keyword in lower for keyword in AMOUNT_KEYWORDS):
+            continue
+        amount = _extract_amount_from_line(line)
+        if amount is not None:
+            return amount
+    return None
 
 
-def _extract_after_keyword(line: str, keywords: List[str]) -> str:
+def _extract_after_keyword(line: str, keywords: list[str]) -> str:
     lower = line.lower()
     for keyword in keywords:
         idx = lower.find(keyword)
@@ -92,7 +126,7 @@ def _extract_after_keyword(line: str, keywords: List[str]) -> str:
     return ""
 
 
-def _find_by_keywords(lines: List[str], keywords: List[str]) -> str:
+def _find_by_keywords(lines: list[str], keywords: list[str]) -> str:
     for line in lines:
         candidate = _extract_after_keyword(line, keywords)
         if candidate:
@@ -112,12 +146,12 @@ def _account_tail_matches(expected: str, text: str, tail_length: int) -> bool:
     return tail in text_digits
 
 
-def _matches_any_normalized(text: str, expected_list: List[str]) -> bool:
+def _matches_any_normalized(text: str, expected_list: list[str]) -> bool:
     if not expected_list:
         return False
     text_norm = _normalize_compact(text)
     for item in expected_list:
-        if _normalize_compact(item) in text_norm:
+        if _normalize_compact(str(item)) in text_norm:
             return True
     return False
 
@@ -129,19 +163,22 @@ def _parse_timestamp(text: str) -> str:
 
 def evaluate_slip_text(
     text: str,
-    expected_amount: float,
+    expected_amount: Any,
     expected_receiver_name: str,
-    expected_receiver_banks: List[str],
+    expected_receiver_banks: list[str],
     expected_receiver_account: str,
     expected_receiver_account_tail: int,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
+    expected_amount_decimal = _to_decimal(expected_amount)
     lines = [line.strip() for line in (text or "").split("\n") if line.strip()]
     normalized_text = _normalize_text(" ".join(lines))
     normalized_compact = _normalize_compact(normalized_text)
 
-    success_found = any(_normalize_compact(phrase) in normalized_compact for phrase in SUCCESS_PHRASES)
+    success_found = any(
+        _normalize_compact(phrase) in normalized_compact for phrase in SUCCESS_PHRASES
+    )
     amount = _find_amount(lines)
-    amount_match = amount is not None and abs(amount - expected_amount) < 0.01
+    amount_match = amount is not None and amount == expected_amount_decimal
 
     receiver_line = _find_by_keywords(lines, RECEIVER_KEYWORDS)
     receiver_name = receiver_line or ""
@@ -174,28 +211,21 @@ def evaluate_slip_text(
         "timestamp_found": bool(timestamp),
     }
 
-    score = 0.0
-    score += 0.2 if signals["success_phrase"] else 0.0
-    score += 0.4 if signals["amount_match"] else 0.0
-    score += 0.2 if signals["receiver_name_match"] else 0.0
-    score += 0.1 if signals["receiver_bank_match"] else 0.0
-    score += 0.1 if signals["receiver_account_match"] else 0.0
-
     status = "pending_review"
-    reason = "low_confidence"
+    reason = "missing_success_phrase"
     if not signals["amount_found"]:
         reason = "amount_missing"
     elif not signals["amount_match"]:
         status = "rejected"
         reason = "amount_mismatch"
-    elif score >= 0.75:
+    elif signals["success_phrase"]:
         status = "verified"
         reason = "verified"
 
     return {
         "status": status,
         "reason": reason,
-        "score": round(score, 2),
+        "score": 0.0,
         "amount": amount,
         "timestamp": timestamp,
         "receiver": {"name": receiver_name, "bank": receiver_bank, "account": account_line},
@@ -204,7 +234,7 @@ def evaluate_slip_text(
     }
 
 
-def _decode_service_account(raw: str) -> Optional[Dict[str, Any]]:
+def _decode_service_account(raw: str) -> dict[str, Any] | None:
     if not raw:
         return None
     text = raw.strip()
@@ -252,7 +282,7 @@ def fetch_slip_bytes(url: str, max_bytes: int) -> bytes:
         raise RuntimeError("Slip image exceeds size limit")
 
     total = 0
-    chunks: List[bytes] = []
+    chunks: list[bytes] = []
     for chunk in resp.iter_content(chunk_size=1024 * 64):
         if not chunk:
             continue
@@ -264,7 +294,7 @@ def fetch_slip_bytes(url: str, max_bytes: int) -> bytes:
     return b"".join(chunks)
 
 
-def detect_text_from_image(image_bytes: bytes) -> Dict[str, Any]:
+def detect_text_from_image(image_bytes: bytes) -> dict[str, Any]:
     token = _get_gcv_access_token()
     payload = {
         "requests": [
@@ -313,22 +343,100 @@ class SlipVerification:
     status: str
     reason: str
     provider: str
-    data: Dict[str, Any]
+    data: dict[str, Any]
     score: float
-    signals: Dict[str, Any]
+    signals: dict[str, Any]
     image_hash: str
     text_hash: str
     ocr_text: str
-    raw: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
+    raw: dict[str, Any] | None = None
+    error: str | None = None
 
 
-def verify_slip_with_gcv(slip_url: str, amount: float) -> SlipVerification:
-    image_bytes = fetch_slip_bytes(slip_url, settings.GCV_OCR_MAX_BYTES)
+def _empty_signals() -> dict[str, bool]:
+    return {
+        "success_phrase": False,
+        "amount_found": False,
+        "amount_match": False,
+        "receiver_name_match": False,
+        "receiver_bank_match": False,
+        "receiver_account_match": False,
+        "timestamp_found": False,
+    }
+
+
+async def _resolve(value: Any) -> Any:
+    if isawaitable(value):
+        return await value
+    return value
+
+
+async def verify_slip_with_gcv(slip_url: str, amount: Any) -> SlipVerification:
+    try:
+        expected_amount = _to_decimal(amount)
+    except Exception as exc:
+        return SlipVerification(
+            status="rejected",
+            reason="amount_mismatch",
+            provider="gcv",
+            data={},
+            score=0.0,
+            signals=_empty_signals(),
+            image_hash="",
+            text_hash="",
+            ocr_text="",
+            error=str(exc),
+        )
+
+    try:
+        image_bytes = await _resolve(fetch_slip_bytes(slip_url, settings.GCV_OCR_MAX_BYTES))
+    except Exception as exc:
+        return SlipVerification(
+            status="rejected",
+            reason="fetch_error",
+            provider="gcv",
+            data={},
+            score=0.0,
+            signals=_empty_signals(),
+            image_hash="",
+            text_hash="",
+            ocr_text="",
+            error=str(exc),
+        )
+
+    if not image_bytes:
+        return SlipVerification(
+            status="rejected",
+            reason="invalid_image",
+            provider="gcv",
+            data={},
+            score=0.0,
+            signals=_empty_signals(),
+            image_hash="",
+            text_hash="",
+            ocr_text="",
+            error="empty_image",
+        )
+
     image_hash = sha256_hex(image_bytes)
-    result = detect_text_from_image(image_bytes)
-    text = result.get("text", "")
 
+    try:
+        result = await _resolve(detect_text_from_image(image_bytes))
+    except Exception as exc:
+        return SlipVerification(
+            status="pending_review",
+            reason="ocr_error",
+            provider="gcv",
+            data={},
+            score=0.0,
+            signals=_empty_signals(),
+            image_hash=image_hash,
+            text_hash="",
+            ocr_text="",
+            error=str(exc),
+        )
+
+    text = str((result or {}).get("text") or "")
     expected_banks = [
         item.strip().lower()
         for item in (settings.SLIP_EXPECT_RECEIVER_BANKS or "").split(",")
@@ -337,30 +445,34 @@ def verify_slip_with_gcv(slip_url: str, amount: float) -> SlipVerification:
 
     evaluation = evaluate_slip_text(
         text=text,
-        expected_amount=amount,
+        expected_amount=expected_amount,
         expected_receiver_name=settings.SLIP_EXPECT_RECEIVER_NAME,
         expected_receiver_banks=expected_banks,
         expected_receiver_account=settings.SLIP_EXPECT_RECEIVER_ACCOUNT,
         expected_receiver_account_tail=settings.SLIP_EXPECT_RECEIVER_ACCOUNT_TAIL,
     )
-
     text_hash = sha256_hex_string(evaluation["normalizedText"])
+
+    amount_value = evaluation.get("amount")
+    if isinstance(amount_value, Decimal):
+        amount_value = float(amount_value)
 
     return SlipVerification(
         status=evaluation["status"],
         reason=evaluation["reason"],
         provider="gcv",
-        score=evaluation["score"],
+        score=0.0,
         signals=evaluation["signals"],
         data={
-            "amount": evaluation.get("amount"),
+            "amount": amount_value,
             "transRef": "",
             "transDate": evaluation.get("timestamp"),
             "receiver": evaluation.get("receiver"),
             "sender": {},
         },
-        raw=result.get("raw"),
+        raw=(result or {}).get("raw"),
         ocr_text=text,
         image_hash=image_hash,
         text_hash=text_hash,
+        error=None,
     )

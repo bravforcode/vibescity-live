@@ -3,7 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/images/pins/Vlive.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
     <!-- PWA & Theme Color -->
     <meta name="theme-color" content="#8B5CF6" />
     <link rel="manifest" href="/manifest.json" />
@@ -35,7 +38,10 @@
     <meta property="og:image:height" content="630" />
     <meta property="og:url" content="https://vibecity.live" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="VibeCity.live | Local Entertainment Map" />
+    <meta
+      name="twitter:title"
+      content="VibeCity.live | Local Entertainment Map"
+    />
     <meta
       name="twitter:description"
       content="Discover the hottest venues in Chiang Mai with real-time vibe updates and navigation."
@@ -88,15 +94,14 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@500;700&family=Prompt:wght@300;400;500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap"
       rel="stylesheet"
     />
 
     <style>
       :root {
-        --font-display:
-          "Chakra Petch", "Prompt", "Sarabun", system-ui, sans-serif;
-        --font-body: "Prompt", "Sarabun", system-ui, sans-serif;
+        --font-display: "Inter", "Sarabun", system-ui, sans-serif;
+        --font-body: "Inter", "Sarabun", system-ui, sans-serif;
         --font-mono: "JetBrains Mono", "Fira Code", "IBM Plex Mono", monospace;
       }
       /* Prevent FOUC */
@@ -109,6 +114,5 @@
   <body>
     <a href="#main-content" class="skip-link">Skip to Map Content</a>
     <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
   </body>
 </html>

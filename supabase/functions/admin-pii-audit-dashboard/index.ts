@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { canViewPiiAudit } from "../_shared/admin.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,25 +22,18 @@ const asDate = (value: unknown) => {
 const toIso = (d: Date) => d.toISOString();
 const toDay = (d: Date) => d.toISOString().slice(0, 10);
 
-const collectRoles = (user: { app_metadata?: Record<string, unknown> }) => {
-  const roles = new Set<string>();
-  const meta = user?.app_metadata || {};
-  const role = meta.role;
-  const roleArray = Array.isArray(meta.roles) ? meta.roles : [];
-
-  if (typeof role === "string" && role.trim()) roles.add(role.trim());
-  for (const r of roleArray) {
-    if (typeof r === "string" && r.trim()) roles.add(r.trim());
-  }
-  return roles;
-};
-
-const canViewPiiAudit = (user: { app_metadata?: Record<string, unknown> }) => {
-  const roles = collectRoles(user);
-  return roles.has("admin") || roles.has("pii_audit_viewer");
-};
-
 type SupabaseClient = ReturnType<typeof createClient>;
+
+const isMissingTableError = (error: unknown, tableName: string) => {
+  const payload = (error || {}) as Record<string, unknown>;
+  const code = String(payload.code || "").toUpperCase();
+  const message = String(payload.message || "").toLowerCase();
+  const table = String(tableName || "").toLowerCase();
+  return (
+    code === "PGRST205" ||
+    (message.includes("could not find the table") && message.includes(table))
+  );
+};
 
 const countSessions = async (
   adminClient: SupabaseClient,
@@ -393,6 +387,58 @@ serve(async (req) => {
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
     const fromIso = toIso(rangeFrom);
     const toIsoValue = toIso(rangeTo);
+
+    const [sessionsProbe, accessLogProbe] = await Promise.all([
+      adminClient.from("pii_audit_sessions").select("id").limit(1),
+      adminClient.from("pii_audit_access_log").select("id").limit(1),
+    ]);
+
+    const sessionsMissing = isMissingTableError(
+      sessionsProbe.error,
+      "pii_audit_sessions",
+    );
+    const accessLogMissing = isMissingTableError(
+      accessLogProbe.error,
+      "pii_audit_access_log",
+    );
+
+    if (sessionsMissing || accessLogMissing) {
+      return new Response(
+        JSON.stringify({
+          request_id: requestId,
+          setup_required: true,
+          setup_message:
+            "PII audit tables are missing. Run the PII audit migrations before using this dashboard.",
+          range: {
+            from: toDay(rangeFrom),
+            to: toDay(rangeTo),
+            days,
+            sessions_time_column: "last_seen_at",
+            max_rows: 0,
+            truncated: false,
+          },
+          kpis: {
+            sessions_total: 0,
+            unique_visitors_total: 0,
+            live_visitors_15m: 0,
+          },
+          sessions_by_day: [],
+          top_countries: [],
+          recent_sessions: [],
+          access_report: {
+            totals: { views: 0, exports: 0, actions: 0 },
+            top_viewers: [],
+            rows_fetched: 0,
+            truncated: false,
+            max_rows: 0,
+          },
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
 
     const maxRows = clamp(
       Number(Deno.env.get("PII_AUDIT_DASHBOARD_MAX_ROWS") || "50000") || 50000,

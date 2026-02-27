@@ -176,6 +176,8 @@ const getItemSize = (index) => {
       :selected-giant-image="selectedGiantImage"
       :get-shop-preview-image="getShopPreviewImage"
       :is-dark-mode="isDarkMode"
+      :is-open="isGiantPinView"
+      :is-fetching="isDataLoading"
       @exit="exitGiantView"
       @select-shop="selectGiantShop"
       @open-ride="(shop) => emit('open-ride', shop)"
@@ -184,7 +186,7 @@ const getItemSize = (index) => {
     <!-- ✅ Minimal Handle Bar for Visual Feedback -->
     <div
       v-if="!isGiantPinView && !isImmersive"
-      class="flex items-center justify-center py-2 pointer-events-auto"
+      class="flex items-center justify-center py-1 pointer-events-auto"
     >
       <div class="w-10 h-1 rounded-full bg-white/30"></div>
     </div>
@@ -347,7 +349,7 @@ const getItemSize = (index) => {
       </div>
 
       <!-- Cards Carousel / Vertical Feed -->
-      <div v-else class="relative pt-6 pb-10 z-[100]">
+      <div v-else class="relative pt-2 pb-4 z-[100]">
         <!-- Ambient glow behind cards -->
         <div
           class="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/60 via-black/25 to-transparent blur-3xl"
@@ -370,7 +372,7 @@ const getItemSize = (index) => {
               'flex gap-3 no-scrollbar items-end transition-[transform,opacity,box-shadow,border-color,background-color] duration-300 snap-x snap-mandatory scroll-smooth',
               isImmersive
                 ? 'flex-col h-full overflow-y-auto overflow-x-hidden pt-0 pb-0 gap-0'
-                : 'flex-row overflow-x-auto overflow-y-visible px-2 py-8 mb-2 h-[420px] items-end',
+                : 'flex-row overflow-x-auto overflow-y-visible px-2 pt-2 pb-[calc(env(safe-area-inset-bottom,0px)+10px)] mb-0 h-[330px] items-end',
               'opacity-100',
               isDragging ? 'cursor-grabbing' : 'cursor-grab',
             ]"
@@ -427,12 +429,12 @@ const getItemSize = (index) => {
                 :class="[
                   isImmersive
                     ? 'w-full h-[100dvh] rounded-none scale-100 opacity-100'
-                    : 'w-[220px] h-[200px]',
+                    : 'w-[220px] h-[196px]',
                   !isImmersive && activeShopId === shop.id
                     ? 'scale-100 z-20'
                     : '',
                   !isImmersive && activeShopId !== shop.id
-                    ? 'scale-90 opacity-70'
+                    ? 'scale-90 opacity-100'
                     : '',
                 ]"
               >
@@ -680,56 +682,10 @@ const getItemSize = (index) => {
     0 4px 6px -4px rgba(0, 0, 0, 0.1);
 }
 
-.glass-header {
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-}
-
-/* ✅ Focus Visible for Accessibility */
-*:focus-visible {
-  outline: 2px solid #60a5fa;
-  outline-offset: 2px;
-  border-radius: 0.5rem;
-}
-
-/* ✅ Safe area utilities */
-.pb-safe {
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
-.pb-safe-offset-8 {
-  padding-bottom: calc(2rem + env(safe-area-inset-bottom));
-}
-
-.top-safe-offset-20 {
-  top: calc(5rem + env(safe-area-inset-top));
-}
-
-/* ✅ Custom Scrollbar */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 10px;
-}
-
-.shop-list-item:hover {
-  transform: scale(1.02);
-}
-
 .shop-list-item.active {
-  /* Use box-shadow to simulate ring instead of invalid ring-width property */
   box-shadow:
     0 0 0 2px rgb(59 130 246),
-    /* Ring color */ 0 10px 15px -3px rgb(0 0 0 / 0.1),
+    0 10px 15px -3px rgb(0 0 0 / 0.1),
     0 4px 6px -4px rgb(0 0 0 / 0.1);
   --tw-shadow-color: #3b82f6;
   --tw-shadow: var(--tw-shadow-colored);

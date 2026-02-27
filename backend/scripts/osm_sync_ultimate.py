@@ -26,6 +26,9 @@ Env required:
   REDIS_URL (cloud ok)
 
 Optional tuning:
+  REDIS_CONNECT_TIMEOUT_SEC (default 5)
+  REDIS_SOCKET_TIMEOUT_SEC (default 15)
+  REDIS_TLS_INSECURE (default false)
   H3_RESOLUTION (default 9)
   TILE_Z (default 10)
   WORKERS (default 6)
@@ -35,25 +38,26 @@ Optional tuning:
   DENSITY_BOOST_WEIGHT (default 2.0)
 """
 
+import hashlib
+import json
+import logging
+import math
 import os
+import random
+import re
 import sys
 import time
-import json
-import math
-import hashlib
-import random
-import logging
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional, Tuple
-
-import requests
-import redis
-import h3
-from supabase import create_client, Client
-from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
+from urllib.parse import urlparse, urlunparse
 
+import h3
+import redis
+import requests
+from dotenv import load_dotenv
+from supabase import Client, create_client
 
 # -----------------------------
 # Logging
@@ -70,7 +74,7 @@ logger = logging.getLogger("vibecity-osm-sync")
 # Utils
 # -----------------------------
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 def iso_now() -> str:
     return utc_now().isoformat()
@@ -78,7 +82,7 @@ def iso_now() -> str:
 def normalize_name(name: str) -> str:
     return "".join(c.lower() for c in name if c.isalnum())
 
-def parse_osm_timestamp(ts: Any) -> Optional[str]:
+def parse_osm_timestamp(ts: Any) -> str | None:
     if not ts:
         return None
     try:
@@ -92,8 +96,8 @@ def compute_content_hash(
     category: str,
     lat: float,
     lon: float,
-    open_time: Optional[str],
-    vibe: Optional[str],
+    open_time: str | None,
+    vibe: str | None,
 ) -> str:
     base = f"{normalize_name(name)}|{category}|{lat:.6f}|{lon:.6f}|{open_time or ''}|{(vibe or '')[:160]}"
     return hashlib.md5(base.encode("utf-8")).hexdigest()
@@ -110,6 +114,12 @@ class Config:
         self.SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 
         self.REDIS_URL = os.getenv("REDIS_URL", "")
+        self.REDIS_CONNECT_TIMEOUT_SEC = float(os.getenv("REDIS_CONNECT_TIMEOUT_SEC", "5"))
+        self.REDIS_SOCKET_TIMEOUT_SEC = float(os.getenv("REDIS_SOCKET_TIMEOUT_SEC", "15"))
+        self.REDIS_TLS_INSECURE = (
+            os.getenv("REDIS_TLS_INSECURE", "false").strip().lower()
+            in ("1", "true", "yes", "on")
+        )
         env_name = os.getenv("ENV", "").strip().lower()
         ci_mode = os.getenv("CI", "").strip().lower() == "true"
         default_allow_fake_redis = "false" if ci_mode or env_name == "production" else "true"
@@ -121,7 +131,6 @@ class Config:
         self.OVERPASS_URLS = [
             "https://overpass-api.de/api/interpreter",
             "https://overpass.kumi.systems/api/interpreter",
-            "https://overpass.nchc.org.tw/api/interpreter",
         ]
         self.OVERPASS_TIMEOUT = int(os.getenv("OVERPASS_TIMEOUT", "180"))
         self.MAX_RETRIES = int(os.getenv("MAX_RETRIES", "6"))
@@ -166,6 +175,85 @@ class Config:
 
 conf = Config()
 
+
+def normalize_redis_url(url: str) -> str:
+    v = (url or "").strip()
+    if not v:
+        return v
+    if "://" not in v:
+        return f"redis://{v}"
+    return v
+
+
+def redact_redis_url(url: str) -> str:
+    try:
+        p = urlparse(url)
+        if not p.scheme:
+            return "<invalid-redis-url>"
+        netloc = p.hostname or ""
+        if p.port:
+            netloc = f"{netloc}:{p.port}"
+        return urlunparse((p.scheme, netloc, p.path, "", "", ""))
+    except Exception:
+        return "<invalid-redis-url>"
+
+
+def with_redis_scheme(url: str, scheme: str) -> str:
+    p = urlparse(url)
+    if not p.scheme:
+        return f"{scheme}://{url}"
+    return urlunparse((scheme, p.netloc, p.path, p.params, p.query, p.fragment))
+
+
+def redis_connection_candidates(url: str) -> list[str]:
+    normalized = normalize_redis_url(url)
+    if not normalized:
+        return []
+    p = urlparse(normalized)
+    scheme = p.scheme.lower()
+    out = [normalized]
+    if scheme == "rediss":
+        out.append(with_redis_scheme(normalized, "redis"))
+    elif scheme == "redis":
+        out.append(with_redis_scheme(normalized, "rediss"))
+    # preserve order, unique only
+    dedup: list[str] = []
+    seen = set()
+    for c in out:
+        if c not in seen:
+            dedup.append(c)
+            seen.add(c)
+    return dedup
+
+
+def connect_redis() -> redis.Redis:
+    errors: list[str] = []
+    candidates = redis_connection_candidates(conf.REDIS_URL)
+    if not candidates:
+        raise RuntimeError("REDIS_URL is empty")
+
+    for url in candidates:
+        kwargs: dict[str, Any] = {
+            "decode_responses": True,
+            "socket_connect_timeout": conf.REDIS_CONNECT_TIMEOUT_SEC,
+            "socket_timeout": conf.REDIS_SOCKET_TIMEOUT_SEC,
+        }
+        if url.startswith("rediss://") and conf.REDIS_TLS_INSECURE:
+            kwargs["ssl_cert_reqs"] = None
+
+        try:
+            r = redis.from_url(url, **kwargs)
+            r.ping()
+            logger.info(f"🔌 Connected to Real Redis ({redact_redis_url(url)})")
+            return r
+        except Exception as e:
+            safe_url = redact_redis_url(url)
+            errors.append(f"{safe_url} -> {e}")
+            logger.warning(f"⚠️ Redis connect failed ({safe_url}): {e}")
+
+    raise RuntimeError("; ".join(errors))
+
+
 REQUIRED_VENUES_COLUMNS = (
     "id",
     "name",
@@ -199,10 +287,15 @@ TAG_MAPPING = {
         "bar": "Nightlife",
         "pub": "Nightlife",
         "nightclub": "Nightlife",
+        "biergarten": "Nightlife",
         "fast_food": "Food",
         "food_court": "Food",
+        "marketplace": "Market",
+        "ice_cream": "Food",
+        "karaoke_box": "Entertainment",
         "cinema": "Entertainment",
         "theatre": "Entertainment",
+        "events_venue": "Entertainment",
         "arts_centre": "Art",
         "library": "Culture",
         "community_centre": "Community",
@@ -211,6 +304,10 @@ TAG_MAPPING = {
         "park": "Nature",
         "garden": "Nature",
         "museum": "Culture",
+        "water_park": "Entertainment",
+        "amusement_arcade": "Entertainment",
+        "bowling_alley": "Entertainment",
+        "escape_game": "Entertainment",
         "sports_centre": "Sports",
         "fitness_centre": "Fitness",
         "playground": "Family",
@@ -226,19 +323,48 @@ TAG_MAPPING = {
         "attraction": "Landmark",
         "hotel": "Accommodation",
         "hostel": "Accommodation",
+        "guest_house": "Accommodation",
     },
     "shop": {
         "mall": "Mall",
         "department_store": "Mall",
         "supermarket": "Shop",
         "convenience": "Shop",
+        "marketplace": "Market",
+        "kiosk": "Shop",
+        "beverages": "Shop",
+        "bakery": "Food",
+        "beauty": "Shopping",
         "clothes": "Fashion",
+        "shoes": "Fashion",
+        "bag": "Fashion",
+        "jewelry": "Fashion",
+        "cosmetics": "Fashion",
+        "gift": "Shopping",
+        "furniture": "Shopping",
+        "hardware": "Shopping",
+        "sports": "Sports",
+        "toys": "Family",
         "books": "Culture",
         "electronics": "Tech",
+        "mobile_phone": "Tech",
+        "computer": "Tech",
+    },
+    "building": {
+        "commercial": "Commercial Building",
+        "retail": "Retail Building",
+        "mall": "Mall",
+        "supermarket": "Shop",
+        "kiosk": "Shop",
+        "mixed_use": "Mixed-Use Building",
+    },
+    "landuse": {
+        "commercial": "Commercial Area",
+        "retail": "Retail Area",
     },
 }
 
-def map_category(tags: Dict[str, Any]) -> str:
+def map_category(tags: dict[str, Any]) -> str:
     for key, mapping in TAG_MAPPING.items():
         v = tags.get(key)
         if v and v in mapping:
@@ -263,7 +389,7 @@ def tiley2lat(y: int, z: int) -> float:
     n = math.pi - 2.0 * math.pi * y / (2 ** z)
     return math.degrees(math.atan(math.sinh(n)))
 
-def tile_bbox(z: int, x: int, y: int) -> Tuple[float, float, float, float]:
+def tile_bbox(z: int, x: int, y: int) -> tuple[float, float, float, float]:
     west = tilex2lon(x, z)
     east = tilex2lon(x + 1, z)
     north = tiley2lat(y, z)
@@ -278,14 +404,14 @@ class TileID:
     def str(self) -> str:
         return f"{self.z}/{self.x}/{self.y}"
 
-def generate_thailand_tiles() -> List[TileID]:
+def generate_thailand_tiles() -> list[TileID]:
     z = conf.TILE_Z
     x_min = lon2tilex(conf.TH_MIN_LON, z)
     x_max = lon2tilex(conf.TH_MAX_LON, z)
     y_min = lat2tiley(conf.TH_MAX_LAT, z)
     y_max = lat2tiley(conf.TH_MIN_LAT, z)
 
-    tiles: List[TileID] = []
+    tiles: list[TileID] = []
     for x in range(min(x_min, x_max), max(x_min, x_max) + 1):
         for y in range(min(y_min, y_max), max(y_min, y_max) + 1):
             tiles.append(TileID(z=z, x=x, y=y))
@@ -297,16 +423,18 @@ def generate_thailand_tiles() -> List[TileID]:
 # -----------------------------
 # Overpass query
 # -----------------------------
-def build_bbox_query(s: float, w: float, n: float, e: float, newer_iso: Optional[str]) -> str:
+def build_bbox_query(s: float, w: float, n: float, e: float, newer_iso: str | None) -> str:
     tags_ql = ""
     for key, values in TAG_MAPPING.items():
         osm_vals = "|".join(values.keys())
         if newer_iso:
             tags_ql += f'node["{key}"~"^({osm_vals})$"]({s},{w},{n},{e})(newer:"{newer_iso}");'
             tags_ql += f'way["{key}"~"^({osm_vals})$"]({s},{w},{n},{e})(newer:"{newer_iso}");'
+            tags_ql += f'relation["{key}"~"^({osm_vals})$"]({s},{w},{n},{e})(newer:"{newer_iso}");'
         else:
             tags_ql += f'node["{key}"~"^({osm_vals})$"]({s},{w},{n},{e});'
             tags_ql += f'way["{key}"~"^({osm_vals})$"]({s},{w},{n},{e});'
+            tags_ql += f'relation["{key}"~"^({osm_vals})$"]({s},{w},{n},{e});'
 
     return f"""
 [out:json][timeout:{conf.OVERPASS_TIMEOUT}];
@@ -316,7 +444,7 @@ def build_bbox_query(s: float, w: float, n: float, e: float, newer_iso: Optional
 out center meta;
 """
 
-def fetch_overpass_bbox(s: float, w: float, n: float, e: float, newer_iso: Optional[str], session: Optional[requests.Session] = None) -> List[Dict[str, Any]]:
+def fetch_overpass_bbox(s: float, w: float, n: float, e: float, newer_iso: str | None, session: requests.Session | None = None) -> list[dict[str, Any]]:
     query = build_bbox_query(s, w, n, e, newer_iso)
     urls = conf.OVERPASS_URLS[:]
     random.shuffle(urls)
@@ -356,15 +484,15 @@ def fetch_overpass_bbox(s: float, w: float, n: float, e: float, newer_iso: Optio
 # -----------------------------
 @dataclass
 class ProcessedVenue:
-    key: Tuple[str, int]  # (osm_type, legacy_shop_id)
-    record: Dict[str, Any]
+    key: tuple[str, int]  # (osm_type, legacy_shop_id)
+    record: dict[str, Any]
     content_hash: str
     osm_version: int
-    osm_timestamp: Optional[str]
+    osm_timestamp: str | None
     h3_cell: str
     tile: str
 
-def transform_element(el: Dict[str, Any], tile_id: str) -> Optional[ProcessedVenue]:
+def transform_element(el: dict[str, Any], tile_id: str) -> ProcessedVenue | None:
     tags = el.get("tags", {})
     osm_id = el.get("id")
     osm_type = el.get("type") or "node"
@@ -391,7 +519,13 @@ def transform_element(el: Dict[str, Any], tile_id: str) -> Optional[ProcessedVen
     osm_timestamp = parse_osm_timestamp(el.get("timestamp"))
 
     now_iso = iso_now()
-    province = tags.get("addr:province") or "Thailand"
+    province = (
+        tags.get("addr:province")
+        or tags.get("is_in:province")
+        or tags.get("addr:state")
+        or tags.get("addr:city")
+        or "Thailand"
+    )
 
     record = {
         # schema fields that exist
@@ -437,10 +571,10 @@ class EventBus:
     def __init__(self, r: redis.Redis):
         self.r = r
 
-    def publish(self, stream: str, payload: Dict[str, Any]) -> None:
+    def publish(self, stream: str, payload: dict[str, Any]) -> None:
         self.publish_batch(stream, [payload])
 
-    def publish_batch(self, stream: str, payloads: List[Dict[str, Any]]) -> None:
+    def publish_batch(self, stream: str, payloads: list[dict[str, Any]]) -> None:
         if not payloads:
             return
         pipe = self.r.pipeline()
@@ -463,7 +597,7 @@ class Scheduler:
     def __init__(self, r: redis.Redis):
         self.r = r
 
-    def init_tiles(self, tiles: List[TileID]) -> None:
+    def init_tiles(self, tiles: list[TileID]) -> None:
         now_ts = time.time()
         pipe = self.r.pipeline()
         for t in tiles:
@@ -473,19 +607,19 @@ class Scheduler:
             pipe.hsetnx(conf.H_TILE_LASTSYNC, tid, "")
         pipe.execute()
 
-    def ensure_initialized(self, tiles: List[TileID]) -> None:
+    def ensure_initialized(self, tiles: list[TileID]) -> None:
         if self.r.zcard(conf.Z_TILES_PRIORITY) == 0:
             logger.info("🧠 Scheduler init...")
             self.init_tiles(tiles)
 
-    def get_last_sync_iso(self, tid: str) -> Optional[str]:
+    def get_last_sync_iso(self, tid: str) -> str | None:
         v = self.r.hget(conf.H_TILE_LASTSYNC, tid)
         return v or None
 
     def set_last_sync_iso(self, tid: str, iso: str) -> None:
         self.r.hset(conf.H_TILE_LASTSYNC, tid, iso)
 
-    def pick_due_tiles(self, k: int) -> List[str]:
+    def pick_due_tiles(self, k: int) -> list[str]:
         now_ts = time.time()
         due = self.r.zrangebyscore(conf.Z_TILES_NEXT_RUN, 0, now_ts, start=0, num=max(k * 10, 50))
         if not due:
@@ -528,12 +662,12 @@ class DBManager:
                 f"Expected columns: {', '.join(REQUIRED_VENUES_COLUMNS)}"
             ) from e
 
-    def fetch_existing(self, type_id_pairs: List[Tuple[str, int]]) -> Dict[Tuple[str, int], Dict[str, Any]]:
+    def fetch_existing(self, type_id_pairs: list[tuple[str, int]]) -> dict[tuple[str, int], dict[str, Any]]:
         if not type_id_pairs:
             return {}
 
         ids = list(set([pid for _, pid in type_id_pairs]))
-        out: Dict[Tuple[str, int], Dict[str, Any]] = {}
+        out: dict[tuple[str, int], dict[str, Any]] = {}
         chunk = 1000
 
         for i in range(0, len(ids), chunk):
@@ -549,10 +683,10 @@ class DBManager:
                 out[k] = row
         return out
 
-    def upsert(self, records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def upsert(self, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if not records:
             return []
-        out_rows: List[Dict[str, Any]] = []
+        out_rows: list[dict[str, Any]] = []
         chunk = 1000  # optimize: larger batches for fewer HTTP roundtrips
         for i in range(0, len(records), chunk):
             part = records[i:i + chunk]
@@ -566,7 +700,7 @@ class DBManager:
                 out_rows.extend(res.data)
         return out_rows
 
-    def touch_unchanged(self, venue_ids: List[str]) -> None:
+    def touch_unchanged(self, venue_ids: list[str]) -> None:
         """
         Optional: if you created RPC bulk_touch_venues(venue_ids uuid[])
         This will keep last_seen_at fresh without upserting unchanged.
@@ -624,9 +758,7 @@ class UltimateSync:
         conf.validate()
 
         try:
-            self.redis = redis.from_url(conf.REDIS_URL, decode_responses=True)
-            self.redis.ping()
-            logger.info("🔌 Connected to Real Redis")
+            self.redis = connect_redis()
         except Exception as e:
             if not conf.ALLOW_FAKE_REDIS:
                 raise RuntimeError(
@@ -658,7 +790,7 @@ class UltimateSync:
         self.scheduler.ensure_initialized(self.tiles)
 
     @staticmethod
-    def _new_summary(mode: str, iterations: int) -> Dict[str, Any]:
+    def _new_summary(mode: str, iterations: int) -> dict[str, Any]:
         return {
             "mode": mode,
             "iterations": iterations,
@@ -672,7 +804,7 @@ class UltimateSync:
         }
 
     @staticmethod
-    def _apply_summary(summary: Dict[str, Any], result: Dict[str, Any]) -> None:
+    def _apply_summary(summary: dict[str, Any], result: dict[str, Any]) -> None:
         summary["tiles_processed"] += 1
         if not result.get("ok"):
             summary["tiles_failed"] += 1
@@ -683,7 +815,7 @@ class UltimateSync:
         summary["elements"] += int(result.get("elements", 0))
         summary["incoming"] += int(result.get("incoming", 0))
 
-    def sync_tile(self, tid: str, full: bool) -> Dict[str, Any]:
+    def sync_tile(self, tid: str, full: bool) -> dict[str, Any]:
         started = utc_now()
 
         try:
@@ -692,7 +824,7 @@ class UltimateSync:
 
             newer_iso = None if full else self.scheduler.get_last_sync_iso(tid)
 
-            elements: List[Dict[str, Any]] = []
+            elements: list[dict[str, Any]] = []
             used_newer = False
 
             if newer_iso:
@@ -707,8 +839,8 @@ class UltimateSync:
                 elements = fetch_overpass_bbox(s, w, n, e, newer_iso=None, session=self.session)
 
             # Transform
-            incoming: List[ProcessedVenue] = []
-            keys: List[Tuple[str, int]] = []
+            incoming: list[ProcessedVenue] = []
+            keys: list[tuple[str, int]] = []
             for el in elements:
                 pv = transform_element(el, tid)
                 if pv:
@@ -719,9 +851,9 @@ class UltimateSync:
             existing = self.db.fetch_existing(keys)
 
             # Diff
-            upserts: List[Dict[str, Any]] = []
-            unchanged_ids: List[str] = []
-            action_by_key: Dict[Tuple[str, int], str] = {}
+            upserts: list[dict[str, Any]] = []
+            unchanged_ids: list[str] = []
+            action_by_key: dict[tuple[str, int], str] = {}
 
             for pv in incoming:
                 old = existing.get(pv.key)
@@ -755,7 +887,7 @@ class UltimateSync:
             self.db.touch_unchanged(unchanged_ids)
 
             # Build final uuid map
-            uuid_map: Dict[Tuple[str, int], str] = {}
+            uuid_map: dict[tuple[str, int], str] = {}
             for k, row in existing.items():
                 if row.get("id"):
                     uuid_map[k] = row["id"]
@@ -831,7 +963,7 @@ class UltimateSync:
             self.scheduler.schedule_next(tid, success=False)
             return {"tile": tid, "ok": False, "error": str(e)}
 
-    def run_full(self) -> Dict[str, Any]:
+    def run_full(self) -> dict[str, Any]:
         logger.info("🚀 FULL SYNC START (all tiles)")
         self.prewarmer.prewarm()
         summary = self._new_summary(mode="full", iterations=1)
@@ -851,7 +983,7 @@ class UltimateSync:
         logger.info("OSM_SYNC_SUMMARY=%s", json.dumps(summary, ensure_ascii=False, sort_keys=True))
         return summary
 
-    def run_loop(self, iterations: int) -> Dict[str, Any]:
+    def run_loop(self, iterations: int) -> dict[str, Any]:
         logger.info(f"⚡ INCREMENTAL LOOP START | iterations={iterations} workers={conf.WORKERS}")
         summary = self._new_summary(mode="loop", iterations=iterations)
         for i in range(iterations):
@@ -879,6 +1011,89 @@ class UltimateSync:
         logger.info("OSM_SYNC_SUMMARY=%s", json.dumps(summary, ensure_ascii=False, sort_keys=True))
         return summary
 
+    def run_tiles(self, tile_ids: list[str], full: bool = True, mode: str = "tiles") -> dict[str, Any]:
+        clean_tiles: list[str] = []
+        seen = set()
+        for tid in tile_ids:
+            t = (tid or "").strip()
+            if not re.match(r"^\d+/\d+/\d+$", t):
+                continue
+            if t in seen:
+                continue
+            clean_tiles.append(t)
+            seen.add(t)
+
+        logger.info(f"🧩 TILE SYNC START | mode={mode} tiles={len(clean_tiles)} full={full}")
+        summary = self._new_summary(mode=mode, iterations=1)
+        if not clean_tiles:
+            summary["ok"] = True
+            logger.info("OSM_SYNC_SUMMARY=%s", json.dumps(summary, ensure_ascii=False, sort_keys=True))
+            return summary
+
+        with ThreadPoolExecutor(max_workers=conf.WORKERS) as ex:
+            futures = [ex.submit(self.sync_tile, tid, full) for tid in clean_tiles]
+            for f in as_completed(futures):
+                r = f.result()
+                self._apply_summary(summary, r)
+                if r.get("ok"):
+                    logger.info(f"✅ {r['tile']} | +{r['created']} ~{r['updated']} ={r['unchanged']} | {r['elapsed_s']}s")
+                else:
+                    logger.warning(f"❌ {r['tile']} | {r.get('error')}")
+
+        logger.info("🏁 TILE SYNC DONE")
+        summary["ok"] = summary["tiles_failed"] == 0
+        logger.info("OSM_SYNC_SUMMARY=%s", json.dumps(summary, ensure_ascii=False, sort_keys=True))
+        return summary
+
+
+def parse_failed_tiles_from_log(log_path: str) -> list[str]:
+    try:
+        with open(log_path, encoding="utf-8", errors="ignore") as f:
+            lines = f.readlines()
+    except Exception as e:
+        logger.warning(f"⚠️ Unable to read log file '{log_path}': {e}")
+        return []
+
+    start_idx = -1
+    end_idx = -1
+    for i, line in enumerate(lines):
+        if "FULL SYNC START" in line:
+            start_idx = i
+        if "FULL SYNC DONE" in line:
+            end_idx = i
+
+    scope = lines
+    if start_idx >= 0 and end_idx >= start_idx:
+        scope = lines[start_idx : end_idx + 1]
+
+    pat = re.compile(r"❌\s+(\d+/\d+/\d+)\s+\|")
+    out: list[str] = []
+    seen = set()
+    for line in scope:
+        m = pat.search(line)
+        if not m:
+            continue
+        tid = m.group(1)
+        if tid in seen:
+            continue
+        out.append(tid)
+        seen.add(tid)
+    return out
+
+
+def parse_tiles_arg(raw: str) -> list[str]:
+    out: list[str] = []
+    seen = set()
+    for part in raw.split(","):
+        tid = part.strip()
+        if not tid or not re.match(r"^\d+/\d+/\d+$", tid):
+            continue
+        if tid in seen:
+            continue
+        out.append(tid)
+        seen.add(tid)
+    return out
+
 
 def main():
     # Windows emoji safety
@@ -889,19 +1104,41 @@ def main():
         except Exception:
             pass
 
+    retry_failed_log: str | None = None
+    tiles_arg: str | None = None
+    loop_n = 1
+    for a in sys.argv[1:]:
+        if a.startswith("--retry-failed-log="):
+            retry_failed_log = a.split("=", 1)[1].strip()
+        elif a.startswith("--tiles="):
+            tiles_arg = a.split("=", 1)[1].strip()
+        elif a.startswith("--loop="):
+            try:
+                loop_n = int(a.split("=", 1)[1])
+            except Exception:
+                loop_n = 1
+
     app = UltimateSync()
 
     if "--full" in sys.argv:
         app.run_full()
         return
 
-    loop_n = 1
-    for a in sys.argv:
-        if a.startswith("--loop="):
-            try:
-                loop_n = int(a.split("=", 1)[1])
-            except Exception:
-                loop_n = 1
+    if retry_failed_log:
+        failed_tiles = parse_failed_tiles_from_log(retry_failed_log)
+        if not failed_tiles:
+            logger.warning(f"⚠️ No failed tiles found in log: {retry_failed_log}")
+            return
+        app.run_tiles(failed_tiles, full=True, mode="retry_failed")
+        return
+
+    if tiles_arg:
+        tiles = parse_tiles_arg(tiles_arg)
+        if not tiles:
+            logger.warning("⚠️ No valid tiles in --tiles argument (expected z/x/y,z/x/y)")
+            return
+        app.run_tiles(tiles, full=True, mode="tiles")
+        return
 
     app.run_loop(loop_n)
 

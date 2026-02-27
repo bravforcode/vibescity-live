@@ -6,6 +6,8 @@ import { useCoinStore } from "../../store/coinStore";
 import { useShopStore } from "../../store/shopStore";
 
 const coinStore = useCoinStore();
+const IMMERSIVE_FALLBACK_IMAGE =
+	"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 1000'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%230b1020'/><stop offset='1' stop-color='%2311162a'/></linearGradient></defs><rect width='1600' height='1000' fill='url(%23g)'/></svg>";
 
 // Async Components (Lazy Load)
 const SmartHeader = defineAsyncComponent(
@@ -122,7 +124,7 @@ const getDistance = (shop) => {
           <img
             :src="
               activeShop?.Image_URL1 ||
-              'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1000&auto=format&fit=crop'
+              IMMERSIVE_FALLBACK_IMAGE
             "
             class="w-full h-full object-cover"
             alt=""
@@ -139,6 +141,7 @@ const getDistance = (shop) => {
     <!-- We repurpose the existing SmartHeader but force immersive props -->
     <SmartHeader
       :is-immersive="true"
+      layout-mode="full"
       :globalSearchQuery="''"
       @open-sidebar="$emit('open-sidebar')"
       @haptic-tap="selectFeedback"

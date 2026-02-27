@@ -52,7 +52,7 @@ const routes = [
 		path: "/:locale(th|en)/partner",
 		name: "PartnerLocale",
 		component: PartnerDashboard,
-		meta: { title: "Partner Dashboard - VibeCity", requiresAuth: true },
+		meta: { title: "Partner Dashboard - VibeCity" },
 	},
 
 	// Legacy (non-locale) public routes for dev fallback
@@ -98,7 +98,6 @@ const routes = [
 		component: PartnerDashboard,
 		meta: {
 			title: "Partner Dashboard - VibeCity",
-			requiresAuth: true,
 			legacyLocale: true,
 		},
 	},
@@ -114,7 +113,6 @@ const routes = [
 		component: MerchantDashboard,
 		meta: {
 			title: "Merchant Portal - VibeCity",
-			requiresAuth: true,
 		},
 	},
 	{
@@ -253,38 +251,14 @@ router.beforeEach(async (to, _from, next) => {
 
 	// 3. Merchant Route Protection
 	if (to.path.startsWith("/merchant")) {
-		if (!visitorId) {
-			// If no visitor ID, they definitely don't own any shops yet
-			// Redirect them home to explore/create first
-			const { useNotifications } = await import(
-				"@/composables/useNotifications"
-			);
-			useNotifications().notifyError(
-				"Access Denied: Please create a shop first to access the dashboard.",
-			);
-			return next("/");
-		}
-		// Ideally we check if they actually own anything here, but for MVP checking presence of ID is step 1.
-		// The dashboard itself handles "No Venues" state gracefully.
-	}
-
-	// Partner route requires authenticated user session.
-	if (to.name === "PartnerDashboard" || to.name === "PartnerLocale") {
-		const { useUserStore } = await import("../store/userStore");
-		const userStore = useUserStore();
 		try {
-			await userStore.initAuth?.();
+			const { getOrCreateVisitorId, bootstrapVisitor } = await import(
+				"../services/visitorIdentity"
+			);
+			getOrCreateVisitorId();
+			void bootstrapVisitor().catch(() => {});
 		} catch {
-			// fail closed below
-		}
-		if (!userStore.isAuthenticated) {
-			const { useNotifications } = await import(
-				"@/composables/useNotifications"
-			);
-			useNotifications().notifyError(
-				"Please sign in before opening Partner Dashboard.",
-			);
-			return next("/");
+			// fail open: dashboard still handles missing visitor state
 		}
 	}
 
@@ -301,7 +275,8 @@ router.beforeEach(async (to, _from, next) => {
 			// fail closed below
 		}
 
-		if (!userStore.isAdmin) {
+		// Allow unauthenticated users to reach /admin for explicit sign-in UI.
+		if (userStore.isAuthenticated && !userStore.isAdmin) {
 			console.warn("Unauthorized Admin Access Attempt");
 			return next("/");
 		}

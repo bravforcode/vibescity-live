@@ -1,0 +1,62 @@
+Debugger listening on ws://127.0.0.1:54739/f8194604-2fb5-45db-9086-b7b302f5fd13
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger attached.
+Initialising login role...
+Connecting to remote database...
+Do you want to push these migrations to the remote database?
+ • 20260224202000_ultrathink_schema_optimization_part3.sql
+ • 20260224202100_ultrathink_schema_optimization_part3a_status_and_deps.sql
+ • 20260224202200_ultrathink_schema_optimization_part3b_sync_triggers_backfills.sql
+ • 20260224202300_ultrathink_schema_optimization_part3c_views_and_rpcs.sql
+ • 20260224202400_ultrathink_schema_optimization_part3d_indexes.sql
+ • 20260224202500_ultrathink_schema_optimization_part3a1_venues_status.sql
+ • 20260224202600_ultrathink_schema_optimization_part3a2_orders_status.sql
+ • 20260224202700_ultrathink_schema_optimization_part3a3_subscriptions_status.sql
+ • 20260224202800_ultrathink_schema_optimization_part3a4_partners_status.sql
+ • 20260224213000_partner_bank_secrets_extended.sql
+ • 20260224220000_hotfix_get_map_pins_status_cast.sql
+
+ [Y/n] y
+Applying migration 20260224202000_ultrathink_schema_optimization_part3.sql...
+NOTICE (00000): constraint "venues_status_check" of relation "venues" does not exist, skipping
+NOTICE (00000): constraint "orders_status_check" of relation "orders" does not exist, skipping
+NOTICE (00000): constraint "orders_status_check" of relation "orders" does not exist, skipping
+NOTICE (00000): constraint "subscriptions_status_check" of relation "subscriptions" does not exist, skipping
+NOTICE (00000): constraint "subscriptions_status_check" of relation "subscriptions" does not exist, skipping
+NOTICE (00000): constraint "partners_status_check" of relation "partners" does not exist, skipping
+NOTICE (00000): constraint "partners_status_check" of relation "partners" does not exist, skipping
+NOTICE (42701): column "visitor_id_uuid" of relation "orders" already exists, skipping
+NOTICE (42701): column "visitor_id_uuid" of relation "subscriptions" already exists, skipping
+NOTICE (42P07): relation "idx_orders_visitor_id_uuid" already exists, skipping
+NOTICE (42P07): relation "idx_subscriptions_visitor_id_uuid" already exists, skipping
+NOTICE (00000): function public.get_feed_cards(pg_catalog.float8,pg_catalog.float8) does not exist, skipping
+ERROR: column reference "index_sql" is ambiguous (SQLSTATE 42702)                                                       
+It could refer to either a PL/pgSQL variable or a table column.                                                         
+At statement: 20                                                                                                        
+DO $$                                                                                                                   
+DECLARE                                                                                                                 
+  rec record;                                                                                                           
+  index_sql text;                                                                                                       
+BEGIN                                                                                                                   
+  IF to_regclass('pg_temp._saved_orders_status_indexes') IS NULL THEN                                                   
+    RETURN;                                                                                                             
+  END IF;                                                                                                               
+                                                                                                                        
+  FOR rec IN                                                                                                            
+    SELECT index_sql                                                                                                    
+    FROM pg_temp._saved_orders_status_indexes                                                                           
+    ORDER BY index_schema, index_name                                                                                   
+  LOOP                                                                                                                  
+    index_sql := rec.index_sql;                                                                                         
+    index_sql := regexp_replace(index_sql, '''canceled''', '''cancelled''', 'gi');                                      
+    index_sql := regexp_replace(                                                                                        
+      index_sql,                                                                                                        
+      '''(pending|pending_review|verified|rejected|paid|failed|cancelled|refunded)''::(text|character varying|varchar)',
+      '''\1''::order_status',                                                                                           
+      'gi'                                                                                                              
+    );                                                                                                                  
+    EXECUTE index_sql;                                                                                                  
+  END LOOP;                                                                                                             
+END $$                                                                                                                  
+Try rerunning the command with --debug to troubleshoot the error.
+Waiting for the debugger to disconnect...

@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { create } from "https://deno.land/x/djwt@v2.8/mod.ts";
+import { isAdminUser } from "../_shared/admin.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,17 +11,57 @@ const corsHeaders = {
 
 const MAX_SYNC_LIMIT = 2000;
 const DEFAULT_SYNC_LIMIT = 200;
-const DEFAULT_INCREMENTAL_WINDOW_HOURS = 24;
-const ALLOWED_ORDER_STATUSES = [
-  "pending",
-  "pending_review",
-  "paid",
-  "rejected",
-];
 
 const SHEET_DAILY = "Daily Stats";
 const SHEET_TH = "TH Slips";
 const SHEET_FOREIGN = "International Slips";
+const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
+const GOOGLE_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
+
+const DAILY_HEADERS = ["date", "sessions_count", "new_users_count"];
+const SLIP_HEADERS = [
+  "order_created_at",
+  "order_id",
+  "order_status",
+  "payment_method",
+  "amount",
+  "sku",
+  "visitor_id",
+  "user_id",
+  "user_display_name",
+  "user_avatar_url",
+  "user_bio",
+  "user_coins",
+  "user_xp",
+  "user_level",
+  "user_metadata_json",
+  "user_profile_created_at",
+  "user_profile_updated_at",
+  "buyer_country",
+  "buyer_email",
+  "buyer_full_name",
+  "buyer_phone",
+  "buyer_address_line1",
+  "buyer_address_line2",
+  "buyer_province",
+  "buyer_district",
+  "buyer_postal",
+  "consent_personal_data",
+  "ip_address",
+  "ip_hash",
+  "geo_country",
+  "geo_region",
+  "geo_city",
+  "geo_postal",
+  "geo_timezone",
+  "geo_loc",
+  "geo_org",
+  "user_agent",
+  "slip_url",
+  "order_updated_at",
+  "order_metadata_json",
+  "audit_created_at",
+];
 
 type SyncStats = {
   inserted: number;
@@ -35,10 +75,17 @@ type SyncResponseStats = {
   daily: SyncStats;
 };
 
+type SyncScope = "all" | "th" | "foreign";
+
 type LedgerRow = {
   source_pk: string;
   sheet_row_index: number | null;
   row_hash: string;
+};
+
+type GoogleServiceAccount = {
+  client_email: string;
+  private_key: string;
 };
 
 const createEmptyStats = (): SyncStats => ({
@@ -66,11 +113,19 @@ const asDateOnly = (value: unknown) => {
   return match ? match[1] : null;
 };
 
-const isAdminUser = (user: { app_metadata?: Record<string, unknown> }) => {
-  const meta = user?.app_metadata || {};
-  const role = meta.role;
-  const roles = Array.isArray(meta.roles) ? meta.roles : [];
-  return role === "admin" || role === "super_admin" || roles.includes("admin");
+const safeJson = (value: unknown) => {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+};
+
+const asNumber = (value: unknown, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
 };
 
 const formatPem = (key: string) => {
@@ -78,27 +133,92 @@ const formatPem = (key: string) => {
   return `-----BEGIN PRIVATE KEY-----\n${key}\n-----END PRIVATE KEY-----\n`;
 };
 
-const getGoogleAuthToken = async (
-  serviceAccountEmail: string,
-  privateKey: string,
-) => {
+const decodeServiceAccount = (raw: string): GoogleServiceAccount => {
+  let jsonText = raw.trim();
+  if (!jsonText.startsWith("{")) {
+    try {
+      jsonText = atob(jsonText);
+    } catch {
+      // Keep original string; parse below will throw with a clear error.
+    }
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch (error) {
+    throw new Error(
+      `GOOGLE_SERVICE_ACCOUNT must be valid JSON or base64 JSON: ${String(error)}`,
+    );
+  }
+
+  const clientEmail = (parsed as Record<string, unknown>)?.client_email;
+  const privateKey = (parsed as Record<string, unknown>)?.private_key;
+  if (typeof clientEmail !== "string" || typeof privateKey !== "string") {
+    throw new Error("GOOGLE_SERVICE_ACCOUNT is missing client_email/private_key");
+  }
+
+  return {
+    client_email: clientEmail,
+    private_key: privateKey,
+  };
+};
+
+const base64UrlEncode = (input: Uint8Array) => {
+  let binary = "";
+  for (const b of input) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+};
+
+const pemToArrayBuffer = (pem: string) => {
+  const base64 = formatPem(pem)
+    .replace(/-----\w+ PRIVATE KEY-----/g, "")
+    .replace(/\s+/g, "");
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
+};
+
+const getGoogleAuthToken = async (rawServiceAccount: string) => {
+  const serviceAccount = decodeServiceAccount(rawServiceAccount);
   const iat = Math.floor(Date.now() / 1000);
   const exp = iat + 3600;
 
-  const jwt = await create(
-    { alg: "RS256", typ: "JWT" },
-    {
-      iss: serviceAccountEmail,
-      sub: serviceAccountEmail,
-      aud: "https://oauth2.googleapis.com/token",
-      scope: "https://www.googleapis.com/auth/spreadsheets",
-      iat,
-      exp,
-    },
-    formatPem(privateKey),
+  const header = { alg: "RS256", typ: "JWT" };
+  const payload = {
+    iss: serviceAccount.client_email,
+    sub: serviceAccount.client_email,
+    aud: GOOGLE_TOKEN_URL,
+    scope: GOOGLE_SCOPE,
+    iat,
+    exp,
+  };
+
+  const encoder = new TextEncoder();
+  const headerEncoded = base64UrlEncode(encoder.encode(JSON.stringify(header)));
+  const payloadEncoded = base64UrlEncode(encoder.encode(JSON.stringify(payload)));
+  const signingInput = `${headerEncoded}.${payloadEncoded}`;
+
+  const key = await crypto.subtle.importKey(
+    "pkcs8",
+    pemToArrayBuffer(serviceAccount.private_key),
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"],
   );
 
-  const res = await fetch("https://oauth2.googleapis.com/token", {
+  const signature = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    key,
+    encoder.encode(signingInput),
+  );
+
+  const jwt = `${signingInput}.${base64UrlEncode(new Uint8Array(signature))}`;
+
+  const res = await fetch(GOOGLE_TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
@@ -130,13 +250,101 @@ const extractRowIndex = (updatedRange: string) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const normalizeHeaderValue = (value: unknown) =>
+  String(value ?? "")
+    .trim()
+    .toLowerCase();
+
+const isSameHeader = (actual: unknown[], expected: string[]) => {
+  if (!Array.isArray(actual) || actual.length < expected.length) return false;
+  for (let i = 0; i < expected.length; i += 1) {
+    if (normalizeHeaderValue(actual[i]) !== normalizeHeaderValue(expected[i])) {
+      return false;
+    }
+  }
+  return true;
+};
+
+const isMissingTableError = (error: unknown, tableName: string) => {
+  const payload = (error || {}) as Record<string, unknown>;
+  const code = String(payload.code || "").toUpperCase();
+  const message = String(payload.message || "").toLowerCase();
+  const table = String(tableName || "").toLowerCase();
+  return (
+    code === "PGRST205" ||
+    (message.includes("could not find the table") && message.includes(table))
+  );
+};
+
+const getErrorMessage = (error: unknown) => {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object") {
+    const payload = error as Record<string, unknown>;
+    if (typeof payload.message === "string" && payload.message.trim()) {
+      return payload.message;
+    }
+    if (typeof payload.error === "string" && payload.error.trim()) {
+      return payload.error;
+    }
+  }
+  return String(error);
+};
+
+const readRow = async (
+  spreadsheetId: string,
+  sheetName: string,
+  rowIndex: number,
+  token: string,
+) => {
+  const range = encodeURIComponent(`${sheetName}!A${rowIndex}:ZZ${rowIndex}`);
+  const url =
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Sheet read failed (${sheetName} row ${rowIndex}): ${text}`);
+  }
+
+  const data = await res.json();
+  return (data?.values?.[0] || []) as unknown[];
+};
+
+const clearRow = async (
+  spreadsheetId: string,
+  sheetName: string,
+  rowIndex: number,
+  token: string,
+) => {
+  const range = encodeURIComponent(`${sheetName}!A${rowIndex}:ZZ${rowIndex}`);
+  const url =
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:clear`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Sheet clear failed (${sheetName} row ${rowIndex}): ${text}`);
+  }
+};
+
 const appendRow = async (
   spreadsheetId: string,
   sheetName: string,
   values: unknown[],
   token: string,
 ) => {
-  const range = encodeURIComponent(`${sheetName}!A:Z`);
+  const range = encodeURIComponent(`${sheetName}!A:ZZ`);
   const url =
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
   const res = await fetch(url, {
@@ -163,7 +371,7 @@ const updateRow = async (
   values: unknown[],
   token: string,
 ) => {
-  const range = encodeURIComponent(`${sheetName}!A${rowIndex}:Z${rowIndex}`);
+  const range = encodeURIComponent(`${sheetName}!A${rowIndex}:ZZ${rowIndex}`);
   const url =
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}?valueInputOption=USER_ENTERED`;
   const res = await fetch(url, {
@@ -178,6 +386,18 @@ const updateRow = async (
     const text = await res.text();
     throw new Error(`Sheet update failed (${sheetName} row ${rowIndex}): ${text}`);
   }
+};
+
+const ensureHeaderRow = async (
+  spreadsheetId: string,
+  sheetName: string,
+  headers: string[],
+  token: string,
+) => {
+  const currentHeader = await readRow(spreadsheetId, sheetName, 1, token);
+  if (isSameHeader(currentHeader, headers)) return;
+  await clearRow(spreadsheetId, sheetName, 1, token);
+  await updateRow(spreadsheetId, sheetName, 1, headers, token);
 };
 
 const loadLedgerMap = async (
@@ -299,6 +519,199 @@ const getAudit = (order: Record<string, unknown>) => {
   const raw = order?.slip_audit as unknown;
   if (Array.isArray(raw)) return raw[0] || {};
   return raw || {};
+};
+
+const loadUserProfileMap = async (
+  adminClient: ReturnType<typeof createClient>,
+  orders: Array<Record<string, unknown>>,
+) => {
+  const ids = [
+    ...new Set(
+      orders
+        .map((order) => String(order.user_id || "").trim())
+        .filter(Boolean),
+    ),
+  ];
+  const out = new Map<string, Record<string, unknown>>();
+  if (!ids.length) return out;
+
+  const CHUNK_SIZE = 200;
+  for (let index = 0; index < ids.length; index += CHUNK_SIZE) {
+    const chunk = ids.slice(index, index + CHUNK_SIZE);
+    const { data, error } = await adminClient
+      .from("user_profiles")
+      .select(
+        "user_id,display_name,avatar_url,bio,coins,xp,level,metadata,created_at,updated_at",
+      )
+      .in("user_id", chunk);
+    if (error) throw error;
+
+    for (const row of (data || []) as Array<Record<string, unknown>>) {
+      const userId = String(row.user_id || "").trim();
+      if (userId) out.set(userId, row);
+    }
+  }
+
+  return out;
+};
+
+const getLastOrdersSyncAt = async (
+  adminClient: ReturnType<typeof createClient>,
+) => {
+  const { data, error } = await adminClient
+    .from("sheet_sync_ledger")
+    .select("last_synced_at")
+    .eq("source_table", "orders")
+    .order("last_synced_at", { ascending: false })
+    .limit(1);
+
+  if (error) throw error;
+  const lastSyncedAt = data?.[0]?.last_synced_at;
+  return typeof lastSyncedAt === "string" ? new Date(lastSyncedAt).toISOString() : null;
+};
+
+const syncOrderBatch = async (
+  adminClient: ReturnType<typeof createClient>,
+  spreadsheetId: string,
+  token: string,
+  orders: Array<Record<string, unknown>>,
+  scope: SyncScope,
+  stats: SyncResponseStats,
+) => {
+  const userProfiles = await loadUserProfileMap(adminClient, orders);
+  const thOrders: Array<Record<string, unknown>> = [];
+  const foreignOrders: Array<Record<string, unknown>> = [];
+
+  for (const order of orders) {
+    const audit = getAudit(order) as Record<string, unknown>;
+    const country = String(audit?.buyer_country || "")
+      .trim()
+      .toUpperCase();
+    if (country === "TH") thOrders.push(order);
+    else foreignOrders.push(order);
+  }
+
+  if (scope !== "foreign") {
+    const ids = thOrders.map((o) => String(o.id));
+    const ledger = await loadLedgerMap(adminClient, "orders", SHEET_TH, ids);
+    for (const order of thOrders) {
+      const audit = getAudit(order) as Record<string, unknown>;
+      const userProfile =
+        userProfiles.get(String(order.user_id || "").trim()) || {};
+      const values = [
+        order.created_at || "",
+        order.id || "",
+        order.status || "",
+        order.payment_method || "",
+        order.amount ?? 0,
+        order.sku || "",
+        order.visitor_id || "",
+        order.user_id || "",
+        userProfile.display_name || "",
+        userProfile.avatar_url || "",
+        userProfile.bio || "",
+        asNumber(userProfile.coins, 0),
+        asNumber(userProfile.xp, 0),
+        asNumber(userProfile.level, 0),
+        safeJson(userProfile.metadata),
+        userProfile.created_at || "",
+        userProfile.updated_at || "",
+        audit?.buyer_country || "TH",
+        audit?.buyer_email || "",
+        audit?.buyer_full_name || "",
+        audit?.buyer_phone || "",
+        audit?.buyer_address_line1 || "",
+        audit?.buyer_address_line2 || "",
+        audit?.buyer_province || "",
+        audit?.buyer_district || "",
+        audit?.buyer_postal || "",
+        audit?.consent_personal_data === true ? "true" : "false",
+        audit?.ip_address || "",
+        audit?.ip_hash || "",
+        audit?.geo_country || "",
+        audit?.geo_region || "",
+        audit?.geo_city || "",
+        audit?.geo_postal || "",
+        audit?.geo_timezone || "",
+        audit?.geo_loc || "",
+        audit?.geo_org || "",
+        audit?.user_agent || "",
+        order.slip_url || "",
+        order.updated_at || "",
+        safeJson(order.metadata),
+        audit?.created_at || "",
+      ];
+      await runRowSync(adminClient, spreadsheetId, token, {
+        sourceTable: "orders",
+        sourcePk: String(order.id),
+        sheetName: SHEET_TH,
+        values,
+        stats: stats.th,
+        ledgerMap: ledger,
+      });
+    }
+  }
+
+  if (scope !== "th") {
+    const ids = foreignOrders.map((o) => String(o.id));
+    const ledger = await loadLedgerMap(adminClient, "orders", SHEET_FOREIGN, ids);
+    for (const order of foreignOrders) {
+      const audit = getAudit(order) as Record<string, unknown>;
+      const userProfile =
+        userProfiles.get(String(order.user_id || "").trim()) || {};
+      const values = [
+        order.created_at || "",
+        order.id || "",
+        order.status || "",
+        order.payment_method || "",
+        order.amount ?? 0,
+        order.sku || "",
+        order.visitor_id || "",
+        order.user_id || "",
+        userProfile.display_name || "",
+        userProfile.avatar_url || "",
+        userProfile.bio || "",
+        asNumber(userProfile.coins, 0),
+        asNumber(userProfile.xp, 0),
+        asNumber(userProfile.level, 0),
+        safeJson(userProfile.metadata),
+        userProfile.created_at || "",
+        userProfile.updated_at || "",
+        audit?.buyer_country || "UNKNOWN",
+        audit?.buyer_email || "",
+        audit?.buyer_full_name || "",
+        audit?.buyer_phone || "",
+        audit?.buyer_address_line1 || "",
+        audit?.buyer_address_line2 || "",
+        audit?.buyer_province || "",
+        audit?.buyer_district || "",
+        audit?.buyer_postal || "",
+        audit?.consent_personal_data === true ? "true" : "false",
+        audit?.ip_address || "",
+        audit?.ip_hash || "",
+        audit?.geo_country || "",
+        audit?.geo_region || "",
+        audit?.geo_city || "",
+        audit?.geo_postal || "",
+        audit?.geo_timezone || "",
+        audit?.geo_loc || "",
+        audit?.geo_org || "",
+        audit?.user_agent || "",
+        order.slip_url || "",
+        order.updated_at || "",
+        safeJson(order.metadata),
+        audit?.created_at || "",
+      ];
+      await runRowSync(adminClient, spreadsheetId, token, {
+        sourceTable: "orders",
+        sourcePk: String(order.id),
+        sheetName: SHEET_FOREIGN,
+        values,
+        stats: stats.foreign,
+        ledgerMap: ledger,
+      });
+    }
+  }
 };
 
 serve(async (req) => {
@@ -430,109 +843,61 @@ serve(async (req) => {
       runStarted = true;
     }
 
-    const serviceAccount = JSON.parse(serviceAccountJson);
-    const googleToken = await getGoogleAuthToken(
-      serviceAccount.client_email,
-      serviceAccount.private_key,
-    );
+    const googleToken = await getGoogleAuthToken(serviceAccountJson);
+    await ensureHeaderRow(googleSheetId, SHEET_DAILY, DAILY_HEADERS, googleToken);
+    await ensureHeaderRow(googleSheetId, SHEET_TH, SLIP_HEADERS, googleToken);
+    await ensureHeaderRow(googleSheetId, SHEET_FOREIGN, SLIP_HEADERS, googleToken);
 
     const now = new Date();
     const toIso = asIsoDate(body.to) || now.toISOString();
     let fromIso = asIsoDate(body.from);
 
     if (!fromIso && mode === "incremental") {
-      fromIso = new Date(
-        now.getTime() - DEFAULT_INCREMENTAL_WINDOW_HOURS * 60 * 60 * 1000,
-      ).toISOString();
+      fromIso = await getLastOrdersSyncAt(adminClient);
     }
 
     if (fromIso && new Date(fromIso).getTime() > new Date(toIso).getTime()) {
       throw new Error("Invalid range: from must be before to");
     }
 
-    let slipsQuery = adminClient
-      .from("orders")
-      .select(
-        `id,sku,amount,status,slip_url,created_at,updated_at,visitor_id,payment_method,
-         slip_audit!left(buyer_country,buyer_email,buyer_full_name)`,
-      )
-      .eq("payment_method", "manual_transfer")
-      .in("status", ALLOWED_ORDER_STATUSES)
-      .order("created_at", { ascending: true })
-      .limit(limit);
+    const timeColumn = mode === "incremental" ? "updated_at" : "created_at";
+    let offset = 0;
 
-    if (fromIso) slipsQuery = slipsQuery.gte("created_at", fromIso);
-    if (toIso) slipsQuery = slipsQuery.lte("created_at", toIso);
+    while (true) {
+      let slipsQuery = adminClient
+        .from("orders")
+        .select(
+          `id,sku,amount,status,slip_url,created_at,updated_at,visitor_id,user_id,payment_method,metadata,
+           slip_audit!left(
+             buyer_country,buyer_email,buyer_full_name,buyer_phone,buyer_address_line1,buyer_address_line2,
+             buyer_province,buyer_district,buyer_postal,consent_personal_data,ip_address,ip_hash,user_agent,
+             geo_country,geo_region,geo_city,geo_postal,geo_timezone,geo_loc,geo_org,created_at
+           )`,
+        )
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(offset, offset + limit - 1);
 
-    const { data: rawOrders, error: ordersError } = await slipsQuery;
-    if (ordersError) throw ordersError;
+      if (fromIso) slipsQuery = slipsQuery.gte(timeColumn, fromIso);
+      if (toIso) slipsQuery = slipsQuery.lte(timeColumn, toIso);
 
-    const orders = (rawOrders || []) as Array<Record<string, unknown>>;
+      const { data: rawOrders, error: ordersError } = await slipsQuery;
+      if (ordersError) throw ordersError;
 
-    const thOrders: Array<Record<string, unknown>> = [];
-    const foreignOrders: Array<Record<string, unknown>> = [];
+      const orders = (rawOrders || []) as Array<Record<string, unknown>>;
+      if (!orders.length) break;
 
-    for (const order of orders) {
-      const audit = getAudit(order) as Record<string, unknown>;
-      const country = String(audit?.buyer_country || "")
-        .trim()
-        .toUpperCase();
-      if (country === "TH") thOrders.push(order);
-      else foreignOrders.push(order);
-    }
+      await syncOrderBatch(
+        adminClient,
+        googleSheetId,
+        googleToken,
+        orders,
+        scope,
+        stats,
+      );
 
-    if (scope !== "foreign") {
-      const ids = thOrders.map((o) => String(o.id));
-      const ledger = await loadLedgerMap(adminClient, "orders", SHEET_TH, ids);
-      for (const order of thOrders) {
-        const audit = getAudit(order) as Record<string, unknown>;
-        const values = [
-          order.created_at || "",
-          order.id || "",
-          order.status || "",
-          order.amount ?? 0,
-          order.sku || "",
-          audit?.buyer_country || "TH",
-          audit?.buyer_email || "",
-          audit?.buyer_full_name || "",
-          order.slip_url || "",
-        ];
-        await runRowSync(adminClient, googleSheetId, googleToken, {
-          sourceTable: "orders",
-          sourcePk: String(order.id),
-          sheetName: SHEET_TH,
-          values,
-          stats: stats.th,
-          ledgerMap: ledger,
-        });
-      }
-    }
-
-    if (scope !== "th") {
-      const ids = foreignOrders.map((o) => String(o.id));
-      const ledger = await loadLedgerMap(adminClient, "orders", SHEET_FOREIGN, ids);
-      for (const order of foreignOrders) {
-        const audit = getAudit(order) as Record<string, unknown>;
-        const values = [
-          order.created_at || "",
-          order.id || "",
-          order.status || "",
-          order.amount ?? 0,
-          order.sku || "",
-          audit?.buyer_country || "UNKNOWN",
-          audit?.buyer_email || "",
-          audit?.buyer_full_name || "",
-          order.slip_url || "",
-        ];
-        await runRowSync(adminClient, googleSheetId, googleToken, {
-          sourceTable: "orders",
-          sourcePk: String(order.id),
-          sheetName: SHEET_FOREIGN,
-          values,
-          stats: stats.foreign,
-          ledgerMap: ledger,
-        });
-      }
+      if (orders.length < limit) break;
+      offset += limit;
     }
 
     const dailyDate =
@@ -541,12 +906,15 @@ serve(async (req) => {
     const dailyStart = `${dailyDate}T00:00:00.000Z`;
     const dailyEnd = `${dailyDate}T23:59:59.999Z`;
 
-    const { count: sessionCount, error: sessionErr } = await adminClient
+    const { count: rawSessionCount, error: sessionErr } = await adminClient
       .from("analytics_sessions")
       .select("id", { count: "exact", head: true })
       .gte("created_at", dailyStart)
       .lte("created_at", dailyEnd);
-    if (sessionErr) throw sessionErr;
+    if (sessionErr && !isMissingTableError(sessionErr, "analytics_sessions")) {
+      throw sessionErr;
+    }
+    const sessionCount = sessionErr ? 0 : (rawSessionCount || 0);
 
     let userCount = 0;
     const { count: profileCount, error: profileErr } = await adminClient
@@ -567,7 +935,7 @@ serve(async (req) => {
       sourceTable: "daily_stats",
       sourcePk: dailySourcePk,
       sheetName: SHEET_DAILY,
-      values: [dailyDate, sessionCount || 0, userCount],
+      values: [dailyDate, sessionCount, userCount],
       stats: stats.daily,
       ledgerMap: dailyLedger,
     });
@@ -584,7 +952,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = getErrorMessage(error);
     if (runStarted && runId) {
       await adminClient.from("sheet_sync_runs").update({
         status: "failed",

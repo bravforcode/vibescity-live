@@ -17,9 +17,9 @@ import { useUserStore } from "../store/userStore";
 import { openExternal } from "../utils/browserUtils";
 import { calculateDistance } from "../utils/shopUtils";
 import {
-	loadFavoritesWithTTL,
-	removeFavoriteItem,
-	saveFavoriteItem,
+    loadFavoritesWithTTL,
+    removeFavoriteItem,
+    saveFavoriteItem,
 } from "../utils/storageHelper";
 import { useAudioSystem } from "./useAudioSystem";
 // ✅ Modular Composables
@@ -34,6 +34,40 @@ import { usePerformance } from "./usePerformance";
 import { useScrollSync } from "./useScrollSync";
 import { useShopFilters } from "./useShopFilters";
 import { useUILogic } from "./useUILogic";
+
+const IS_STRICT_MAP_E2E = import.meta.env.VITE_E2E_MAP_REQUIRED === "true";
+const DEEPLINK_NOT_FOUND_DEDUPE_MS = 3500;
+let lastDeepLinkNotFoundKey = "";
+let lastDeepLinkNotFoundAt = 0;
+
+const shouldNotifyDeepLinkNotFound = (key) => {
+	const safeKey = String(key || "").trim();
+	const now = Date.now();
+	if (
+		safeKey &&
+		lastDeepLinkNotFoundKey === safeKey &&
+		now - lastDeepLinkNotFoundAt < DEEPLINK_NOT_FOUND_DEDUPE_MS
+	) {
+		return false;
+	}
+	lastDeepLinkNotFoundKey = safeKey;
+	lastDeepLinkNotFoundAt = now;
+	return true;
+};
+
+const looksLikeVenueId = (value) => {
+	const raw = String(value || "").trim();
+	if (!raw) return false;
+	if (/^\d+$/.test(raw)) return true;
+	if (
+		/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+			raw,
+		)
+	) {
+		return true;
+	}
+	return /^[0-9a-f-]{12,}$/i.test(raw);
+};
 
 export function useAppLogic() {
 	const { t, locale } = useI18n();
@@ -91,6 +125,8 @@ export function useAppLogic() {
 	const { getDirectionsUrl, hasHomeBase } = useHomeBase(); // ✅ Correct Destructuring
 	const {
 		isMobileView,
+		isTabletView,
+		isDesktopView,
 		bottomUiHeight,
 		mobileCardScrollRef,
 		showSidebar, // Used in isUiVisible
@@ -129,6 +165,8 @@ export function useAppLogic() {
 	// --- 3. Init Map Logic ---
 	const mapLogic = useMapLogic({
 		isMobileView,
+		isTabletView,
+		isDesktopView,
 		bottomUiHeight,
 		userLocation, // Now reactive from locationStore
 	});
@@ -192,8 +230,13 @@ export function useAppLogic() {
 		selectFeedback,
 		mobileCardScrollRef,
 	});
-	const { handleHorizontalScroll, scrollToCard, onScrollStart, onScrollEnd } =
-		scrollSync;
+	const {
+		handleHorizontalScroll,
+		scrollToCard,
+		onScrollStart,
+		onScrollEnd,
+		isCenteredCard,
+	} = scrollSync;
 
 	// --- 7. Local State & Glue Logic ---
 	// --- REFACTORED: Computed Base for Logic ---
@@ -324,8 +367,12 @@ export function useAppLogic() {
 		else window.history.pushState({}, "", targetPath);
 	};
 	const redirectToHome = () => {
-		if (typeof window === "undefined") return;
-		window.history.replaceState({}, "", withLocalePrefix("/"));
+		if (typeof window === "undefined") return false;
+		const targetPath = withLocalePrefix("/");
+		const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+		if (currentPath === targetPath) return false;
+		window.history.replaceState({}, "", targetPath);
+		return true;
 	};
 	const closeDetailSheet = ({ syncRoute = true, replace = true } = {}) => {
 		selectedShop.value = null;
@@ -359,6 +406,9 @@ export function useAppLogic() {
 			syncRouteMode = "replace",
 			trackEvent = false,
 			trackEventType = "view_venue",
+			shouldFly = true,
+			shouldSyncCarousel = true,
+			flyOffsetY,
 		} = {},
 	) => {
 		const normalizedId = normalizeVenueId(shopId);
@@ -376,12 +426,12 @@ export function useAppLogic() {
 
 		const shop = shopStore.getShopById(normalizedId); // ✅ Use getShopById for accuracy
 		if (shop) {
-			if (shop.lat && shop.lng) {
-				smoothFlyTo([shop.lat, shop.lng]);
+			if (shouldFly && shop.lat && shop.lng) {
+				smoothFlyTo([shop.lat, shop.lng], { offsetY: flyOffsetY });
 			}
 
 			// Sync Carousel
-			if (isMobileView.value) {
+			if (shouldSyncCarousel && isMobileView.value) {
 				scrollToCard(shopId);
 			}
 
@@ -408,15 +458,12 @@ export function useAppLogic() {
 			return;
 		}
 		selectFeedback();
-		if (activeShopId.value == shop.id) {
-			activeShopId.value = null;
-			return;
-		}
-		applyShopSelection(shop.id, false, {
-			trackEvent: true,
-			trackEventType: "view_venue",
-		});
 		socketService.joinRoom(shop.id);
+		handleOpenDetail(shop, {
+			trackEvent: true,
+			trackEventType: "open_detail",
+			routeMode: "replace",
+		});
 	};
 
 	const handleOpenDetail = (
@@ -432,13 +479,24 @@ export function useAppLogic() {
 			return;
 		}
 
+		// When opening detail sheet, the modal covers ~85-90vh of the screen on mobile,
+		// so we need a much larger offsetY (e.g. 40%) to ensure the pin flies into the visible top 10%.
+		const viewportHeight = typeof window !== "undefined" ? window.innerHeight : 800;
+
 		applyShopSelection(shop.id, false, {
 			syncRoute: true,
 			syncRouteMode: routeMode,
 			trackEvent,
 			trackEventType,
+			flyOffsetY: Math.round(viewportHeight * 0.48)
 		});
-		selectedShop.value = shop;
+
+		// Stagger the heavy Vue modal mount slightly to let Mapbox lock into WebGL animation first
+		requestAnimationFrame(() => {
+			requestAnimationFrame(() => {
+				selectedShop.value = shop;
+			});
+		});
 
 		// Progressive enhancement: fetch full venue details lazily.
 		// Must not block UI or navigation.
@@ -470,10 +528,24 @@ export function useAppLogic() {
 		// Stop user scroll processing
 		scrollSync.isUserScrolling.value = false;
 
-		applyShopSelection(shop.id, false, {
-			trackEvent: true,
-			trackEventType: "view_venue",
-		});
+		const shouldSettleCardFirst =
+			isMobileView.value && !isCenteredCard(normalizeVenueId(shop.id));
+
+		if (shouldSettleCardFirst) {
+			scrollToCard(shop.id);
+			window.setTimeout(() => {
+				applyShopSelection(shop.id, false, {
+					trackEvent: true,
+					trackEventType: "view_venue",
+					shouldSyncCarousel: false,
+				});
+			}, 260);
+		} else {
+			applyShopSelection(shop.id, false, {
+				trackEvent: true,
+				trackEventType: "view_venue",
+			});
+		}
 
 		// Video sync logic
 		const videoEl = document.querySelector(
@@ -481,6 +553,14 @@ export function useAppLogic() {
 		);
 		if (videoEl) {
 			shop.initialTime = videoEl.currentTime;
+		}
+
+		if (IS_STRICT_MAP_E2E) {
+			handleOpenDetail(shop, {
+				trackEvent: true,
+				trackEventType: "open_detail",
+				routeMode: "replace",
+			});
 		}
 	};
 
@@ -558,6 +638,8 @@ export function useAppLogic() {
 	// Local Interval for time update
 	let timeInterval = null;
 	let popStateHandler = null;
+	let deepLinkTimer = null;
+	let initRunSeq = 0;
 
 	// --- Initialization Logic ---
 	const handleSocketEvent = (data) => {
@@ -582,6 +664,11 @@ export function useAppLogic() {
 	const initApp = async () => {
 		// Clean up previous interval if exists
 		if (timeInterval) clearInterval(timeInterval);
+		if (deepLinkTimer) {
+			clearTimeout(deepLinkTimer);
+			deepLinkTimer = null;
+		}
+		const runSeq = ++initRunSeq;
 
 		isDataLoading.value = true;
 		try {
@@ -693,27 +780,95 @@ export function useAppLogic() {
 				return null;
 			};
 
+			const resolveVenueIdFromDb = async (ref) => {
+				if (!ref) return null;
+				try {
+					if (ref.kind === "id") {
+						const normalized = normalizeVenueId(ref.value);
+						if (!normalized) return null;
+						const { data, error } = await supabase
+							.from("venues")
+							.select("id")
+							.eq("id", normalized)
+							.maybeSingle();
+						if (!error && data?.id) return normalizeVenueId(data.id);
+						return null;
+					}
+
+					if (ref.kind !== "slug") return null;
+					const slug = normalizeVenueSlug(ref.value);
+					if (!slug) return null;
+
+					const { data, error } = await supabase
+						.from("venues")
+						.select("id")
+						.eq("slug", slug)
+						.maybeSingle();
+					if (!error && data?.id) return normalizeVenueId(data.id);
+				} catch {
+					// ignore
+				}
+				return null;
+			};
+
 			const queryRef = (() => {
-				const normalized = normalizeVenueId(queryVenueRaw);
+				const raw = String(queryVenueRaw || "").trim();
+				const normalized = normalizeVenueId(raw);
 				if (!normalized) return null;
 				const byId = shopStore.getShopById(normalized);
 				if (byId) return { kind: "id", value: normalizeVenueId(byId.id) };
 				const bySlug = shopStore.getShopBySlug(normalized);
 				if (bySlug) return { kind: "id", value: normalizeVenueId(bySlug.id) };
-				// Fall back: treat it as an id-like value (may be not found).
-				return { kind: "id", value: normalized };
+				return looksLikeVenueId(normalized)
+					? { kind: "id", value: normalized }
+					: { kind: "slug", value: normalizeVenueSlug(normalized) };
 			})();
 
+			const deepLinkRef = pathVenue ?? queryRef;
 			const initialVenueId =
 				(await resolveVenueIdFromRef(pathVenue)) ??
-				(await resolveVenueIdFromRef(queryRef));
+				(await resolveVenueIdFromRef(queryRef)) ??
+				(await resolveVenueIdFromDb(deepLinkRef));
 
 			if (initialVenueId) {
-				setTimeout(() => {
-					const shop = shopStore.getShopById(initialVenueId);
+				deepLinkTimer = setTimeout(async () => {
+					if (runSeq !== initRunSeq) return;
+					let shop = shopStore.getShopById(initialVenueId);
+					if (!shop && typeof shopStore.fetchVenueDetail === "function") {
+						try {
+							const hydrated = await shopStore.fetchVenueDetail(initialVenueId);
+							if (runSeq !== initRunSeq) return;
+							shop = hydrated || shopStore.getShopById(initialVenueId);
+						} catch {
+							// ignore
+						}
+					}
+					if (!shop && deepLinkRef) {
+						const lateResolvedId = await resolveVenueIdFromDb(deepLinkRef);
+						if (lateResolvedId && lateResolvedId !== initialVenueId) {
+							shop = shopStore.getShopById(lateResolvedId);
+							if (!shop && typeof shopStore.fetchVenueDetail === "function") {
+								try {
+									const hydrated =
+										await shopStore.fetchVenueDetail(lateResolvedId);
+									if (runSeq !== initRunSeq) return;
+									shop = hydrated || shopStore.getShopById(lateResolvedId);
+								} catch {
+									// ignore
+								}
+							}
+						}
+					}
 					if (!shop) {
-						notifyError("Venue not found. Redirected to home.");
-						redirectToHome();
+						const redirected = redirectToHome();
+						if (
+							redirected &&
+							shouldNotifyDeepLinkNotFound(
+								`venue:${initialVenueId}:${deepLinkRef?.kind || "unknown"}`,
+							)
+						) {
+							notifyError("Venue not found. Redirected to home.");
+						}
 						return;
 					}
 					handleOpenDetail(shop, {
@@ -721,7 +876,7 @@ export function useAppLogic() {
 						trackEventType: "deeplink_open",
 						routeMode: "replace",
 					});
-				}, 300);
+				}, 650);
 			}
 
 			// Intervals
@@ -753,6 +908,10 @@ export function useAppLogic() {
 		if (timeInterval) {
 			clearInterval(timeInterval);
 			timeInterval = null;
+		}
+		if (deepLinkTimer) {
+			clearTimeout(deepLinkTimer);
+			deepLinkTimer = null;
 		}
 		socketService.removeListener(handleSocketEvent);
 		socketService.disconnect?.();

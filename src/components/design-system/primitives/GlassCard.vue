@@ -1,10 +1,10 @@
 <template>
   <div
-    class="relative overflow-hidden backdrop-blur-[20px] bg-surface-glass border border-white/10 shadow-elevation-1 transition-all duration-normal ease-standard"
+    class="relative overflow-hidden backdrop-blur-[20px] bg-surface-glass border border-white/10 shadow-elevation-1 transition-all duration-normal ease-emphasized"
     :class="[
       roundedClass,
       interactive
-        ? 'cursor-pointer hover:bg-white/5 hover:border-white/20 hover:shadow-elevation-2 active:scale-95'
+        ? 'cursor-pointer hover:bg-white/5 hover:border-white/20 hover:shadow-elevation-2 hover:-translate-y-0.5 active:scale-[0.98] active:translate-y-0'
         : '',
     ]"
   >

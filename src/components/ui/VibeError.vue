@@ -42,7 +42,7 @@ const handleRetry = () => {
 
     <button
       @click="handleRetry"
-      class="group relative flex items-center justify-center gap-2 px-8 py-3 rounded-full bg-white text-black font-black text-xs uppercase tracking-widest hover:scale-105 active:scale-95 transition-all"
+      class="group relative flex items-center justify-center gap-2 px-8 py-3 rounded-full bg-white text-black font-black text-xs uppercase tracking-widest hover:scale-105 active:scale-95 transition"
     >
       <RefreshCw class="w-4 h-4 transition-transform group-hover:rotate-180" />
       <span>{{ actionLabel }}</span>

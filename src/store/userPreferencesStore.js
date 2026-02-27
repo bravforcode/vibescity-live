@@ -93,10 +93,6 @@ export const useUserPreferencesStore = defineStore(
 			homeLocation.value = [lat, lng];
 			homeName.value = name;
 			homeAddress.value = address;
-
-			console.log(
-				`🏠 Home set: ${name} [${lat.toFixed(5)}, ${lng.toFixed(5)}]`,
-			);
 			return true;
 		};
 
@@ -288,6 +284,8 @@ export const useUserPreferencesStore = defineStore(
 		// Map Performance / Visual FX
 		const isAmbientFxEnabled = ref(false);
 		const isNeonPulseEnabled = ref(false);
+		const isWeatherFxEnabled = ref(true);
+		const isSoundEnabled = ref(false);
 		const isHeatmapEnabled = ref(true);
 		const is3dBuildingsEnabled = ref(true);
 		const isMapFogEnabled = ref(true);
@@ -318,6 +316,12 @@ export const useUserPreferencesStore = defineStore(
 		};
 		const toggleNeonPulse = () => {
 			isNeonPulseEnabled.value = !isNeonPulseEnabled.value;
+		};
+		const toggleWeatherFx = () => {
+			isWeatherFxEnabled.value = !isWeatherFxEnabled.value;
+		};
+		const toggleSoundEnabled = () => {
+			isSoundEnabled.value = !isSoundEnabled.value;
 		};
 		const toggleHeatmap = () => {
 			isHeatmapEnabled.value = !isHeatmapEnabled.value;
@@ -351,6 +355,7 @@ export const useUserPreferencesStore = defineStore(
 				// Performance-first
 				isAmbientFxEnabled.value = false;
 				isNeonPulseEnabled.value = false;
+				isWeatherFxEnabled.value = false;
 				isHeatmapEnabled.value = true;
 				is3dBuildingsEnabled.value = true;
 				isMapFogEnabled.value = true;
@@ -359,8 +364,9 @@ export const useUserPreferencesStore = defineStore(
 				return;
 			}
 			if (preset === "colorful") {
-				isAmbientFxEnabled.value = false;
+				isAmbientFxEnabled.value = true;
 				isNeonPulseEnabled.value = true;
+				isWeatherFxEnabled.value = false;
 				isHeatmapEnabled.value = true;
 				is3dBuildingsEnabled.value = true;
 				isMapFogEnabled.value = true;
@@ -369,8 +375,9 @@ export const useUserPreferencesStore = defineStore(
 				return;
 			}
 			// cinematic
-			isAmbientFxEnabled.value = false;
+			isAmbientFxEnabled.value = true;
 			isNeonPulseEnabled.value = true;
+			isWeatherFxEnabled.value = true;
 			isHeatmapEnabled.value = true;
 			is3dBuildingsEnabled.value = true;
 			isMapFogEnabled.value = true;
@@ -393,6 +400,8 @@ export const useUserPreferencesStore = defineStore(
 			isLowPowerMode,
 			isAmbientFxEnabled,
 			isNeonPulseEnabled,
+			isWeatherFxEnabled,
+			isSoundEnabled,
 			isHeatmapEnabled,
 			is3dBuildingsEnabled,
 			isMapFogEnabled,
@@ -429,6 +438,8 @@ export const useUserPreferencesStore = defineStore(
 			toggleLowPowerMode,
 			toggleAmbientFx,
 			toggleNeonPulse,
+			toggleWeatherFx,
+			toggleSoundEnabled,
 			toggleHeatmap,
 			toggle3dBuildings,
 			toggleMapFog,
@@ -458,6 +469,8 @@ export const useUserPreferencesStore = defineStore(
 				"isLowPowerMode",
 				"isAmbientFxEnabled",
 				"isNeonPulseEnabled",
+				"isWeatherFxEnabled",
+				"isSoundEnabled",
 				"isHeatmapEnabled",
 				"is3dBuildingsEnabled",
 				"isMapFogEnabled",

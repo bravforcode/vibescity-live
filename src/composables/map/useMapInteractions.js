@@ -11,9 +11,18 @@ export function useMapInteractions(
 ) {
 	const { impactFeedback } = useHaptics();
 	const { spawnTapRipple } = options;
-	const PIN_LAYER_ID = "vibe-pins-layer";
-	const CLUSTER_LAYER_ID = "vibe-clusters-layer";
-	const PIN_SOURCE_ID = "vibe-shops";
+	const resolveFeatureItem =
+		typeof options.resolveFeatureItem === "function"
+			? options.resolveFeatureItem
+			: null;
+	const enableTapRipple = options.enableTapRipple !== false;
+	const PIN_LAYER_ID = options.pinLayerId || "unclustered-pins";
+	const PIN_HITBOX_LAYER_ID =
+		options.pinHitboxLayerId || "unclustered-pins-hitbox";
+	const CLUSTER_LAYER_ID = options.clusterLayerId || "clusters";
+	const PIN_SOURCE_ID = options.pinSourceId || "pins_source";
+	let lastPointClickSignature = "";
+	let lastPointClickAt = 0;
 
 	const handlePointClick = (e) => {
 		if (!e.features?.[0]) return;
@@ -40,14 +49,16 @@ export function useMapInteractions(
 					? "#ef4444"
 					: "#60a5fa";
 
-		// Trigger Ripple directly if function provided
-		if (typeof spawnTapRipple === "function") {
-			spawnTapRipple(feature.geometry.coordinates, pulseColor);
-		} else {
-			emit("interaction-ripple", {
-				coords: feature.geometry.coordinates,
-				color: pulseColor,
-			});
+		// Trigger ripple only when enabled.
+		if (enableTapRipple) {
+			if (typeof spawnTapRipple === "function") {
+				spawnTapRipple(feature.geometry.coordinates, pulseColor);
+			} else {
+				emit("interaction-ripple", {
+					coords: feature.geometry.coordinates,
+					color: pulseColor,
+				});
+			}
 		}
 
 		impactFeedback("light");
@@ -55,13 +66,20 @@ export function useMapInteractions(
 		// Ensure numeric coords
 		shopData.lat = Number(feature.geometry.coordinates[1]);
 		shopData.lng = Number(feature.geometry.coordinates[0]);
+		const pointSig = `${String(shopData.id ?? feature.id ?? "")}:${Math.round(
+			Number(e.point?.x ?? 0),
+		)}:${Math.round(Number(e.point?.y ?? 0))}`;
+		const now = Date.now();
+		if (pointSig === lastPointClickSignature && now - lastPointClickAt < 220) {
+			return;
+		}
+		lastPointClickSignature = pointSig;
+		lastPointClickAt = now;
 
-		emit("select-shop", shopData);
-		flyTo({
-			center: [shopData.lng, shopData.lat],
-			zoom: 16,
-			essential: true,
-		});
+		const resolvedShop = resolveFeatureItem
+			? resolveFeatureItem(shopData, feature)
+			: shopData;
+		emit("select-shop", resolvedShop || shopData);
 	};
 
 	const handleClusterClick = (e) => {
@@ -73,13 +91,15 @@ export function useMapInteractions(
 		if (!cluster) return;
 		impactFeedback("medium");
 
-		if (typeof spawnTapRipple === "function") {
-			spawnTapRipple(cluster.geometry.coordinates, "#a78bfa");
-		} else {
-			emit("interaction-ripple", {
-				coords: cluster.geometry.coordinates,
-				color: "#a78bfa",
-			});
+		if (enableTapRipple) {
+			if (typeof spawnTapRipple === "function") {
+				spawnTapRipple(cluster.geometry.coordinates, "#a78bfa");
+			} else {
+				emit("interaction-ripple", {
+					coords: cluster.geometry.coordinates,
+					color: "#a78bfa",
+				});
+			}
 		}
 
 		const clusterId = cluster.properties?.cluster_id;
@@ -116,16 +136,37 @@ export function useMapInteractions(
 	const setupMapInteractions = () => {
 		if (!map.value) return;
 
+		const safeUnbind = (event, layerId, handler) => {
+			try {
+				map.value.off(event, layerId, handler);
+			} catch {
+				// no-op when layer/handler is not bound
+			}
+		};
 		const safeBind = (event, layerId, handler) => {
 			if (!map.value.getLayer(layerId)) return;
 			map.value.off(event, layerId, handler);
 			map.value.on(event, layerId, handler);
 		};
 
-		// Pins
-		safeBind("click", PIN_LAYER_ID, handlePointClick);
-		safeBind("mouseenter", PIN_LAYER_ID, setPointer);
-		safeBind("mouseleave", PIN_LAYER_ID, resetPointer);
+		// Ensure old bindings are removed before rebinding.
+		for (const layerId of [PIN_LAYER_ID, PIN_HITBOX_LAYER_ID]) {
+			safeUnbind("click", layerId, handlePointClick);
+			safeUnbind("mouseenter", layerId, setPointer);
+			safeUnbind("mouseleave", layerId, resetPointer);
+		}
+
+		// Click is bound once to avoid duplicate open from pin + hitbox overlays.
+		const clickLayer = map.value.getLayer(PIN_HITBOX_LAYER_ID)
+			? PIN_HITBOX_LAYER_ID
+			: map.value.getLayer(PIN_LAYER_ID)
+				? PIN_LAYER_ID
+				: null;
+		if (clickLayer) {
+			safeBind("click", clickLayer, handlePointClick);
+			safeBind("mouseenter", clickLayer, setPointer);
+			safeBind("mouseleave", clickLayer, resetPointer);
+		}
 
 		// Clusters
 		safeBind("click", CLUSTER_LAYER_ID, handleClusterClick);
@@ -134,14 +175,17 @@ export function useMapInteractions(
 	};
 
 	// --- FlyTo / Focus Logic ---
-
 	const focusLocation = (
 		coords,
-		targetZoom = 17,
-		pitch = 50,
+		targetZoom = 16,
+		pitch = 60,
 		extraBottomOffset = 0,
 	) => {
-		if (!map.value || !coords) return;
+		if (!map.value || !Array.isArray(coords) || coords.length < 2) return;
+
+		const lng = Number(coords[0]);
+		const lat = Number(coords[1]);
+		if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
 
 		// Calculate dynamic padding based on UI offsets
 		const padding = {
@@ -149,15 +193,15 @@ export function useMapInteractions(
 			bottom:
 				(props.uiBottomOffset || 0) +
 				(props.isSidebarOpen ? 20 : 180) +
-				extraBottomOffset,
+				Number(extraBottomOffset || 0),
 			left: props.isSidebarOpen ? 300 : 20,
 			right: 20,
 		};
 
 		map.value.flyTo({
-			center: coords,
+			center: [lng, lat],
 			zoom: targetZoom,
-			pitch: pitch ?? 50,
+			pitch: pitch ?? 60,
 			bearing: 0,
 			padding,
 			speed: 0.6,
@@ -165,24 +209,37 @@ export function useMapInteractions(
 			essential: true,
 		});
 
-		// Parent should handle "addHeatmapLayer" if needed,
-		// or we expose a callback/hook
+		// Parent should handle "addHeatmapLayer" if needed.
 	};
 
 	const centerOnUser = () => {
 		if (props.userLocation && props.userLocation.length >= 2) {
 			// [lat, lng] -> [lng, lat]
 			const lngLat = [props.userLocation[1], props.userLocation[0]];
-			focusLocation(lngLat, 17);
+			focusLocation(lngLat, 17, 60);
 		}
 	};
 
 	const flyTo = (arg1, arg2) => {
 		if (!map.value) return;
+
+		const padding = {
+			top: (props.uiTopOffset || 0) + 50,
+			bottom: (props.uiBottomOffset || 0) + (props.isSidebarOpen ? 20 : 180),
+			left: props.isSidebarOpen ? 300 : 20,
+			right: 20,
+		};
+
 		if (typeof arg1 === "object" && !Array.isArray(arg1)) {
-			map.value.flyTo(arg1);
+			map.value.flyTo({ padding, pitch: 60, ...arg1 });
 		} else {
-			map.value.flyTo({ center: arg1, zoom: arg2, essential: true });
+			map.value.flyTo({
+				center: arg1,
+				zoom: arg2,
+				essential: true,
+				padding,
+				pitch: 60,
+			});
 		}
 	};
 
@@ -190,6 +247,8 @@ export function useMapInteractions(
 		handlePointClick,
 		handleClusterClick,
 		handleMarkerClick,
+		setPointer,
+		resetPointer,
 		setupMapInteractions,
 		focusLocation,
 		centerOnUser,

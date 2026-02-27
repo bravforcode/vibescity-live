@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { isSupabaseSchemaCacheError, supabase } from "../lib/supabase";
 
 /**
  * Maps Supabase Postgres data to the internal shop object format.
@@ -97,7 +97,7 @@ export const getLiveEverywhere = async () => {
 		const { data, error } = await supabase
 			.from("venues")
 			.select("*")
-			.eq("status", "LIVE");
+			.eq("status", "active");
 
 		if (error) throw error;
 		return (data || []).map((item, index) => mapShopData(item, index));
@@ -220,26 +220,88 @@ export const getFeedCards = async (lat, lng) => {
 
 /**
  * RPC: Get Map Pins (Bounds + Zoom Rules)
+ * Includes an aggressive client timeout + circuit-breaker so the UI never hangs
+ * waiting for a slow PostGIS query.
  */
+const MAP_PINS_TIMEOUT_MS = 8_000;
+const MAP_PINS_WARN_INTERVAL_MS = 20_000;
+const MAP_PINS_CIRCUIT_BREAKER_THRESHOLD = 3;
+const MAP_PINS_CIRCUIT_BREAKER_BASE_COOLDOWN_MS = 8_000;
+const MAP_PINS_CIRCUIT_BREAKER_MAX_COOLDOWN_MS = 60_000;
+let mapPinsConsecutiveTimeouts = 0;
+let mapPinsCircuitOpenUntil = 0;
+let mapPinsCircuitCooldownMs = MAP_PINS_CIRCUIT_BREAKER_BASE_COOLDOWN_MS;
+let mapPinsLastWarningAt = 0;
+let mapPinsLastGoodPins = [];
+
+const warnMapPins = (message) => {
+	// Suppress in production — instant-pins pattern shows fallback data immediately
+	if (!import.meta.env.DEV) return;
+	const now = Date.now();
+	if (now - mapPinsLastWarningAt < MAP_PINS_WARN_INTERVAL_MS) return;
+	mapPinsLastWarningAt = now;
+	console.debug(message);
+};
+
+const resetMapPinsCircuit = () => {
+	mapPinsConsecutiveTimeouts = 0;
+	mapPinsCircuitOpenUntil = 0;
+	mapPinsCircuitCooldownMs = MAP_PINS_CIRCUIT_BREAKER_BASE_COOLDOWN_MS;
+};
+
+const openMapPinsCircuit = () => {
+	const cooldownMs = mapPinsCircuitCooldownMs;
+	mapPinsCircuitOpenUntil = Date.now() + cooldownMs;
+	mapPinsCircuitCooldownMs = Math.min(
+		MAP_PINS_CIRCUIT_BREAKER_MAX_COOLDOWN_MS,
+		mapPinsCircuitCooldownMs * 2,
+	);
+	return cooldownMs;
+};
+
 export const getMapPins = async ({
 	p_min_lat,
 	p_min_lng,
 	p_max_lat,
 	p_max_lng,
 	p_zoom,
+	signal,
 }) => {
+	let timeoutId = null;
+	let timedOut = false;
+	const timeoutController = new AbortController();
+	let externalAbortListener = null;
+
 	try {
-		const { data, error } = await supabase.rpc("get_map_pins", {
+		const now = Date.now();
+		if (mapPinsCircuitOpenUntil > now) {
+			warnMapPins("Map pins RPC temporarily paused after repeated timeouts");
+			return mapPinsLastGoodPins;
+		}
+		if (signal?.aborted) {
+			timeoutController.abort();
+		} else if (signal) {
+			externalAbortListener = () => timeoutController.abort();
+			signal.addEventListener("abort", externalAbortListener, { once: true });
+		}
+		timeoutId = setTimeout(() => {
+			timedOut = true;
+			timeoutController.abort();
+		}, MAP_PINS_TIMEOUT_MS);
+
+		let rpcQuery = supabase.rpc("get_map_pins", {
 			p_min_lat,
 			p_min_lng,
 			p_max_lat,
 			p_max_lng,
 			p_zoom: Math.round(p_zoom),
 		});
+		rpcQuery = rpcQuery.abortSignal(timeoutController.signal);
+		const { data, error } = await rpcQuery;
 
 		if (error) throw error;
 
-		return (data || []).map((item) => ({
+		const mapped = (data || []).map((item) => ({
 			id: item.id,
 			name: item.name,
 			lat: item.lat,
@@ -250,11 +312,60 @@ export const getMapPins = async ({
 			glowActive: item.glow_active,
 			boostActive: item.boost_active,
 			giantActive: item.giant_active,
+			hasCoin:
+				typeof item.has_coin === "boolean"
+					? item.has_coin
+					: typeof item.hasCoin === "boolean"
+						? item.hasCoin
+						: null,
 			visibilityScore: item.visibility_score,
 			coverImage: item.cover_image,
 		}));
+		resetMapPinsCircuit();
+		if (mapped.length > 0) mapPinsLastGoodPins = mapped;
+		return mapped;
 	} catch (error) {
-		console.error("Error fetching map pins:", error);
+		const statusCode = Number(error?.status || error?.code || 0);
+		const isAbort =
+			error?.name === "AbortError" ||
+			String(error?.message || "").includes("AbortError") ||
+			String(error?.message || "").includes("signal is aborted");
+		if (isAbort && signal?.aborted && !timedOut) {
+			// Silently return cached pins when request was cancelled
+			return mapPinsLastGoodPins;
+		}
+		const isServerError = statusCode >= 500 && statusCode < 600;
+		const isSchemaCacheBusy = isSupabaseSchemaCacheError(error);
+		const isTimeoutLike =
+			timedOut ||
+			error?.message?.includes("client timeout") ||
+			String(error?.code) === "57014" ||
+			isSchemaCacheBusy;
+		if (isTimeoutLike || isServerError) {
+			mapPinsConsecutiveTimeouts += 1;
+			if (mapPinsConsecutiveTimeouts >= MAP_PINS_CIRCUIT_BREAKER_THRESHOLD) {
+				const cooldownMs = openMapPinsCircuit();
+				warnMapPins(
+					`Map pins RPC circuit open for ${Math.round(cooldownMs / 1000)}s after repeated failures`,
+				);
+			}
+			warnMapPins(
+				isSchemaCacheBusy
+					? "Map pins temporarily unavailable while Supabase schema cache reloads — using fallback data"
+					: "Map pins RPC or DB statement timed out — using fallback data",
+			);
+			if (mapPinsLastGoodPins.length > 0) return mapPinsLastGoodPins;
+		} else {
+			console.error("Error fetching map pins:", error);
+			if (mapPinsLastGoodPins.length > 0) return mapPinsLastGoodPins;
+		}
 		return [];
+	} finally {
+		if (timeoutId) {
+			clearTimeout(timeoutId);
+		}
+		if (signal && externalAbortListener) {
+			signal.removeEventListener("abort", externalAbortListener);
+		}
 	}
 };

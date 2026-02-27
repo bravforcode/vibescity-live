@@ -1,0 +1,45 @@
+export const THAI_BANK_OPTIONS = [
+	{ code: "BBL", name: "Bangkok Bank" },
+	{ code: "KBANK", name: "Kasikornbank" },
+	{ code: "KTB", name: "Krungthai Bank" },
+	{ code: "SCB", name: "Siam Commercial Bank" },
+	{ code: "BAY", name: "Bank of Ayudhya (Krungsri)" },
+	{ code: "TTB", name: "TMBThanachart Bank" },
+	{ code: "GSB", name: "Government Savings Bank" },
+	{ code: "BAAC", name: "Bank for Agriculture and Agricultural Cooperatives" },
+	{ code: "GHB", name: "Government Housing Bank" },
+	{ code: "EXIM", name: "Export-Import Bank of Thailand" },
+	{ code: "UOB", name: "UOB Thailand" },
+	{ code: "CIMBT", name: "CIMB Thai Bank" },
+	{ code: "ICBC", name: "ICBC (Thai)" },
+	{ code: "TISCO", name: "TISCO Bank" },
+	{ code: "KKP", name: "Kiatnakin Phatra Bank" },
+	{ code: "LHFG", name: "Land and Houses Bank" },
+	{ code: "TTBSC", name: "Thai Credit Bank" },
+	{ code: "SME", name: "SME Development Bank" },
+	{ code: "ISBT", name: "Islamic Bank of Thailand" },
+	{ code: "CITI", name: "Citibank Thailand" },
+];
+
+export const PAYOUT_COUNTRY_OPTIONS = [
+	{ code: "TH", name: "Thailand" },
+	{ code: "SG", name: "Singapore" },
+	{ code: "US", name: "United States" },
+	{ code: "GB", name: "United Kingdom" },
+	{ code: "JP", name: "Japan" },
+	{ code: "AU", name: "Australia" },
+	{ code: "EU", name: "European Union" },
+	{ code: "OTHER", name: "Other" },
+];
+
+export const PAYOUT_CURRENCY_OPTIONS = [
+	"THB",
+	"USD",
+	"EUR",
+	"GBP",
+	"JPY",
+	"AUD",
+	"SGD",
+	"HKD",
+	"CNY",
+];

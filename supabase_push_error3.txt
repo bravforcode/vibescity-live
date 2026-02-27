@@ -1,0 +1,21 @@
+Debugger listening on ws://127.0.0.1:58958/66accdbb-5078-44ef-bbf2-a5358ef70192
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger attached.
+Initialising login role...
+Connecting to remote database...
+Do you want to push these migrations to the remote database?
+ ΓÇó 20260224135000_ultrathink_schema_optimization_part1.sql
+ ΓÇó 20260224160000_map_pins_dual_branch_and_backfill.sql
+ ΓÇó 20260224161000_owner_dashboard_indexes.sql
+ ΓÇó 20260224190000_ultrathink_schema_optimization_part2.sql
+
+ [Y/n] 
+Applying migration 20260224135000_ultrathink_schema_optimization_part1.sql...
+NOTICE (42P07): relation "idx_redemptions_user_id" already exists, skipping
+ERROR: cannot drop index venue_tags_name_key because constraint venue_tags_name_key on table venue_tags requires it (SQLSTATE 2BP01)
+At statement: 11                                                                                                                    
+-- B6: Case Insensitivity Missing (Venue Tags)                                                                                      
+-- Create a unique index on lowercase name instead of altering column type                                                          
+DROP INDEX IF EXISTS venue_tags_name_key                                                                                            
+Try rerunning the command with --debug to troubleshoot the error.
+Waiting for the debugger to disconnect...

@@ -1,10 +1,17 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { resolveVenueMedia } from "../domain/venue/viewModel";
+import { useFeatureFlagStore } from "../store/featureFlagStore";
 
 /**
  * Bottom Feed Logic Composable
  * Extracted from BottomFeed.vue for better separation of concerns
  */
 export function useBottomFeedLogic(props, emit) {
+	const featureFlagStore = useFeatureFlagStore();
+	const useVirtualizedFeed = computed(() =>
+		featureFlagStore.isEnabled("enable_feed_virtualization_v2"),
+	);
+
 	// ✅ Giant Pin View State (70/30 Split)
 	const isGiantPinView = ref(false);
 	const activeGiantPin = ref(null);
@@ -23,6 +30,8 @@ export function useBottomFeedLogic(props, emit) {
 	let scrollFrame = null;
 	let lastScrollTime = 0;
 	const SCROLL_THROTTLE = 100;
+	let autoOpenTimer = null; // Debounce timer for auto-opening modal
+	const autoOpenedShops = new Set(); // Track shops already auto-opened this session
 
 	// ✅ Utility Functions
 	const normalizeId = (value) => {
@@ -31,25 +40,24 @@ export function useBottomFeedLogic(props, emit) {
 	};
 
 	const getShopVideoUrl = (shop) =>
-		shop?.cinematic_video_url || shop?.video_url || shop?.Video_URL || "";
+		resolveVenueMedia(shop || {}).videoUrl || "";
 
 	const getShopImages = (shop) => {
-		if (!shop) return [];
-		const list = [];
-		if (Array.isArray(shop.image_urls)) list.push(...shop.image_urls);
-		if (Array.isArray(shop.images)) list.push(...shop.images);
-		if (shop.Image_URL1) list.push(shop.Image_URL1);
-		if (shop.image_url) list.push(shop.image_url);
-		return list.filter(Boolean);
+		const media = resolveVenueMedia(shop || {});
+		return Array.isArray(media.images) ? media.images.filter(Boolean) : [];
 	};
 
 	const isCinemaEligible = (shop) => {
 		if (!shop || !props.enableCinemaExplorer) return false;
 		const pinType = String(shop.pin_type || "").toLowerCase();
+		const pinState = String(shop.pin_state || shop.statusNormalized || "")
+			.trim()
+			.toLowerCase();
 		return (
 			shop?.is_giant_active === true ||
 			shop?.isGiantPin === true ||
-			pinType === "giant"
+			pinType === "giant" ||
+			pinState === "event"
 		);
 	};
 
@@ -192,6 +200,16 @@ export function useBottomFeedLogic(props, emit) {
 			const shop = props.carouselShops[index];
 			if (shop && normalizeId(shop.id) !== normalizeId(props.activeShopId)) {
 				emit("click-shop", shop);
+				// Auto-open modal with debounce — only once per shop per session
+				const shopKey = normalizeId(shop.id);
+				if (shopKey && !autoOpenedShops.has(shopKey)) {
+					if (autoOpenTimer) clearTimeout(autoOpenTimer);
+					autoOpenTimer = setTimeout(() => {
+						autoOpenedShops.add(shopKey);
+						emit("open-detail", shop);
+						autoOpenTimer = null;
+					}, 350);
+				}
 			}
 			return;
 		}
@@ -208,13 +226,24 @@ export function useBottomFeedLogic(props, emit) {
 			const shop = props.carouselShops[index];
 			if (shop && normalizeId(shop.id) !== normalizeId(props.activeShopId)) {
 				emit("click-shop", shop);
+				// Auto-open modal with debounce — only once per shop per session
+				const shopKey = normalizeId(shop.id);
+				if (shopKey && !autoOpenedShops.has(shopKey)) {
+					if (autoOpenTimer) clearTimeout(autoOpenTimer);
+					autoOpenTimer = setTimeout(() => {
+						autoOpenedShops.add(shopKey);
+						emit("open-detail", shop);
+						autoOpenTimer = null;
+					}, 350);
+				}
 			}
 		}
 	};
 
 	const handleScroll = (e) => {
 		const now = Date.now();
-		if (now - lastScrollTime < SCROLL_THROTTLE) return;
+		const throttleMs = useVirtualizedFeed.value ? 60 : SCROLL_THROTTLE;
+		if (now - lastScrollTime < throttleMs) return;
 		lastScrollTime = now;
 
 		emit("scroll", e);
@@ -227,7 +256,7 @@ export function useBottomFeedLogic(props, emit) {
 			emit("load-more");
 		}
 
-		// Optimized active detection
+		// Optimized active detection — runs in BOTH carousel and immersive mode
 		if (scrollFrame) cancelAnimationFrame(scrollFrame);
 		scrollFrame = requestAnimationFrame(() => {
 			detectActiveCard(container);
@@ -252,6 +281,7 @@ export function useBottomFeedLogic(props, emit) {
 
 	// ✅ Lifecycle
 	onMounted(() => {
+		void featureFlagStore.refreshFlags().catch(() => {});
 		if (import.meta.env.DEV) {
 			console.log("🔍 [BottomFeedLogic] MOUNTED");
 		}
@@ -259,13 +289,14 @@ export function useBottomFeedLogic(props, emit) {
 		// Initial check
 		setTimeout(() => {
 			const el = document.querySelector('[data-testid="vibe-carousel"]');
-			if (el) detectActiveCard(el);
+			if (el && props.isImmersive) detectActiveCard(el);
 		}, 500);
 	});
 
 	onUnmounted(() => {
 		if (scrollFrame) cancelAnimationFrame(scrollFrame);
 		if (giantImageRotateTimer) clearInterval(giantImageRotateTimer);
+		if (autoOpenTimer) clearTimeout(autoOpenTimer);
 	});
 
 	return {

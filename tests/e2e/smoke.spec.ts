@@ -451,7 +451,8 @@ test.describe("VibeCity – Smoke Tests", { tag: "@smoke" }, () => {
 
       const modalVisible = await modal
         .first()
-        .isVisible({ timeout: 10_000 })
+        .waitFor({ state: "visible", timeout: 10_000 })
+        .then(() => true)
         .catch(() => false);
       enforceMapConditionOrSkip(modalVisible, "Modal did not open after card click");
       if (!modalVisible) {

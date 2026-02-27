@@ -11,12 +11,12 @@ export default {
     extend: {
       // Runtime typography tokens (Entertainment map theme)
       fontFamily: {
-        sans: ["var(--font-body)", "Prompt", "Sarabun", "system-ui", "sans-serif"],
+        sans: ["var(--font-body)", "Inter", "Sarabun", "system-ui", "sans-serif"],
         display: [
           "var(--font-display)",
-          "Chakra Petch",
-          "Prompt",
+          "Inter",
           "Sarabun",
+          "system-ui",
           "sans-serif",
         ],
         mono: [

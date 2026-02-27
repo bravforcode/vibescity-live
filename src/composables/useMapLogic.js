@@ -1,10 +1,39 @@
 import { computed, ref } from "vue";
 
-export function useMapLogic({ isMobileView, bottomUiHeight, userLocation }) {
+const DESKTOP_MIN_WIDTH = 1280;
+
+export function useMapLogic({
+	isMobileView,
+	isTabletView,
+	isDesktopView,
+	bottomUiHeight,
+	userLocation,
+}) {
 	const mapRef = ref(null);
+	const getViewportWidth = () => {
+		if (typeof window === "undefined") return 0;
+		return Math.round(
+			window.visualViewport?.width ||
+				window.innerWidth ||
+				document.documentElement?.clientWidth ||
+				0,
+		);
+	};
+	const isDesktopLayout = computed(() => {
+		if (isDesktopView && typeof isDesktopView.value === "boolean") {
+			return isDesktopView.value;
+		}
+		return !isMobileView?.value && getViewportWidth() >= DESKTOP_MIN_WIDTH;
+	});
+	const isTabletLayout = computed(() => {
+		if (isTabletView && typeof isTabletView.value === "boolean") {
+			return isTabletView.value;
+		}
+		return !isMobileView?.value && !isDesktopLayout.value;
+	});
 
 	// ✅ Robust FlyTo Logic with Validation
-	const smoothFlyTo = (targetCoords) => {
+	const smoothFlyTo = (targetCoords, options = {}) => {
 		if (!mapRef.value || !targetCoords) return;
 		if (!Array.isArray(targetCoords) || targetCoords.length !== 2) return;
 
@@ -19,24 +48,29 @@ export function useMapLogic({ isMobileView, bottomUiHeight, userLocation }) {
 			return;
 		}
 
-		// Pre-calculate visual offsets
-		const bottomPanelHeight = bottomUiHeight?.value || 0;
-
 		// Create fly options
+		// On mobile, the modal covers ~50% of the screen bottom,
+		// so offset the pin upward to center it in the visible map area above the modal.
+		const viewportHeight = window.innerHeight || 800;
+		let mobileBottomOffset = isDesktopLayout.value
+			? 0
+			: Math.round(viewportHeight * 0.25);
+
+		// Override if specific offsetY is provided
+		if (options.offsetY !== undefined) {
+			mobileBottomOffset = options.offsetY;
+		}
+
 		const flyOptions = {
 			center: [lng, lat], // Mapbox uses [lng, lat]
-			zoom: 17.5,
-			pitch: 45, // Cinematic pitch
+			zoom: isDesktopLayout.value ? 15.5 : 16.0,
+			pitch: 60, // 3D tilt without showing beyond map world
 			bearing: 0,
 			speed: 0.5, // 0.8 -> 0.5 (Slower/Smoother)
 			curve: 1.5, // 1.2 -> 1.5 (More gradual zoom)
 			essential: true,
-			padding: {
-				bottom: isMobileView?.value ? bottomPanelHeight + 120 : 50, // Revert to panel-aware center
-				top: isMobileView?.value ? 80 : 50, // Clear header only
-				left: isMobileView?.value ? 20 : window.innerWidth * 0.35 + 20,
-				right: 20,
-			},
+			offset: [0, -mobileBottomOffset],
+			padding: { top: 0, bottom: 0, left: 0, right: 0 },
 			maxDuration: 2500, // Cap duration for long flights
 		};
 
@@ -101,7 +135,7 @@ export function useMapLogic({ isMobileView, bottomUiHeight, userLocation }) {
 				flyCall.call(mapRef.value.map || mapRef.value, {
 					center: [userLocation.value[1], userLocation.value[0]],
 					zoom: 15,
-					pitch: 45,
+					pitch: 60,
 					bearing: 0,
 					essential: true,
 				});
@@ -111,15 +145,15 @@ export function useMapLogic({ isMobileView, bottomUiHeight, userLocation }) {
 
 	// ✅ UI offsets for "visual center" (between top bar & bottom carousel)
 	const mapUiTopOffset = computed(() => {
-		return 64;
+		return isDesktopLayout.value ? 72 : 64;
 	});
 
 	/**
 	 * Computes the padding needed for the map based on the bottom carousel height on mobile.
 	 */
 	const mapUiBottomOffset = computed(() => {
-		if (isMobileView?.value) return bottomUiHeight?.value || 0;
-		return 0;
+		if (isDesktopLayout.value) return 0;
+		return Math.max(0, Number(bottomUiHeight?.value || 0));
 	});
 
 	return {

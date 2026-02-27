@@ -1,14 +1,15 @@
 # workers.py
+import json
+import logging
+import math
 import os
 import sys
-import json
 import time
-import math
-import logging
-from datetime import datetime, timezone
-from typing import Dict, Any, List, Tuple, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 import redis
@@ -93,7 +94,7 @@ def get_redis() -> redis.Redis:
     try:
         r = redis.from_url(Config.REDIS_URL, decode_responses=True)
         r.ping()
-        logger.info(f"🔌 Connected to Real Redis")
+        logger.info("🔌 Connected to Real Redis")
         return r
     except Exception as e:
         logger.warning(f"⚠️ Real Redis failed ({e}). Falling back to fakeredis (in-memory).")
@@ -122,9 +123,9 @@ def safe_json_load(s: str) -> Any:
         return None
 
 def now_ts() -> float:
-    return datetime.now(timezone.utc).timestamp()
+    return datetime.now(UTC).timestamp()
 
-def minute_bucket(ts: Optional[float] = None) -> int:
+def minute_bucket(ts: float | None = None) -> int:
     t = ts if ts is not None else now_ts()
     return int(t // Config.BUCKET_SEC)
 
@@ -153,7 +154,7 @@ class BaseConsumer:
         self.group = group
         self.name = name
 
-    def handle(self, event: Dict[str, Any]) -> bool:
+    def handle(self, event: dict[str, Any]) -> bool:
         raise NotImplementedError
 
     def run(self) -> None:
@@ -203,7 +204,7 @@ class BaseConsumer:
 # Analytics (optional)
 # =========================
 class AnalyticsConsumer(BaseConsumer):
-    def handle(self, event: Dict[str, Any]) -> bool:
+    def handle(self, event: dict[str, Any]) -> bool:
         etype = event.get("type", "")
         if etype not in ("created", "updated"):
             return True
@@ -227,11 +228,11 @@ class SpatialIndexerConsumer(BaseConsumer):
       STR  venue:h3:<venue_uuid> = h3_cell (reverse)
       STR  venue:tile:<venue_uuid> = tile
     """
-    def handle(self, event: Dict[str, Any]) -> bool:
+    def handle(self, event: dict[str, Any]) -> bool:
         venue_id = event.get("venue_id")
         h3_cell = event.get("h3_cell")
         tile = event.get("tile")
-        ts = event.get("ts")
+        event.get("ts")
 
         if not venue_id or not h3_cell or not tile:
             return True
@@ -263,7 +264,7 @@ class ActivityBucketConsumer(BaseConsumer):
       HINCRBY heat:bucket:<minute>:<tile> <h3_cell> +1
     TTL buckets ~ 2.5h so we can build 15m/1h windows fast.
     """
-    def handle(self, event: Dict[str, Any]) -> bool:
+    def handle(self, event: dict[str, Any]) -> bool:
         etype = event.get("type", "")
         if etype not in ("created", "updated"):
             return True
@@ -300,7 +301,7 @@ class HeatmapInvalidateConsumer(BaseConsumer):
     Store to:
       heatmap:tile:<tile> (json) TTL=HEATMAP_TILE_TTL_SEC
     """
-    def handle(self, event: Dict[str, Any]) -> bool:
+    def handle(self, event: dict[str, Any]) -> bool:
         etype = event.get("type", "")
         if etype != "invalidate_tile":
             return True
@@ -324,12 +325,12 @@ class HeatmapInvalidateConsumer(BaseConsumer):
             return True
 
         # 2) Inventory base
-        inv: Dict[str, int] = {}
+        inv: dict[str, int] = {}
         pipe = self.r.pipeline()
         for c in cells:
             pipe.zcard(f"{Config.H3_VENUES_PREFIX}{c}")
         inv_counts = pipe.execute()
-        for c, cnt in zip(cells, inv_counts):
+        for c, cnt in zip(cells, inv_counts, strict=False):
             inv[c] = int(cnt or 0)
 
         # 3) Activity rolling buckets
@@ -338,12 +339,12 @@ class HeatmapInvalidateConsumer(BaseConsumer):
         a1h = self._sum_buckets(tile, now_b, Config.WINDOW_1H_MINUTES)
 
         # 4) User density overlay (only for cells in tile)
-        ud: Dict[str, float] = {}
+        ud: dict[str, float] = {}
         pipe2 = self.r.pipeline()
         for c in cells:
             pipe2.zscore(Config.USER_HEX_DENSITY_ZSET, c)
         dens_scores = pipe2.execute()
-        for c, sc in zip(cells, dens_scores):
+        for c, sc in zip(cells, dens_scores, strict=False):
             ud[c] = float(sc or 0.0)
 
         # 5) Normalize + final score
@@ -353,7 +354,7 @@ class HeatmapInvalidateConsumer(BaseConsumer):
         a1h_n = self._normalize_map(a1h)
         ud_n = self._normalize_map(ud)
 
-        cells_out: Dict[str, Dict[str, float]] = {}
+        cells_out: dict[str, dict[str, float]] = {}
         for c in cells:
             score = (
                 Config.W_INV * inv_n.get(c, 0.0)
@@ -381,8 +382,8 @@ class HeatmapInvalidateConsumer(BaseConsumer):
         logger.info(f"🔥 heatmap rebuilt tile={tile} cells={len(cells)} ttl={Config.HEATMAP_TILE_TTL_SEC}s")
         return True
 
-    def _sum_buckets(self, tile: str, now_bucket: int, minutes: int) -> Dict[str, int]:
-        agg: Dict[str, int] = {}
+    def _sum_buckets(self, tile: str, now_bucket: int, minutes: int) -> dict[str, int]:
+        agg: dict[str, int] = {}
         pipe = self.r.pipeline()
         keys = []
         for i in range(minutes):
@@ -402,7 +403,7 @@ class HeatmapInvalidateConsumer(BaseConsumer):
                     continue
         return agg
 
-    def _normalize_map(self, m: Dict[str, Any]) -> Dict[str, float]:
+    def _normalize_map(self, m: dict[str, Any]) -> dict[str, float]:
         if not m:
             return {}
         # log1p to reduce spikes

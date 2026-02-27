@@ -1,0 +1,457 @@
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+  --> backend\app\api\routers\admin.py:31:9
+   |
+29 |         return {"success": True, "data": response.data}
+30 |     except Exception as e:
+31 |         raise HTTPException(500, str(e))
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+32 |
+33 | @router.post("/shops/{shop_id}/approve")
+   |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+  --> backend\app\api\routers\admin.py:78:9
+   |
+77 |     except Exception as e:
+78 |         raise HTTPException(500, str(e))
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+79 |
+80 | @router.post("/shops/{shop_id}/reject")
+   |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+  --> backend\app\api\routers\admin.py:99:9
+   |
+98 |     except Exception as e:
+99 |         raise HTTPException(500, str(e))
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+
+E402 Module level import not at top of file
+  --> backend\app\api\routers\analytics.py:20:1
+   |
+18 |     visitor_id: str | None = None
+19 |
+20 | from app.services.analytics_service import analytics_buffer
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\geodata.py:210:9
+    |
+208 |     except httpx.RequestError as e:
+209 |         logger.error(f"Overpass request failed: {e}")
+210 |         raise HTTPException(status_code=502, detail="Overpass API failed")
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+211 |     except Exception as e:
+212 |         logger.error(f"Error processing OSM data: {e}")
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\geodata.py:213:9
+    |
+211 |     except Exception as e:
+212 |         logger.error(f"Error processing OSM data: {e}")
+213 |         raise HTTPException(status_code=500, detail=str(e))
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\owner.py:429:9
+    |
+427 |         owner_id = repository.get_owner(shop_id)
+428 |     except Exception:
+429 |         raise HTTPException(status_code=500, detail="Failed to verify ownership")
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+430 |
+431 |     if not owner_id or str(owner_id) != str(user_id):
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\partner.py:400:13
+    |
+398 |         message = str(exc).lower()
+399 |         if "referral_code" in message and "duplicate" in message:
+400 |             raise HTTPException(status_code=409, detail="Referral code already in use")
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+401 |         raise HTTPException(status_code=400, detail="Unable to save partner profile")
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\partner.py:401:9
+    |
+399 |         if "referral_code" in message and "duplicate" in message:
+400 |             raise HTTPException(status_code=409, detail="Referral code already in use")
+401 |         raise HTTPException(status_code=400, detail="Unable to save partner profile")
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+402 |
+403 |     profile_data = res.data or payload
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\partner.py:475:9
+    |
+473 |         await _upsert_partner_bank_secret(str(partner.get("id")), bank_payload)
+474 |     except Exception:
+475 |         raise HTTPException(status_code=400, detail="Unable to persist secure payout details")
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+476 |
+477 |     await asyncio.to_thread(
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\payments.py:267:9
+    |
+265 |             },
+266 |         )
+267 |         raise HTTPException(status_code=502, detail="Payment provider error")
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+268 |     except Exception as e:
+269 |         logger.error(
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\payments.py:278:9
+    |
+276 |               },
+277 |           )
+278 | /         raise HTTPException(
+279 | |             status_code=400,
+280 | |             detail="Unable to create checkout session",
+281 | |         )
+    | |_________^
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\payments.py:413:17
+    |
+411 |                               "verification_status": existing_status,
+412 |                           }
+413 | /                 raise HTTPException(
+414 | |                     status_code=409,
+415 | |                     detail="This slip has already been submitted and is being processed",
+416 | |                 )
+    | |_________________^
+417 |               raise HTTPException(status_code=400, detail=message)
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\payments.py:417:13
+    |
+415 |                     detail="This slip has already been submitted and is being processed",
+416 |                 )
+417 |             raise HTTPException(status_code=400, detail=message)
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+418 |
+419 |     slip_audit_payload = {
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\payments.py:690:9
+    |
+688 |     except stripe.error.SignatureVerificationError:
+689 |         logger.warning("stripe_webhook_invalid_signature")
+690 |         raise HTTPException(status_code=400, detail="Invalid signature")
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+691 |     except Exception as e:
+692 |         logger.error("stripe_webhook_parse_error", extra={"error": str(e)})
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\payments.py:693:9
+    |
+691 |     except Exception as e:
+692 |         logger.error("stripe_webhook_parse_error", extra={"error": str(e)})
+693 |         raise HTTPException(status_code=400, detail="Bad payload")
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+694 |
+695 |     event_id = event.get("id", "")
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\payments.py:728:9
+    |
+726 |             extra={"event_id": event_id, "err": str(e)},
+727 |         )
+728 |         raise HTTPException(status_code=500, detail="Event processing error")
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+729 |
+730 |     event_type = event.get("type")
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+  --> backend\app\api\routers\redemption.py:35:9
+   |
+33 |     except Exception as e:
+34 |         print(f"Redemption error: {e}")
+35 |         raise HTTPException(500, detail="Transaction failed")
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+  --> backend\app\api\routers\rides.py:82:9
+   |
+80 |         }
+81 |     except Exception as e:
+82 |         raise HTTPException(status_code=500, detail=str(e))
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\seo.py:186:9
+    |
+184 |         raise
+185 |     except Exception as e:
+186 |         raise HTTPException(status_code=500, detail=str(e))
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\seo.py:302:9
+    |
+300 |         raise
+301 |     except Exception as e:
+302 |         raise HTTPException(status_code=500, detail=str(e))
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+
+UP007 Use `X | Y` for type annotations
+  --> backend\app\api\routers\ugc.py:18:16
+   |
+17 | router = APIRouter()
+18 | VenueIdInput = Union[str, int, UUID]
+   |                ^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Convert to `X | Y`
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\ugc.py:124:9
+    |
+122 |         raise
+123 |     except Exception as e:
+124 |         raise HTTPException(status_code=500, detail=str(e))
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\ugc.py:200:9
+    |
+198 |         raise
+199 |     except Exception as e:
+200 |         raise HTTPException(status_code=500, detail=str(e))
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\ugc.py:246:9
+    |
+244 |         raise
+245 |     except Exception as e:
+246 |         raise HTTPException(status_code=500, detail=str(e))
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+  --> backend\app\core\auth.py:46:10
+   |
+44 |       except Exception:
+45 |            # print(f"Auth Error: {e}")
+46 | /          raise HTTPException(
+47 | |             status_code=status.HTTP_401_UNAUTHORIZED,
+48 | |             detail="Could not validate credentials",
+49 | |             headers={"WWW-Authenticate": "Bearer"},
+50 | |         )
+   | |_________^
+51 |
+52 |   async def verify_admin(user = Depends(verify_user)):
+   |
+
+F401 `app.services.vector.places_vector_service.COLLECTION_NAME` imported but unused; consider using `importlib.util.find_spec` to test for availability
+  --> backend\app\jobs\triad_reconcile.py:25:13
+   |
+23 |         from app.db.session import _qdrant_client
+24 |         from app.services.vector.places_vector_service import (
+25 |             COLLECTION_NAME,
+   |             ^^^^^^^^^^^^^^^
+26 |             configure_genai_once,
+27 |             embed_text,
+   |
+help: Remove unused import: `app.services.vector.places_vector_service.COLLECTION_NAME`
+
+F841 Local variable `sql` is assigned to but never used
+ --> backend\scripts\apply_phase2_migration.py:5:9
+  |
+3 |     print("Applying Phase 2 Migration...")
+4 |     with open("backend/scripts/phase2_schema.sql", encoding="utf-8") as f:
+5 |         sql = f.read()
+  |         ^^^
+6 |
+7 |     # Split by statement if needed, but postgrest's .rpc usually takes a function name,
+  |
+help: Remove assignment to unused variable `sql`
+
+F841 Local variable `result` is assigned to but never used
+   --> backend\scripts\data_pipeline.py:142:13
+    |
+140 |         try:
+141 |             # Upsert based on osm_id to avoid duplicates
+142 |             result = supabase.table("venues").upsert(
+    |             ^^^^^^
+143 |                 batch,
+144 |                 on_conflict="osm_id"
+    |
+help: Remove assignment to unused variable `result`
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\scripts\ingest_knowledge.py:181:9
+    |
+179 |     except KeyboardInterrupt:
+180 |         logger.info("Ingestion interrupted by user")
+181 |         raise SystemExit(130)
+    |         ^^^^^^^^^^^^^^^^^^^^^
+    |
+
+E402 Module level import not at top of file
+  --> backend\scripts\list_tables.py:25:1
+   |
+23 |     pass
+24 |
+25 | from app.db.session import _core_session_maker
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+
+B905 `zip()` without an explicit `strict=` parameter
+   --> backend\scripts\osm_scraper.py:292:29
+    |
+290 |         results = await asyncio.gather(*tasks)
+291 |
+292 |         for name, venues in zip(batch_names, results):
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^
+293 |             print(f"   Γ£à {name}: {len(venues)} venues")
+294 |             all_venues.extend(venues)
+    |
+help: Add explicit value for parameter `strict=`
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\scripts\osm_sync_ultimate.py:774:17
+    |
+772 |             except ImportError:
+773 |                 logger.error("Γ¥î Redis unavailable and fakeredis not installed.")
+774 |                 raise e
+    |                 ^^^^^^^
+775 |
+776 |         self.sb = create_client(conf.SUPABASE_URL, conf.SUPABASE_SERVICE_ROLE_KEY)
+    |
+
+F401 `google.generativeai` imported but unused; consider using `importlib.util.find_spec` to test for availability
+  --> backend\scripts\triad_doctor.py:18:12
+   |
+16 | # Check optional dependencies
+17 | try:
+18 |     import google.generativeai
+   |            ^^^^^^^^^^^^^^^^^^^
+19 |     GENAI_INSTALLED = True
+20 | except ImportError:
+   |
+help: Remove unused import: `google.generativeai`
+
+F401 `qdrant_client` imported but unused; consider using `importlib.util.find_spec` to test for availability
+  --> backend\scripts\triad_doctor.py:24:12
+   |
+23 | try:
+24 |     import qdrant_client
+   |            ^^^^^^^^^^^^^
+25 |     QDRANT_INSTALLED = True
+26 | except ImportError:
+   |
+help: Remove unused import: `qdrant_client`
+
+F401 `asyncpg` imported but unused; consider using `importlib.util.find_spec` to test for availability
+  --> backend\scripts\triad_doctor.py:30:12
+   |
+29 | try:
+30 |     import asyncpg
+   |            ^^^^^^^
+31 |     ASYNCPG_INSTALLED = True
+32 | except ImportError:
+   |
+help: Remove unused import: `asyncpg`
+
+E402 Module level import not at top of file
+  --> backend\scripts\workers.py:15:1
+   |
+13 | load_dotenv()
+14 |
+15 | import redis
+   | ^^^^^^^^^^^^
+16 |
+17 | logging.basicConfig(
+   |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\scripts\workers.py:107:13
+    |
+105 |         except ImportError:
+106 |             logger.error("Γ¥î Redis unavailable and fakeredis not installed.")
+107 |             raise e
+    |             ^^^^^^^
+108 |
+109 | def ensure_group(r: redis.Redis, stream: str, group: str) -> None:
+    |
+
+F841 Local variable `ts` is assigned to but never used
+   --> backend\scripts\workers.py:235:9
+    |
+233 |         h3_cell = event.get("h3_cell")
+234 |         tile = event.get("tile")
+235 |         ts = event.get("ts")
+    |         ^^
+236 |
+237 |         if not venue_id or not h3_cell or not tile:
+    |
+help: Remove assignment to unused variable `ts`
+
+B905 `zip()` without an explicit `strict=` parameter
+   --> backend\scripts\workers.py:333:23
+    |
+331 |             pipe.zcard(f"{Config.H3_VENUES_PREFIX}{c}")
+332 |         inv_counts = pipe.execute()
+333 |         for c, cnt in zip(cells, inv_counts):
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+334 |             inv[c] = int(cnt or 0)
+    |
+help: Add explicit value for parameter `strict=`
+
+B905 `zip()` without an explicit `strict=` parameter
+   --> backend\scripts\workers.py:347:22
+    |
+345 |             pipe2.zscore(Config.USER_HEX_DENSITY_ZSET, c)
+346 |         dens_scores = pipe2.execute()
+347 |         for c, sc in zip(cells, dens_scores):
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^
+348 |             ud[c] = float(sc or 0.0)
+    |
+help: Add explicit value for parameter `strict=`
+
+B017 Do not assert blind exception: `Exception`
+   --> backend\tests\test_slip_verification.py:686:14
+    |
+685 |     def test_invalid_type_raises(self):
+686 |         with pytest.raises(Exception):
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^
+687 |             _to_decimal([123])
+    |
+
+F841 Local variable `engine` is assigned to but never used
+  --> backend\tests\test_triad.py:97:9
+   |
+96 |         from app.db.session import get_core_engine
+97 |         engine = get_core_engine()
+   |         ^^^^^^
+98 |
+99 |         # Verify NullPool was passed
+   |
+help: Remove assignment to unused variable `engine`
+
+Found 43 errors.
+No fixes available (7 hidden fixes can be enabled with the `--unsafe-fixes` option).

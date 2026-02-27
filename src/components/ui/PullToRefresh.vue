@@ -116,7 +116,7 @@ onBeforeUnmount(() => {
     >
       <div class="transform translate-y-2">
         <Loader2
-          class="w-6 h-6 transition-all duration-300"
+          class="w-6 h-6 transition duration-300"
           :class="[
             isRefreshing || isReadyToRefresh
               ? 'animate-spin text-purple-400 drop-shadow-[0_0_8px_rgba(192,132,252,0.8)]'

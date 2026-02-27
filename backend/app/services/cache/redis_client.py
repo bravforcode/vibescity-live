@@ -1,0 +1,18 @@
+from __future__ import annotations
+
+import redis
+
+from app.core.config import get_settings
+
+settings = get_settings()
+_redis_client: redis.Redis | None = None
+
+
+def get_redis() -> redis.Redis:
+    global _redis_client
+    if _redis_client is not None:
+        return _redis_client
+    if not settings.REDIS_URL:
+        raise RuntimeError("Missing REDIS_URL")
+    _redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
+    return _redis_client

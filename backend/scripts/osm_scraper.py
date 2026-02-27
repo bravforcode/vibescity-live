@@ -4,13 +4,12 @@ OSM Thailand Entertainment Scraper - Full 77 Province Coverage
 Fetches all entertainment venues from OpenStreetMap
 Designed for cloud deployment with scheduled runs
 """
-import httpx
 import asyncio
 import json
-import os
-from datetime import datetime, timezone
-from typing import List, Dict, Optional
+from datetime import UTC, datetime
 from pathlib import Path
+
+import httpx
 
 # Overpass API endpoints (multiple for load balancing)
 OVERPASS_ENDPOINTS = [
@@ -181,7 +180,7 @@ def build_province_query(bbox: tuple) -> str:
     """
 
 
-async def fetch_with_retry(query: str, max_retries: int = 3) -> List[Dict]:
+async def fetch_with_retry(query: str, max_retries: int = 3) -> list[dict]:
     """Fetch from Overpass with retry and endpoint rotation"""
     for attempt in range(max_retries):
         endpoint = OVERPASS_ENDPOINTS[attempt % len(OVERPASS_ENDPOINTS)]
@@ -200,7 +199,7 @@ async def fetch_with_retry(query: str, max_retries: int = 3) -> List[Dict]:
     return []
 
 
-def parse_element(element: Dict, province: str, province_en: str, region: str) -> Optional[Dict]:
+def parse_element(element: dict, province: str, province_en: str, region: str) -> dict | None:
     """Parse OSM element into venue dict"""
     tags = element.get("tags", {})
 
@@ -248,11 +247,11 @@ def parse_element(element: Dict, province: str, province_en: str, region: str) -
         "tiktok": tags.get("contact:tiktok"),
         "rating": tags.get("stars"),
         "source": "openstreetmap",
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "fetched_at": datetime.now(UTC).isoformat(),
     }
 
 
-async def scrape_province(province_name: str, province_data: dict) -> List[Dict]:
+async def scrape_province(province_name: str, province_data: dict) -> list[dict]:
     """Scrape all entertainment venues from a province"""
     query = build_province_query(province_data["bbox"])
     elements = await fetch_with_retry(query)
@@ -271,7 +270,7 @@ async def scrape_province(province_name: str, province_data: dict) -> List[Dict]
     return venues
 
 
-async def scrape_all_thailand(batch_size: int = 5) -> Dict:
+async def scrape_all_thailand(batch_size: int = 5) -> dict:
     """Scrape all 77 provinces in batches to avoid rate limiting"""
     all_venues = []
     provinces = list(THAILAND_PROVINCES.items())
@@ -290,7 +289,7 @@ async def scrape_all_thailand(batch_size: int = 5) -> Dict:
         tasks = [scrape_province(name, data) for name, data in batch]
         results = await asyncio.gather(*tasks)
 
-        for name, venues in zip(batch_names, results):
+        for name, venues in zip(batch_names, results, strict=False):
             print(f"   ✅ {name}: {len(venues)} venues")
             all_venues.extend(venues)
 
@@ -316,7 +315,7 @@ async def scrape_all_thailand(batch_size: int = 5) -> Dict:
             "source": "OpenStreetMap via Overpass API",
             "license": "ODbL - Open Database License",
             "attribution": "© OpenStreetMap contributors",
-            "scraped_at": datetime.now(timezone.utc).isoformat(),
+            "scraped_at": datetime.now(UTC).isoformat(),
             "total_venues": len(all_venues),
             "provinces_scraped": total,
             "regions": region_counts,
@@ -325,7 +324,7 @@ async def scrape_all_thailand(batch_size: int = 5) -> Dict:
     }
 
 
-def save_results(data: Dict, filename: str = "thailand_venues.json"):
+def save_results(data: dict, filename: str = "thailand_venues.json"):
     """Save results to JSON file"""
     output_path = Path(__file__).parent / filename
     with open(output_path, "w", encoding="utf-8") as f:
@@ -337,12 +336,12 @@ def save_results(data: Dict, filename: str = "thailand_venues.json"):
 async def main():
     """Main entry point"""
     print("🚀 OSM Thailand Entertainment Scraper")
-    print(f"📅 Started at: {datetime.now(timezone.utc).isoformat()}")
+    print(f"📅 Started at: {datetime.now(UTC).isoformat()}")
 
     data = await scrape_all_thailand()
     save_results(data)
 
-    print(f"\n✅ Scraping complete!")
+    print("\n✅ Scraping complete!")
     return data
 
 

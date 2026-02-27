@@ -2,17 +2,17 @@
 import { onUnmounted } from "vue";
 
 const state = {
-	locked: false,
+	lockCount: 0,
 	scrollY: 0,
 };
 
 export function useBodyScrollLock() {
 	const lock = () => {
 		if (typeof window === "undefined") return;
-		if (state.locked) return;
+		state.lockCount += 1;
+		if (state.lockCount > 1) return;
 
 		state.scrollY = window.scrollY || 0;
-		state.locked = true;
 
 		document.body.style.position = "fixed";
 		document.body.style.top = `-${state.scrollY}px`;
@@ -25,9 +25,12 @@ export function useBodyScrollLock() {
 
 	const unlock = () => {
 		if (typeof window === "undefined") return;
-		if (!state.locked) return;
+		if (state.lockCount === 0) return;
+		state.lockCount = Math.max(0, state.lockCount - 1);
+		if (state.lockCount > 0) return;
 
-		state.locked = false;
+		const top = document.body.style.top;
+		const scrollY = top ? Math.abs(parseInt(top, 10)) : state.scrollY;
 
 		document.body.style.position = "";
 		document.body.style.top = "";
@@ -36,8 +39,9 @@ export function useBodyScrollLock() {
 		document.body.style.width = "";
 		document.body.style.overflow = "";
 		document.body.style.touchAction = "";
-
-		window.scrollTo(0, state.scrollY);
+		const resolvedScrollY = Number.isFinite(scrollY) ? scrollY : state.scrollY;
+		window.scrollTo(0, resolvedScrollY);
+		state.scrollY = resolvedScrollY;
 	};
 
 	onUnmounted(() => {

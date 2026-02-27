@@ -1,11 +1,26 @@
-from typing import Optional
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from supabase import Client
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from app.core.config import get_settings
 from app.core.supabase import supabase
 
 security = HTTPBearer()
 security_optional = HTTPBearer(auto_error=False)
+settings = get_settings()
+
+
+def _normalize_email(value: str | None) -> str:
+    return str(value or "").strip().lower()
+
+
+def _admin_email_allowlist() -> set[str]:
+    raw = str(getattr(settings, "ADMIN_EMAIL_ALLOWLIST", "") or "")
+    out: set[str] = set()
+    for item in raw.split(","):
+        normalized = _normalize_email(item)
+        if normalized:
+            out.add(normalized)
+    return out
 
 async def verify_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """
@@ -26,7 +41,7 @@ async def verify_user(credentials: HTTPAuthorizationCredentials = Depends(securi
 
         return response.user
 
-    except Exception as e:
+    except Exception:
          # print(f"Auth Error: {e}")
          raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -42,10 +57,19 @@ async def verify_admin(user = Depends(verify_user)):
     # Check for 'admin' in app_metadata roles or role field
     # Supabase specific: app_metadata is usually where roles live
     app_metadata = getattr(user, "app_metadata", {})
-    role = app_metadata.get("role", "")
-    roles = app_metadata.get("roles", [])
+    role = str(app_metadata.get("role", "")).strip().lower()
+    roles = [
+        str(r).strip().lower()
+        for r in (app_metadata.get("roles", []) if isinstance(app_metadata.get("roles", []), list) else [])
+        if str(r).strip()
+    ]
+    email = _normalize_email(getattr(user, "email", None))
+    allowlist = _admin_email_allowlist()
 
-    if role != "admin" and "admin" not in roles:
+    has_admin_role = role in {"admin", "super_admin"} or "admin" in roles or "super_admin" in roles
+    is_allowlisted = bool(email and email in allowlist)
+
+    if not has_admin_role and not is_allowlisted:
          raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin privileges required"

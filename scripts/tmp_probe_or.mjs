@@ -1,0 +1,14 @@
+import { chromium } from "playwright";
+const browser = await chromium.launch({ headless: true });
+const page = await browser.newPage();
+await page.goto("http://localhost:5417", { waitUntil: "domcontentloaded" });
+await page.waitForTimeout(3000);
+const a = page.getByTestId("btn-filter");
+const b = page.locator("button[aria-label='Open filter menu']");
+const aCount = await a.count();
+const bCount = await b.count();
+const orLocator = a.or(b).first();
+const orCount = await orLocator.count();
+const orVisible = await orLocator.isVisible().catch(() => false);
+console.log(JSON.stringify({ aCount, bCount, orCount, orVisible }, null, 2));
+await browser.close();

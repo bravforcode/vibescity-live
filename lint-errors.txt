@@ -1,0 +1,63 @@
+
+> vibescity-live@2.0.0 lint
+> biome lint src
+
+src\components\admin\AdminOrders.vue:362:46 lint/style/useTemplate  FIXABLE  ΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöü
+
+  i Template literals are preferred over string concatenation.
+  
+    360 Γöé 			ticks: {
+    361 Γöé 				color: "#94a3b8",
+  > 362 Γöé 				callback: (value) => `α╕┐${value >= 1000 ? value / 1000 + "k" : value}`,
+        Γöé 				                                         ^^^^^^^^^^^^^^^^^^
+    363 Γöé 			},
+    364 Γöé 			border: { display: false },
+  
+  i Unsafe fix: Use a template literal.
+  
+    114 114 Γöé   			ticks: {
+    115 115 Γöé   				color: "#94a3b8",
+    116     Γöé - ΓåÆ ΓåÆ ΓåÆ ΓåÆ callback:┬╖(value)┬╖=>┬╖`α╕┐${value┬╖>=┬╖1000┬╖?┬╖value┬╖/┬╖1000┬╖+┬╖"k"┬╖:┬╖value}`,
+        116 Γöé + ΓåÆ ΓåÆ ΓåÆ ΓåÆ callback:┬╖(value)┬╖=>┬╖`α╕┐${value┬╖>=┬╖1000┬╖?┬╖`${value┬╖/┬╖1000}k`┬╖:┬╖value}`,
+    117 117 Γöé   			},
+    118 118 Γöé   			border: { display: false },
+  
+
+src\components\admin\AdminVenues.vue:108:9 lint/style/useTemplate  FIXABLE  ΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöü
+
+  i Template literals are preferred over string concatenation.
+  
+    106 Γöé 	} catch (e) {
+    107 Γöé 		console.error("Fetch media error:", e);
+  > 108 Γöé 		alert("Failed to fetch media: " + e.message);
+        Γöé 		      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    109 Γöé 	} finally {
+    110 Γöé 		isFetchingMedia.value = false;
+  
+  i Unsafe fix: Use a template literal.
+  
+    73 73 Γöé   	} catch (e) {
+    74 74 Γöé   		console.error("Fetch media error:", e);
+    75    Γöé - ΓåÆ ΓåÆ alert("Failed┬╖to┬╖fetch┬╖media:┬╖"┬╖+┬╖e.message);
+       75 Γöé + ΓåÆ ΓåÆ alert(`Failed┬╖to┬╖fetch┬╖media:┬╖${e.message}`);
+    76 76 Γöé   	} finally {
+    77 77 Γöé   		isFetchingMedia.value = false;
+  
+
+src\composables\useFeedV2.js:19:42 lint/correctness/noUnusedFunctionParameters ΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöü
+
+  ! This parameter is unused.
+  
+    17 Γöé  * Fetch a single page of feed data from the Supabase RPC.
+    18 Γöé  */
+  > 19 Γöé async function fetchFeedPage({ lat, lng, pageParam }) {
+       Γöé                                          ^^^^^^^^^
+    20 Γöé 	const { data, error } = await supabase.rpc("get_feed_cards", {
+    21 Γöé 		p_lat: lat,
+  
+  i Unused parameters might be the result of an incomplete refactoring.
+  
+
+Checked 214 files in 124ms. No fixes applied.
+Found 1 warning.
+Found 2 infos.

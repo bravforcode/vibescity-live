@@ -12,15 +12,15 @@ test.describe("Map Smoke Lite", () => {
 
     const mapShell = page.locator(MAP_SHELL_SELECTOR).first();
     const mapShellVisible = await mapShell
-      .isVisible({ timeout: 30_000 })
+      .waitFor({ state: "visible", timeout: 30_000 })
+      .then(() => true)
       .catch(() => false);
     enforceMapConditionOrSkip(mapShellVisible, "Map shell did not render.");
     if (!mapShellVisible) return;
 
-    const mapReady = await page
-      .locator(MAP_READY_SELECTOR)
-      .first()
-      .isVisible({ timeout: 45_000 })
+    const mapReady = await page.locator(MAP_READY_SELECTOR).first()
+      .waitFor({ state: "visible", timeout: 45_000 })
+      .then(() => true)
       .catch(() => false);
     enforceMapConditionOrSkip(mapReady, "Map shell did not become ready.");
   });
@@ -30,15 +30,15 @@ test.describe("Map Smoke Lite", () => {
 
     const mapShell = page.locator(MAP_SHELL_SELECTOR).first();
     const mapShellVisible = await mapShell
-      .isVisible({ timeout: 30_000 })
+      .waitFor({ state: "visible", timeout: 30_000 })
+      .then(() => true)
       .catch(() => false);
     enforceMapConditionOrSkip(mapShellVisible, "Map shell did not render.");
     if (!mapShellVisible) return;
 
-    const mapReady = await page
-      .locator(MAP_READY_SELECTOR)
-      .first()
-      .isVisible({ timeout: 45_000 })
+    const mapReady = await page.locator(MAP_READY_SELECTOR).first()
+      .waitFor({ state: "visible", timeout: 45_000 })
+      .then(() => true)
       .catch(() => false);
     enforceMapConditionOrSkip(mapReady, "Map shell did not become ready.");
     if (!mapReady) return;

@@ -1,0 +1,5703 @@
+F401 [*] `os` imported but unused
+  --> .agent\.shared\ui-ux-pro-max\scripts\design_system.py:18:8
+   |
+16 | import csv
+17 | import json
+18 | import os
+   |        ^^
+19 | from datetime import datetime
+20 | from pathlib import Path
+   |
+help: Remove unused import: `os`
+
+F541 [*] f-string without any placeholders
+   --> .agent\.shared\ui-ux-pro-max\scripts\design_system.py:406:18
+    |
+404 |     # Colors section
+405 |     lines.append("### Colors")
+406 |     lines.append(f"| Role | Hex |")
+    |                  ^^^^^^^^^^^^^^^^^
+407 |     lines.append(f"|------|-----|")
+408 |     lines.append(f"| Primary | {colors.get('primary', '')} |")
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> .agent\.shared\ui-ux-pro-max\scripts\design_system.py:407:18
+    |
+405 |     lines.append("### Colors")
+406 |     lines.append(f"| Role | Hex |")
+407 |     lines.append(f"|------|-----|")
+    |                  ^^^^^^^^^^^^^^^^^
+408 |     lines.append(f"| Primary | {colors.get('primary', '')} |")
+409 |     lines.append(f"| Secondary | {colors.get('secondary', '')} |")
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> .agent\.shared\ui-ux-pro-max\scripts\design_system.py:428:22
+    |
+426 |         lines.append(f"- **Google Fonts:** {typography.get('google_fonts_url', '')}")
+427 |     if typography.get("css_import"):
+428 |         lines.append(f"- **CSS Import:**")
+    |                      ^^^^^^^^^^^^^^^^^^^^
+429 |         lines.append(f"```css")
+430 |         lines.append(f"{typography.get('css_import', '')}")
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> .agent\.shared\ui-ux-pro-max\scripts\design_system.py:429:22
+    |
+427 |     if typography.get("css_import"):
+428 |         lines.append(f"- **CSS Import:**")
+429 |         lines.append(f"```css")
+    |                      ^^^^^^^^^
+430 |         lines.append(f"{typography.get('css_import', '')}")
+431 |         lines.append(f"```")
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> .agent\.shared\ui-ux-pro-max\scripts\design_system.py:431:22
+    |
+429 |         lines.append(f"```css")
+430 |         lines.append(f"{typography.get('css_import', '')}")
+431 |         lines.append(f"```")
+    |                      ^^^^^^
+432 |     lines.append("")
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> .agent\.shared\ui-ux-pro-max\scripts\design_system.py:661:18
+    |
+659 |     lines.append("/* Secondary Button */")
+660 |     lines.append(".btn-secondary {")
+661 |     lines.append(f"  background: transparent;")
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+662 |     lines.append(f"  color: {colors.get('primary', '#2563EB')};")
+663 |     lines.append(f"  border: 2px solid {colors.get('primary', '#2563EB')};")
+    |
+help: Remove extraneous `f` prefix
+
+F841 Local variable `style_name` is assigned to but never used
+   --> .agent\.shared\ui-ux-pro-max\scripts\design_system.py:952:9
+    |
+950 |     if style_results:
+951 |         style = style_results[0]
+952 |         style_name = style.get("Style Category", "")
+    |         ^^^^^^^^^^
+953 |         keywords = style.get("Keywords", "")
+954 |         best_for = style.get("Best For", "")
+    |
+help: Remove assignment to unused variable `style_name`
+
+F841 Local variable `best_for` is assigned to but never used
+   --> .agent\.shared\ui-ux-pro-max\scripts\design_system.py:954:9
+    |
+952 |         style_name = style.get("Style Category", "")
+953 |         keywords = style.get("Keywords", "")
+954 |         best_for = style.get("Best For", "")
+    |         ^^^^^^^^
+955 |         effects = style.get("Effects & Animation", "")
+    |
+help: Remove assignment to unused variable `best_for`
+
+F841 Local variable `style_name` is assigned to but never used
+    --> .agent\.shared\ui-ux-pro-max\scripts\design_system.py:1044:9
+     |
+1042 |     # Fallback: try to infer from style results
+1043 |     if style_results:
+1044 |         style_name = style_results[0].get("Style Category", "").lower()
+     |         ^^^^^^^^^^
+1045 |         best_for = style_results[0].get("Best For", "").lower()
+     |
+help: Remove assignment to unused variable `style_name`
+
+F401 [*] `design_system.persist_design_system` imported but unused
+  --> .agent\.shared\ui-ux-pro-max\scripts\search.py:19:51
+   |
+17 | import argparse
+18 | from core import CSV_CONFIG, AVAILABLE_STACKS, MAX_RESULTS, search, search_stack
+19 | from design_system import generate_design_system, persist_design_system
+   |                                                   ^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Remove unused import: `design_system.persist_design_system`
+
+F541 [*] f-string without any placeholders
+  --> .agent\.shared\ui-ux-pro-max\scripts\search.py:29:23
+   |
+27 |     output = []
+28 |     if result.get("stack"):
+29 |         output.append(f"## UI Pro Max Stack Guidelines")
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+30 |         output.append(f"**Stack:** {result['stack']} | **Query:** {result['query']}")
+31 |     else:
+   |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+  --> .agent\.shared\ui-ux-pro-max\scripts\search.py:32:23
+   |
+30 |         output.append(f"**Stack:** {result['stack']} | **Query:** {result['query']}")
+31 |     else:
+32 |         output.append(f"## UI Pro Max Search Results")
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+33 |         output.append(f"**Domain:** {result['domain']} | **Query:** {result['query']}")
+34 |     output.append(f"**Source:** {result['file']} | **Found:** {result['count']} results\n")
+   |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+  --> .agent\.shared\ui-ux-pro-max\scripts\search.py:89:19
+   |
+87 |             print("")
+88 |             print(f"≡ƒôû Usage: When building a page, check design-system/{project_slug}/pages/[page].md first.")
+89 |             print(f"   If exists, its rules override MASTER.md. Otherwise, use MASTER.md.")
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+90 |             print("=" * 60)
+91 |     # Stack search
+   |
+help: Remove extraneous `f` prefix
+
+F401 [*] `time` imported but unused
+  --> .agent\scripts\auto_preview.py:15:8
+   |
+13 | import os
+14 | import sys
+15 | import time
+   |        ^^^^
+16 | import json
+17 | import signal
+   |
+help: Remove unused import: `time`
+
+E722 Do not use bare `except`
+  --> .agent\scripts\auto_preview.py:58:9
+   |
+56 |                 print(f"ΓÜá∩╕Å  Preview already running (PID: {pid})")
+57 |                 return
+58 |         except:
+   |         ^^^^^^
+59 |             pass # Invalid PID file
+   |
+
+E722 Do not use bare `except`
+   --> .agent\scripts\auto_preview.py:120:9
+    |
+118 |                 # Heuristic for URL, strictly we should save it
+119 |                 url = "http://localhost:3000" 
+120 |         except:
+    |         ^^^^^^
+121 |             pass
+    |
+
+F541 [*] f-string without any placeholders
+   --> .agent\scripts\auto_preview.py:125:15
+    |
+123 |     print("\n=== Preview Status ===")
+124 |     if running:
+125 |         print(f"Γ£à Status: Running")
+    |               ^^^^^^^^^^^^^^^^^^^^^
+126 |         print(f"≡ƒöó PID: {pid}")
+127 |         print(f"≡ƒîÉ URL: {url} (Likely)")
+    |
+help: Remove extraneous `f` prefix
+
+F401 [*] `typing.Tuple` imported but unused
+  --> .agent\scripts\checklist.py:27:26
+   |
+25 | import argparse
+26 | from pathlib import Path
+27 | from typing import List, Tuple, Optional
+   |                          ^^^^^
+28 |
+29 | # ANSI colors for terminal output
+   |
+help: Remove unused import: `typing.Tuple`
+
+E701 Multiple statements on one line (colon)
+  --> .agent\scripts\session_manager.py:36:30
+   |
+35 |         stack = []
+36 |         if "next" in all_deps: stack.append("Next.js")
+   |                              ^
+37 |         elif "react" in all_deps: stack.append("React")
+38 |         elif "vue" in all_deps: stack.append("Vue")
+   |
+
+E701 Multiple statements on one line (colon)
+  --> .agent\scripts\session_manager.py:37:33
+   |
+35 |         stack = []
+36 |         if "next" in all_deps: stack.append("Next.js")
+37 |         elif "react" in all_deps: stack.append("React")
+   |                                 ^
+38 |         elif "vue" in all_deps: stack.append("Vue")
+39 |         elif "svelte" in all_deps: stack.append("Svelte")
+   |
+
+E701 Multiple statements on one line (colon)
+  --> .agent\scripts\session_manager.py:38:31
+   |
+36 |         if "next" in all_deps: stack.append("Next.js")
+37 |         elif "react" in all_deps: stack.append("React")
+38 |         elif "vue" in all_deps: stack.append("Vue")
+   |                               ^
+39 |         elif "svelte" in all_deps: stack.append("Svelte")
+40 |         elif "express" in all_deps: stack.append("Express")
+   |
+
+E701 Multiple statements on one line (colon)
+  --> .agent\scripts\session_manager.py:39:34
+   |
+37 |         elif "react" in all_deps: stack.append("React")
+38 |         elif "vue" in all_deps: stack.append("Vue")
+39 |         elif "svelte" in all_deps: stack.append("Svelte")
+   |                                  ^
+40 |         elif "express" in all_deps: stack.append("Express")
+41 |         elif "nestjs" in all_deps or "@nestjs/core" in all_deps: stack.append("NestJS")
+   |
+
+E701 Multiple statements on one line (colon)
+  --> .agent\scripts\session_manager.py:40:35
+   |
+38 |         elif "vue" in all_deps: stack.append("Vue")
+39 |         elif "svelte" in all_deps: stack.append("Svelte")
+40 |         elif "express" in all_deps: stack.append("Express")
+   |                                   ^
+41 |         elif "nestjs" in all_deps or "@nestjs/core" in all_deps: stack.append("NestJS")
+   |
+
+E701 Multiple statements on one line (colon)
+  --> .agent\scripts\session_manager.py:41:64
+   |
+39 |         elif "svelte" in all_deps: stack.append("Svelte")
+40 |         elif "express" in all_deps: stack.append("Express")
+41 |         elif "nestjs" in all_deps or "@nestjs/core" in all_deps: stack.append("NestJS")
+   |                                                                ^
+42 |         
+43 |         if "tailwindcss" in all_deps: stack.append("Tailwind CSS")
+   |
+
+E701 Multiple statements on one line (colon)
+  --> .agent\scripts\session_manager.py:43:37
+   |
+41 |         elif "nestjs" in all_deps or "@nestjs/core" in all_deps: stack.append("NestJS")
+42 |         
+43 |         if "tailwindcss" in all_deps: stack.append("Tailwind CSS")
+   |                                     ^
+44 |         if "prisma" in all_deps: stack.append("Prisma")
+45 |         if "typescript" in all_deps: stack.append("TypeScript")
+   |
+
+E701 Multiple statements on one line (colon)
+  --> .agent\scripts\session_manager.py:44:32
+   |
+43 |         if "tailwindcss" in all_deps: stack.append("Tailwind CSS")
+44 |         if "prisma" in all_deps: stack.append("Prisma")
+   |                                ^
+45 |         if "typescript" in all_deps: stack.append("TypeScript")
+   |
+
+E701 Multiple statements on one line (colon)
+  --> .agent\scripts\session_manager.py:45:36
+   |
+43 |         if "tailwindcss" in all_deps: stack.append("Tailwind CSS")
+44 |         if "prisma" in all_deps: stack.append("Prisma")
+45 |         if "typescript" in all_deps: stack.append("TypeScript")
+   |                                    ^
+46 |         
+47 |         return {
+   |
+
+F541 [*] f-string without any placeholders
+  --> .agent\scripts\session_manager.py:91:11
+   |
+89 |     print(f"≡ƒôé Path: {root}")
+90 |     print(f"≡ƒÅ╖∩╕Å  Type: {', '.join(info.get('stack', ['Generic']))}")
+91 |     print(f"≡ƒôè Status: Active")
+   |           ^^^^^^^^^^^^^^^^^^^^
+92 |     
+93 |     print("\n≡ƒöº Tech Stack:")
+   |
+help: Remove extraneous `f` prefix
+
+F401 [*] `typing.Dict` imported but unused
+  --> .agent\scripts\verify_all.py:29:26
+   |
+27 | import argparse
+28 | from pathlib import Path
+29 | from typing import List, Dict, Optional
+   |                          ^^^^
+30 | from datetime import datetime
+   |
+help: Remove unused import: `typing.Dict`
+
+E722 Do not use bare `except`
+  --> .agent\skills\database-design\scripts\schema_validator.py:25:1
+   |
+23 | try:
+24 |     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+25 | except:
+   | ^^^^^^
+26 |     pass
+   |
+
+F541 [*] f-string without any placeholders
+   --> .agent\skills\database-design\scripts\schema_validator.py:98:11
+    |
+ 97 |     print(f"\n{'='*60}")
+ 98 |     print(f"[SCHEMA VALIDATOR] Database Schema Validation")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 99 |     print(f"{'='*60}")
+100 |     print(f"Project: {project_path}")
+    |
+help: Remove extraneous `f` prefix
+
+E722 Do not use bare `except`
+  --> .agent\skills\frontend-design\scripts\accessibility_checker.py:26:1
+   |
+24 | try:
+25 |     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+26 | except:
+   | ^^^^^^
+27 |     pass
+   |
+
+F541 [*] f-string without any placeholders
+   --> .agent\skills\frontend-design\scripts\accessibility_checker.py:115:11
+    |
+114 |     print(f"\n{'='*60}")
+115 |     print(f"[ACCESSIBILITY CHECKER] WCAG Compliance Audit")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+116 |     print(f"{'='*60}")
+117 |     print(f"Project: {project_path}")
+    |
+help: Remove extraneous `f` prefix
+
+E722 Do not use bare `except`
+   --> .agent\skills\frontend-design\scripts\ux_audit.py:109:9
+    |
+107 |             with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+108 |                 content = f.read()
+109 |         except: return
+    |         ^^^^^^
+110 |         
+111 |         self.files_checked += 1
+    |
+
+E701 Multiple statements on one line (colon)
+   --> .agent\skills\frontend-design\scripts\ux_audit.py:109:15
+    |
+107 |             with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+108 |                 content = f.read()
+109 |         except: return
+    |               ^
+110 |         
+111 |         self.files_checked += 1
+    |
+
+E701 Multiple statements on one line (colon)
+   --> .agent\skills\frontend-design\scripts\ux_audit.py:253:31
+    |
+251 |         font_family_css = re.findall(r'font-family:\s*([^;]+)', content, re.IGNORECASE)
+252 |
+253 |         for font in font_faces: font_families.add(font.strip().lower())
+    |                               ^
+254 |         for font in google_fonts:
+255 |             for f in font.replace('+', ' ').split('|'):
+    |
+
+E722 Do not use bare `except`
+   --> .agent\skills\frontend-design\scripts\ux_audit.py:308:17
+    |
+306 |                 try:
+307 |                     weight_values.append(int(val))
+308 |                 except: pass
+    |                 ^^^^^^
+309 |
+310 |         # Check for adjacent weights (400/500, 500/600, etc.)
+    |
+
+E701 Multiple statements on one line (colon)
+   --> .agent\skills\frontend-design\scripts\ux_audit.py:308:23
+    |
+306 |                 try:
+307 |                     weight_values.append(int(val))
+308 |                 except: pass
+    |                       ^
+309 |
+310 |         # Check for adjacent weights (400/500, 500/600, etc.)
+    |
+
+E701 Multiple statements on one line (colon)
+   --> .agent\skills\frontend-design\scripts\ux_audit.py:692:25
+    |
+691 | def main():
+692 |     if len(sys.argv) < 2: sys.exit(1)
+    |                         ^
+693 |     
+694 |     path = sys.argv[1]
+    |
+
+E701 Multiple statements on one line (colon)
+   --> .agent\skills\frontend-design\scripts\ux_audit.py:698:28
+    |
+697 |     auditor = UXAuditor()
+698 |     if os.path.isfile(path): auditor.audit_file(path)
+    |                            ^
+699 |     else: auditor.audit_directory(path)
+    |
+
+E701 Multiple statements on one line (colon)
+   --> .agent\skills\frontend-design\scripts\ux_audit.py:699:9
+    |
+697 |     auditor = UXAuditor()
+698 |     if os.path.isfile(path): auditor.audit_file(path)
+699 |     else: auditor.audit_directory(path)
+    |         ^
+700 |     
+701 |     report = auditor.get_report()
+    |
+
+E701 Multiple statements on one line (colon)
+   --> .agent\skills\frontend-design\scripts\ux_audit.py:711:43
+    |
+709 |         if report['issues']:
+710 |             print(f"[!] ISSUES ({len(report['issues'])}):")
+711 |             for i in report['issues'][:10]: print(f"  - {i}")
+    |                                           ^
+712 |         if report['warnings']:
+713 |             print(f"[*] WARNINGS ({len(report['warnings'])}):")
+    |
+
+E701 Multiple statements on one line (colon)
+   --> .agent\skills\frontend-design\scripts\ux_audit.py:714:45
+    |
+712 |         if report['warnings']:
+713 |             print(f"[*] WARNINGS ({len(report['warnings'])}):")
+714 |             for w in report['warnings'][:15]: print(f"  - {w}")
+    |                                             ^
+715 |         print(f"[+] PASSED CHECKS: {report['passed_checks']}")
+716 |         status = "PASS" if report['compliant'] else "FAIL"
+    |
+
+E722 Do not use bare `except`
+  --> .agent\skills\i18n-localization\scripts\i18n_checker.py:88:13
+   |
+86 |                     locales[lang] = {}
+87 |                 locales[lang][f.stem] = set(flatten_keys(content))
+88 |             except:
+   |             ^^^^^^
+89 |                 continue
+   |
+
+E722 Do not use bare `except`
+   --> .agent\skills\i18n-localization\scripts\i18n_checker.py:182:9
+    |
+180 |                 files_with_hardcoded += 1
+181 |                 
+182 |         except:
+    |         ^^^^^^
+183 |             continue
+    |
+
+F401 [*] `shutil` imported but unused
+  --> .agent\skills\lint-and-validate\scripts\lint_runner.py:18:8
+   |
+16 | import json
+17 | import platform
+18 | import shutil
+   |        ^^^^^^
+19 | from pathlib import Path
+20 | from datetime import datetime
+   |
+help: Remove unused import: `shutil`
+
+E722 Do not use bare `except`
+  --> .agent\skills\lint-and-validate\scripts\lint_runner.py:25:1
+   |
+23 | try:
+24 |     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+25 | except:
+   | ^^^^^^
+26 |     pass
+   |
+
+E722 Do not use bare `except`
+  --> .agent\skills\lint-and-validate\scripts\lint_runner.py:55:9
+   |
+53 |                 result["linters"].append({"name": "tsc", "cmd": ["npx", "tsc", "--noEmit"]})
+54 |                 
+55 |         except:
+   |         ^^^^^^
+56 |             pass
+   |
+
+F541 [*] f-string without any placeholders
+   --> .agent\skills\lint-and-validate\scripts\lint_runner.py:120:11
+    |
+119 |     print(f"\n{'='*60}")
+120 |     print(f"[LINT RUNNER] Unified Linting")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+121 |     print(f"{'='*60}")
+122 |     print(f"Project: {project_path}")
+    |
+help: Remove extraneous `f` prefix
+
+F401 [*] `subprocess` imported but unused
+ --> .agent\skills\lint-and-validate\scripts\type_coverage.py:8:8
+  |
+6 | import sys
+7 | import re
+8 | import subprocess
+  |        ^^^^^^^^^^
+9 | from pathlib import Path
+  |
+help: Remove unused import: `subprocess`
+
+E722 Do not use bare `except`
+  --> .agent\skills\mobile-design\scripts\mobile_audit.py:85:9
+   |
+83 |             with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+84 |                 content = f.read()
+85 |         except:
+   |         ^^^^^^
+86 |             return
+   |
+
+F841 Local variable `has_large_title` is assigned to but never used
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:350:13
+    |
+348 |         if is_react_native:
+349 |             # Check for iOS text styles that match HIG
+350 |             has_large_title = bool(re.search(r'fontSize:\s*34|largeTitle|font-weight:\s*["\']?bold', content))
+    |             ^^^^^^^^^^^^^^^
+351 |             has_title_1 = bool(re.search(r'fontSize:\s*28', content))
+352 |             has_headline = bool(re.search(r'fontSize:\s*17.*semibold|headline', content))
+    |
+help: Remove assignment to unused variable `has_large_title`
+
+F841 Local variable `has_title_1` is assigned to but never used
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:351:13
+    |
+349 |             # Check for iOS text styles that match HIG
+350 |             has_large_title = bool(re.search(r'fontSize:\s*34|largeTitle|font-weight:\s*["\']?bold', content))
+351 |             has_title_1 = bool(re.search(r'fontSize:\s*28', content))
+    |             ^^^^^^^^^^^
+352 |             has_headline = bool(re.search(r'fontSize:\s*17.*semibold|headline', content))
+353 |             has_body = bool(re.search(r'fontSize:\s*17.*regular|body', content))
+    |
+help: Remove assignment to unused variable `has_title_1`
+
+F841 Local variable `has_headline` is assigned to but never used
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:352:13
+    |
+350 |             has_large_title = bool(re.search(r'fontSize:\s*34|largeTitle|font-weight:\s*["\']?bold', content))
+351 |             has_title_1 = bool(re.search(r'fontSize:\s*28', content))
+352 |             has_headline = bool(re.search(r'fontSize:\s*17.*semibold|headline', content))
+    |             ^^^^^^^^^^^^
+353 |             has_body = bool(re.search(r'fontSize:\s*17.*regular|body', content))
+    |
+help: Remove assignment to unused variable `has_headline`
+
+F841 Local variable `has_body` is assigned to but never used
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:353:13
+    |
+351 |             has_title_1 = bool(re.search(r'fontSize:\s*28', content))
+352 |             has_headline = bool(re.search(r'fontSize:\s*17.*semibold|headline', content))
+353 |             has_body = bool(re.search(r'fontSize:\s*17.*regular|body', content))
+    |             ^^^^^^^^
+354 |
+355 |             # Check if following iOS scale roughly
+    |
+help: Remove assignment to unused variable `has_body`
+
+F841 Local variable `has_title_material` is assigned to but never used
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:368:13
+    |
+366 |             has_display = bool(re.search(r'fontSize:\s*[456][0-9]|display', content))
+367 |             has_headline_material = bool(re.search(r'fontSize:\s*[23][0-9]|headline', content))
+368 |             has_title_material = bool(re.search(r'fontSize:\s*2[12][0-9].*medium|title', content))
+    |             ^^^^^^^^^^^^^^^^^^
+369 |             has_body_material = bool(re.search(r'fontSize:\s*1[456].*regular|body', content))
+370 |             has_label = bool(re.search(r'fontSize:\s*1[1234].*medium|label', content))
+    |
+help: Remove assignment to unused variable `has_title_material`
+
+F841 Local variable `has_body_material` is assigned to but never used
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:369:13
+    |
+367 |             has_headline_material = bool(re.search(r'fontSize:\s*[23][0-9]|headline', content))
+368 |             has_title_material = bool(re.search(r'fontSize:\s*2[12][0-9].*medium|title', content))
+369 |             has_body_material = bool(re.search(r'fontSize:\s*1[456].*regular|body', content))
+    |             ^^^^^^^^^^^^^^^^^
+370 |             has_label = bool(re.search(r'fontSize:\s*1[1234].*medium|label', content))
+    |
+help: Remove assignment to unused variable `has_body_material`
+
+E722 Do not use bare `except`
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:413:17
+    |
+411 |                 try:
+412 |                     numeric_weights.append(int(val))
+413 |                 except:
+    |                 ^^^^^^
+414 |                     pass
+    |
+
+E722 Do not use bare `except`
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:450:13
+    |
+448 |                     if saturation > 0.8:  # Highly saturated
+449 |                         saturated_count += 1
+450 |             except:
+    |             ^^^^^^
+451 |                 pass
+    |
+
+F841 Local variable `light_colors` is assigned to but never used
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:458:9
+    |
+456 |         # 10.3 Outdoor Visibility Check
+457 |         # Low contrast combinations fail in outdoor sunlight
+458 |         light_colors = re.findall(r'#[0-9A-Fa-f]{6}|rgba?\([^)]+\)', content)
+    |         ^^^^^^^^^^^^
+459 |         # Check for potential low contrast (light gray on white, dark gray on black)
+460 |         potential_low_contrast = bool(re.search(r'#[EeEeEeEe].*#ffffff|#999999.*#ffffff|#333333.*#000000|#666666.*#000000', content))
+    |
+help: Remove assignment to unused variable `light_colors`
+
+F841 Local variable `has_systemBackground` is assigned to but never used
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:485:13
+    |
+483 |             has_label = bool(re.search(r'color:\s*["\']?label|\.label', content))
+484 |             has_secondaryLabel = bool(re.search(r'secondaryLabel|\.secondaryLabel', content))
+485 |             has_systemBackground = bool(re.search(r'systemBackground|\.systemBackground', content))
+    |             ^^^^^^^^^^^^^^^^^^^^
+486 |
+487 |             has_hardcoded_gray = bool(re.search(r'#[78]0{4}', content))
+    |
+help: Remove assignment to unused variable `has_systemBackground`
+
+E701 Multiple statements on one line (colon)
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:567:20
+    |
+566 |         testing_tools = []
+567 |         if has_jest: testing_tools.append('Jest')
+    |                    ^
+568 |         if has_rntl: testing_tools.append('RNTL')
+569 |         if has_detox: testing_tools.append('Detox')
+    |
+
+E701 Multiple statements on one line (colon)
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:568:20
+    |
+566 |         testing_tools = []
+567 |         if has_jest: testing_tools.append('Jest')
+568 |         if has_rntl: testing_tools.append('RNTL')
+    |                    ^
+569 |         if has_detox: testing_tools.append('Detox')
+570 |         if has_maestro: testing_tools.append('Maestro')
+    |
+
+E701 Multiple statements on one line (colon)
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:569:21
+    |
+567 |         if has_jest: testing_tools.append('Jest')
+568 |         if has_rntl: testing_tools.append('RNTL')
+569 |         if has_detox: testing_tools.append('Detox')
+    |                     ^
+570 |         if has_maestro: testing_tools.append('Maestro')
+    |
+
+E701 Multiple statements on one line (colon)
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:570:23
+    |
+568 |         if has_rntl: testing_tools.append('RNTL')
+569 |         if has_detox: testing_tools.append('Detox')
+570 |         if has_maestro: testing_tools.append('Maestro')
+    |                       ^
+571 |
+572 |         if len(testing_tools) == 0:
+    |
+
+F841 Local variable `has_debugger` is assigned to but never used
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:594:9
+    |
+592 |         has_performance = bool(re.search(r'Performance|systrace|profile|Flipper', content))
+593 |         has_console_log = len(re.findall(r'console\.(log|warn|error|debug|info)', content))
+594 |         has_debugger = bool(re.search(r'debugger|__DEV__|React\.DevTools', content))
+    |         ^^^^^^^^^^^^
+595 |
+596 |         if has_console_log > 10:
+    |
+help: Remove assignment to unused variable `has_debugger`
+
+F401 [*] `os` imported but unused
+ --> .agent\skills\nextjs-react-expert\scripts\convert_rules.py:7:8
+  |
+5 | """
+6 |
+7 | import os
+  |        ^^
+8 | import re
+9 | from pathlib import Path
+  |
+help: Remove unused import: `os`
+
+F401 [*] `re` imported but unused
+  --> .agent\skills\nextjs-react-expert\scripts\convert_rules.py:8:8
+   |
+ 7 | import os
+ 8 | import re
+   |        ^^
+ 9 | from pathlib import Path
+10 | from typing import Dict, List, Tuple
+   |
+help: Remove unused import: `re`
+
+F401 [*] `json` imported but unused
+  --> .agent\skills\nextjs-react-expert\scripts\react_performance_checker.py:10:8
+   |
+ 8 | import os
+ 9 | import re
+10 | import json
+   |        ^^^^
+11 | from pathlib import Path
+12 | from typing import List, Dict, Tuple
+   |
+help: Remove unused import: `json`
+
+F401 [*] `typing.List` imported but unused
+  --> .agent\skills\nextjs-react-expert\scripts\react_performance_checker.py:12:20
+   |
+10 | import json
+11 | from pathlib import Path
+12 | from typing import List, Dict, Tuple
+   |                    ^^^^
+13 |
+14 | class PerformanceChecker:
+   |
+help: Remove unused import
+
+F401 [*] `typing.Dict` imported but unused
+  --> .agent\skills\nextjs-react-expert\scripts\react_performance_checker.py:12:26
+   |
+10 | import json
+11 | from pathlib import Path
+12 | from typing import List, Dict, Tuple
+   |                          ^^^^
+13 |
+14 | class PerformanceChecker:
+   |
+help: Remove unused import
+
+F401 [*] `typing.Tuple` imported but unused
+  --> .agent\skills\nextjs-react-expert\scripts\react_performance_checker.py:12:32
+   |
+10 | import json
+11 | from pathlib import Path
+12 | from typing import List, Dict, Tuple
+   |                                ^^^^^
+13 |
+14 | class PerformanceChecker:
+   |
+help: Remove unused import
+
+F841 [*] Local variable `e` is assigned to but never used
+  --> .agent\skills\nextjs-react-expert\scripts\react_performance_checker.py:43:33
+   |
+41 |                         'section': '1-async-eliminating-waterfalls.md'
+42 |                     })
+43 |             except Exception as e:
+   |                                 ^
+44 |                 continue
+   |
+help: Remove assignment to unused variable `e`
+
+F841 [*] Local variable `e` is assigned to but never used
+  --> .agent\skills\nextjs-react-expert\scripts\react_performance_checker.py:69:33
+   |
+67 |                         'section': '2-bundle-bundle-size-optimization.md'
+68 |                     })
+69 |             except Exception as e:
+   |                                 ^
+70 |                 continue
+   |
+help: Remove assignment to unused variable `e`
+
+F841 [*] Local variable `e` is assigned to but never used
+   --> .agent\skills\nextjs-react-expert\scripts\react_performance_checker.py:104:33
+    |
+102 |                                 })
+103 |                                 break
+104 |             except Exception as e:
+    |                                 ^
+105 |                 continue
+    |
+help: Remove assignment to unused variable `e`
+
+F841 [*] Local variable `e` is assigned to but never used
+   --> .agent\skills\nextjs-react-expert\scripts\react_performance_checker.py:128:33
+    |
+126 |                             'section': '4-client-client-side-data-fetching.md'
+127 |                         })
+128 |             except Exception as e:
+    |                                 ^
+129 |                 continue
+    |
+help: Remove assignment to unused variable `e`
+
+F841 [*] Local variable `e` is assigned to but never used
+   --> .agent\skills\nextjs-react-expert\scripts\react_performance_checker.py:155:33
+    |
+153 |                             'section': '5-rerender-re-render-optimization.md'
+154 |                         })
+155 |             except Exception as e:
+    |                                 ^
+156 |                 continue
+    |
+help: Remove assignment to unused variable `e`
+
+F841 [*] Local variable `e` is assigned to but never used
+   --> .agent\skills\nextjs-react-expert\scripts\react_performance_checker.py:178:33
+    |
+176 |                         'section': '6-rendering-rendering-performance.md'
+177 |                     })
+178 |             except Exception as e:
+    |                                 ^
+179 |                 continue
+    |
+help: Remove assignment to unused variable `e`
+
+F541 [*] f-string without any placeholders
+   --> .agent\skills\nextjs-react-expert\scripts\react_performance_checker.py:206:15
+    |
+205 |         print("\n" + "="*60)
+206 |         print(f"SUMMARY:")
+    |               ^^^^^^^^^^^
+207 |         print(f"  Critical Issues: {len([i for i in self.issues if i['type'] == 'CRITICAL'])}")
+208 |         print(f"  Warnings: {len(self.warnings)}")
+    |
+help: Remove extraneous `f` prefix
+
+E722 Do not use bare `except`
+  --> .agent\skills\seo-fundamentals\scripts\seo_checker.py:29:1
+   |
+27 | try:
+28 |     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+29 | except:
+   | ^^^^^^
+30 |     pass
+   |
+
+F541 [*] f-string without any placeholders
+   --> .agent\skills\seo-fundamentals\scripts\seo_checker.py:152:11
+    |
+151 |     print(f"\n{'='*60}")
+152 |     print(f"  SEO CHECKER - Search Engine Optimization Audit")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+153 |     print(f"{'='*60}")
+154 |     print(f"Project: {project_path}")
+    |
+help: Remove extraneous `f` prefix
+
+E722 Do not use bare `except`
+  --> .agent\skills\testing-patterns\scripts\test_runner.py:23:1
+   |
+21 | try:
+22 |     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+23 | except:
+   | ^^^^^^
+24 |     pass
+   |
+
+E722 Do not use bare `except`
+  --> .agent\skills\testing-patterns\scripts\test_runner.py:66:9
+   |
+64 |                 result["coverage_cmd"] = ["npx", "jest", "--coverage"]
+65 |                 
+66 |         except:
+   |         ^^^^^^
+67 |             pass
+   |
+
+F541 [*] f-string without any placeholders
+   --> .agent\skills\testing-patterns\scripts\test_runner.py:145:11
+    |
+144 |     print(f"\n{'='*60}")
+145 |     print(f"[TEST RUNNER] Unified Test Execution")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+146 |     print(f"{'='*60}")
+147 |     print(f"Project: {project_path}")
+    |
+help: Remove extraneous `f` prefix
+
+F401 [*] `typing.List` imported but unused
+  --> .agent\skills\vulnerability-scanner\scripts\security_scan.py:22:26
+   |
+20 | import argparse
+21 | from pathlib import Path
+22 | from typing import Dict, List, Any
+   |                          ^^^^
+23 | from datetime import datetime
+   |
+help: Remove unused import: `typing.List`
+
+F401 [*] `os` imported but unused
+ --> .agents\skills\skill-creator\scripts\quick_validate.py:7:8
+  |
+6 | import sys
+7 | import os
+  |        ^^
+8 | import re
+9 | import yaml
+  |
+help: Remove unused import: `os`
+
+F401 [*] `backend.app.main.app` imported but unused
+ --> api\index.py:1:30
+  |
+1 | from backend.app.main import app
+  |                              ^^^
+2 |
+3 | # This file is the Vercel entrypoint.
+  |
+help: Remove unused import: `backend.app.main.app`
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\app\api\routers\admin.py:1:1
+   |
+ 1 | / from fastapi import APIRouter, Depends, HTTPException, Request
+ 2 | | from typing import List, Optional
+ 3 | | from pydantic import BaseModel
+ 4 | | from app.core.supabase import supabase_admin
+ 5 | | from app.core.auth import verify_admin
+ 6 | | from app.core.rate_limit import limiter
+ 7 | | from app.services.notifications import notify_shop_approved
+ 8 | | from app.services.venue_repository import VenueRepository
+   | |_________________________________________________________^
+ 9 |
+10 |   router = APIRouter()
+   |
+help: Organize imports
+
+F401 [*] `fastapi.Request` imported but unused
+ --> backend\app\api\routers\admin.py:1:56
+  |
+1 | from fastapi import APIRouter, Depends, HTTPException, Request
+  |                                                        ^^^^^^^
+2 | from typing import List, Optional
+3 | from pydantic import BaseModel
+  |
+help: Remove unused import: `fastapi.Request`
+
+UP035 `typing.List` is deprecated, use `list` instead
+ --> backend\app\api\routers\admin.py:2:1
+  |
+1 | from fastapi import APIRouter, Depends, HTTPException, Request
+2 | from typing import List, Optional
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+3 | from pydantic import BaseModel
+4 | from app.core.supabase import supabase_admin
+  |
+
+F401 [*] `typing.List` imported but unused
+ --> backend\app\api\routers\admin.py:2:20
+  |
+1 | from fastapi import APIRouter, Depends, HTTPException, Request
+2 | from typing import List, Optional
+  |                    ^^^^
+3 | from pydantic import BaseModel
+4 | from app.core.supabase import supabase_admin
+  |
+help: Remove unused import: `typing.List`
+
+F401 [*] `app.core.rate_limit.limiter` imported but unused
+ --> backend\app\api\routers\admin.py:6:33
+  |
+4 | from app.core.supabase import supabase_admin
+5 | from app.core.auth import verify_admin
+6 | from app.core.rate_limit import limiter
+  |                                 ^^^^^^^
+7 | from app.services.notifications import notify_shop_approved
+8 | from app.services.venue_repository import VenueRepository
+  |
+help: Remove unused import: `app.core.rate_limit.limiter`
+
+F401 [*] `app.services.notifications.notify_shop_approved` imported but unused
+ --> backend\app\api\routers\admin.py:7:40
+  |
+5 | from app.core.auth import verify_admin
+6 | from app.core.rate_limit import limiter
+7 | from app.services.notifications import notify_shop_approved
+  |                                        ^^^^^^^^^^^^^^^^^^^^
+8 | from app.services.venue_repository import VenueRepository
+  |
+help: Remove unused import: `app.services.notifications.notify_shop_approved`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\api\routers\admin.py:14:13
+   |
+12 | # --- Schemas ---
+13 | class ReviewAction(BaseModel):
+14 |     reason: Optional[str] = None
+   |             ^^^^^^^^^^^^^
+15 |
+16 | # --- Endpoints ---
+   |
+help: Convert to `X | None`
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+  --> backend\app\api\routers\admin.py:32:9
+   |
+30 |         return {"success": True, "data": response.data}
+31 |     except Exception as e:
+32 |         raise HTTPException(500, str(e))
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+33 |
+34 | @router.post("/shops/{shop_id}/approve")
+   |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+  --> backend\app\api\routers\admin.py:79:9
+   |
+78 |     except Exception as e:
+79 |         raise HTTPException(500, str(e))
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+80 |
+81 | @router.post("/shops/{shop_id}/reject")
+   |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\admin.py:100:9
+    |
+ 99 |     except Exception as e:
+100 |         raise HTTPException(500, str(e))
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+
+E402 Module level import not at top of file
+  --> backend\app\api\routers\analytics.py:20:1
+   |
+18 |     visitor_id: str | None = None
+19 |
+20 | from app.services.analytics_service import analytics_buffer
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+21 |
+22 | @router.post("/log")
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\app\api\routers\analytics.py:20:1
+   |
+18 |     visitor_id: str | None = None
+19 |
+20 | from app.services.analytics_service import analytics_buffer
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+21 |
+22 | @router.post("/log")
+   |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\app\api\routers\emergency.py:5:1
+   |
+ 3 |   Find nearby hospitals, police, fire stations using OpenStreetMap
+ 4 |   """
+ 5 | / from fastapi import APIRouter, Query
+ 6 | | from typing import Optional
+ 7 | | from starlette.requests import Request
+ 8 | |
+ 9 | | from app.core.rate_limit import limiter
+10 | | from app.services.emergency_service import emergency_service
+   | |____________________________________________________________^
+11 |
+12 |   router = APIRouter()
+   |
+help: Organize imports
+
+F401 [*] `typing.Optional` imported but unused
+ --> backend\app\api\routers\emergency.py:6:20
+  |
+4 | """
+5 | from fastapi import APIRouter, Query
+6 | from typing import Optional
+  |                    ^^^^^^^^
+7 | from starlette.requests import Request
+  |
+help: Remove unused import: `typing.Optional`
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\app\api\routers\geodata.py:1:1
+  |
+1 | / import asyncio
+2 | | import logging
+3 | | from typing import Any
+4 | |
+5 | | from cachetools import TTLCache
+6 | | import httpx
+7 | | from fastapi import APIRouter, HTTPException, Query
+  | |___________________________________________________^
+8 |
+9 |   router = APIRouter()
+  |
+help: Organize imports
+
+F401 [*] `asyncio` imported but unused
+ --> backend\app\api\routers\geodata.py:1:8
+  |
+1 | import asyncio
+  |        ^^^^^^^
+2 | import logging
+3 | from typing import Any
+  |
+help: Remove unused import: `asyncio`
+
+F401 [*] `typing.Any` imported but unused
+ --> backend\app\api\routers\geodata.py:3:20
+  |
+1 | import asyncio
+2 | import logging
+3 | from typing import Any
+  |                    ^^^
+4 |
+5 | from cachetools import TTLCache
+  |
+help: Remove unused import: `typing.Any`
+
+F401 [*] `fastapi.Query` imported but unused
+ --> backend\app\api\routers\geodata.py:7:47
+  |
+5 | from cachetools import TTLCache
+6 | import httpx
+7 | from fastapi import APIRouter, HTTPException, Query
+  |                                               ^^^^^
+8 |
+9 | router = APIRouter()
+  |
+help: Remove unused import: `fastapi.Query`
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\geodata.py:212:9
+    |
+210 |     except httpx.RequestError as e:
+211 |         logger.error(f"Overpass request failed: {e}")
+212 |         raise HTTPException(status_code=502, detail="Overpass API failed")
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+213 |     except Exception as e:
+214 |         logger.error(f"Error processing OSM data: {e}")
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\geodata.py:215:9
+    |
+213 |     except Exception as e:
+214 |         logger.error(f"Error processing OSM data: {e}")
+215 |         raise HTTPException(status_code=500, detail=str(e))
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+
+UP017 [*] Use `datetime.UTC` alias
+  --> backend\app\api\routers\owner.py:27:28
+   |
+26 | def _now_utc() -> datetime:
+27 |     return datetime.now(tz=timezone.utc)
+   |                            ^^^^^^^^^^^^
+   |
+help: Convert to `datetime.UTC` alias
+
+UP017 [*] Use `datetime.UTC` alias
+  --> backend\app\api\routers\owner.py:53:56
+   |
+51 |         text = f"{text[:-1]}+00:00"
+52 |     try:
+53 |         return datetime.fromisoformat(text).astimezone(timezone.utc)
+   |                                                        ^^^^^^^^^^^^
+54 |     except Exception:
+55 |         return None
+   |
+help: Convert to `datetime.UTC` alias
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\owner.py:429:9
+    |
+427 |         owner_id = repository.get_owner(shop_id)
+428 |     except Exception:
+429 |         raise HTTPException(status_code=500, detail="Failed to verify ownership")
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+430 |
+431 |     if not owner_id or str(owner_id) != str(user_id):
+    |
+
+UP017 [*] Use `datetime.UTC` alias
+  --> backend\app\api\routers\partner.py:38:56
+   |
+36 |         text = f"{text[:-1]}+00:00"
+37 |     try:
+38 |         return datetime.fromisoformat(text).astimezone(timezone.utc)
+   |                                                        ^^^^^^^^^^^^
+39 |     except Exception:
+40 |         return None
+   |
+help: Convert to `datetime.UTC` alias
+
+UP017 [*] Use `datetime.UTC` alias
+   --> backend\app\api\routers\partner.py:144:35
+    |
+143 | async def _fetch_partner_orders_90d(visitor_id: str) -> list[dict[str, Any]]:
+144 |     cutoff_iso = (datetime.now(tz=timezone.utc) - timedelta(days=90)).isoformat()
+    |                                   ^^^^^^^^^^^^
+145 |     rows = await _fetch_rows_by_visitor(
+146 |         "orders",
+    |
+help: Convert to `datetime.UTC` alias
+
+UP017 [*] Use `datetime.UTC` alias
+   --> backend\app\api\routers\partner.py:158:27
+    |
+157 | async def _resolve_partner_status(visitor_id: str) -> dict[str, Any]:
+158 |     now = datetime.now(tz=timezone.utc)
+    |                           ^^^^^^^^^^^^
+159 |     subscription = await _fetch_latest_subscription(visitor_id)
+    |
+help: Convert to `datetime.UTC` alias
+
+UP017 [*] Use `datetime.UTC` alias
+   --> backend\app\api\routers\partner.py:238:31
+    |
+236 |         return
+237 |
+238 |     now_iso = datetime.now(tz=timezone.utc).isoformat()
+    |                               ^^^^^^^^^^^^
+239 |     save_payload = {
+240 |         "partner_id": partner_id,
+    |
+help: Convert to `datetime.UTC` alias
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\partner.py:400:13
+    |
+398 |         message = str(exc).lower()
+399 |         if "referral_code" in message and "duplicate" in message:
+400 |             raise HTTPException(status_code=409, detail="Referral code already in use")
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+401 |         raise HTTPException(status_code=400, detail="Unable to save partner profile")
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\partner.py:401:9
+    |
+399 |         if "referral_code" in message and "duplicate" in message:
+400 |             raise HTTPException(status_code=409, detail="Referral code already in use")
+401 |         raise HTTPException(status_code=400, detail="Unable to save partner profile")
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+402 |
+403 |     profile_data = res.data or payload
+    |
+
+UP017 [*] Use `datetime.UTC` alias
+   --> backend\app\api\routers\partner.py:455:31
+    |
+453 |         "account_type": _clean_text(body.account_type),
+454 |     }
+455 |     now_iso = datetime.now(tz=timezone.utc).isoformat()
+    |                               ^^^^^^^^^^^^
+456 |     metadata["bank"] = {
+457 |         "bank_code": bank_payload["bank_code"],
+    |
+help: Convert to `datetime.UTC` alias
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\partner.py:475:9
+    |
+473 |         await _upsert_partner_bank_secret(str(partner.get("id")), bank_payload)
+474 |     except Exception:
+475 |         raise HTTPException(status_code=400, detail="Unable to persist secure payout details")
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+476 |
+477 |     await asyncio.to_thread(
+    |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\app\api\routers\payments.py:1:1
+   |
+ 1 | / from fastapi import APIRouter, HTTPException, Depends, Request
+ 2 | | from pydantic import BaseModel, Field
+ 3 | | from typing import Any, Dict, Optional
+ 4 | | import asyncio
+ 5 | | from datetime import datetime, timezone
+ 6 | | import hashlib
+ 7 | | import json
+ 8 | | import logging
+ 9 | | import time
+10 | | import uuid
+11 | | import stripe
+12 | | import requests
+13 | | from urllib.parse import urlparse
+14 | | from app.core.config import get_settings
+15 | | from app.core.auth import verify_user
+16 | | from app.core.concurrency import core_db_sem
+17 | | from app.core.rate_limit import limiter
+18 | | from app.core.supabase import supabase_admin
+19 | | from app.services.ocr_queue import enqueue_ocr_job
+20 | | from app.services.sheets_logger import sheets_logger
+21 | | from app.services.slip_verification import get_feature_from_sku, verify_slip_with_gcv
+   | |_____________________________________________________________________________________^
+22 |
+23 |   router = APIRouter()
+   |
+help: Organize imports
+
+UP035 `typing.Dict` is deprecated, use `dict` instead
+ --> backend\app\api\routers\payments.py:3:1
+  |
+1 | from fastapi import APIRouter, HTTPException, Depends, Request
+2 | from pydantic import BaseModel, Field
+3 | from typing import Any, Dict, Optional
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+4 | import asyncio
+5 | from datetime import datetime, timezone
+  |
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+  --> backend\app\api\routers\payments.py:32:14
+   |
+30 | def _schedule_payment_sheet_log(
+31 |     event_type: str,
+32 |     payload: Dict[str, Any],
+   |              ^^^^
+33 |     *,
+34 |     actor_id: str | None = None,
+   |
+help: Replace with `dict`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\api\routers\payments.py:64:20
+   |
+62 |     email: str
+63 |     address_line1: str
+64 |     address_line2: Optional[str] = None
+   |                    ^^^^^^^^^^^^^
+65 |     country: str
+66 |     province: str
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\api\routers\payments.py:72:15
+   |
+71 | class ManualOrderRequest(BaseModel):
+72 |     venue_id: Optional[str] = None
+   |               ^^^^^^^^^^^^^
+73 |     sku: str
+74 |     amount: Optional[float] = Field(default=None, gt=0)
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\api\routers\payments.py:74:13
+   |
+72 |     venue_id: Optional[str] = None
+73 |     sku: str
+74 |     amount: Optional[float] = Field(default=None, gt=0)
+   |             ^^^^^^^^^^^^^^^
+75 |     slip_url: str
+76 |     visitor_id: Optional[str] = None
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\api\routers\payments.py:76:17
+   |
+74 |     amount: Optional[float] = Field(default=None, gt=0)
+75 |     slip_url: str
+76 |     visitor_id: Optional[str] = None
+   |                 ^^^^^^^^^^^^^
+77 |     metadata: Optional[Dict[str, Any]] = None
+78 |     consent_personal_data: bool = False
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\api\routers\payments.py:77:15
+   |
+75 |     slip_url: str
+76 |     visitor_id: Optional[str] = None
+77 |     metadata: Optional[Dict[str, Any]] = None
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^
+78 |     consent_personal_data: bool = False
+79 |     buyer_profile: BuyerProfile
+   |
+help: Convert to `X | None`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+  --> backend\app\api\routers\payments.py:77:24
+   |
+75 |     slip_url: str
+76 |     visitor_id: Optional[str] = None
+77 |     metadata: Optional[Dict[str, Any]] = None
+   |                        ^^^^
+78 |     consent_personal_data: bool = False
+79 |     buyer_profile: BuyerProfile
+   |
+help: Replace with `dict`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\api\routers\payments.py:93:58
+   |
+93 | async def _resolve_order_amount(sku: str, client_amount: Optional[float]) -> float:
+   |                                                          ^^^^^^^^^^^^^^^
+94 |     try:
+95 |         satang = await get_product_price(sku)
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\app\api\routers\payments.py:133:32
+    |
+133 | def _fetch_ip_info(ip: str) -> Optional[Dict[str, Any]]:
+    |                                ^^^^^^^^^^^^^^^^^^^^^^^^
+134 |     if not ip or not settings.IPINFO_TOKEN:
+135 |         return None
+    |
+help: Convert to `X | None`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\app\api\routers\payments.py:133:41
+    |
+133 | def _fetch_ip_info(ip: str) -> Optional[Dict[str, Any]]:
+    |                                         ^^^^
+134 |     if not ip or not settings.IPINFO_TOKEN:
+135 |         return None
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\app\api\routers\payments.py:148:28
+    |
+148 | def _send_discord(payload: Dict[str, Any]) -> None:
+    |                            ^^^^
+149 |     if not settings.DISCORD_WEBHOOK_URL:
+150 |         return
+    |
+help: Replace with `dict`
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\payments.py:265:9
+    |
+263 |             },
+264 |         )
+265 |         raise HTTPException(status_code=502, detail="Payment provider error")
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+266 |     except Exception as e:
+267 |         logger.error(
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\payments.py:276:9
+    |
+274 |               },
+275 |           )
+276 | /         raise HTTPException(
+277 | |             status_code=400,
+278 | |             detail="Unable to create checkout session",
+279 | |         )
+    | |_________^
+    |
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\app\api\routers\payments.py:317:20
+    |
+315 |     # H1: Serialize concurrent payment DB writes through semaphore
+316 |     # Keep the critical section limited to DB operations.
+317 |     order_payload: Dict[str, Any] = {
+    |                    ^^^^
+318 |         "venue_id": body.venue_id,
+319 |         "visitor_id": body.visitor_id,
+    |
+help: Replace with `dict`
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\payments.py:411:17
+    |
+409 |                               "verification_status": existing_status,
+410 |                           }
+411 | /                 raise HTTPException(
+412 | |                     status_code=409,
+413 | |                     detail="This slip has already been submitted and is being processed",
+414 | |                 )
+    | |_________________^
+415 |               raise HTTPException(status_code=400, detail=message)
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\payments.py:415:13
+    |
+413 |                     detail="This slip has already been submitted and is being processed",
+414 |                 )
+415 |             raise HTTPException(status_code=400, detail=message)
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+416 |
+417 |     slip_audit_payload = {
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\payments.py:688:9
+    |
+686 |     except stripe.error.SignatureVerificationError:
+687 |         logger.warning("stripe_webhook_invalid_signature")
+688 |         raise HTTPException(status_code=400, detail="Invalid signature")
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+689 |     except Exception as e:
+690 |         logger.error("stripe_webhook_parse_error", extra={"error": str(e)})
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\payments.py:691:9
+    |
+689 |     except Exception as e:
+690 |         logger.error("stripe_webhook_parse_error", extra={"error": str(e)})
+691 |         raise HTTPException(status_code=400, detail="Bad payload")
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+692 |
+693 |     event_id = event.get("id", "")
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\payments.py:726:9
+    |
+724 |             extra={"event_id": event_id, "err": str(e)},
+725 |         )
+726 |         raise HTTPException(status_code=500, detail="Event processing error")
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+727 |
+728 |     event_type = event.get("type")
+    |
+
+UP017 [*] Use `datetime.UTC` alias
+   --> backend\app\api\routers\payments.py:736:43
+    |
+734 |     try:
+735 |         supabase_admin.table("stripe_webhook_events").update(
+736 |             {"processed_at": datetime.now(timezone.utc).isoformat()}
+    |                                           ^^^^^^^^^^^^
+737 |         ).eq("stripe_event_id", event_id).execute()
+738 |     except Exception as e:
+    |
+help: Convert to `datetime.UTC` alias
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\app\api\routers\proxy.py:7:1
+   |
+ 5 |   """
+ 6 |
+ 7 | / import logging
+ 8 | | from urllib.parse import urlparse
+ 9 | |
+10 | | import httpx
+11 | | from cachetools import TTLCache
+12 | | from fastapi import APIRouter, HTTPException, Header, Query
+13 | |
+14 | | from app.core.config import get_settings
+   | |________________________________________^
+15 |
+16 |   logger = logging.getLogger(__name__)
+   |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\app\api\routers\redemption.py:1:1
+  |
+1 | / from fastapi import APIRouter, Depends, HTTPException
+2 | | from app.core.supabase import supabase
+3 | | from app.core.auth import verify_user
+  | |_____________________________________^
+4 |
+5 |   router = APIRouter()
+  |
+help: Organize imports
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+  --> backend\app\api\routers\redemption.py:34:9
+   |
+32 |     except Exception as e:
+33 |         print(f"Redemption error: {e}")
+34 |         raise HTTPException(500, detail="Transaction failed")
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\app\api\routers\rides.py:5:1
+   |
+ 3 |   Provides estimates from multiple providers with deep links
+ 4 |   """
+ 5 | / from fastapi import APIRouter, HTTPException, Query
+ 6 | | from pydantic import BaseModel
+ 7 | | from typing import Optional
+ 8 | | from starlette.requests import Request
+ 9 | |
+10 | | from app.core.rate_limit import limiter
+11 | | from app.services.ride_service import ride_service, Location
+   | |____________________________________________________________^
+12 |
+13 |   router = APIRouter()
+   |
+help: Organize imports
+
+F401 [*] `fastapi.Query` imported but unused
+ --> backend\app\api\routers\rides.py:5:47
+  |
+3 | Provides estimates from multiple providers with deep links
+4 | """
+5 | from fastapi import APIRouter, HTTPException, Query
+  |                                               ^^^^^
+6 | from pydantic import BaseModel
+7 | from typing import Optional
+  |
+help: Remove unused import: `fastapi.Query`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\api\routers\rides.py:24:15
+   |
+22 |     origin: LocationInput
+23 |     destination: LocationInput
+24 |     province: Optional[str] = "α╕üα╕úα╕╕α╕çα╣Çα╕ùα╕₧α╕íα╕½α╕▓α╕Öα╕äα╕ú"
+   |               ^^^^^^^^^^^^^
+   |
+help: Convert to `X | None`
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+  --> backend\app\api\routers\rides.py:82:9
+   |
+80 |         }
+81 |     except Exception as e:
+82 |         raise HTTPException(status_code=500, detail=str(e))
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\app\api\routers\seo.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | import io
+ 4 | | from typing import Optional
+ 5 | |
+ 6 | | import httpx
+ 7 | | from fastapi import APIRouter, HTTPException, Response, Request, Query
+ 8 | | from fastapi.responses import RedirectResponse
+ 9 | | from urllib.parse import quote
+10 | | import re
+11 | | from PIL import Image, ImageDraw, ImageOps
+12 | |
+13 | | from app.core.supabase import supabase
+   | |______________________________________^
+   |
+help: Organize imports
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\api\routers\seo.py:23:28
+   |
+23 | def _normalize_locale(raw: Optional[str]) -> Optional[str]:
+   |                            ^^^^^^^^^^^^^
+24 |     if not raw:
+25 |         return None
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\api\routers\seo.py:23:46
+   |
+23 | def _normalize_locale(raw: Optional[str]) -> Optional[str]:
+   |                                              ^^^^^^^^^^^^^
+24 |     if not raw:
+25 |         return None
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\api\routers\seo.py:72:35
+   |
+70 |     )
+71 |
+72 | def _pick_cover_url(row: dict) -> Optional[str]:
+   |                                   ^^^^^^^^^^^^^
+73 |     image_urls = row.get("image_urls") or []
+74 |     if isinstance(image_urls, list) and image_urls:
+   |
+help: Convert to `X | None`
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\seo.py:188:9
+    |
+186 |         raise
+187 |     except Exception as e:
+188 |         raise HTTPException(status_code=500, detail=str(e))
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\seo.py:304:9
+    |
+302 |         raise
+303 |     except Exception as e:
+304 |         raise HTTPException(status_code=500, detail=str(e))
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+
+UP035 `typing.List` is deprecated, use `list` instead
+ --> backend\app\api\routers\shops.py:1:1
+  |
+1 | from typing import List
+  | ^^^^^^^^^^^^^^^^^^^^^^^
+2 |
+3 | from fastapi import APIRouter, HTTPException, Query, Request
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\app\api\routers\shops.py:1:1
+   |
+ 1 | / from typing import List
+ 2 | |
+ 3 | | from fastapi import APIRouter, HTTPException, Query, Request
+ 4 | | from pydantic import BaseModel, Field
+ 5 | |
+ 6 | | from app.core.supabase import supabase, supabase_admin
+ 7 | | from app.services.shop_service import shop_service
+ 8 | | from app.core.rate_limit import limiter
+   | |_______________________________________^
+ 9 |
+10 |   router = APIRouter()
+   |
+help: Organize imports
+
+UP006 [*] Use `list` instead of `List` for type annotation
+  --> backend\app\api\routers\shops.py:33:33
+   |
+31 |     return supabase_admin or supabase
+32 |
+33 | @router.get("/", response_model=List[dict])
+   |                                 ^^^^
+34 | @limiter.limit("60/minute")
+35 | async def read_shops(request: Request):
+   |
+help: Replace with `list`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+  --> backend\app\api\routers\shops.py:53:50
+   |
+53 | @router.get("/{shop_id}/reviews", response_model=List[dict])
+   |                                                  ^^^^
+54 | @limiter.limit("90/minute")
+55 | async def read_shop_reviews(
+   |
+help: Replace with `list`
+
+UP035 `typing.List` is deprecated, use `list` instead
+ --> backend\app\api\routers\ugc.py:5:1
+  |
+3 | """
+4 | from datetime import datetime, timezone
+5 | from typing import List, Optional, Union
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+6 | from uuid import UUID
+  |
+
+UP007 Use `X | Y` for type annotations
+  --> backend\app\api\routers\ugc.py:18:16
+   |
+17 | router = APIRouter()
+18 | VenueIdInput = Union[str, int, UUID]
+   |                ^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Convert to `X | Y`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\api\routers\ugc.py:26:15
+   |
+24 |     latitude: float
+25 |     longitude: float
+26 |     province: Optional[str] = "Unknown"
+   |               ^^^^^^^^^^^^^
+27 |     images: List[str] = Field(default_factory=list)
+28 |     description: Optional[str] = ""
+   |
+help: Convert to `X | None`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+  --> backend\app\api\routers\ugc.py:27:13
+   |
+25 |     longitude: float
+26 |     province: Optional[str] = "Unknown"
+27 |     images: List[str] = Field(default_factory=list)
+   |             ^^^^
+28 |     description: Optional[str] = ""
+   |
+help: Replace with `list`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\api\routers\ugc.py:28:18
+   |
+26 |     province: Optional[str] = "Unknown"
+27 |     images: List[str] = Field(default_factory=list)
+28 |     description: Optional[str] = ""
+   |                  ^^^^^^^^^^^^^
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\api\routers\ugc.py:33:11
+   |
+31 | class CheckInRequest(BaseModel):
+32 |     venue_id: VenueIdInput
+33 |     note: Optional[str] = ""
+   |           ^^^^^^^^^^^^^
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\api\routers\ugc.py:39:14
+   |
+37 |     venue_id: VenueIdInput
+38 |     image_url: str
+39 |     caption: Optional[str] = ""
+   |              ^^^^^^^^^^^^^
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\api\routers\ugc.py:52:49
+   |
+52 | def grant_rewards(user_id: str, action: str) -> Optional[dict]:
+   |                                                 ^^^^^^^^^^^^^^
+53 |     reward = REWARDS.get(action, {"coins": 0, "xp": 0})
+54 |     # S5: invalidate cached profile so next read reflects new coin/xp balance
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\api\routers\ugc.py:75:63
+   |
+75 | def _normalize_venue_id(venue_id: VenueIdInput) -> tuple[str, Optional[str]]:
+   |                                                               ^^^^^^^^^^^^^
+76 |     venue_text = str(venue_id).strip()
+77 |     if not venue_text:
+   |
+help: Convert to `X | None`
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\ugc.py:124:9
+    |
+122 |         raise
+123 |     except Exception as e:
+124 |         raise HTTPException(status_code=500, detail=str(e))
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+
+UP017 [*] Use `datetime.UTC` alias
+   --> backend\app\api\routers\ugc.py:136:36
+    |
+134 |     try:
+135 |         venue_text, venue_uuid = _normalize_venue_id(check_in_data.venue_id)
+136 |         today_start = datetime.now(timezone.utc).replace(
+    |                                    ^^^^^^^^^^^^
+137 |             hour=0,
+138 |             minute=0,
+    |
+help: Convert to `datetime.UTC` alias
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\ugc.py:200:9
+    |
+198 |         raise
+199 |     except Exception as e:
+200 |         raise HTTPException(status_code=500, detail=str(e))
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\ugc.py:246:9
+    |
+244 |         raise
+245 |     except Exception as e:
+246 |         raise HTTPException(status_code=500, detail=str(e))
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+
+UP035 `typing.List` is deprecated, use `list` instead
+  --> backend\app\api\routers\vibes.py:8:1
+   |
+ 6 | import logging
+ 7 | import time
+ 8 | from typing import Any, List
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 9 |
+10 | from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+   |
+
+UP006 [*] Use `list` instead of `List` for type annotation
+  --> backend\app\api\routers\vibes.py:62:28
+   |
+60 |     def __init__(self):
+61 |         # Receives global stream payloads (Map / Home)
+62 |         self.global_connections: List[WebSocket] = []
+   |                                  ^^^^
+63 |         # Room presence channels (shop detail)
+64 |         self.room_connections: dict[str, List[WebSocket]] = {}
+   |
+help: Replace with `list`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+  --> backend\app\api\routers\vibes.py:64:36
+   |
+62 |         self.global_connections: List[WebSocket] = []
+63 |         # Room presence channels (shop detail)
+64 |         self.room_connections: dict[str, List[WebSocket]] = {}
+   |                                          ^^^^
+65 |
+66 |     async def connect(self, websocket: WebSocket):
+   |
+help: Replace with `list`
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\app\core\auth.py:1:1
+  |
+1 | / from typing import Optional
+2 | | from fastapi import Depends, HTTPException, status
+3 | | from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+4 | | from supabase import Client
+5 | | from app.core.supabase import supabase
+6 | | from app.core.config import get_settings
+  | |________________________________________^
+7 |
+8 |   security = HTTPBearer()
+  |
+help: Organize imports
+
+F401 [*] `typing.Optional` imported but unused
+ --> backend\app\core\auth.py:1:20
+  |
+1 | from typing import Optional
+  |                    ^^^^^^^^
+2 | from fastapi import Depends, HTTPException, status
+3 | from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+  |
+help: Remove unused import: `typing.Optional`
+
+F401 [*] `supabase.Client` imported but unused
+ --> backend\app\core\auth.py:4:22
+  |
+2 | from fastapi import Depends, HTTPException, status
+3 | from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+4 | from supabase import Client
+  |                      ^^^^^^
+5 | from app.core.supabase import supabase
+6 | from app.core.config import get_settings
+  |
+help: Remove unused import: `supabase.Client`
+
+F841 [*] Local variable `e` is assigned to but never used
+  --> backend\app\core\auth.py:45:25
+   |
+43 |         return response.user
+44 |
+45 |     except Exception as e:
+   |                         ^
+46 |          # print(f"Auth Error: {e}")
+47 |          raise HTTPException(
+   |
+help: Remove assignment to unused variable `e`
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+  --> backend\app\core\auth.py:47:10
+   |
+45 |       except Exception as e:
+46 |            # print(f"Auth Error: {e}")
+47 | /          raise HTTPException(
+48 | |             status_code=status.HTTP_401_UNAUTHORIZED,
+49 | |             detail="Could not validate credentials",
+50 | |             headers={"WWW-Authenticate": "Bearer"},
+51 | |         )
+   | |_________^
+52 |
+53 |   async def verify_admin(user = Depends(verify_user)):
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\app\core\config.py:1:1
+  |
+1 | / from functools import lru_cache
+2 | | from typing import List, Optional
+3 | | import logging
+4 | | from pydantic_settings import BaseSettings, SettingsConfigDict
+  | |______________________________________________________________^
+5 |
+6 |   class Settings(BaseSettings):
+  |
+help: Organize imports
+
+UP035 `typing.List` is deprecated, use `list` instead
+ --> backend\app\core\config.py:2:1
+  |
+1 | from functools import lru_cache
+2 | from typing import List, Optional
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+3 | import logging
+4 | from pydantic_settings import BaseSettings, SettingsConfigDict
+  |
+
+UP006 [*] Use `list` instead of `List` for type annotation
+  --> backend\app\core\config.py:13:27
+   |
+12 |     # CORS
+13 |     BACKEND_CORS_ORIGINS: List[str] = [
+   |                           ^^^^
+14 |         "http://localhost:3000",
+15 |         "http://localhost:5173",
+   |
+help: Replace with `list`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+  --> backend\app\core\config.py:53:38
+   |
+51 |     # Frontend / Redirect Safety
+52 |     FRONTEND_URL: str = "https://vibecity.live"
+53 |     ALLOWED_CHECKOUT_REDIRECT_HOSTS: List[str] = [
+   |                                      ^^^^
+54 |         "vibecity.live",
+55 |         "localhost",
+   |
+help: Replace with `list`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\core\config.py:91:23
+   |
+90 |     # PayPal
+91 |     PAYPAL_CLIENT_ID: Optional[str] = None
+   |                       ^^^^^^^^^^^^^
+92 |     PAYPAL_SECRET: Optional[str] = None
+93 |     PAYPAL_MODE: str = "sandbox"  # sandbox or live
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\core\config.py:92:20
+   |
+90 |     # PayPal
+91 |     PAYPAL_CLIENT_ID: Optional[str] = None
+92 |     PAYPAL_SECRET: Optional[str] = None
+   |                    ^^^^^^^^^^^^^
+93 |     PAYPAL_MODE: str = "sandbox"  # sandbox or live
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\app\core\config.py:105:21
+    |
+103 |     # Memory (mem0 + pgvector)
+104 |     MEMORY_ENABLED: bool = False
+105 |     OPENAI_API_KEY: Optional[str] = None
+    |                     ^^^^^^^^^^^^^
+106 |     MEMORY_DATABASE_URL: Optional[str] = None  # postgres://... (Supabase direct DB URL)
+107 |     GOOGLE_API_KEY: Optional[str] = None  # For Gemini support
+    |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\app\core\config.py:106:26
+    |
+104 |     MEMORY_ENABLED: bool = False
+105 |     OPENAI_API_KEY: Optional[str] = None
+106 |     MEMORY_DATABASE_URL: Optional[str] = None  # postgres://... (Supabase direct DB URL)
+    |                          ^^^^^^^^^^^^^
+107 |     GOOGLE_API_KEY: Optional[str] = None  # For Gemini support
+    |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\app\core\config.py:107:21
+    |
+105 |     OPENAI_API_KEY: Optional[str] = None
+106 |     MEMORY_DATABASE_URL: Optional[str] = None  # postgres://... (Supabase direct DB URL)
+107 |     GOOGLE_API_KEY: Optional[str] = None  # For Gemini support
+    |                     ^^^^^^^^^^^^^
+108 |
+109 |     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
+    |
+help: Convert to `X | None`
+
+UP011 [*] Unnecessary parentheses to `functools.lru_cache`
+   --> backend\app\core\config.py:111:11
+    |
+109 |     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
+110 |
+111 | @lru_cache()
+    |           ^^
+112 | def get_settings():
+113 |     return Settings()
+    |
+help: Remove unnecessary parentheses
+
+UP017 [*] Use `datetime.UTC` alias
+  --> backend\app\core\logging.py:10:39
+   |
+ 8 |     def format(self, record: logging.LogRecord) -> str:
+ 9 |         payload = {
+10 |             "timestamp": datetime.now(timezone.utc).isoformat(),
+   |                                       ^^^^^^^^^^^^
+11 |             "level": record.levelname,
+12 |             "logger": record.name,
+   |
+help: Convert to `datetime.UTC` alias
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\app\core\metrics.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | import logging
+ 4 | | import time
+ 5 | | from typing import Optional
+ 6 | |
+ 7 | | from fastapi import Request
+ 8 | | from prometheus_client import Counter, Gauge, Histogram, CONTENT_TYPE_LATEST, generate_latest
+ 9 | | from starlette.middleware.base import BaseHTTPMiddleware
+10 | | from starlette.responses import Response
+11 | |
+12 | | from app.core.config import Settings
+   | |____________________________________^
+13 |
+14 |   logger = logging.getLogger("app.metrics")
+   |
+help: Organize imports
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\core\metrics.py:62:22
+   |
+60 |         start = time.perf_counter()
+61 |         IN_PROGRESS.labels(method, path).inc()
+62 |         status_code: Optional[int] = None
+   |                      ^^^^^^^^^^^^^
+63 |
+64 |         try:
+   |
+help: Convert to `X | None`
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\app\core\models.py:1:1
+  |
+1 | from pydantic import BaseModel
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2 |
+3 | class RideEstimateRequest(BaseModel):
+  |
+help: Organize imports
+
+E402 Module level import not at top of file
+  --> backend\app\core\models.py:9:1
+   |
+ 7 |     end_lng: float
+ 8 |
+ 9 | from typing import Optional
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+10 |
+11 | class VibePayload(BaseModel):
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\app\core\models.py:9:1
+   |
+ 7 |     end_lng: float
+ 8 |
+ 9 | from typing import Optional
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+10 |
+11 | class VibePayload(BaseModel):
+   |
+help: Organize imports
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\core\models.py:14:13
+   |
+12 |     action: str = "vibe" # "vibe" or "subscribe"
+13 |     content: str = "Γ£¿"
+14 |     shopId: Optional[str | int] = None
+   |             ^^^^^^^^^^^^^^^^^^^
+15 |     lat: Optional[float] = None
+16 |     lng: Optional[float] = None
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\core\models.py:15:10
+   |
+13 |     content: str = "Γ£¿"
+14 |     shopId: Optional[str | int] = None
+15 |     lat: Optional[float] = None
+   |          ^^^^^^^^^^^^^^^
+16 |     lng: Optional[float] = None
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\core\models.py:16:10
+   |
+14 |     shopId: Optional[str | int] = None
+15 |     lat: Optional[float] = None
+16 |     lng: Optional[float] = None
+   |          ^^^^^^^^^^^^^^^
+   |
+help: Convert to `X | None`
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\app\core\otel.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | import logging
+ 4 | |
+ 5 | | from opentelemetry import trace
+ 6 | | from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+ 7 | | from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+ 8 | | from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+ 9 | | from opentelemetry.sdk.resources import Resource
+10 | | from opentelemetry.sdk.trace import TracerProvider
+11 | | from opentelemetry.sdk.trace.export import BatchSpanProcessor
+12 | | from opentelemetry.sdk.trace.sampling import ParentBased, TraceIdRatioBased, ALWAYS_OFF, ALWAYS_ON
+13 | |
+14 | | from app.core.config import Settings
+   | |____________________________________^
+15 |
+16 |   logger = logging.getLogger("app.otel")
+   |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\app\core\supabase.py:1:1
+  |
+1 | / from supabase import create_client, Client
+2 | | from app.core.config import settings
+  | |____________________________________^
+3 |
+4 |   url: str = settings.SUPABASE_URL
+  |
+help: Organize imports
+
+UP017 [*] Use `datetime.UTC` alias
+   --> backend\app\core\visitor_auth.py:133:43
+    |
+131 | def payload_expiry_iso(payload: dict) -> str:
+132 |     exp = int(payload.get("exp") or 0)
+133 |     return datetime.fromtimestamp(exp, tz=timezone.utc).isoformat()
+    |                                           ^^^^^^^^^^^^
+    |
+help: Convert to `datetime.UTC` alias
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\app\db\session.py:10:1
+   |
+ 8 |   """
+ 9 |
+10 | / from sqlalchemy.ext.asyncio import (
+11 | |     AsyncSession,
+12 | |     async_sessionmaker,
+13 | |     create_async_engine,
+14 | | )
+15 | | from sqlalchemy.pool import NullPool
+16 | | from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+17 | |
+18 | | from app.core.concurrency import core_db_sem, history_db_sem, vector_sem
+19 | | from app.core.config import settings
+20 | | from app.core.lazy import LazyClient
+   | |____________________________________^
+21 |
+22 |   _REMOVED_ASYNCPG_QUERY_PARAMS = {
+   |
+help: Organize imports
+
+F401 `app.services.vector.places_vector_service.COLLECTION_NAME` imported but unused; consider using `importlib.util.find_spec` to test for availability
+  --> backend\app\jobs\triad_reconcile.py:25:13
+   |
+23 |         from app.db.session import _qdrant_client
+24 |         from app.services.vector.places_vector_service import (
+25 |             COLLECTION_NAME,
+   |             ^^^^^^^^^^^^^^^
+26 |             configure_genai_once,
+27 |             embed_text,
+   |
+help: Remove unused import: `app.services.vector.places_vector_service.COLLECTION_NAME`
+
+UP017 [*] Use `datetime.UTC` alias
+  --> backend\app\jobs\triad_reconcile.py:96:31
+   |
+95 |     # 3. Stamp last_vector_sync on successfully synced venues
+96 |     now_iso = datetime.now(tz=timezone.utc).isoformat()
+   |                               ^^^^^^^^^^^^
+97 |     try:
+98 |         await asyncio.to_thread(
+   |
+help: Convert to `datetime.UTC` alias
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\app\main.py:1:1
+   |
+ 1 | / from fastapi import FastAPI, Request
+ 2 | | from fastapi.middleware.cors import CORSMiddleware
+ 3 | | from app.core.config import get_settings, validate_settings
+ 4 | | from app.core.logging import setup_logging
+ 5 | | from app.core.observability import setup_observability
+ 6 | | from starlette.middleware.base import BaseHTTPMiddleware
+ 7 | | from contextlib import asynccontextmanager
+ 8 | | import logging
+ 9 | | import time
+10 | | import uuid
+11 | | from app.api.routers import (
+12 | |     vibes,
+13 | |     rides,
+14 | |     payments,
+15 | |     shops,
+16 | |     owner,
+17 | |     ugc,
+18 | |     emergency,
+19 | |     admin,
+20 | |     redemption,
+21 | |     analytics,
+22 | |     seo,
+23 | |     partner,
+24 | |     visitor,
+25 | |     places,
+26 | |     proxy,
+27 | | )
+28 | |
+29 | | from slowapi import _rate_limit_exceeded_handler
+30 | | from slowapi.errors import RateLimitExceeded
+31 | | from slowapi.middleware import SlowAPIMiddleware
+32 | | from app.core.rate_limit import limiter
+   | |_______________________________________^
+33 |
+34 |   settings = get_settings()
+   |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\app\main.py:43:5
+   |
+41 |   @asynccontextmanager
+42 |   async def lifespan(_app: FastAPI):
+43 | /     import asyncio
+44 | |     from app.jobs import triad_reconcile
+   | |________________________________________^
+45 |
+46 |       await vibes.start_background_tasks()
+   |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\app\middleware\security.py:1:1
+  |
+1 | / from starlette.middleware.base import BaseHTTPMiddleware
+2 | | from starlette.types import ASGIApp
+3 | | from fastapi import Request
+  | |___________________________^
+4 |
+5 |   class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+  |
+help: Organize imports
+
+UP017 [*] Use `datetime.UTC` alias
+  --> backend\app\services\analytics_service.py:36:40
+   |
+34 |             "data": data or {},
+35 |             "user_id": user_id,
+36 |             "created_at": datetime.now(timezone.utc).isoformat(),
+   |                                        ^^^^^^^^^^^^
+37 |         }
+38 |         async with self._lock:
+   |
+help: Convert to `datetime.UTC` alias
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\app\services\emergency_service.py:5:1
+   |
+ 3 |   Uses Overpass API (free, no API key required)
+ 4 |   """
+ 5 | / import httpx
+ 6 | | from typing import List, Dict, Optional
+ 7 | | from dataclasses import dataclass
+ 8 | | import math
+ 9 | | from functools import lru_cache
+10 | | import asyncio
+   | |______________^
+11 |
+12 |   # Overpass API endpoint (public, free)
+   |
+help: Organize imports
+
+UP035 `typing.List` is deprecated, use `list` instead
+ --> backend\app\services\emergency_service.py:6:1
+  |
+4 | """
+5 | import httpx
+6 | from typing import List, Dict, Optional
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+7 | from dataclasses import dataclass
+8 | import math
+  |
+
+UP035 `typing.Dict` is deprecated, use `dict` instead
+ --> backend\app\services\emergency_service.py:6:1
+  |
+4 | """
+5 | import httpx
+6 | from typing import List, Dict, Optional
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+7 | from dataclasses import dataclass
+8 | import math
+  |
+
+F401 [*] `functools.lru_cache` imported but unused
+  --> backend\app\services\emergency_service.py:9:23
+   |
+ 7 | from dataclasses import dataclass
+ 8 | import math
+ 9 | from functools import lru_cache
+   |                       ^^^^^^^^^
+10 | import asyncio
+   |
+help: Remove unused import: `functools.lru_cache`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\services\emergency_service.py:22:12
+   |
+20 |     lng: float
+21 |     type: str  # hospital, police, fire_station
+22 |     phone: Optional[str] = None
+   |            ^^^^^^^^^^^^^
+23 |     distance_km: Optional[float] = None
+24 |     opening_hours: Optional[str] = None
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\services\emergency_service.py:23:18
+   |
+21 |     type: str  # hospital, police, fire_station
+22 |     phone: Optional[str] = None
+23 |     distance_km: Optional[float] = None
+   |                  ^^^^^^^^^^^^^^^
+24 |     opening_hours: Optional[str] = None
+25 |     emergency: bool = True
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\services\emergency_service.py:24:20
+   |
+22 |     phone: Optional[str] = None
+23 |     distance_km: Optional[float] = None
+24 |     opening_hours: Optional[str] = None
+   |                    ^^^^^^^^^^^^^
+25 |     emergency: bool = True
+   |
+help: Convert to `X | None`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+  --> backend\app\services\emergency_service.py:55:22
+   |
+54 |     def __init__(self):
+55 |         self._cache: Dict[str, List[EmergencyLocation]] = {}
+   |                      ^^^^
+56 |         self._cache_ttl = 3600  # 1 hour
+   |
+help: Replace with `dict`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+  --> backend\app\services\emergency_service.py:55:32
+   |
+54 |     def __init__(self):
+55 |         self._cache: Dict[str, List[EmergencyLocation]] = {}
+   |                                ^^^^
+56 |         self._cache_ttl = 3600  # 1 hour
+   |
+help: Replace with `list`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+  --> backend\app\services\emergency_service.py:69:57
+   |
+67 |         """
+68 |
+69 |     async def _fetch_from_overpass(self, query: str) -> List[Dict]:
+   |                                                         ^^^^
+70 |         """Execute Overpass API query"""
+71 |         try:
+   |
+help: Replace with `list`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+  --> backend\app\services\emergency_service.py:69:62
+   |
+67 |         """
+68 |
+69 |     async def _fetch_from_overpass(self, query: str) -> List[Dict]:
+   |                                                              ^^^^
+70 |         """Execute Overpass API query"""
+71 |         try:
+   |
+help: Replace with `dict`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+  --> backend\app\services\emergency_service.py:85:43
+   |
+83 |             return []
+84 |
+85 |     def _parse_osm_element(self, element: Dict, location_type: str, user_lat: float, user_lng: float) -> EmergencyLocation:
+   |                                           ^^^^
+86 |         """Parse OSM element into EmergencyLocation"""
+87 |         tags = element.get("tags", {})
+   |
+help: Replace with `dict`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\app\services\emergency_service.py:117:10
+    |
+115 |         radius_m: int = 10000,
+116 |         limit: int = 5
+117 |     ) -> List[EmergencyLocation]:
+    |          ^^^^
+118 |         """
+119 |         Find nearby hospitals from OpenStreetMap.
+    |
+help: Replace with `list`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\app\services\emergency_service.py:140:10
+    |
+138 |         radius_m: int = 10000,
+139 |         limit: int = 5
+140 |     ) -> List[EmergencyLocation]:
+    |          ^^^^
+141 |         """Find nearby police stations from OpenStreetMap."""
+142 |         query = self._build_overpass_query(lat, lng, radius_m, "police")
+    |
+help: Replace with `list`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\app\services\emergency_service.py:159:10
+    |
+157 |         radius_m: int = 15000,
+158 |         limit: int = 3
+159 |     ) -> List[EmergencyLocation]:
+    |          ^^^^
+160 |         """Find nearby fire stations from OpenStreetMap."""
+161 |         query = self._build_overpass_query(lat, lng, radius_m, "fire_station")
+    |
+help: Replace with `list`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\app\services\emergency_service.py:177:10
+    |
+175 |         lng: float,
+176 |         radius_m: int = 10000
+177 |     ) -> Dict[str, List[EmergencyLocation]]:
+    |          ^^^^
+178 |         """
+179 |         Get all nearby emergency services in parallel.
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\app\services\emergency_service.py:177:20
+    |
+175 |         lng: float,
+176 |         radius_m: int = 10000
+177 |     ) -> Dict[str, List[EmergencyLocation]]:
+    |                    ^^^^
+178 |         """
+179 |         Get all nearby emergency services in parallel.
+    |
+help: Replace with `list`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\app\services\emergency_service.py:195:41
+    |
+193 |         }
+194 |
+195 |     def get_emergency_contacts(self) -> List[Dict]:
+    |                                         ^^^^
+196 |         """Get list of emergency phone numbers for Thailand."""
+197 |         return [
+    |
+help: Replace with `list`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\app\services\emergency_service.py:195:46
+    |
+193 |         }
+194 |
+195 |     def get_emergency_contacts(self) -> List[Dict]:
+    |                                              ^^^^
+196 |         """Get list of emergency phone numbers for Thailand."""
+197 |         return [
+    |
+help: Replace with `dict`
+
+F401 [*] `pathlib.Path` imported but unused
+  --> backend\app\services\memory_service.py:11:21
+   |
+ 9 | import logging
+10 | import os
+11 | from pathlib import Path
+   |                     ^^^^
+12 | from typing import Optional
+   |
+help: Remove unused import: `pathlib.Path`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\app\services\memory_service.py:128:19
+    |
+126 |         self,
+127 |         text: str,
+128 |         metadata: Optional[dict] = None,
+    |                   ^^^^^^^^^^^^^^
+129 |         user_id: str = "system",
+130 |     ) -> Optional[str]:
+    |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\app\services\memory_service.py:130:10
+    |
+128 |         metadata: Optional[dict] = None,
+129 |         user_id: str = "system",
+130 |     ) -> Optional[str]:
+    |          ^^^^^^^^^^^^^
+131 |         """
+132 |         Store text in project memory.
+    |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\app\services\memory_service.py:223:15
+    |
+221 | async def add_memory(
+222 |     text: str,
+223 |     metadata: Optional[dict] = None,
+    |               ^^^^^^^^^^^^^^
+224 |     user_id: str = "system",
+225 | ) -> Optional[str]:
+    |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\app\services\memory_service.py:225:6
+    |
+223 |     metadata: Optional[dict] = None,
+224 |     user_id: str = "system",
+225 | ) -> Optional[str]:
+    |      ^^^^^^^^^^^^^
+226 |     from app.core.config import get_settings
+    |
+help: Convert to `X | None`
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\app\services\notifications.py:1:1
+  |
+1 | / import httpx
+2 | | from typing import List, Optional
+3 | | from app.core.config import get_settings
+  | |________________________________________^
+4 |
+5 |   settings = get_settings()
+  |
+help: Organize imports
+
+UP035 `typing.List` is deprecated, use `list` instead
+ --> backend\app\services\notifications.py:2:1
+  |
+1 | import httpx
+2 | from typing import List, Optional
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+3 | from app.core.config import get_settings
+  |
+
+UP006 [*] Use `list` instead of `List` for type annotation
+  --> backend\app\services\notifications.py:8:15
+   |
+ 7 | async def send_push_notification(
+ 8 |     user_ids: List[str],
+   |               ^^^^
+ 9 |     title: str,
+10 |     message: str,
+   |
+help: Replace with `list`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\services\notifications.py:11:11
+   |
+ 9 |     title: str,
+10 |     message: str,
+11 |     data: Optional[dict] = None
+   |           ^^^^^^^^^^^^^^
+12 | ):
+13 |     """
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+ --> backend\app\services\ocr_queue.py:9:16
+  |
+8 | settings = get_settings()
+9 | _redis_client: Optional[redis.Redis] = None
+  |                ^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Convert to `X | None`
+
+UP035 `typing.Dict` is deprecated, use `dict` instead
+ --> backend\app\services\ride_service.py:5:1
+  |
+3 | Generates deep links and price estimates for Grab, Bolt, Lineman, Maxim
+4 | """
+5 | from typing import Dict, List, Optional
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+6 | from dataclasses import dataclass
+7 | import math
+  |
+
+UP035 `typing.List` is deprecated, use `list` instead
+ --> backend\app\services\ride_service.py:5:1
+  |
+3 | Generates deep links and price estimates for Grab, Bolt, Lineman, Maxim
+4 | """
+5 | from typing import Dict, List, Optional
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+6 | from dataclasses import dataclass
+7 | import math
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\app\services\ride_service.py:5:1
+   |
+ 3 |   Generates deep links and price estimates for Grab, Bolt, Lineman, Maxim
+ 4 |   """
+ 5 | / from typing import Dict, List, Optional
+ 6 | | from dataclasses import dataclass
+ 7 | | import math
+ 8 | | from urllib.parse import urlencode
+   | |__________________________________^
+ 9 |
+10 |   @dataclass
+   |
+help: Organize imports
+
+F401 [*] `typing.Dict` imported but unused
+ --> backend\app\services\ride_service.py:5:20
+  |
+3 | Generates deep links and price estimates for Grab, Bolt, Lineman, Maxim
+4 | """
+5 | from typing import Dict, List, Optional
+  |                    ^^^^
+6 | from dataclasses import dataclass
+7 | import math
+  |
+help: Remove unused import
+
+F401 [*] `typing.Optional` imported but unused
+ --> backend\app\services\ride_service.py:5:32
+  |
+3 | Generates deep links and price estimates for Grab, Bolt, Lineman, Maxim
+4 | """
+5 | from typing import Dict, List, Optional
+  |                                ^^^^^^^^
+6 | from dataclasses import dataclass
+7 | import math
+  |
+help: Remove unused import
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\app\services\ride_service.py:130:10
+    |
+128 |         destination: Location,
+129 |         province: str = "α╕üα╕úα╕╕α╕çα╣Çα╕ùα╕₧α╕íα╕½α╕▓α╕Öα╕äα╕ú"
+130 |     ) -> List[RideEstimate]:
+    |          ^^^^
+131 |         """
+132 |         Get ride estimates from all available providers.
+    |
+help: Replace with `list`
+
+UP017 [*] Use `datetime.UTC` alias
+  --> backend\app\services\sheets_logger.py:15:28
+   |
+14 | def _utc_now_iso() -> str:
+15 |     return datetime.now(tz=timezone.utc).isoformat()
+   |                            ^^^^^^^^^^^^
+   |
+help: Convert to `datetime.UTC` alias
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\app\services\shop_service.py:1:1
+  |
+1 | / from supabase import create_client, Client
+2 | | from app.core.config import settings
+3 | | import logging
+  | |______________^
+4 |
+5 |   logger = logging.getLogger(__name__)
+  |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\app\services\slip_verification.py:1:1
+   |
+ 1 | / import base64
+ 2 | | import hashlib
+ 3 | | import json
+ 4 | | from inspect import isawaitable
+ 5 | | import re
+ 6 | | from dataclasses import dataclass
+ 7 | | from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+ 8 | | from typing import Any, Dict, List, Optional
+ 9 | |
+10 | | import requests
+11 | | from google.auth.transport.requests import Request
+12 | | from google.oauth2 import service_account
+13 | |
+14 | | from app.core.config import get_settings
+   | |________________________________________^
+   |
+help: Organize imports
+
+UP035 `typing.Dict` is deprecated, use `dict` instead
+  --> backend\app\services\slip_verification.py:8:1
+   |
+ 6 | from dataclasses import dataclass
+ 7 | from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+ 8 | from typing import Any, Dict, List, Optional
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 9 |
+10 | import requests
+   |
+
+UP035 `typing.List` is deprecated, use `list` instead
+  --> backend\app\services\slip_verification.py:8:1
+   |
+ 6 | from dataclasses import dataclass
+ 7 | from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+ 8 | from typing import Any, Dict, List, Optional
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 9 |
+10 | import requests
+   |
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\app\services\slip_verification.py:100:45
+    |
+100 | def _extract_amount_from_line(line: str) -> Optional[Decimal]:
+    |                                             ^^^^^^^^^^^^^^^^^
+101 |     for candidate in AMOUNT_PATTERN.findall(line or ""):
+102 |         try:
+    |
+help: Convert to `X | None`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\app\services\slip_verification.py:109:25
+    |
+109 | def _find_amount(lines: List[str]) -> Optional[Decimal]:
+    |                         ^^^^
+110 |     # Anti-fraud: only trust numbers that appear on lines with amount keywords.
+111 |     for line in lines:
+    |
+help: Replace with `list`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\app\services\slip_verification.py:109:39
+    |
+109 | def _find_amount(lines: List[str]) -> Optional[Decimal]:
+    |                                       ^^^^^^^^^^^^^^^^^
+110 |     # Anti-fraud: only trust numbers that appear on lines with amount keywords.
+111 |     for line in lines:
+    |
+help: Convert to `X | None`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\app\services\slip_verification.py:121:49
+    |
+121 | def _extract_after_keyword(line: str, keywords: List[str]) -> str:
+    |                                                 ^^^^
+122 |     lower = line.lower()
+123 |     for keyword in keywords:
+    |
+help: Replace with `list`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\app\services\slip_verification.py:130:30
+    |
+130 | def _find_by_keywords(lines: List[str], keywords: List[str]) -> str:
+    |                              ^^^^
+131 |     for line in lines:
+132 |         candidate = _extract_after_keyword(line, keywords)
+    |
+help: Replace with `list`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\app\services\slip_verification.py:130:51
+    |
+130 | def _find_by_keywords(lines: List[str], keywords: List[str]) -> str:
+    |                                                   ^^^^
+131 |     for line in lines:
+132 |         candidate = _extract_after_keyword(line, keywords)
+    |
+help: Replace with `list`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\app\services\slip_verification.py:150:55
+    |
+150 | def _matches_any_normalized(text: str, expected_list: List[str]) -> bool:
+    |                                                       ^^^^
+151 |     if not expected_list:
+152 |         return False
+    |
+help: Replace with `list`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\app\services\slip_verification.py:169:30
+    |
+167 |     expected_amount: Any,
+168 |     expected_receiver_name: str,
+169 |     expected_receiver_banks: List[str],
+    |                              ^^^^
+170 |     expected_receiver_account: str,
+171 |     expected_receiver_account_tail: int,
+    |
+help: Replace with `list`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\app\services\slip_verification.py:172:6
+    |
+170 |     expected_receiver_account: str,
+171 |     expected_receiver_account_tail: int,
+172 | ) -> Dict[str, Any]:
+    |      ^^^^
+173 |     expected_amount_decimal = _to_decimal(expected_amount)
+174 |     lines = [line.strip() for line in (text or "").split("\n") if line.strip()]
+    |
+help: Replace with `dict`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\app\services\slip_verification.py:238:42
+    |
+238 | def _decode_service_account(raw: str) -> Optional[Dict[str, Any]]:
+    |                                          ^^^^^^^^^^^^^^^^^^^^^^^^
+239 |     if not raw:
+240 |         return None
+    |
+help: Convert to `X | None`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\app\services\slip_verification.py:238:51
+    |
+238 | def _decode_service_account(raw: str) -> Optional[Dict[str, Any]]:
+    |                                                   ^^^^
+239 |     if not raw:
+240 |         return None
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\app\services\slip_verification.py:286:13
+    |
+285 |     total = 0
+286 |     chunks: List[bytes] = []
+    |             ^^^^
+287 |     for chunk in resp.iter_content(chunk_size=1024 * 64):
+288 |         if not chunk:
+    |
+help: Replace with `list`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\app\services\slip_verification.py:298:51
+    |
+298 | def detect_text_from_image(image_bytes: bytes) -> Dict[str, Any]:
+    |                                                   ^^^^
+299 |     token = _get_gcv_access_token()
+300 |     payload = {
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\app\services\slip_verification.py:347:11
+    |
+345 |     reason: str
+346 |     provider: str
+347 |     data: Dict[str, Any]
+    |           ^^^^
+348 |     score: float
+349 |     signals: Dict[str, Any]
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\app\services\slip_verification.py:349:14
+    |
+347 |     data: Dict[str, Any]
+348 |     score: float
+349 |     signals: Dict[str, Any]
+    |              ^^^^
+350 |     image_hash: str
+351 |     text_hash: str
+    |
+help: Replace with `dict`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\app\services\slip_verification.py:353:10
+    |
+351 |     text_hash: str
+352 |     ocr_text: str
+353 |     raw: Optional[Dict[str, Any]] = None
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^
+354 |     error: Optional[str] = None
+    |
+help: Convert to `X | None`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\app\services\slip_verification.py:353:19
+    |
+351 |     text_hash: str
+352 |     ocr_text: str
+353 |     raw: Optional[Dict[str, Any]] = None
+    |                   ^^^^
+354 |     error: Optional[str] = None
+    |
+help: Replace with `dict`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\app\services\slip_verification.py:354:12
+    |
+352 |     ocr_text: str
+353 |     raw: Optional[Dict[str, Any]] = None
+354 |     error: Optional[str] = None
+    |            ^^^^^^^^^^^^^
+    |
+help: Convert to `X | None`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\app\services\slip_verification.py:357:25
+    |
+357 | def _empty_signals() -> Dict[str, bool]:
+    |                         ^^^^
+358 |     return {
+359 |         "success_phrase": False,
+    |
+help: Replace with `dict`
+
+UP041 [*] Replace aliased errors with `TimeoutError`
+   --> backend\app\services\vector\places_vector_service.py:204:12
+    |
+202 |         _record_cb_success()
+203 |         return result
+204 |     except (asyncio.TimeoutError, Exception) as exc:
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+205 |         _record_cb_failure()
+206 |         raise RuntimeError(f"qdrant_search failed: {exc}") from exc
+    |
+help: Replace with builtin `TimeoutError`
+
+UP035 `typing.Dict` is deprecated, use `dict` instead
+ --> backend\app\services\venue_repository.py:1:1
+  |
+1 | from typing import Any, Dict, Optional
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2 |
+3 | from app.core.cache import vector_search_cache
+  |
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\services\venue_repository.py:34:43
+   |
+32 |             )
+33 |
+34 |     def get_owner(self, venue_id: Any) -> Optional[str]:
+   |                                           ^^^^^^^^^^^^^
+35 |         try:
+36 |             response = (
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\app\services\venue_repository.py:80:45
+   |
+78 |             )
+79 |
+80 |     def reject(self, venue_id: Any, reason: Optional[str] = None):
+   |                                             ^^^^^^^^^^^^^
+81 |         # S5: venue status change ΓåÆ stale search results; clear bounded cache
+82 |         vector_search_cache.clear()
+   |
+help: Convert to `X | None`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+  --> backend\app\services\venue_repository.py:83:18
+   |
+81 |         # S5: venue status change ΓåÆ stale search results; clear bounded cache
+82 |         vector_search_cache.clear()
+83 |         payload: Dict[str, Any] = {
+   |                  ^^^^
+84 |             "status": "archived",
+85 |             "metadata": {"rejection_reason": reason},
+   |
+help: Replace with `dict`
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\check_pydantic.py:1:1
+  |
+1 | / import pydantic
+2 | | import pydantic_settings
+  | |________________________^
+3 |   print(f"Pydantic Version: {pydantic.VERSION}")
+4 |   print(f"Pydantic Settings Version: {pydantic_settings.__version__}")
+  |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\debug_config.py:1:1
+  |
+1 | / import sys
+2 | | import os
+3 | | import traceback
+  | |________________^
+4 |
+5 |   sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+  |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\debug_main.py:1:1
+  |
+1 | / import sys
+2 | | import os
+3 | | import traceback
+  | |________________^
+4 |
+5 |   # Ensure backend dir is in path
+  |
+help: Organize imports
+
+F401 [*] `app.main` imported but unused
+  --> backend\debug_main.py:14:29
+   |
+12 |         try:
+13 |             print("Testing app.main import...")
+14 |             from app import main
+   |                             ^^^^
+15 |             print("Γ£à app.main imported successfully.")
+16 |             f.write("SUCCESS")
+   |
+help: Remove unused import: `app.main`
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\diagnose.py:1:1
+  |
+1 | / import sys
+2 | | import os
+  | |_________^
+3 |
+4 |   print("Running diagnosis...")
+  |
+help: Organize imports
+
+F401 [*] `sys` imported but unused
+ --> backend\diagnose.py:1:8
+  |
+1 | import sys
+  |        ^^^
+2 | import os
+  |
+help: Remove unused import: `sys`
+
+F401 [*] `os` imported but unused
+ --> backend\diagnose.py:2:8
+  |
+1 | import sys
+2 | import os
+  |        ^^
+3 |
+4 | print("Running diagnosis...")
+  |
+help: Remove unused import: `os`
+
+F401 [*] `app.main.app` imported but unused
+ --> backend\diagnose.py:7:26
+  |
+5 | try:
+6 |     print("1. Importing app.main...")
+7 |     from app.main import app
+  |                          ^^^
+8 |     print("   Γ£à app.main imported successfully.")
+  |
+help: Remove unused import: `app.main.app`
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\diagnose.py:15:5
+   |
+14 |     print("3. Checking routers...")
+15 |     from app.api.routers import vibes, rides, payments, shops, owner
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+16 |     print("   Γ£à All routers imported.")
+   |
+help: Organize imports
+
+F401 [*] `app.api.routers.vibes` imported but unused
+  --> backend\diagnose.py:15:33
+   |
+14 |     print("3. Checking routers...")
+15 |     from app.api.routers import vibes, rides, payments, shops, owner
+   |                                 ^^^^^
+16 |     print("   Γ£à All routers imported.")
+   |
+help: Remove unused import
+
+F401 [*] `app.api.routers.rides` imported but unused
+  --> backend\diagnose.py:15:40
+   |
+14 |     print("3. Checking routers...")
+15 |     from app.api.routers import vibes, rides, payments, shops, owner
+   |                                        ^^^^^
+16 |     print("   Γ£à All routers imported.")
+   |
+help: Remove unused import
+
+F401 [*] `app.api.routers.payments` imported but unused
+  --> backend\diagnose.py:15:47
+   |
+14 |     print("3. Checking routers...")
+15 |     from app.api.routers import vibes, rides, payments, shops, owner
+   |                                               ^^^^^^^^
+16 |     print("   Γ£à All routers imported.")
+   |
+help: Remove unused import
+
+F401 [*] `app.api.routers.shops` imported but unused
+  --> backend\diagnose.py:15:57
+   |
+14 |     print("3. Checking routers...")
+15 |     from app.api.routers import vibes, rides, payments, shops, owner
+   |                                                         ^^^^^
+16 |     print("   Γ£à All routers imported.")
+   |
+help: Remove unused import
+
+F401 [*] `app.api.routers.owner` imported but unused
+  --> backend\diagnose.py:15:64
+   |
+14 |     print("3. Checking routers...")
+15 |     from app.api.routers import vibes, rides, payments, shops, owner
+   |                                                                ^^^^^
+16 |     print("   Γ£à All routers imported.")
+   |
+help: Remove unused import
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\run_backend.py:1:1
+  |
+1 | / import uvicorn
+2 | | import os
+3 | | import sys
+  | |__________^
+4 |
+5 |   # Ensure backend dir is in path
+  |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\scripts\apply_phase2_migration.py:1:1
+  |
+1 | / import asyncio
+2 | | import os
+3 | | from app.core.supabase import supabase_admin
+  | |____________________________________________^
+4 |
+5 |   async def apply_migration():
+  |
+help: Organize imports
+
+F401 [*] `asyncio` imported but unused
+ --> backend\scripts\apply_phase2_migration.py:1:8
+  |
+1 | import asyncio
+  |        ^^^^^^^
+2 | import os
+3 | from app.core.supabase import supabase_admin
+  |
+help: Remove unused import: `asyncio`
+
+F401 [*] `os` imported but unused
+ --> backend\scripts\apply_phase2_migration.py:2:8
+  |
+1 | import asyncio
+2 | import os
+  |        ^^
+3 | from app.core.supabase import supabase_admin
+  |
+help: Remove unused import: `os`
+
+F401 [*] `app.core.supabase.supabase_admin` imported but unused
+ --> backend\scripts\apply_phase2_migration.py:3:31
+  |
+1 | import asyncio
+2 | import os
+3 | from app.core.supabase import supabase_admin
+  |                               ^^^^^^^^^^^^^^
+4 |
+5 | async def apply_migration():
+  |
+help: Remove unused import: `app.core.supabase.supabase_admin`
+
+UP015 [*] Unnecessary mode argument
+ --> backend\scripts\apply_phase2_migration.py:7:52
+  |
+5 | async def apply_migration():
+6 |     print("Applying Phase 2 Migration...")
+7 |     with open("backend/scripts/phase2_schema.sql", "r", encoding="utf-8") as f:
+  |                                                    ^^^
+8 |         sql = f.read()
+  |
+help: Remove mode argument
+
+F841 Local variable `sql` is assigned to but never used
+  --> backend\scripts\apply_phase2_migration.py:8:9
+   |
+ 6 |     print("Applying Phase 2 Migration...")
+ 7 |     with open("backend/scripts/phase2_schema.sql", "r", encoding="utf-8") as f:
+ 8 |         sql = f.read()
+   |         ^^^
+ 9 |
+10 |     # Split by statement if needed, but postgrest's .rpc usually takes a function name,
+   |
+help: Remove assignment to unused variable `sql`
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\scripts\check_columns.py:1:1
+  |
+1 | / import os
+2 | | import sys
+3 | | import psycopg2
+4 | | from dotenv import load_dotenv
+  | |______________________________^
+5 |
+6 |   # Load env from parent directory
+  |
+help: Organize imports
+
+F541 [*] f-string without any placeholders
+  --> backend\scripts\check_columns.py:16:11
+   |
+15 | try:
+16 |     print(f"≡ƒöî Connecting to database...")
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+17 |     conn = psycopg2.connect(DB_URL)
+18 |     cur = conn.cursor()
+   |
+help: Remove extraneous `f` prefix
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\scripts\data_pipeline.py:7:1
+   |
+ 5 |   Designed for cloud deployment with GitHub Actions
+ 6 |   """
+ 7 | / import json
+ 8 | | import os
+ 9 | | import sys
+10 | | from datetime import datetime, timezone
+11 | | from pathlib import Path
+12 | | from typing import List, Dict, Optional
+   | |_______________________________________^
+13 |
+14 |   # Try to import supabase, handle gracefully if not available
+   |
+help: Organize imports
+
+F401 [*] `sys` imported but unused
+  --> backend\scripts\data_pipeline.py:9:8
+   |
+ 7 | import json
+ 8 | import os
+ 9 | import sys
+   |        ^^^
+10 | from datetime import datetime, timezone
+11 | from pathlib import Path
+   |
+help: Remove unused import: `sys`
+
+UP035 `typing.List` is deprecated, use `list` instead
+  --> backend\scripts\data_pipeline.py:12:1
+   |
+10 | from datetime import datetime, timezone
+11 | from pathlib import Path
+12 | from typing import List, Dict, Optional
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+13 |
+14 | # Try to import supabase, handle gracefully if not available
+   |
+
+UP035 `typing.Dict` is deprecated, use `dict` instead
+  --> backend\scripts\data_pipeline.py:12:1
+   |
+10 | from datetime import datetime, timezone
+11 | from pathlib import Path
+12 | from typing import List, Dict, Optional
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+13 |
+14 | # Try to import supabase, handle gracefully if not available
+   |
+
+F401 [*] `typing.Optional` imported but unused
+  --> backend\scripts\data_pipeline.py:12:32
+   |
+10 | from datetime import datetime, timezone
+11 | from pathlib import Path
+12 | from typing import List, Dict, Optional
+   |                                ^^^^^^^^
+13 |
+14 | # Try to import supabase, handle gracefully if not available
+   |
+help: Remove unused import: `typing.Optional`
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\scripts\data_pipeline.py:16:5
+   |
+14 | # Try to import supabase, handle gracefully if not available
+15 | try:
+16 |     from supabase import create_client, Client
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+17 |     SUPABASE_AVAILABLE = True
+18 | except ImportError:
+   |
+help: Organize imports
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+  --> backend\scripts\data_pipeline.py:55:32
+   |
+55 | def transform_venue(osm_venue: Dict) -> Dict:
+   |                                ^^^^
+56 |     """Transform OSM venue to Supabase venues table format"""
+57 |     category = osm_venue.get("category", "α╕¡α╕╖α╣êα╕Öα╣å")
+   |
+help: Replace with `dict`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+  --> backend\scripts\data_pipeline.py:55:41
+   |
+55 | def transform_venue(osm_venue: Dict) -> Dict:
+   |                                         ^^^^
+56 |     """Transform OSM venue to Supabase venues table format"""
+57 |     category = osm_venue.get("category", "α╕¡α╕╖α╣êα╕Öα╣å")
+   |
+help: Replace with `dict`
+
+UP017 [*] Use `datetime.UTC` alias
+  --> backend\scripts\data_pipeline.py:90:36
+   |
+88 |         "osm_id": osm_venue.get("osm_id", ""),
+89 |         "osm_type": osm_venue.get("osm_type", "node"),
+90 |         "updated_at": datetime.now(timezone.utc).isoformat(),
+   |                                    ^^^^^^^^^^^^
+91 |     }
+   |
+help: Convert to `datetime.UTC` alias
+
+UP006 [*] Use `list` instead of `List` for type annotation
+  --> backend\scripts\data_pipeline.py:94:64
+   |
+94 | def load_venue_data(filename: str = "thailand_venues.json") -> List[Dict]:
+   |                                                                ^^^^
+95 |     """Load scraped venue data from JSON file"""
+96 |     file_path = Path(__file__).parent / filename
+   |
+help: Replace with `list`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+  --> backend\scripts\data_pipeline.py:94:69
+   |
+94 | def load_venue_data(filename: str = "thailand_venues.json") -> List[Dict]:
+   |                                                                     ^^^^
+95 |     """Load scraped venue data from JSON file"""
+96 |     file_path = Path(__file__).parent / filename
+   |
+help: Replace with `dict`
+
+UP015 [*] Unnecessary mode argument
+   --> backend\scripts\data_pipeline.py:103:26
+    |
+101 |         return []
+102 |
+103 |     with open(file_path, "r", encoding="utf-8") as f:
+    |                          ^^^
+104 |         data = json.load(f)
+    |
+help: Remove mode argument
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\scripts\data_pipeline.py:109:32
+    |
+109 | def import_to_supabase(venues: List[Dict], batch_size: int = 50):
+    |                                ^^^^
+110 |     """Import venues to Supabase with upsert (insert or update)"""
+111 |     if not SUPABASE_AVAILABLE:
+    |
+help: Replace with `list`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\data_pipeline.py:109:37
+    |
+109 | def import_to_supabase(venues: List[Dict], batch_size: int = 50):
+    |                                     ^^^^
+110 |     """Import venues to Supabase with upsert (insert or update)"""
+111 |     if not SUPABASE_AVAILABLE:
+    |
+help: Replace with `dict`
+
+F541 [*] f-string without any placeholders
+   --> backend\scripts\data_pipeline.py:120:11
+    |
+118 |         return
+119 |
+120 |     print(f"≡ƒöî Connecting to Supabase...")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+121 |     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    |
+help: Remove extraneous `f` prefix
+
+F841 Local variable `result` is assigned to but never used
+   --> backend\scripts\data_pipeline.py:144:13
+    |
+142 |         try:
+143 |             # Upsert based on osm_id to avoid duplicates
+144 |             result = supabase.table("venues").upsert(
+    |             ^^^^^^
+145 |                 batch,
+146 |                 on_conflict="osm_id"
+    |
+help: Remove assignment to unused variable `result`
+
+F541 [*] f-string without any placeholders
+   --> backend\scripts\data_pipeline.py:159:11
+    |
+157 |     print()
+158 |     print("=" * 50)
+159 |     print(f"≡ƒôè Import Summary:")
+    |           ^^^^^^^^^^^^^^^^^^^^^
+160 |     print(f"   Γ£à Success: {success_count}")
+161 |     print(f"   Γ¥î Errors: {error_count}")
+    |
+help: Remove extraneous `f` prefix
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\scripts\data_pipeline.py:165:28
+    |
+165 | def generate_stats(venues: List[Dict]) -> Dict:
+    |                            ^^^^
+166 |     """Generate statistics from venue data"""
+167 |     stats = {
+    |
+help: Replace with `list`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\data_pipeline.py:165:33
+    |
+165 | def generate_stats(venues: List[Dict]) -> Dict:
+    |                                 ^^^^
+166 |     """Generate statistics from venue data"""
+167 |     stats = {
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\data_pipeline.py:165:43
+    |
+165 | def generate_stats(venues: List[Dict]) -> Dict:
+    |                                           ^^^^
+166 |     """Generate statistics from venue data"""
+167 |     stats = {
+    |
+help: Replace with `dict`
+
+F541 [*] f-string without any placeholders
+   --> backend\scripts\data_pipeline.py:201:11
+    |
+199 |     # Generate and print stats
+200 |     stats = generate_stats(venues)
+201 |     print(f"\n≡ƒôè Data Statistics:")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^
+202 |     print(f"   Total venues: {stats['total']}")
+203 |     print(f"   Provinces: {len(stats['by_province'])}")
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> backend\scripts\data_pipeline.py:206:11
+    |
+204 |     print(f"   Categories: {len(stats['by_category'])}")
+205 |
+206 |     print(f"\n≡ƒôì Top 10 Provinces:")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^
+207 |     top_provinces = sorted(stats["by_province"].items(), key=lambda x: -x[1])[:10]
+208 |     for province, count in top_provinces:
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> backend\scripts\data_pipeline.py:211:11
+    |
+209 |         print(f"   {province}: {count}")
+210 |
+211 |     print(f"\n≡ƒÅ╖∩╕Å  Top 10 Categories:")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+212 |     top_categories = sorted(stats["by_category"].items(), key=lambda x: -x[1])[:10]
+213 |     for cat, count in top_categories:
+    |
+help: Remove extraneous `f` prefix
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\scripts\debug_venues_insert.py:1:1
+  |
+1 | / import os
+2 | | import sys
+3 | | import psycopg2
+4 | | from dotenv import load_dotenv
+  | |______________________________^
+5 |
+6 |   # Load env from backend/.env
+  |
+help: Organize imports
+
+F541 [*] f-string without any placeholders
+  --> backend\scripts\debug_venues_insert.py:16:11
+   |
+15 | try:
+16 |     print(f"≡ƒöî Connecting to database...")
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+17 |     conn = psycopg2.connect(DB_URL)
+18 |     conn.autocommit = True
+   |
+help: Remove extraneous `f` prefix
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\scripts\fix_venues_schema.py:1:1
+  |
+1 | / import os
+2 | | import psycopg2
+3 | | from dotenv import load_dotenv
+  | |______________________________^
+4 |
+5 |   load_dotenv(os.path.join(os.path.dirname(__file__), "../.env"))
+  |
+help: Organize imports
+
+F541 [*] f-string without any placeholders
+  --> backend\scripts\fix_venues_schema.py:13:7
+   |
+11 |     exit(1)
+12 |
+13 | print(f"Connecting to DB using DIRECT_URL...")
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+14 |
+15 | try:
+   |
+help: Remove extraneous `f` prefix
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\scripts\ingest_knowledge.py:181:9
+    |
+179 |     except KeyboardInterrupt:
+180 |         logger.info("Ingestion interrupted by user")
+181 |         raise SystemExit(130)
+    |         ^^^^^^^^^^^^^^^^^^^^^
+    |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\scripts\list_tables.py:2:1
+  |
+2 | / import asyncio
+3 | | import os
+4 | | import sys
+5 | | from pathlib import Path
+6 | | from sqlalchemy import text
+  | |___________________________^
+7 |
+8 |   # Setup path to import from app package
+  |
+help: Organize imports
+
+E402 Module level import not at top of file
+  --> backend\scripts\list_tables.py:24:1
+   |
+22 |     pass
+23 |
+24 | from app.db.session import _core_session_maker
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+25 |
+26 | async def list_tables():
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\scripts\list_tables.py:24:1
+   |
+22 |     pass
+23 |
+24 | from app.db.session import _core_session_maker
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+25 |
+26 | async def list_tables():
+   |
+help: Organize imports
+
+F401 [*] `os` imported but unused
+  --> backend\scripts\manage_memory.py:19:8
+   |
+17 | """
+18 |
+19 | import os
+   |        ^^
+20 | import sys
+21 | from pathlib import Path
+   |
+help: Remove unused import: `os`
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\scripts\ocr_worker.py:1:1
+   |
+ 1 | / import json
+ 2 | | import logging
+ 3 | | import os
+ 4 | | import sys
+ 5 | | import time
+ 6 | | from datetime import datetime, timedelta, timezone
+ 7 | |
+ 8 | | from dotenv import load_dotenv
+ 9 | | import redis
+10 | | import requests
+   | |_______________^
+11 |
+12 |   # Ensure backend dir is in path
+   |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\scripts\ocr_worker.py:15:1
+   |
+13 |   sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+14 |
+15 | / from app.core.config import get_settings
+16 | | from app.core.supabase import supabase_admin
+17 | | from app.services.slip_verification import get_feature_from_sku, verify_slip_with_gcv
+   | |_____________________________________________________________________________________^
+   |
+help: Organize imports
+
+UP017 [*] Use `datetime.UTC` alias
+  --> backend\scripts\ocr_worker.py:49:25
+   |
+48 | def now_iso() -> str:
+49 |     return datetime.now(timezone.utc).isoformat()
+   |                         ^^^^^^^^^^^^
+   |
+help: Convert to `datetime.UTC` alias
+
+UP017 [*] Use `datetime.UTC` alias
+  --> backend\scripts\ocr_worker.py:93:22
+   |
+91 |         return ""
+92 |     duplicate_window_start = (
+93 |         datetime.now(timezone.utc)
+   |                      ^^^^^^^^^^^^
+94 |         - timedelta(days=settings.SLIP_DUPLICATE_WINDOW_DAYS)
+95 |     ).isoformat()
+   |
+help: Convert to `datetime.UTC` alias
+
+UP017 [*] Use `datetime.UTC` alias
+   --> backend\scripts\ocr_worker.py:169:34
+    |
+167 |     if verification and verification.status == "verified":
+168 |         feature = get_feature_from_sku(sku)
+169 |         starts_at = datetime.now(timezone.utc)
+    |                                  ^^^^^^^^^^^^
+170 |         ends_at = starts_at
+    |
+help: Convert to `datetime.UTC` alias
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\scripts\osm_scraper.py:7:1
+   |
+ 5 |   Designed for cloud deployment with scheduled runs
+ 6 |   """
+ 7 | / import httpx
+ 8 | | import asyncio
+ 9 | | import json
+10 | | import os
+11 | | from datetime import datetime, timezone
+12 | | from typing import List, Dict, Optional
+13 | | from pathlib import Path
+   | |________________________^
+14 |
+15 |   # Overpass API endpoints (multiple for load balancing)
+   |
+help: Organize imports
+
+F401 [*] `os` imported but unused
+  --> backend\scripts\osm_scraper.py:10:8
+   |
+ 8 | import asyncio
+ 9 | import json
+10 | import os
+   |        ^^
+11 | from datetime import datetime, timezone
+12 | from typing import List, Dict, Optional
+   |
+help: Remove unused import: `os`
+
+UP035 `typing.List` is deprecated, use `list` instead
+  --> backend\scripts\osm_scraper.py:12:1
+   |
+10 | import os
+11 | from datetime import datetime, timezone
+12 | from typing import List, Dict, Optional
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+13 | from pathlib import Path
+   |
+
+UP035 `typing.Dict` is deprecated, use `dict` instead
+  --> backend\scripts\osm_scraper.py:12:1
+   |
+10 | import os
+11 | from datetime import datetime, timezone
+12 | from typing import List, Dict, Optional
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+13 | from pathlib import Path
+   |
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\scripts\osm_scraper.py:184:65
+    |
+184 | async def fetch_with_retry(query: str, max_retries: int = 3) -> List[Dict]:
+    |                                                                 ^^^^
+185 |     """Fetch from Overpass with retry and endpoint rotation"""
+186 |     for attempt in range(max_retries):
+    |
+help: Replace with `list`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_scraper.py:184:70
+    |
+184 | async def fetch_with_retry(query: str, max_retries: int = 3) -> List[Dict]:
+    |                                                                      ^^^^
+185 |     """Fetch from Overpass with retry and endpoint rotation"""
+186 |     for attempt in range(max_retries):
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_scraper.py:203:28
+    |
+203 | def parse_element(element: Dict, province: str, province_en: str, region: str) -> Optional[Dict]:
+    |                            ^^^^
+204 |     """Parse OSM element into venue dict"""
+205 |     tags = element.get("tags", {})
+    |
+help: Replace with `dict`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\scripts\osm_scraper.py:203:83
+    |
+203 | def parse_element(element: Dict, province: str, province_en: str, region: str) -> Optional[Dict]:
+    |                                                                                   ^^^^^^^^^^^^^^
+204 |     """Parse OSM element into venue dict"""
+205 |     tags = element.get("tags", {})
+    |
+help: Convert to `X | None`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_scraper.py:203:92
+    |
+203 | def parse_element(element: Dict, province: str, province_en: str, region: str) -> Optional[Dict]:
+    |                                                                                            ^^^^
+204 |     """Parse OSM element into venue dict"""
+205 |     tags = element.get("tags", {})
+    |
+help: Replace with `dict`
+
+UP017 [*] Use `datetime.UTC` alias
+   --> backend\scripts\osm_scraper.py:251:36
+    |
+249 |         "rating": tags.get("stars"),
+250 |         "source": "openstreetmap",
+251 |         "fetched_at": datetime.now(timezone.utc).isoformat(),
+    |                                    ^^^^^^^^^^^^
+252 |     }
+    |
+help: Convert to `datetime.UTC` alias
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\scripts\osm_scraper.py:255:71
+    |
+255 | async def scrape_province(province_name: str, province_data: dict) -> List[Dict]:
+    |                                                                       ^^^^
+256 |     """Scrape all entertainment venues from a province"""
+257 |     query = build_province_query(province_data["bbox"])
+    |
+help: Replace with `list`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_scraper.py:255:76
+    |
+255 | async def scrape_province(province_name: str, province_data: dict) -> List[Dict]:
+    |                                                                            ^^^^
+256 |     """Scrape all entertainment venues from a province"""
+257 |     query = build_province_query(province_data["bbox"])
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_scraper.py:274:55
+    |
+274 | async def scrape_all_thailand(batch_size: int = 5) -> Dict:
+    |                                                       ^^^^
+275 |     """Scrape all 77 provinces in batches to avoid rate limiting"""
+276 |     all_venues = []
+    |
+help: Replace with `dict`
+
+B905 `zip()` without an explicit `strict=` parameter
+   --> backend\scripts\osm_scraper.py:293:29
+    |
+291 |         results = await asyncio.gather(*tasks)
+292 |
+293 |         for name, venues in zip(batch_names, results):
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^
+294 |             print(f"   Γ£à {name}: {len(venues)} venues")
+295 |             all_venues.extend(venues)
+    |
+help: Add explicit value for parameter `strict=`
+
+UP017 [*] Use `datetime.UTC` alias
+   --> backend\scripts\osm_scraper.py:319:40
+    |
+317 |             "license": "ODbL - Open Database License",
+318 |             "attribution": "┬⌐ OpenStreetMap contributors",
+319 |             "scraped_at": datetime.now(timezone.utc).isoformat(),
+    |                                        ^^^^^^^^^^^^
+320 |             "total_venues": len(all_venues),
+321 |             "provinces_scraped": total,
+    |
+help: Convert to `datetime.UTC` alias
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_scraper.py:328:24
+    |
+328 | def save_results(data: Dict, filename: str = "thailand_venues.json"):
+    |                        ^^^^
+329 |     """Save results to JSON file"""
+330 |     output_path = Path(__file__).parent / filename
+    |
+help: Replace with `dict`
+
+UP017 [*] Use `datetime.UTC` alias
+   --> backend\scripts\osm_scraper.py:340:41
+    |
+338 |     """Main entry point"""
+339 |     print("≡ƒÜÇ OSM Thailand Entertainment Scraper")
+340 |     print(f"≡ƒôà Started at: {datetime.now(timezone.utc).isoformat()}")
+    |                                          ^^^^^^^^^^^^
+341 |
+342 |     data = await scrape_all_thailand()
+    |
+help: Convert to `datetime.UTC` alias
+
+F541 [*] f-string without any placeholders
+   --> backend\scripts\osm_scraper.py:345:11
+    |
+343 |     save_results(data)
+344 |
+345 |     print(f"\nΓ£à Scraping complete!")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+346 |     return data
+    |
+help: Remove extraneous `f` prefix
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\scripts\osm_sync_ultimate.py:41:1
+   |
+39 |   """
+40 |
+41 | / import os
+42 | | import sys
+43 | | import time
+44 | | import json
+45 | | import math
+46 | | import re
+47 | | import hashlib
+48 | | import random
+49 | | import logging
+50 | | from dataclasses import dataclass
+51 | | from datetime import datetime, timezone
+52 | | from typing import Dict, Any, List, Optional, Tuple
+53 | | from urllib.parse import urlparse, urlunparse
+54 | |
+55 | | import requests
+56 | | import redis
+57 | | import h3
+58 | | from supabase import create_client, Client
+59 | | from dotenv import load_dotenv
+60 | | from concurrent.futures import ThreadPoolExecutor, as_completed
+   | |_______________________________________________________________^
+   |
+help: Organize imports
+
+UP035 `typing.Dict` is deprecated, use `dict` instead
+  --> backend\scripts\osm_sync_ultimate.py:52:1
+   |
+50 | from dataclasses import dataclass
+51 | from datetime import datetime, timezone
+52 | from typing import Dict, Any, List, Optional, Tuple
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+53 | from urllib.parse import urlparse, urlunparse
+   |
+
+UP035 `typing.List` is deprecated, use `list` instead
+  --> backend\scripts\osm_sync_ultimate.py:52:1
+   |
+50 | from dataclasses import dataclass
+51 | from datetime import datetime, timezone
+52 | from typing import Dict, Any, List, Optional, Tuple
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+53 | from urllib.parse import urlparse, urlunparse
+   |
+
+UP035 `typing.Tuple` is deprecated, use `tuple` instead
+  --> backend\scripts\osm_sync_ultimate.py:52:1
+   |
+50 | from dataclasses import dataclass
+51 | from datetime import datetime, timezone
+52 | from typing import Dict, Any, List, Optional, Tuple
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+53 | from urllib.parse import urlparse, urlunparse
+   |
+
+UP017 [*] Use `datetime.UTC` alias
+  --> backend\scripts\osm_sync_ultimate.py:78:25
+   |
+76 | # -----------------------------
+77 | def utc_now() -> datetime:
+78 |     return datetime.now(timezone.utc)
+   |                         ^^^^^^^^^^^^
+79 |
+80 | def iso_now() -> str:
+   |
+help: Convert to `datetime.UTC` alias
+
+UP045 [*] Use `X | None` for type annotations
+  --> backend\scripts\osm_sync_ultimate.py:86:37
+   |
+84 |     return "".join(c.lower() for c in name if c.isalnum())
+85 |
+86 | def parse_osm_timestamp(ts: Any) -> Optional[str]:
+   |                                     ^^^^^^^^^^^^^
+87 |     if not ts:
+88 |         return None
+   |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\scripts\osm_sync_ultimate.py:100:16
+    |
+ 98 |     lat: float,
+ 99 |     lon: float,
+100 |     open_time: Optional[str],
+    |                ^^^^^^^^^^^^^
+101 |     vibe: Optional[str],
+102 | ) -> str:
+    |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\scripts\osm_sync_ultimate.py:101:11
+    |
+ 99 |     lon: float,
+100 |     open_time: Optional[str],
+101 |     vibe: Optional[str],
+    |           ^^^^^^^^^^^^^
+102 | ) -> str:
+103 |     base = f"{normalize_name(name)}|{category}|{lat:.6f}|{lon:.6f}|{open_time or ''}|{(vibe or '')[:160]}"
+    |
+help: Convert to `X | None`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:209:46
+    |
+209 | def redis_connection_candidates(url: str) -> List[str]:
+    |                                              ^^^^
+210 |     normalized = normalize_redis_url(url)
+211 |     if not normalized:
+    |
+help: Replace with `list`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:221:12
+    |
+219 |         out.append(with_redis_scheme(normalized, "rediss"))
+220 |     # preserve order, unique only
+221 |     dedup: List[str] = []
+    |            ^^^^
+222 |     seen = set()
+223 |     for c in out:
+    |
+help: Replace with `list`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:231:13
+    |
+230 | def connect_redis() -> redis.Redis:
+231 |     errors: List[str] = []
+    |             ^^^^
+232 |     candidates = redis_connection_candidates(conf.REDIS_URL)
+233 |     if not candidates:
+    |
+help: Replace with `list`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:237:17
+    |
+236 |     for url in candidates:
+237 |         kwargs: Dict[str, Any] = {
+    |                 ^^^^
+238 |             "decode_responses": True,
+239 |             "socket_connect_timeout": conf.REDIS_CONNECT_TIMEOUT_SEC,
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:368:24
+    |
+366 | }
+367 |
+368 | def map_category(tags: Dict[str, Any]) -> str:
+    |                        ^^^^
+369 |     for key, mapping in TAG_MAPPING.items():
+370 |         v = tags.get(key)
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `tuple` instead of `Tuple` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:393:42
+    |
+391 |     return math.degrees(math.atan(math.sinh(n)))
+392 |
+393 | def tile_bbox(z: int, x: int, y: int) -> Tuple[float, float, float, float]:
+    |                                          ^^^^^
+394 |     west = tilex2lon(x, z)
+395 |     east = tilex2lon(x + 1, z)
+    |
+help: Replace with `tuple`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:408:34
+    |
+406 |         return f"{self.z}/{self.x}/{self.y}"
+407 |
+408 | def generate_thailand_tiles() -> List[TileID]:
+    |                                  ^^^^
+409 |     z = conf.TILE_Z
+410 |     x_min = lon2tilex(conf.TH_MIN_LON, z)
+    |
+help: Replace with `list`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:415:12
+    |
+413 |     y_max = lat2tiley(conf.TH_MIN_LAT, z)
+414 |
+415 |     tiles: List[TileID] = []
+    |            ^^^^
+416 |     for x in range(min(x_min, x_max), max(x_min, x_max) + 1):
+417 |         for y in range(min(y_min, y_max), max(y_min, y_max) + 1):
+    |
+help: Replace with `list`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\scripts\osm_sync_ultimate.py:427:73
+    |
+425 | # Overpass query
+426 | # -----------------------------
+427 | def build_bbox_query(s: float, w: float, n: float, e: float, newer_iso: Optional[str]) -> str:
+    |                                                                         ^^^^^^^^^^^^^
+428 |     tags_ql = ""
+429 |     for key, values in TAG_MAPPING.items():
+    |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\scripts\osm_sync_ultimate.py:448:76
+    |
+446 | """
+447 |
+448 | def fetch_overpass_bbox(s: float, w: float, n: float, e: float, newer_iso: Optional[str], session: Optional[requests.Session] = None)ΓÇª
+    |                                                                            ^^^^^^^^^^^^^
+449 |     query = build_bbox_query(s, w, n, e, newer_iso)
+450 |     urls = conf.OVERPASS_URLS[:]
+    |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\scripts\osm_sync_ultimate.py:448:100
+    |
+446 | """
+447 |
+448 | def fetch_overpass_bbox(s: float, w: float, n: float, e: float, newer_iso: Optional[str], session: Optional[requests.Session] = None)ΓÇª
+    |                                                                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+449 |     query = build_bbox_query(s, w, n, e, newer_iso)
+450 |     urls = conf.OVERPASS_URLS[:]
+    |
+help: Convert to `X | None`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:448:138
+    |
+446 | ΓÇª
+447 | ΓÇª
+448 | ΓÇª: Optional[str], session: Optional[requests.Session] = None) -> List[Dict[str, Any]]:
+    |                                                                  ^^^^
+449 | ΓÇª
+450 | ΓÇª
+    |
+help: Replace with `list`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:448:143
+    |
+446 | ΓÇª
+447 | ΓÇª
+448 | ΓÇªional[str], session: Optional[requests.Session] = None) -> List[Dict[str, Any]]:
+    |                                                                  ^^^^
+449 | ΓÇª
+450 | ΓÇª
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `tuple` instead of `Tuple` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:488:10
+    |
+486 | @dataclass
+487 | class ProcessedVenue:
+488 |     key: Tuple[str, int]  # (osm_type, legacy_shop_id)
+    |          ^^^^^
+489 |     record: Dict[str, Any]
+490 |     content_hash: str
+    |
+help: Replace with `tuple`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:489:13
+    |
+487 | class ProcessedVenue:
+488 |     key: Tuple[str, int]  # (osm_type, legacy_shop_id)
+489 |     record: Dict[str, Any]
+    |             ^^^^
+490 |     content_hash: str
+491 |     osm_version: int
+    |
+help: Replace with `dict`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\scripts\osm_sync_ultimate.py:492:20
+    |
+490 |     content_hash: str
+491 |     osm_version: int
+492 |     osm_timestamp: Optional[str]
+    |                    ^^^^^^^^^^^^^
+493 |     h3_cell: str
+494 |     tile: str
+    |
+help: Convert to `X | None`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:496:27
+    |
+494 |     tile: str
+495 |
+496 | def transform_element(el: Dict[str, Any], tile_id: str) -> Optional[ProcessedVenue]:
+    |                           ^^^^
+497 |     tags = el.get("tags", {})
+498 |     osm_id = el.get("id")
+    |
+help: Replace with `dict`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\scripts\osm_sync_ultimate.py:496:60
+    |
+494 |     tile: str
+495 |
+496 | def transform_element(el: Dict[str, Any], tile_id: str) -> Optional[ProcessedVenue]:
+    |                                                            ^^^^^^^^^^^^^^^^^^^^^^^^
+497 |     tags = el.get("tags", {})
+498 |     osm_id = el.get("id")
+    |
+help: Convert to `X | None`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:575:45
+    |
+573 |         self.r = r
+574 |
+575 |     def publish(self, stream: str, payload: Dict[str, Any]) -> None:
+    |                                             ^^^^
+576 |         self.publish_batch(stream, [payload])
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:578:52
+    |
+576 |         self.publish_batch(stream, [payload])
+577 |
+578 |     def publish_batch(self, stream: str, payloads: List[Dict[str, Any]]) -> None:
+    |                                                    ^^^^
+579 |         if not payloads:
+580 |             return
+    |
+help: Replace with `list`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:578:57
+    |
+576 |         self.publish_batch(stream, [payload])
+577 |
+578 |     def publish_batch(self, stream: str, payloads: List[Dict[str, Any]]) -> None:
+    |                                                         ^^^^
+579 |         if not payloads:
+580 |             return
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:601:33
+    |
+599 |         self.r = r
+600 |
+601 |     def init_tiles(self, tiles: List[TileID]) -> None:
+    |                                 ^^^^
+602 |         now_ts = time.time()
+603 |         pipe = self.r.pipeline()
+    |
+help: Replace with `list`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:611:41
+    |
+609 |         pipe.execute()
+610 |
+611 |     def ensure_initialized(self, tiles: List[TileID]) -> None:
+    |                                         ^^^^
+612 |         if self.r.zcard(conf.Z_TILES_PRIORITY) == 0:
+613 |             logger.info("≡ƒºá Scheduler init...")
+    |
+help: Replace with `list`
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\scripts\osm_sync_ultimate.py:616:46
+    |
+614 |             self.init_tiles(tiles)
+615 |
+616 |     def get_last_sync_iso(self, tid: str) -> Optional[str]:
+    |                                              ^^^^^^^^^^^^^
+617 |         v = self.r.hget(conf.H_TILE_LASTSYNC, tid)
+618 |         return v or None
+    |
+help: Convert to `X | None`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:623:41
+    |
+621 |         self.r.hset(conf.H_TILE_LASTSYNC, tid, iso)
+622 |
+623 |     def pick_due_tiles(self, k: int) -> List[str]:
+    |                                         ^^^^
+624 |         now_ts = time.time()
+625 |         due = self.r.zrangebyscore(conf.Z_TILES_NEXT_RUN, 0, now_ts, start=0, num=max(k * 10, 50))
+    |
+help: Replace with `list`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:666:45
+    |
+664 |             ) from e
+665 |
+666 |     def fetch_existing(self, type_id_pairs: List[Tuple[str, int]]) -> Dict[Tuple[str, int], Dict[str, Any]]:
+    |                                             ^^^^
+667 |         if not type_id_pairs:
+668 |             return {}
+    |
+help: Replace with `list`
+
+UP006 [*] Use `tuple` instead of `Tuple` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:666:50
+    |
+664 |             ) from e
+665 |
+666 |     def fetch_existing(self, type_id_pairs: List[Tuple[str, int]]) -> Dict[Tuple[str, int], Dict[str, Any]]:
+    |                                                  ^^^^^
+667 |         if not type_id_pairs:
+668 |             return {}
+    |
+help: Replace with `tuple`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:666:71
+    |
+664 |             ) from e
+665 |
+666 |     def fetch_existing(self, type_id_pairs: List[Tuple[str, int]]) -> Dict[Tuple[str, int], Dict[str, Any]]:
+    |                                                                       ^^^^
+667 |         if not type_id_pairs:
+668 |             return {}
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `tuple` instead of `Tuple` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:666:76
+    |
+664 |             ) from e
+665 |
+666 |     def fetch_existing(self, type_id_pairs: List[Tuple[str, int]]) -> Dict[Tuple[str, int], Dict[str, Any]]:
+    |                                                                            ^^^^^
+667 |         if not type_id_pairs:
+668 |             return {}
+    |
+help: Replace with `tuple`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:666:93
+    |
+664 |             ) from e
+665 |
+666 |     def fetch_existing(self, type_id_pairs: List[Tuple[str, int]]) -> Dict[Tuple[str, int], Dict[str, Any]]:
+    |                                                                                             ^^^^
+667 |         if not type_id_pairs:
+668 |             return {}
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:671:14
+    |
+670 |         ids = list(set([pid for _, pid in type_id_pairs]))
+671 |         out: Dict[Tuple[str, int], Dict[str, Any]] = {}
+    |              ^^^^
+672 |         chunk = 1000
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `tuple` instead of `Tuple` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:671:19
+    |
+670 |         ids = list(set([pid for _, pid in type_id_pairs]))
+671 |         out: Dict[Tuple[str, int], Dict[str, Any]] = {}
+    |                   ^^^^^
+672 |         chunk = 1000
+    |
+help: Replace with `tuple`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:671:36
+    |
+670 |         ids = list(set([pid for _, pid in type_id_pairs]))
+671 |         out: Dict[Tuple[str, int], Dict[str, Any]] = {}
+    |                                    ^^^^
+672 |         chunk = 1000
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:687:31
+    |
+685 |         return out
+686 |
+687 |     def upsert(self, records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    |                               ^^^^
+688 |         if not records:
+689 |             return []
+    |
+help: Replace with `list`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:687:36
+    |
+685 |         return out
+686 |
+687 |     def upsert(self, records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    |                                    ^^^^
+688 |         if not records:
+689 |             return []
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:687:56
+    |
+685 |         return out
+686 |
+687 |     def upsert(self, records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    |                                                        ^^^^
+688 |         if not records:
+689 |             return []
+    |
+help: Replace with `list`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:687:61
+    |
+685 |         return out
+686 |
+687 |     def upsert(self, records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    |                                                             ^^^^
+688 |         if not records:
+689 |             return []
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:690:19
+    |
+688 |         if not records:
+689 |             return []
+690 |         out_rows: List[Dict[str, Any]] = []
+    |                   ^^^^
+691 |         chunk = 1000  # optimize: larger batches for fewer HTTP roundtrips
+692 |         for i in range(0, len(records), chunk):
+    |
+help: Replace with `list`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:690:24
+    |
+688 |         if not records:
+689 |             return []
+690 |         out_rows: List[Dict[str, Any]] = []
+    |                        ^^^^
+691 |         chunk = 1000  # optimize: larger batches for fewer HTTP roundtrips
+692 |         for i in range(0, len(records), chunk):
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:704:42
+    |
+702 |         return out_rows
+703 |
+704 |     def touch_unchanged(self, venue_ids: List[str]) -> None:
+    |                                          ^^^^
+705 |         """
+706 |         Optional: if you created RPC bulk_touch_venues(venue_ids uuid[])
+    |
+help: Replace with `list`
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\scripts\osm_sync_ultimate.py:775:17
+    |
+773 |             except ImportError:
+774 |                 logger.error("Γ¥î Redis unavailable and fakeredis not installed.")
+775 |                 raise e
+    |                 ^^^^^^^
+776 |
+777 |         self.sb = create_client(conf.SUPABASE_URL, conf.SUPABASE_SERVICE_ROLE_KEY)
+    |
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:794:53
+    |
+793 |     @staticmethod
+794 |     def _new_summary(mode: str, iterations: int) -> Dict[str, Any]:
+    |                                                     ^^^^
+795 |         return {
+796 |             "mode": mode,
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:808:33
+    |
+807 |     @staticmethod
+808 |     def _apply_summary(summary: Dict[str, Any], result: Dict[str, Any]) -> None:
+    |                                 ^^^^
+809 |         summary["tiles_processed"] += 1
+810 |         if not result.get("ok"):
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:808:57
+    |
+807 |     @staticmethod
+808 |     def _apply_summary(summary: Dict[str, Any], result: Dict[str, Any]) -> None:
+    |                                                         ^^^^
+809 |         summary["tiles_processed"] += 1
+810 |         if not result.get("ok"):
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:819:50
+    |
+817 |         summary["incoming"] += int(result.get("incoming", 0))
+818 |
+819 |     def sync_tile(self, tid: str, full: bool) -> Dict[str, Any]:
+    |                                                  ^^^^
+820 |         started = utc_now()
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:828:23
+    |
+826 |             newer_iso = None if full else self.scheduler.get_last_sync_iso(tid)
+827 |
+828 |             elements: List[Dict[str, Any]] = []
+    |                       ^^^^
+829 |             used_newer = False
+    |
+help: Replace with `list`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:828:28
+    |
+826 |             newer_iso = None if full else self.scheduler.get_last_sync_iso(tid)
+827 |
+828 |             elements: List[Dict[str, Any]] = []
+    |                            ^^^^
+829 |             used_newer = False
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:843:23
+    |
+842 |             # Transform
+843 |             incoming: List[ProcessedVenue] = []
+    |                       ^^^^
+844 |             keys: List[Tuple[str, int]] = []
+845 |             for el in elements:
+    |
+help: Replace with `list`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:844:19
+    |
+842 |             # Transform
+843 |             incoming: List[ProcessedVenue] = []
+844 |             keys: List[Tuple[str, int]] = []
+    |                   ^^^^
+845 |             for el in elements:
+846 |                 pv = transform_element(el, tid)
+    |
+help: Replace with `list`
+
+UP006 [*] Use `tuple` instead of `Tuple` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:844:24
+    |
+842 |             # Transform
+843 |             incoming: List[ProcessedVenue] = []
+844 |             keys: List[Tuple[str, int]] = []
+    |                        ^^^^^
+845 |             for el in elements:
+846 |                 pv = transform_element(el, tid)
+    |
+help: Replace with `tuple`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:855:22
+    |
+854 |             # Diff
+855 |             upserts: List[Dict[str, Any]] = []
+    |                      ^^^^
+856 |             unchanged_ids: List[str] = []
+857 |             action_by_key: Dict[Tuple[str, int], str] = {}
+    |
+help: Replace with `list`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:855:27
+    |
+854 |             # Diff
+855 |             upserts: List[Dict[str, Any]] = []
+    |                           ^^^^
+856 |             unchanged_ids: List[str] = []
+857 |             action_by_key: Dict[Tuple[str, int], str] = {}
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:856:28
+    |
+854 |             # Diff
+855 |             upserts: List[Dict[str, Any]] = []
+856 |             unchanged_ids: List[str] = []
+    |                            ^^^^
+857 |             action_by_key: Dict[Tuple[str, int], str] = {}
+    |
+help: Replace with `list`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:857:28
+    |
+855 |             upserts: List[Dict[str, Any]] = []
+856 |             unchanged_ids: List[str] = []
+857 |             action_by_key: Dict[Tuple[str, int], str] = {}
+    |                            ^^^^
+858 |
+859 |             for pv in incoming:
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `tuple` instead of `Tuple` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:857:33
+    |
+855 |             upserts: List[Dict[str, Any]] = []
+856 |             unchanged_ids: List[str] = []
+857 |             action_by_key: Dict[Tuple[str, int], str] = {}
+    |                                 ^^^^^
+858 |
+859 |             for pv in incoming:
+    |
+help: Replace with `tuple`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:891:23
+    |
+890 |             # Build final uuid map
+891 |             uuid_map: Dict[Tuple[str, int], str] = {}
+    |                       ^^^^
+892 |             for k, row in existing.items():
+893 |                 if row.get("id"):
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `tuple` instead of `Tuple` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:891:28
+    |
+890 |             # Build final uuid map
+891 |             uuid_map: Dict[Tuple[str, int], str] = {}
+    |                            ^^^^^
+892 |             for k, row in existing.items():
+893 |                 if row.get("id"):
+    |
+help: Replace with `tuple`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:967:27
+    |
+965 |             return {"tile": tid, "ok": False, "error": str(e)}
+966 |
+967 |     def run_full(self) -> Dict[str, Any]:
+    |                           ^^^^
+968 |         logger.info("≡ƒÜÇ FULL SYNC START (all tiles)")
+969 |         self.prewarmer.prewarm()
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\osm_sync_ultimate.py:987:44
+    |
+985 |         return summary
+986 |
+987 |     def run_loop(self, iterations: int) -> Dict[str, Any]:
+    |                                            ^^^^
+988 |         logger.info(f"ΓÜí INCREMENTAL LOOP START | iterations={iterations} workers={conf.WORKERS}")
+989 |         summary = self._new_summary(mode="loop", iterations=iterations)
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+    --> backend\scripts\osm_sync_ultimate.py:1015:35
+     |
+1013 |         return summary
+1014 |
+1015 |     def run_tiles(self, tile_ids: List[str], full: bool = True, mode: str = "tiles") -> Dict[str, Any]:
+     |                                   ^^^^
+1016 |         clean_tiles: List[str] = []
+1017 |         seen = set()
+     |
+help: Replace with `list`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+    --> backend\scripts\osm_sync_ultimate.py:1015:89
+     |
+1013 |         return summary
+1014 |
+1015 |     def run_tiles(self, tile_ids: List[str], full: bool = True, mode: str = "tiles") -> Dict[str, Any]:
+     |                                                                                         ^^^^
+1016 |         clean_tiles: List[str] = []
+1017 |         seen = set()
+     |
+help: Replace with `dict`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+    --> backend\scripts\osm_sync_ultimate.py:1016:22
+     |
+1015 |     def run_tiles(self, tile_ids: List[str], full: bool = True, mode: str = "tiles") -> Dict[str, Any]:
+1016 |         clean_tiles: List[str] = []
+     |                      ^^^^
+1017 |         seen = set()
+1018 |         for tid in tile_ids:
+     |
+help: Replace with `list`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+    --> backend\scripts\osm_sync_ultimate.py:1050:51
+     |
+1050 | def parse_failed_tiles_from_log(log_path: str) -> List[str]:
+     |                                                   ^^^^
+1051 |     try:
+1052 |         with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+     |
+help: Replace with `list`
+
+UP015 [*] Unnecessary mode argument
+    --> backend\scripts\osm_sync_ultimate.py:1052:29
+     |
+1050 | def parse_failed_tiles_from_log(log_path: str) -> List[str]:
+1051 |     try:
+1052 |         with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+     |                             ^^^
+1053 |             lines = f.readlines()
+1054 |     except Exception as e:
+     |
+help: Remove mode argument
+
+UP006 [*] Use `list` instead of `List` for type annotation
+    --> backend\scripts\osm_sync_ultimate.py:1071:10
+     |
+1070 |     pat = re.compile(r"Γ¥î\s+(\d+/\d+/\d+)\s+\|")
+1071 |     out: List[str] = []
+     |          ^^^^
+1072 |     seen = set()
+1073 |     for line in scope:
+     |
+help: Replace with `list`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+    --> backend\scripts\osm_sync_ultimate.py:1085:34
+     |
+1085 | def parse_tiles_arg(raw: str) -> List[str]:
+     |                                  ^^^^
+1086 |     out: List[str] = []
+1087 |     seen = set()
+     |
+help: Replace with `list`
+
+UP006 [*] Use `list` instead of `List` for type annotation
+    --> backend\scripts\osm_sync_ultimate.py:1086:10
+     |
+1085 | def parse_tiles_arg(raw: str) -> List[str]:
+1086 |     out: List[str] = []
+     |          ^^^^
+1087 |     seen = set()
+1088 |     for part in raw.split(","):
+     |
+help: Replace with `list`
+
+UP045 [*] Use `X | None` for type annotations
+    --> backend\scripts\osm_sync_ultimate.py:1108:23
+     |
+1106 |             pass
+1107 |
+1108 |     retry_failed_log: Optional[str] = None
+     |                       ^^^^^^^^^^^^^
+1109 |     tiles_arg: Optional[str] = None
+1110 |     loop_n = 1
+     |
+help: Convert to `X | None`
+
+UP045 [*] Use `X | None` for type annotations
+    --> backend\scripts\osm_sync_ultimate.py:1109:16
+     |
+1108 |     retry_failed_log: Optional[str] = None
+1109 |     tiles_arg: Optional[str] = None
+     |                ^^^^^^^^^^^^^
+1110 |     loop_n = 1
+1111 |     for a in sys.argv[1:]:
+     |
+help: Convert to `X | None`
+
+F401 [*] `json` imported but unused
+  --> backend\scripts\schema_tools.py:9:8
+   |
+ 8 | import asyncio
+ 9 | import json
+   |        ^^^^
+10 | import os
+11 | import sys
+   |
+help: Remove unused import: `json`
+
+F401 [*] `os` imported but unused
+  --> backend\scripts\schema_tools.py:10:8
+   |
+ 8 | import asyncio
+ 9 | import json
+10 | import os
+   |        ^^
+11 | import sys
+12 | from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+   |
+help: Remove unused import: `os`
+
+F401 [*] `sys` imported but unused
+  --> backend\scripts\schema_tools.py:11:8
+   |
+ 9 | import json
+10 | import os
+11 | import sys
+   |        ^^^
+12 | from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+   |
+help: Remove unused import: `sys`
+
+F541 [*] f-string without any placeholders
+  --> backend\scripts\schema_tools.py:87:15
+   |
+85 |     missing_tables = old_tables - new_tables
+86 |     if missing_tables:
+87 |         print(f"MISSING TABLES (Present in Old, Missing in New):")
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+88 |         for t in missing_tables:
+89 |             print(f"  - {t}")
+   |
+help: Remove extraneous `f` prefix
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\scripts\setup_bigquery.py:1:1
+  |
+1 | / import os
+2 | | import argparse
+3 | | from google.cloud import bigquery
+4 | | from google.api_core.exceptions import NotFound
+  | |_______________________________________________^
+5 |
+6 |   def setup_bigquery(project_id, dataset_id, location="US"):
+  |
+help: Organize imports
+
+F401 [*] `os` imported but unused
+ --> backend\scripts\setup_bigquery.py:1:8
+  |
+1 | import os
+  |        ^^
+2 | import argparse
+3 | from google.cloud import bigquery
+  |
+help: Remove unused import: `os`
+
+F541 [*] f-string without any placeholders
+  --> backend\scripts\test_connect.py:36:11
+   |
+35 | def test_qdrant():
+36 |     print(f"\n--- Testing Qdrant ---")
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+37 |     print(f"URL: {settings.QDRANT_URL}")
+38 |     print(f"API_KEY: {settings.QDRANT_API_KEY[:5]}...")
+   |
+help: Remove extraneous `f` prefix
+
+F401 `google.generativeai` imported but unused; consider using `importlib.util.find_spec` to test for availability
+  --> backend\scripts\triad_doctor.py:18:12
+   |
+16 | # Check optional dependencies
+17 | try:
+18 |     import google.generativeai
+   |            ^^^^^^^^^^^^^^^^^^^
+19 |     GENAI_INSTALLED = True
+20 | except ImportError:
+   |
+help: Remove unused import: `google.generativeai`
+
+F401 `qdrant_client` imported but unused; consider using `importlib.util.find_spec` to test for availability
+  --> backend\scripts\triad_doctor.py:24:12
+   |
+23 | try:
+24 |     import qdrant_client
+   |            ^^^^^^^^^^^^^
+25 |     QDRANT_INSTALLED = True
+26 | except ImportError:
+   |
+help: Remove unused import: `qdrant_client`
+
+F401 `asyncpg` imported but unused; consider using `importlib.util.find_spec` to test for availability
+  --> backend\scripts\triad_doctor.py:30:12
+   |
+29 | try:
+30 |     import asyncpg
+   |            ^^^^^^^
+31 |     ASYNCPG_INSTALLED = True
+32 | except ImportError:
+   |
+help: Remove unused import: `asyncpg`
+
+I001 [*] Import block is un-sorted or un-formatted
+   --> backend\scripts\triad_doctor.py:108:5
+    |
+106 |   async def ping_services() -> None:
+107 |       """Minimal network probes to verify connectivity."""
+108 | /     import asyncio
+109 | |     import asyncpg
+    | |__________________^
+110 |
+111 |       print("\n=== Network Probes ===\n")
+    |
+help: Organize imports
+
+F401 [*] `asyncio` imported but unused
+   --> backend\scripts\triad_doctor.py:108:12
+    |
+106 | async def ping_services() -> None:
+107 |     """Minimal network probes to verify connectivity."""
+108 |     import asyncio
+    |            ^^^^^^^
+109 |     import asyncpg
+    |
+help: Remove unused import: `asyncio`
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\scripts\workers.py:2:1
+   |
+ 1 |   # workers.py
+ 2 | / import os
+ 3 | | import sys
+ 4 | | import json
+ 5 | | import time
+ 6 | | import math
+ 7 | | import logging
+ 8 | | from datetime import datetime, timezone
+ 9 | | from typing import Dict, Any, List, Tuple, Optional
+10 | |
+11 | | from dotenv import load_dotenv
+   | |______________________________^
+12 |   load_dotenv()
+   |
+help: Organize imports
+
+UP035 `typing.Dict` is deprecated, use `dict` instead
+  --> backend\scripts\workers.py:9:1
+   |
+ 7 | import logging
+ 8 | from datetime import datetime, timezone
+ 9 | from typing import Dict, Any, List, Tuple, Optional
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+10 |
+11 | from dotenv import load_dotenv
+   |
+
+UP035 `typing.List` is deprecated, use `list` instead
+  --> backend\scripts\workers.py:9:1
+   |
+ 7 | import logging
+ 8 | from datetime import datetime, timezone
+ 9 | from typing import Dict, Any, List, Tuple, Optional
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+10 |
+11 | from dotenv import load_dotenv
+   |
+
+UP035 `typing.Tuple` is deprecated, use `tuple` instead
+  --> backend\scripts\workers.py:9:1
+   |
+ 7 | import logging
+ 8 | from datetime import datetime, timezone
+ 9 | from typing import Dict, Any, List, Tuple, Optional
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+10 |
+11 | from dotenv import load_dotenv
+   |
+
+F401 [*] `typing.List` imported but unused
+  --> backend\scripts\workers.py:9:31
+   |
+ 7 | import logging
+ 8 | from datetime import datetime, timezone
+ 9 | from typing import Dict, Any, List, Tuple, Optional
+   |                               ^^^^
+10 |
+11 | from dotenv import load_dotenv
+   |
+help: Remove unused import
+
+F401 [*] `typing.Tuple` imported but unused
+  --> backend\scripts\workers.py:9:37
+   |
+ 7 | import logging
+ 8 | from datetime import datetime, timezone
+ 9 | from typing import Dict, Any, List, Tuple, Optional
+   |                                     ^^^^^
+10 |
+11 | from dotenv import load_dotenv
+   |
+help: Remove unused import
+
+E402 Module level import not at top of file
+  --> backend\scripts\workers.py:14:1
+   |
+12 | load_dotenv()
+13 |
+14 | import redis
+   | ^^^^^^^^^^^^
+15 |
+16 | logging.basicConfig(
+   |
+
+F541 [*] f-string without any placeholders
+  --> backend\scripts\workers.py:96:21
+   |
+94 |         r = redis.from_url(Config.REDIS_URL, decode_responses=True)
+95 |         r.ping()
+96 |         logger.info(f"≡ƒöî Connected to Real Redis")
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+97 |         return r
+98 |     except Exception as e:
+   |
+help: Remove extraneous `f` prefix
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\scripts\workers.py:106:13
+    |
+104 |         except ImportError:
+105 |             logger.error("Γ¥î Redis unavailable and fakeredis not installed.")
+106 |             raise e
+    |             ^^^^^^^
+107 |
+108 | def ensure_group(r: redis.Redis, stream: str, group: str) -> None:
+    |
+
+UP017 [*] Use `datetime.UTC` alias
+   --> backend\scripts\workers.py:125:25
+    |
+124 | def now_ts() -> float:
+125 |     return datetime.now(timezone.utc).timestamp()
+    |                         ^^^^^^^^^^^^
+126 |
+127 | def minute_bucket(ts: Optional[float] = None) -> int:
+    |
+help: Convert to `datetime.UTC` alias
+
+UP045 [*] Use `X | None` for type annotations
+   --> backend\scripts\workers.py:127:23
+    |
+125 |     return datetime.now(timezone.utc).timestamp()
+126 |
+127 | def minute_bucket(ts: Optional[float] = None) -> int:
+    |                       ^^^^^^^^^^^^^^^
+128 |     t = ts if ts is not None else now_ts()
+129 |     return int(t // Config.BUCKET_SEC)
+    |
+help: Convert to `X | None`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\workers.py:156:29
+    |
+154 |         self.name = name
+155 |
+156 |     def handle(self, event: Dict[str, Any]) -> bool:
+    |                             ^^^^
+157 |         raise NotImplementedError
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\workers.py:206:29
+    |
+204 | # =========================
+205 | class AnalyticsConsumer(BaseConsumer):
+206 |     def handle(self, event: Dict[str, Any]) -> bool:
+    |                             ^^^^
+207 |         etype = event.get("type", "")
+208 |         if etype not in ("created", "updated"):
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\workers.py:230:29
+    |
+228 |       STR  venue:tile:<venue_uuid> = tile
+229 |     """
+230 |     def handle(self, event: Dict[str, Any]) -> bool:
+    |                             ^^^^
+231 |         venue_id = event.get("venue_id")
+232 |         h3_cell = event.get("h3_cell")
+    |
+help: Replace with `dict`
+
+F841 Local variable `ts` is assigned to but never used
+   --> backend\scripts\workers.py:234:9
+    |
+232 |         h3_cell = event.get("h3_cell")
+233 |         tile = event.get("tile")
+234 |         ts = event.get("ts")
+    |         ^^
+235 |
+236 |         if not venue_id or not h3_cell or not tile:
+    |
+help: Remove assignment to unused variable `ts`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\workers.py:266:29
+    |
+264 |     TTL buckets ~ 2.5h so we can build 15m/1h windows fast.
+265 |     """
+266 |     def handle(self, event: Dict[str, Any]) -> bool:
+    |                             ^^^^
+267 |         etype = event.get("type", "")
+268 |         if etype not in ("created", "updated"):
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\workers.py:303:29
+    |
+301 |       heatmap:tile:<tile> (json) TTL=HEATMAP_TILE_TTL_SEC
+302 |     """
+303 |     def handle(self, event: Dict[str, Any]) -> bool:
+    |                             ^^^^
+304 |         etype = event.get("type", "")
+305 |         if etype != "invalidate_tile":
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\workers.py:327:14
+    |
+326 |         # 2) Inventory base
+327 |         inv: Dict[str, int] = {}
+    |              ^^^^
+328 |         pipe = self.r.pipeline()
+329 |         for c in cells:
+    |
+help: Replace with `dict`
+
+B905 `zip()` without an explicit `strict=` parameter
+   --> backend\scripts\workers.py:332:23
+    |
+330 |             pipe.zcard(f"{Config.H3_VENUES_PREFIX}{c}")
+331 |         inv_counts = pipe.execute()
+332 |         for c, cnt in zip(cells, inv_counts):
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+333 |             inv[c] = int(cnt or 0)
+    |
+help: Add explicit value for parameter `strict=`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\workers.py:341:13
+    |
+340 |         # 4) User density overlay (only for cells in tile)
+341 |         ud: Dict[str, float] = {}
+    |             ^^^^
+342 |         pipe2 = self.r.pipeline()
+343 |         for c in cells:
+    |
+help: Replace with `dict`
+
+B905 `zip()` without an explicit `strict=` parameter
+   --> backend\scripts\workers.py:346:22
+    |
+344 |             pipe2.zscore(Config.USER_HEX_DENSITY_ZSET, c)
+345 |         dens_scores = pipe2.execute()
+346 |         for c, sc in zip(cells, dens_scores):
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^
+347 |             ud[c] = float(sc or 0.0)
+    |
+help: Add explicit value for parameter `strict=`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\workers.py:356:20
+    |
+354 |         ud_n = self._normalize_map(ud)
+355 |
+356 |         cells_out: Dict[str, Dict[str, float]] = {}
+    |                    ^^^^
+357 |         for c in cells:
+358 |             score = (
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\workers.py:356:30
+    |
+354 |         ud_n = self._normalize_map(ud)
+355 |
+356 |         cells_out: Dict[str, Dict[str, float]] = {}
+    |                              ^^^^
+357 |         for c in cells:
+358 |             score = (
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\workers.py:384:73
+    |
+382 |         return True
+383 |
+384 |     def _sum_buckets(self, tile: str, now_bucket: int, minutes: int) -> Dict[str, int]:
+    |                                                                         ^^^^
+385 |         agg: Dict[str, int] = {}
+386 |         pipe = self.r.pipeline()
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\workers.py:385:14
+    |
+384 |     def _sum_buckets(self, tile: str, now_bucket: int, minutes: int) -> Dict[str, int]:
+385 |         agg: Dict[str, int] = {}
+    |              ^^^^
+386 |         pipe = self.r.pipeline()
+387 |         keys = []
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\workers.py:405:33
+    |
+403 |         return agg
+404 |
+405 |     def _normalize_map(self, m: Dict[str, Any]) -> Dict[str, float]:
+    |                                 ^^^^
+406 |         if not m:
+407 |             return {}
+    |
+help: Replace with `dict`
+
+UP006 [*] Use `dict` instead of `Dict` for type annotation
+   --> backend\scripts\workers.py:405:52
+    |
+403 |         return agg
+404 |
+405 |     def _normalize_map(self, m: Dict[str, Any]) -> Dict[str, float]:
+    |                                                    ^^^^
+406 |         if not m:
+407 |             return {}
+    |
+help: Replace with `dict`
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\tests\conftest.py:1:1
+  |
+1 | / import os
+2 | | import socket
+3 | | import sys
+4 | | from pathlib import Path
+5 | |
+6 | | import pytest
+7 | | from types import SimpleNamespace
+8 | | from fastapi.testclient import TestClient
+  | |_________________________________________^
+  |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\tests\conftest.py:41:1
+   |
+39 |   os.environ.setdefault("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+40 |
+41 | / from app.main import app  # noqa: E402
+42 | | from app.core.auth import verify_user  # noqa: E402
+   | |_____________________________________^
+   |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\tests\manual_test.py:1:1
+  |
+1 | / import asyncio
+2 | | import httpx
+3 | | import websockets
+4 | | import json
+5 | | import sys
+  | |__________^
+6 |
+7 |   # Prevent pytest from collecting this file (manual smoke test script).
+  |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\tests\test_analytics.py:1:1
+  |
+1 | / from types import SimpleNamespace
+2 | | from unittest.mock import AsyncMock
+3 | |
+4 | | from app.main import app
+5 | | import app.api.routers.analytics as analytics
+  | |_____________________________________________^
+  |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\tests\test_auth.py:1:1
+  |
+1 | / import pytest
+2 | | from types import SimpleNamespace
+3 | | from fastapi.security import HTTPAuthorizationCredentials
+4 | | from fastapi import HTTPException
+5 | |
+6 | | import app.core.auth as auth
+  | |____________________________^
+  |
+help: Organize imports
+
+F541 [*] f-string without any placeholders
+  --> backend\tests\test_owner.py:36:27
+   |
+34 |     monkeypatch.setattr(owner, "supabase_admin", None)
+35 |
+36 |     response = client.get(f"/api/v1/owner/stats/123")
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+37 |     assert response.status_code == 200
+38 |     data = response.json()
+   |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+  --> backend\tests\test_owner.py:47:27
+   |
+45 |     monkeypatch.setattr(owner, "supabase_admin", None)
+46 |
+47 |     response = client.get(f"/api/v1/owner/stats/123")
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+48 |     assert response.status_code == 403
+   |
+help: Remove extraneous `f` prefix
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\tests\test_payments_slip_flow.py:8:1
+   |
+ 6 |   """
+ 7 |
+ 8 | / import hashlib
+ 9 | | from types import SimpleNamespace
+10 | | from unittest.mock import patch, AsyncMock
+11 | |
+12 | | import pytest
+13 | | from fastapi.testclient import TestClient
+14 | |
+15 | | from app.core.auth import verify_user
+16 | | from app.main import app
+17 | | from app.services.slip_verification import SlipVerification
+   | |___________________________________________________________^
+18 |
+19 |   # ---------------------------------------------------------------------------
+   |
+help: Organize imports
+
+UP012 [*] Unnecessary call to `encode` as UTF-8
+  --> backend\tests\test_payments_slip_flow.py:52:28
+   |
+51 | IMG_HASH = hashlib.sha256(b"fake-image").hexdigest()
+52 | TEXT_HASH = hashlib.sha256("normalized text".encode()).hexdigest()
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+53 |
+54 | ORDER_COUNTER = {"n": 0}
+   |
+help: Rewrite as bytes literal
+
+F401 [*] `socket` imported but unused
+  --> backend\tests\test_slip_verification.py:19:8
+   |
+17 | """
+18 |
+19 | import socket
+   |        ^^^^^^
+20 | from unittest.mock import MagicMock, patch
+   |
+help: Remove unused import: `socket`
+
+F401 [*] `unittest.mock.patch` imported but unused
+  --> backend\tests\test_slip_verification.py:20:38
+   |
+19 | import socket
+20 | from unittest.mock import MagicMock, patch
+   |                                      ^^^^^
+21 |
+22 | try:
+   |
+help: Remove unused import: `unittest.mock.patch`
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\tests\test_slip_verification.py:27:1
+   |
+25 |       from unittest.mock import MagicMock as AsyncMock
+26 |
+27 | / import httpx as _httpx_mod
+28 | | import pytest
+29 | | import requests as _requests_mod
+30 | |
+31 | | from decimal import Decimal
+32 | |
+33 | | from app.services.slip_verification import (
+34 | |     SlipVerification,
+35 | |     _to_decimal,
+36 | |     evaluate_slip_text,
+37 | |     get_feature_from_sku,
+38 | |     verify_slip_with_gcv,
+39 | | )
+   | |_^
+40 |
+41 |   # ---------------------------------------------------------------------------
+   |
+help: Organize imports
+
+F401 [*] `app.services.slip_verification.SlipVerification` imported but unused
+  --> backend\tests\test_slip_verification.py:34:5
+   |
+33 | from app.services.slip_verification import (
+34 |     SlipVerification,
+   |     ^^^^^^^^^^^^^^^^
+35 |     _to_decimal,
+36 |     evaluate_slip_text,
+   |
+help: Remove unused import: `app.services.slip_verification.SlipVerification`
+
+F401 [*] `hashlib` imported but unused
+   --> backend\tests\test_slip_verification.py:433:16
+    |
+432 |     async def test_text_hash_is_sha256_of_normalized_text(self, mock_ocr):
+433 |         import hashlib
+    |                ^^^^^^^
+434 |         mock_ocr.return_value = {"text": _valid_slip_text("500.00"), "raw": {}}
+435 |         result = await verify_slip_with_gcv(SLIP_URL, 500)
+    |
+help: Remove unused import: `hashlib`
+
+B017 Do not assert blind exception: `Exception`
+   --> backend\tests\test_slip_verification.py:689:14
+    |
+688 |     def test_invalid_type_raises(self):
+689 |         with pytest.raises(Exception):
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^
+690 |             _to_decimal([123])
+    |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\tests\test_triad.py:5:1
+  |
+3 |   """
+4 |
+5 | / import asyncio
+6 | | import os
+7 | |
+8 | | import pytest
+  | |_____________^
+  |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\tests\test_triad.py:85:5
+   |
+83 |   def test_engines_use_nullpool():
+84 |       """Test that engines are created with NullPool."""
+85 | /     from unittest.mock import MagicMock, patch
+86 | |     from sqlalchemy.pool import NullPool
+   | |________________________________________^
+87 |
+88 |       with patch("app.db.session.create_async_engine") as mock_create:
+   |
+help: Organize imports
+
+F841 Local variable `engine` is assigned to but never used
+  --> backend\tests\test_triad.py:97:9
+   |
+96 |         from app.db.session import get_core_engine
+97 |         engine = get_core_engine()
+   |         ^^^^^^
+98 |
+99 |         # Verify NullPool was passed
+   |
+help: Remove assignment to unused variable `engine`
+
+I001 [*] Import block is un-sorted or un-formatted
+   --> backend\tests\test_triad.py:108:5
+    |
+106 |   async def test_ensure_collection_once_called_once():
+107 |       """Test ensure_collection_once is called exactly once under concurrency."""
+108 | /     from unittest.mock import AsyncMock, MagicMock, patch
+109 | |     import app.services.memory_service as mem_mod
+    | |_________________________________________________^
+110 |
+111 |       mock_ensure = MagicMock()
+    |
+help: Organize imports
+
+F401 [*] `unittest.mock.AsyncMock` imported but unused
+   --> backend\tests\test_triad.py:108:31
+    |
+106 | async def test_ensure_collection_once_called_once():
+107 |     """Test ensure_collection_once is called exactly once under concurrency."""
+108 |     from unittest.mock import AsyncMock, MagicMock, patch
+    |                               ^^^^^^^^^
+109 |     import app.services.memory_service as mem_mod
+    |
+help: Remove unused import: `unittest.mock.AsyncMock`
+
+I001 [*] Import block is un-sorted or un-formatted
+   --> backend\tests\test_triad.py:130:5
+    |
+128 |   async def test_safe_mode_enforces_k_limit(monkeypatch):
+129 |       """Test SAFE_MODE limits k to <=10 in search_memory."""
+130 | /     from unittest.mock import AsyncMock, MagicMock, patch
+131 | |     import app.services.memory_service as mem_mod
+    | |_________________________________________________^
+132 |
+133 |       monkeypatch.setenv("MEMORY_ENABLED", "true")
+    |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend\tests\test_ugc_rewards.py:2:1
+   |
+ 1 |   """Tests for UGC reward atomicity and daily limit enforcement."""
+ 2 | / from types import SimpleNamespace
+ 3 | | from unittest.mock import MagicMock, patch
+ 4 | |
+ 5 | | import pytest
+ 6 | | from fastapi.testclient import TestClient
+ 7 | |
+ 8 | | from app.main import app
+ 9 | | from app.core.auth import verify_user
+10 | | from app.api.routers.ugc import grant_rewards, REWARDS
+   | |______________________________________________________^
+   |
+help: Organize imports
+
+F401 [*] `sys` imported but unused
+  --> scripts\ci\validate_osm_contract.py:15:8
+   |
+13 | import os
+14 | import re
+15 | import sys
+   |        ^^^
+16 | from typing import Iterable
+17 | from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+   |
+help: Remove unused import: `sys`
+
+F401 [*] `sys` imported but unused
+  --> scripts\ci\verify_osm_ingestion.py:22:8
+   |
+20 | import json
+21 | import os
+22 | import sys
+   |        ^^^
+23 | from urllib.parse import urlsplit
+   |
+help: Remove unused import: `sys`
+
+Found 490 errors.
+[*] 373 fixable with the `--fix` option (19 hidden fixes can be enabled with the `--unsafe-fixes` option).

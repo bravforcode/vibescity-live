@@ -29,15 +29,17 @@
 </template>
 
 <script setup>
-defineProps({
+const props = defineProps({
 	ad: { type: Object, default: null },
 });
 
 defineEmits(["dismiss"]);
 
 function handleClick() {
-	if (window.__currentAd?.link_url) {
-		window.open(window.__currentAd.link_url, "_blank", "noopener");
+	const targetUrl =
+		typeof props.ad?.link_url === "string" ? props.ad.link_url.trim() : "";
+	if (targetUrl) {
+		window.open(targetUrl, "_blank", "noopener,noreferrer");
 	}
 }
 </script>
@@ -45,15 +47,15 @@ function handleClick() {
 <style scoped>
 .local-ad-banner {
   position: absolute;
-  bottom: 90px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 800;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  left: 1rem;
+  transform: none;
+  z-index: 45;
   display: flex;
   align-items: center;
   gap: 12px;
   max-width: 380px;
-  width: calc(100% - 32px);
+  width: min(380px, calc(100% - 2rem));
   padding: 12px 14px;
   border-radius: 16px;
   background: rgba(20, 20, 30, 0.75);
@@ -69,7 +71,7 @@ function handleClick() {
 }
 
 .local-ad-banner:hover {
-  transform: translateX(-50%) translateY(-2px);
+  transform: translateY(-2px);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
 }
 
@@ -147,11 +149,23 @@ function handleClick() {
 /* transitions */
 .ad-slide-enter-active,
 .ad-slide-leave-active {
-  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .ad-slide-enter-from,
 .ad-slide-leave-to {
   opacity: 0;
-  transform: translateX(-50%) translateY(24px);
+  transform: translateY(24px);
+}
+
+@media (max-width: 768px) {
+  .local-ad-banner {
+    left: 0.75rem;
+    right: 0.75rem;
+    width: auto;
+    max-width: none;
+    bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
 }
 </style>

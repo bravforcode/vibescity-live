@@ -7,6 +7,14 @@ export const Z = Object.freeze({
 	SIDEBAR_BACKDROP: 4500,
 	SIDEBAR: 5000,
 
+	// Filter Menu
+	FILTER_MENU_BACKDROP: 5100,
+	FILTER_MENU: 5200,
+
+	// Sidebar Drawer
+	SIDEBAR_DRAWER_BACKDROP: 6000,
+	SIDEBAR_DRAWER: 6010,
+
 	// Toast / alerts
 	TOAST: 8000,
 

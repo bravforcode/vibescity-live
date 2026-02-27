@@ -1,0 +1,229 @@
+Debugger listening on ws://127.0.0.1:52674/f2b4cdd4-7aee-4a2e-973a-a6c9f9fc5413
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger attached.
+Initialising login role...
+Connecting to remote database...
+Do you want to push these migrations to the remote database?
+ ΓÇó 20260224190000_ultrathink_schema_optimization_part2.sql
+ ΓÇó 20260224201000_partner_owner_perf_followup.sql
+
+ [Y/n] y
+Applying migration 20260224190000_ultrathink_schema_optimization_part2.sql...
+NOTICE (42710): enum label "active" already exists, skipping
+NOTICE (42710): enum label "pending" already exists, skipping
+NOTICE (42710): enum label "archived" already exists, skipping
+NOTICE (42710): enum label "draft" already exists, skipping
+NOTICE (42710): enum label "off" already exists, skipping
+NOTICE (42710): enum label "inactive" already exists, skipping
+NOTICE (42710): enum label "disabled" already exists, skipping
+NOTICE (42710): enum label "deleted" already exists, skipping
+NOTICE (42710): enum label "active" already exists, skipping
+NOTICE (42710): enum label "paused" already exists, skipping
+NOTICE (42710): enum label "cancelled" already exists, skipping
+NOTICE (42710): enum label "expired" already exists, skipping
+NOTICE (42710): enum label "trialing" already exists, skipping
+NOTICE (42710): enum label "active" already exists, skipping
+NOTICE (42710): enum label "inactive" already exists, skipping
+NOTICE (42710): enum label "blocked" already exists, skipping
+NOTICE (42710): enum label "paid" already exists, skipping
+NOTICE (42710): enum label "failed" already exists, skipping
+NOTICE (42710): enum label "refunded" already exists, skipping
+ERROR: COALESCE types venue_status and text cannot be matched (SQLSTATE 42804)                                                                                
+At statement: 2                                                                                                                                               
+DO $$                                                                                                                                                         
+DECLARE                                                                                                                                                       
+  status_type text;                                                                                                                                           
+  shops_view_def text;                                                                                                                                        
+  policy_rec record;                                                                                                                                          
+BEGIN                                                                                                                                                         
+  CREATE TEMP TABLE IF NOT EXISTS pg_temp._saved_view_defs (                                                                                                  
+    view_name text PRIMARY KEY,                                                                                                                               
+    view_sql text NOT NULL                                                                                                                                    
+  ) ON COMMIT DROP;                                                                                                                                           
+  CREATE TEMP TABLE IF NOT EXISTS pg_temp._saved_venues_policies (                                                                                            
+    policy_name text PRIMARY KEY,                                                                                                                             
+    permissive text NOT NULL,                                                                                                                                 
+    cmd text NOT NULL,                                                                                                                                        
+    roles text[] NOT NULL,                                                                                                                                    
+    qual text,                                                                                                                                                
+    with_check text                                                                                                                                           
+  ) ON COMMIT DROP;                                                                                                                                           
+                                                                                                                                                              
+  IF to_regclass('public.venues') IS NOT NULL THEN                                                                                                            
+    SELECT udt_name INTO status_type                                                                                                                          
+    FROM information_schema.columns                                                                                                                           
+    WHERE table_schema = 'public' AND table_name = 'venues' AND column_name = 'status';                                                                       
+                                                                                                                                                              
+    IF status_type IS NOT NULL THEN                                                                                                                           
+      IF status_type <> 'venue_status' THEN                                                                                                                   
+        INSERT INTO pg_temp._saved_venues_policies (                                                                                                          
+          policy_name,                                                                                                                                        
+          permissive,                                                                                                                                         
+          cmd,                                                                                                                                                
+          roles,                                                                                                                                              
+          qual,                                                                                                                                               
+          with_check                                                                                                                                          
+        )                                                                                                                                                     
+        SELECT                                                                                                                                                
+          p.policyname,                                                                                                                                       
+          p.permissive,                                                                                                                                       
+          p.cmd,                                                                                                                                              
+          COALESCE(p.roles::text[], ARRAY['public']),                                                                                                         
+          p.qual,                                                                                                                                             
+          p.with_check                                                                                                                                        
+        FROM pg_policies p                                                                                                                                    
+        WHERE p.schemaname = 'public'                                                                                                                         
+          AND p.tablename = 'venues'                                                                                                                          
+          AND (                                                                                                                                               
+            COALESCE(p.qual, '') ILIKE '%status%'                                                                                                             
+            OR COALESCE(p.with_check, '') ILIKE '%status%'                                                                                                    
+          )                                                                                                                                                   
+        ON CONFLICT (policy_name) DO NOTHING;                                                                                                                 
+                                                                                                                                                              
+        FOR policy_rec IN                                                                                                                                     
+          SELECT policy_name                                                                                                                                  
+          FROM pg_temp._saved_venues_policies                                                                                                                 
+        LOOP                                                                                                                                                  
+          EXECUTE format(                                                                                                                                     
+            'DROP POLICY IF EXISTS %I ON public.venues',                                                                                                      
+            policy_rec.policy_name                                                                                                                            
+          );                                                                                                                                                  
+        END LOOP;                                                                                                                                             
+                                                                                                                                                              
+        IF EXISTS (                                                                                                                                           
+          SELECT 1                                                                                                                                            
+          FROM pg_class c                                                                                                                                     
+          JOIN pg_namespace n ON n.oid = c.relnamespace                                                                                                       
+          WHERE n.nspname = 'public'                                                                                                                          
+            AND c.relname = 'shops'                                                                                                                           
+            AND c.relkind = 'v'                                                                                                                               
+        ) THEN                                                                                                                                                
+          SELECT pg_get_viewdef('public.shops'::regclass, true) INTO shops_view_def;                                                                          
+          IF shops_view_def IS NOT NULL THEN                                                                                                                  
+            INSERT INTO pg_temp._saved_view_defs (view_name, view_sql)                                                                                        
+            VALUES ('shops', shops_view_def)                                                                                                                  
+            ON CONFLICT (view_name) DO UPDATE                                                                                                                 
+            SET view_sql = EXCLUDED.view_sql;                                                                                                                 
+          END IF;                                                                                                                                             
+        END IF;                                                                                                                                               
+                                                                                                                                                              
+        DROP VIEW IF EXISTS public.venues_public;                                                                                                             
+        DROP VIEW IF EXISTS public.shops;                                                                                                                     
+                                                                                                                                                              
+        ALTER TABLE public.venues                                                                                                                             
+          ALTER COLUMN status DROP DEFAULT;                                                                                                                   
+                                                                                                                                                              
+        ALTER TABLE public.venues                                                                                                                             
+          ALTER COLUMN status TYPE venue_status                                                                                                               
+          USING (                                                                                                                                             
+            CASE                                                                                                                                              
+              WHEN status IS NULL THEN 'active'                                                                                                               
+              WHEN lower(status) = 'live' THEN 'active'                                                                                                       
+              WHEN lower(status) = 'off' THEN 'off'                                                                                                           
+              WHEN lower(status) = 'inactive' THEN 'inactive'                                                                                                 
+              WHEN lower(status) = 'disabled' THEN 'disabled'                                                                                                 
+              WHEN lower(status) = 'deleted' THEN 'deleted'                                                                                                   
+              WHEN lower(status) IN ('active','pending','archived','draft') THEN lower(status)::venue_status                                                  
+              ELSE 'active'                                                                                                                                   
+            END                                                                                                                                               
+          );                                                                                                                                                  
+      END IF;                                                                                                                                                 
+                                                                                                                                                              
+      ALTER TABLE public.venues                                                                                                                               
+        ALTER COLUMN status SET DEFAULT 'active';                                                                                                             
+                                                                                                                                                              
+      ALTER TABLE public.venues                                                                                                                               
+        DROP CONSTRAINT IF EXISTS venues_status_check;                                                                                                        
+    END IF;                                                                                                                                                   
+  END IF;                                                                                                                                                     
+                                                                                                                                                              
+  IF to_regclass('public.orders') IS NOT NULL THEN                                                                                                            
+    SELECT udt_name INTO status_type                                                                                                                          
+    FROM information_schema.columns                                                                                                                           
+    WHERE table_schema = 'public' AND table_name = 'orders' AND column_name = 'status';                                                                       
+                                                                                                                                                              
+    IF status_type IS NOT NULL THEN                                                                                                                           
+      IF status_type <> 'order_status' THEN                                                                                                                   
+        ALTER TABLE public.orders                                                                                                                             
+          ALTER COLUMN status DROP DEFAULT;                                                                                                                   
+                                                                                                                                                              
+        ALTER TABLE public.orders                                                                                                                             
+          ALTER COLUMN status TYPE order_status                                                                                                               
+          USING (                                                                                                                                             
+            CASE                                                                                                                                              
+              WHEN status IS NULL THEN 'pending'                                                                                                              
+              WHEN lower(status) IN ('pending','pending_review','verified','rejected','paid','failed','cancelled','refunded') THEN lower(status)::order_status
+              ELSE 'pending'                                                                                                                                  
+            END                                                                                                                                               
+          );                                                                                                                                                  
+      END IF;                                                                                                                                                 
+                                                                                                                                                              
+      ALTER TABLE public.orders                                                                                                                               
+        ALTER COLUMN status SET DEFAULT 'pending';                                                                                                            
+                                                                                                                                                              
+      ALTER TABLE public.orders                                                                                                                               
+        DROP CONSTRAINT IF EXISTS orders_status_check;                                                                                                        
+    END IF;                                                                                                                                                   
+  END IF;                                                                                                                                                     
+                                                                                                                                                              
+  IF to_regclass('public.subscriptions') IS NOT NULL THEN                                                                                                     
+    SELECT udt_name INTO status_type                                                                                                                          
+    FROM information_schema.columns                                                                                                                           
+    WHERE table_schema = 'public' AND table_name = 'subscriptions' AND column_name = 'status';                                                                
+                                                                                                                                                              
+    IF status_type IS NOT NULL THEN                                                                                                                           
+      IF status_type <> 'subscription_status' THEN                                                                                                            
+        ALTER TABLE public.subscriptions                                                                                                                      
+          ALTER COLUMN status DROP DEFAULT;                                                                                                                   
+                                                                                                                                                              
+        ALTER TABLE public.subscriptions                                                                                                                      
+          ALTER COLUMN status TYPE subscription_status                                                                                                        
+          USING (                                                                                                                                             
+            CASE                                                                                                                                              
+              WHEN status IS NULL THEN 'active'                                                                                                               
+              WHEN lower(status) = 'canceled' THEN 'cancelled'                                                                                                
+              WHEN lower(status) IN ('active','paused','cancelled','expired','trialing') THEN lower(status)::subscription_status                              
+              ELSE 'active'                                                                                                                                   
+            END                                                                                                                                               
+          );                                                                                                                                                  
+      END IF;                                                                                                                                                 
+                                                                                                                                                              
+      ALTER TABLE public.subscriptions                                                                                                                        
+        ALTER COLUMN status SET DEFAULT 'active';                                                                                                             
+                                                                                                                                                              
+      ALTER TABLE public.subscriptions                                                                                                                        
+        DROP CONSTRAINT IF EXISTS subscriptions_status_check;                                                                                                 
+    END IF;                                                                                                                                                   
+  END IF;                                                                                                                                                     
+                                                                                                                                                              
+  IF to_regclass('public.partners') IS NOT NULL THEN                                                                                                          
+    SELECT udt_name INTO status_type                                                                                                                          
+    FROM information_schema.columns                                                                                                                           
+    WHERE table_schema = 'public' AND table_name = 'partners' AND column_name = 'status';                                                                     
+                                                                                                                                                              
+    IF status_type IS NOT NULL THEN                                                                                                                           
+      IF status_type <> 'partner_status' THEN                                                                                                                 
+        ALTER TABLE public.partners                                                                                                                           
+          ALTER COLUMN status DROP DEFAULT;                                                                                                                   
+                                                                                                                                                              
+        ALTER TABLE public.partners                                                                                                                           
+          ALTER COLUMN status TYPE partner_status                                                                                                             
+          USING (                                                                                                                                             
+            CASE                                                                                                                                              
+              WHEN status IS NULL THEN 'active'                                                                                                               
+              WHEN lower(status) IN ('active','inactive','blocked') THEN lower(status)::partner_status                                                        
+              ELSE 'active'                                                                                                                                   
+            END                                                                                                                                               
+          );                                                                                                                                                  
+      END IF;                                                                                                                                                 
+                                                                                                                                                              
+      ALTER TABLE public.partners                                                                                                                             
+        ALTER COLUMN status SET DEFAULT 'active';                                                                                                             
+                                                                                                                                                              
+      ALTER TABLE public.partners                                                                                                                             
+        DROP CONSTRAINT IF EXISTS partners_status_check;                                                                                                      
+    END IF;                                                                                                                                                   
+  END IF;                                                                                                                                                     
+END $$                                                                                                                                                        
+Try rerunning the command with --debug to troubleshoot the error.
+Waiting for the debugger to disconnect...

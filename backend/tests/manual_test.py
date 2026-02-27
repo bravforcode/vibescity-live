@@ -1,8 +1,9 @@
 import asyncio
-import httpx
-import websockets
 import json
 import sys
+
+import httpx
+import websockets
 
 # Prevent pytest from collecting this file (manual smoke test script).
 __test__ = False

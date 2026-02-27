@@ -10,17 +10,26 @@
 
     <div
       class="relative w-full max-w-lg bg-zinc-900 rounded-3xl border border-white/10 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="merchant-register-title"
     >
       <div class="p-6 pb-2 shrink-0 flex items-center justify-between">
         <div>
-          <h2 class="text-2xl font-black text-white tracking-tight">
+          <h2
+            id="merchant-register-title"
+            class="text-2xl font-black text-white tracking-tight"
+          >
             Promote Your Vibe
           </h2>
-          <p class="text-sm text-gray-400">Boost visibility with flexible pin options</p>
+          <p class="text-sm text-gray-400">
+            Boost visibility with flexible pin options
+          </p>
         </div>
         <button
           @click="emit('close')"
-          class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white"
+          aria-label="Close promote panel"
+          class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition focus-ring"
         >
           ✕
         </button>
@@ -28,16 +37,21 @@
 
       <div class="flex-1 overflow-y-auto p-6 space-y-6">
         <div class="space-y-4">
-          <h3 class="text-sm font-black text-white/60 uppercase tracking-widest">
+          <h3
+            class="text-sm font-black text-white/60 uppercase tracking-widest"
+          >
             1. Shop Details
           </h3>
           <input
             v-model="form.name"
             placeholder="Shop Name"
+            aria-label="Shop Name"
+            autocomplete="organization"
             class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500"
           />
           <select
             v-model="form.category"
+            aria-label="Shop Category"
             class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white"
           >
             <option value="" disabled>Select Category</option>
@@ -51,7 +65,9 @@
         </div>
 
         <div class="space-y-4">
-          <h3 class="text-sm font-black text-white/60 uppercase tracking-widest">
+          <h3
+            class="text-sm font-black text-white/60 uppercase tracking-widest"
+          >
             2. Location
           </h3>
           <div
@@ -77,7 +93,9 @@
 
         <div class="space-y-4">
           <div class="flex items-center justify-between">
-            <h3 class="text-sm font-black text-white/60 uppercase tracking-widest">
+            <h3
+              class="text-sm font-black text-white/60 uppercase tracking-widest"
+            >
               3. Pin Type + Package
             </h3>
             <span class="text-lg font-black text-green-400"
@@ -89,26 +107,30 @@
             <button
               @click="form.pinType = 'normal'"
               :class="[
-                'p-3 rounded-xl border text-left transition-all',
+                'p-3 rounded-xl border text-left transition',
                 form.pinType === 'normal'
                   ? 'bg-blue-600/20 border-blue-500 text-white'
                   : 'bg-white/5 border-white/10 text-white/80',
               ]"
             >
               <div class="text-sm font-black">📍 Normal Pin</div>
-              <div class="text-[11px] text-white/60">Standard map visibility</div>
+              <div class="text-[11px] text-white/60">
+                Standard map visibility
+              </div>
             </button>
             <button
               @click="form.pinType = 'giant'"
               :class="[
-                'p-3 rounded-xl border text-left transition-all',
+                'p-3 rounded-xl border text-left transition',
                 form.pinType === 'giant'
                   ? 'bg-pink-600/20 border-pink-500 text-white'
                   : 'bg-white/5 border-white/10 text-white/80',
               ]"
             >
               <div class="text-sm font-black">🔥 Giant Pin</div>
-              <div class="text-[11px] text-white/60">Premium spotlight reach</div>
+              <div class="text-[11px] text-white/60">
+                Premium spotlight reach
+              </div>
             </button>
           </div>
 
@@ -118,7 +140,7 @@
               :key="pkg.id"
               @click="form.selectedPackageId = pkg.id"
               :class="[
-                'w-full p-4 rounded-xl border cursor-pointer transition-all text-left',
+                'w-full p-4 rounded-xl border cursor-pointer transition text-left',
                 form.selectedPackageId === pkg.id
                   ? 'bg-white/10 border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.2)]'
                   : 'bg-white/5 border-white/10 hover:bg-white/10',
@@ -137,13 +159,17 @@
                   </div>
                   <div class="text-xs text-gray-400 mt-1">{{ pkg.desc }}</div>
                 </div>
-                <div class="text-sm font-black text-white">฿{{ pkg.price.toLocaleString() }}</div>
+                <div class="text-sm font-black text-white">
+                  ฿{{ pkg.price.toLocaleString() }}
+                </div>
               </div>
             </button>
           </div>
 
           <div class="space-y-2">
-            <h4 class="text-xs font-black text-white/60 uppercase tracking-wider">
+            <h4
+              class="text-xs font-black text-white/60 uppercase tracking-wider"
+            >
               Add-ons
             </h4>
             <div class="grid grid-cols-2 gap-2">
@@ -152,21 +178,25 @@
                 :key="addon.id"
                 @click="toggleAddOn(addon.id)"
                 :class="[
-                  'p-3 rounded-xl border text-left transition-all',
+                  'p-3 rounded-xl border text-left transition',
                   selectedAddOns.includes(addon.id)
                     ? 'bg-emerald-600/20 border-emerald-400 text-white'
                     : 'bg-white/5 border-white/10 text-white/80 hover:bg-white/10',
                 ]"
               >
                 <div class="text-xs font-bold">{{ addon.label }}</div>
-                <div class="text-[11px] text-white/60">+฿{{ addon.price.toLocaleString() }}</div>
+                <div class="text-[11px] text-white/60">
+                  +฿{{ addon.price.toLocaleString() }}
+                </div>
               </button>
             </div>
           </div>
         </div>
 
         <div class="space-y-4">
-          <h3 class="text-sm font-black text-white/60 uppercase tracking-widest">
+          <h3
+            class="text-sm font-black text-white/60 uppercase tracking-widest"
+          >
             4. Payment
           </h3>
 
@@ -174,7 +204,7 @@
             <button
               @click="paymentTab = 'qr'"
               :class="[
-                'flex-1 py-2 text-xs font-bold rounded-lg transition-all',
+                'flex-1 py-2 text-xs font-bold rounded-lg transition',
                 paymentTab === 'qr' ? 'bg-white text-black' : 'text-white/60',
               ]"
             >
@@ -183,7 +213,7 @@
             <button
               @click="paymentTab = 'bank'"
               :class="[
-                'flex-1 py-2 text-xs font-bold rounded-lg transition-all',
+                'flex-1 py-2 text-xs font-bold rounded-lg transition',
                 paymentTab === 'bank' ? 'bg-white text-black' : 'text-white/60',
               ]"
             >
@@ -205,7 +235,9 @@
             <p class="text-black text-xs font-bold mt-3">
               Scan PromptPay to pay ฿{{ totalPrice.toLocaleString() }}
             </p>
-            <p class="text-[11px] text-gray-600 mt-1">PromptPay ID: {{ PROMPTPAY_ID }}</p>
+            <p class="text-[11px] text-gray-600 mt-1">
+              PromptPay ID: {{ PROMPTPAY_ID }}
+            </p>
           </div>
 
           <div
@@ -221,7 +253,9 @@
               class="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/20 font-mono text-left flex items-center justify-between"
             >
               <span>{{ BANK_ACCOUNT_DISPLAY }}</span>
-              <span class="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">COPY</span>
+              <span class="text-[10px] bg-white/20 px-1.5 py-0.5 rounded"
+                >COPY</span
+              >
             </button>
 
             <div class="text-xs text-white/60">Account Name</div>
@@ -237,10 +271,10 @@
           />
           <button
             @click="slipInput?.click()"
-            class="w-full py-3 rounded-xl border-dashed border-2 border-white/20 text-white/50 hover:text-white hover:border-white/50 transition-all flex items-center justify-center gap-2"
+            class="w-full py-3 rounded-xl border-dashed border-2 border-white/20 text-white/50 hover:text-white hover:border-white/50 transition flex items-center justify-center gap-2"
           >
             <Upload class="w-4 h-4" />
-            {{ slipFile ? slipFile.name : 'Upload Payment Slip' }}
+            {{ slipFile ? slipFile.name : "Upload Payment Slip" }}
           </button>
           <div
             v-if="previewUrl"
@@ -255,11 +289,13 @@
           <div v-if="uploadProgress > 0" class="mt-2">
             <div class="w-full bg-white/10 rounded-full h-2">
               <div
-                class="h-2 rounded-full bg-emerald-400 transition-all"
+                class="h-2 rounded-full bg-emerald-400 transition"
                 :style="{ width: `${uploadProgress}%` }"
               ></div>
             </div>
-            <p class="text-[11px] text-emerald-200 mt-1">Uploading... {{ uploadProgress }}%</p>
+            <p class="text-[11px] text-emerald-200 mt-1">
+              Uploading… {{ uploadProgress }}%
+            </p>
           </div>
         </div>
       </div>
@@ -268,9 +304,9 @@
         <button
           @click="submitForm"
           :disabled="isSubmitting"
-          class="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-black text-lg shadow-lg hover:shadow-blue-500/20 active:scale-95 transition-all disabled:opacity-50"
+          class="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-black text-lg shadow-lg hover:shadow-blue-500/20 active:scale-95 transition disabled:opacity-50"
         >
-          {{ isSubmitting ? 'Submitting...' : 'Confirm & Promote' }}
+          {{ isSubmitting ? "Submitting…" : "Confirm & Promote" }}
         </button>
       </div>
     </div>

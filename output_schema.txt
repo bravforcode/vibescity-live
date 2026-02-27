@@ -1,0 +1,22 @@
+Debugger listening on ws://127.0.0.1:52413/2f59bc5a-0166-4dd2-8c1f-d1796438bc8c
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger attached.
+[dotenv@17.3.1] injecting env (86) from .env -- tip: ΓÜÖ∩╕Å  suppress all logs with { quiet: true }
+Venues Columns: [
+  'Image_URL1',      'Video_URL',        'boost_until',
+  'category',        'category_id',      'content_hash',
+  'created_at',      'giant_until',      'glow_until',
+  'h3_cell',         'id',               'image_urls',
+  'is_verified',     'last_osm_sync',    'last_seen_at',
+  'latitude',        'legacy_shop_id',   'location',
+  'longitude',       'metadata',         'name',
+  'name_normalized', 'open_time',        'osm_id',
+  'osm_timestamp',   'osm_type',         'osm_version',
+  'owner_id',        'owner_visitor_id', 'pin_metadata',
+  'pin_type',        'province',         'rating',
+  'short_code',      'slug',             'social_links',
+  'source',          'source_hash',      'status',
+  'total_views',     'updated_at',       'verified_until',
+  'vibe_info',       'view_count',       'visibility_score'
+]
+Waiting for the debugger to disconnect...

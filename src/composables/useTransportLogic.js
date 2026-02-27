@@ -1,6 +1,8 @@
 import { ref } from "vue";
+import { getApiV1BaseUrl } from "../lib/runtimeConfig";
 
-const BASE_URL = ""; // ✅ Relative path - works on Vercel & Localhost (via Proxy)
+const BASE_URL = getApiV1BaseUrl();
+const RIDE_ESTIMATE_TIMEOUT_MS = 4500;
 
 export function useTransportLogic() {
 	const estimates = ref([]);
@@ -25,22 +27,37 @@ export function useTransportLogic() {
 				},
 			};
 
-			const response = await fetch(`${BASE_URL}/api/v1/rides/estimate`, {
+			const controller = new AbortController();
+			const timeoutId = setTimeout(
+				() => controller.abort("ride_estimate_timeout"),
+				RIDE_ESTIMATE_TIMEOUT_MS,
+			);
+
+			const response = await fetch(`${BASE_URL}/rides/estimate`, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify(payload),
+				signal: controller.signal,
 			});
+			clearTimeout(timeoutId);
 
 			if (!response.ok) {
 				throw new Error("Failed to fetch estimates");
 			}
 
+			const contentType = String(response.headers.get("content-type") || "");
+			if (!contentType.includes("application/json")) {
+				throw new Error("Ride estimate endpoint returned non-JSON response");
+			}
+
 			const data = await response.json();
-			estimates.value = data.providers; // Expecting { providers: [...] }
+			estimates.value = Array.isArray(data?.providers) ? data.providers : [];
 		} catch (err) {
-			console.warn("Ride API failed, activating fallback:", err);
+			if (import.meta.env.DEV) {
+				console.warn("Ride API failed, activating fallback:", err);
+			}
 
 			// ✅ Loki Mode: GUARANTEED Fallback
 			estimates.value = [
@@ -61,12 +78,12 @@ export function useTransportLogic() {
 					icon: "⚡",
 				},
 				{
-					name: "RedTruck",
-					service: "Shared",
-					price: 30,
+					name: "Lineman",
+					service: "Taxi",
+					price: 89,
 					currency: "THB",
-					eta_mins: 15,
-					icon: "🔴",
+					eta_mins: 6,
+					icon: "🏍️",
 				},
 			];
 			error.value = null; // Suppress error UI

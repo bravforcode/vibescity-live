@@ -1,0 +1,84 @@
+Debugger listening on ws://127.0.0.1:57015/f5ac2bd1-e9bc-4e02-9de1-a0632f77a425
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger attached.
+Initialising login role...
+Connecting to remote database...
+Do you want to push these migrations to the remote database?
+ ΓÇó 20260224190000_ultrathink_schema_optimization_part2.sql
+ ΓÇó 20260224201000_partner_owner_perf_followup.sql
+
+ [Y/n] y
+Applying migration 20260224190000_ultrathink_schema_optimization_part2.sql...
+ERROR: operator does not exist: uuid ~* text (SQLSTATE 42883)                                             
+At statement: 1                                                                                           
+-- -----------------------------------------------------------------------------                          
+-- A1/A2: check_ins & daily_checkins venue_id text -> venue_id_uuid + FK                                  
+-- -----------------------------------------------------------------------------                          
+DO $$                                                                                                     
+DECLARE                                                                                                   
+  uuid_regex constant text := '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$';
+BEGIN                                                                                                     
+  IF to_regclass('public.check_ins') IS NOT NULL THEN                                                     
+    ALTER TABLE public.check_ins ADD COLUMN IF NOT EXISTS venue_id_uuid uuid;                             
+                                                                                                          
+    UPDATE public.check_ins                                                                               
+    SET venue_id_uuid = venue_id::uuid                                                                    
+    WHERE venue_id_uuid IS NULL                                                                           
+      AND venue_id ~* uuid_regex;                                                                         
+                                                                                                          
+    IF NOT EXISTS (                                                                                       
+      SELECT 1 FROM pg_constraint                                                                         
+      WHERE conname = 'fk_check_ins_venue_uuid'                                                           
+        AND conrelid = 'public.check_ins'::regclass                                                       
+    ) THEN                                                                                                
+      ALTER TABLE public.check_ins                                                                        
+        ADD CONSTRAINT fk_check_ins_venue_uuid                                                            
+        FOREIGN KEY (venue_id_uuid) REFERENCES public.venues(id)                                          
+        ON DELETE CASCADE                                                                                 
+        NOT VALID;                                                                                        
+    END IF;                                                                                               
+                                                                                                          
+    IF NOT EXISTS (                                                                                       
+      SELECT 1                                                                                            
+      FROM public.check_ins ci                                                                            
+      LEFT JOIN public.venues v ON v.id = ci.venue_id_uuid                                                
+      WHERE ci.venue_id_uuid IS NOT NULL AND v.id IS NULL                                                 
+    ) THEN                                                                                                
+      ALTER TABLE public.check_ins                                                                        
+        VALIDATE CONSTRAINT fk_check_ins_venue_uuid;                                                      
+    END IF;                                                                                               
+  END IF;                                                                                                 
+                                                                                                          
+  IF to_regclass('public.daily_checkins') IS NOT NULL THEN                                                
+    ALTER TABLE public.daily_checkins ADD COLUMN IF NOT EXISTS venue_id_uuid uuid;                        
+                                                                                                          
+    UPDATE public.daily_checkins                                                                          
+    SET venue_id_uuid = venue_id::uuid                                                                    
+    WHERE venue_id_uuid IS NULL                                                                           
+      AND venue_id ~* uuid_regex;                                                                         
+                                                                                                          
+    IF NOT EXISTS (                                                                                       
+      SELECT 1 FROM pg_constraint                                                                         
+      WHERE conname = 'fk_daily_checkins_venue_uuid'                                                      
+        AND conrelid = 'public.daily_checkins'::regclass                                                  
+    ) THEN                                                                                                
+      ALTER TABLE public.daily_checkins                                                                   
+        ADD CONSTRAINT fk_daily_checkins_venue_uuid                                                       
+        FOREIGN KEY (venue_id_uuid) REFERENCES public.venues(id)                                          
+        ON DELETE CASCADE                                                                                 
+        NOT VALID;                                                                                        
+    END IF;                                                                                               
+                                                                                                          
+    IF NOT EXISTS (                                                                                       
+      SELECT 1                                                                                            
+      FROM public.daily_checkins dc                                                                       
+      LEFT JOIN public.venues v ON v.id = dc.venue_id_uuid                                                
+      WHERE dc.venue_id_uuid IS NOT NULL AND v.id IS NULL                                                 
+    ) THEN                                                                                                
+      ALTER TABLE public.daily_checkins                                                                   
+        VALIDATE CONSTRAINT fk_daily_checkins_venue_uuid;                                                 
+    END IF;                                                                                               
+  END IF;                                                                                                 
+END $$                                                                                                    
+Try rerunning the command with --debug to troubleshoot the error.
+Waiting for the debugger to disconnect...

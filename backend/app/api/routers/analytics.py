@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -6,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from app.core.auth import get_optional_user, verify_admin
 from app.core.supabase import supabase
+from app.services.sheets_logger import sheets_logger
 
 router = APIRouter()
 
@@ -13,8 +15,10 @@ class AnalyticsEvent(BaseModel):
     event_type: str
     data: dict[str, Any] = Field(default_factory=dict)
     user_id: str | None = None
+    visitor_id: str | None = None
 
 from app.services.analytics_service import analytics_buffer
+
 
 @router.post("/log")
 async def log_event(
@@ -24,13 +28,33 @@ async def log_event(
     """
     Log an analytics event (buffered internally).
     """
-    user_id = getattr(user, "id", None) if user else None
+    user_id = None
+    if user:
+        if isinstance(user, dict):
+            user_id = user.get("id")
+        else:
+            user_id = getattr(user, "id", None)
+    actor_id = user_id or event.user_id
     # We await the buffer.log, which is fast (in-memory append) unless it triggers a flush (backgroundable?)
     # Ideally log() puts it in queue and returns immediately. Our .log() implementation acquires lock,
     # appends, and if full, awaits flush(). This might block briefly.
     # Given it's a log endpoint, maybe we should fire-and-forget this too?
     # But `analytics_buffer.log` is async, so `await` handles it nicely.
-    await analytics_buffer.log(event.event_type, event.data, user_id)
+    await analytics_buffer.log(event.event_type, event.data, actor_id)
+
+    try:
+        asyncio.create_task(
+            sheets_logger.log_event(
+                event.event_type,
+                event.data,
+                actor_id=actor_id,
+                visitor_id=event.visitor_id,
+                channel="events",
+            )
+        )
+    except Exception:
+        # fail-open for analytics logging
+        pass
     return {"success": True}
 
 

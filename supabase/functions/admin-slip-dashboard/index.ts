@@ -1,17 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { isAdminUser } from "../_shared/admin.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
-};
-
-const isAdminUser = (user: { app_metadata?: Record<string, unknown> }) => {
-  const meta = user?.app_metadata || {};
-  const role = meta.role;
-  const roles = Array.isArray(meta.roles) ? meta.roles : [];
-  return role === "admin" || roles.includes("admin");
 };
 
 serve(async (req) => {

@@ -68,7 +68,8 @@ export const triggerFireworks = () => {
 		const timeLeft = animationEnd - Date.now();
 
 		if (timeLeft <= 0) {
-			return clearInterval(interval);
+			clearInterval(interval);
+			return;
 		}
 
 		const particleCount = 50 * (timeLeft / duration);
@@ -84,4 +85,8 @@ export const triggerFireworks = () => {
 			origin: { x: random(0.7, 0.9), y: Math.random() - 0.2 },
 		});
 	}, 250);
+
+	return {
+		stop: () => clearInterval(interval),
+	};
 };

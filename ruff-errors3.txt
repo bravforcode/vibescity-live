@@ -1,0 +1,981 @@
+F841 Local variable `style_name` is assigned to but never used
+   --> .agent\.shared\ui-ux-pro-max\scripts\design_system.py:951:9
+    |
+949 |     if style_results:
+950 |         style = style_results[0]
+951 |         style_name = style.get("Style Category", "")
+    |         ^^^^^^^^^^
+952 |         keywords = style.get("Keywords", "")
+953 |         best_for = style.get("Best For", "")
+    |
+help: Remove assignment to unused variable `style_name`
+
+F841 Local variable `best_for` is assigned to but never used
+   --> .agent\.shared\ui-ux-pro-max\scripts\design_system.py:953:9
+    |
+951 |         style_name = style.get("Style Category", "")
+952 |         keywords = style.get("Keywords", "")
+953 |         best_for = style.get("Best For", "")
+    |         ^^^^^^^^
+954 |         effects = style.get("Effects & Animation", "")
+    |
+help: Remove assignment to unused variable `best_for`
+
+F841 Local variable `style_name` is assigned to but never used
+    --> .agent\.shared\ui-ux-pro-max\scripts\design_system.py:1043:9
+     |
+1041 |     # Fallback: try to infer from style results
+1042 |     if style_results:
+1043 |         style_name = style_results[0].get("Style Category", "").lower()
+     |         ^^^^^^^^^^
+1044 |         best_for = style_results[0].get("Best For", "").lower()
+     |
+help: Remove assignment to unused variable `style_name`
+
+E722 Do not use bare `except`
+  --> .agent\scripts\auto_preview.py:57:9
+   |
+55 |                 print(f"ΓÜá∩╕Å  Preview already running (PID: {pid})")
+56 |                 return
+57 |         except:
+   |         ^^^^^^
+58 |             pass # Invalid PID file
+   |
+
+E722 Do not use bare `except`
+   --> .agent\scripts\auto_preview.py:119:9
+    |
+117 |                 # Heuristic for URL, strictly we should save it
+118 |                 url = "http://localhost:3000" 
+119 |         except:
+    |         ^^^^^^
+120 |             pass
+    |
+
+E701 Multiple statements on one line (colon)
+  --> .agent\scripts\session_manager.py:36:30
+   |
+35 |         stack = []
+36 |         if "next" in all_deps: stack.append("Next.js")
+   |                              ^
+37 |         elif "react" in all_deps: stack.append("React")
+38 |         elif "vue" in all_deps: stack.append("Vue")
+   |
+
+E701 Multiple statements on one line (colon)
+  --> .agent\scripts\session_manager.py:37:33
+   |
+35 |         stack = []
+36 |         if "next" in all_deps: stack.append("Next.js")
+37 |         elif "react" in all_deps: stack.append("React")
+   |                                 ^
+38 |         elif "vue" in all_deps: stack.append("Vue")
+39 |         elif "svelte" in all_deps: stack.append("Svelte")
+   |
+
+E701 Multiple statements on one line (colon)
+  --> .agent\scripts\session_manager.py:38:31
+   |
+36 |         if "next" in all_deps: stack.append("Next.js")
+37 |         elif "react" in all_deps: stack.append("React")
+38 |         elif "vue" in all_deps: stack.append("Vue")
+   |                               ^
+39 |         elif "svelte" in all_deps: stack.append("Svelte")
+40 |         elif "express" in all_deps: stack.append("Express")
+   |
+
+E701 Multiple statements on one line (colon)
+  --> .agent\scripts\session_manager.py:39:34
+   |
+37 |         elif "react" in all_deps: stack.append("React")
+38 |         elif "vue" in all_deps: stack.append("Vue")
+39 |         elif "svelte" in all_deps: stack.append("Svelte")
+   |                                  ^
+40 |         elif "express" in all_deps: stack.append("Express")
+41 |         elif "nestjs" in all_deps or "@nestjs/core" in all_deps: stack.append("NestJS")
+   |
+
+E701 Multiple statements on one line (colon)
+  --> .agent\scripts\session_manager.py:40:35
+   |
+38 |         elif "vue" in all_deps: stack.append("Vue")
+39 |         elif "svelte" in all_deps: stack.append("Svelte")
+40 |         elif "express" in all_deps: stack.append("Express")
+   |                                   ^
+41 |         elif "nestjs" in all_deps or "@nestjs/core" in all_deps: stack.append("NestJS")
+   |
+
+E701 Multiple statements on one line (colon)
+  --> .agent\scripts\session_manager.py:41:64
+   |
+39 |         elif "svelte" in all_deps: stack.append("Svelte")
+40 |         elif "express" in all_deps: stack.append("Express")
+41 |         elif "nestjs" in all_deps or "@nestjs/core" in all_deps: stack.append("NestJS")
+   |                                                                ^
+42 |         
+43 |         if "tailwindcss" in all_deps: stack.append("Tailwind CSS")
+   |
+
+E701 Multiple statements on one line (colon)
+  --> .agent\scripts\session_manager.py:43:37
+   |
+41 |         elif "nestjs" in all_deps or "@nestjs/core" in all_deps: stack.append("NestJS")
+42 |         
+43 |         if "tailwindcss" in all_deps: stack.append("Tailwind CSS")
+   |                                     ^
+44 |         if "prisma" in all_deps: stack.append("Prisma")
+45 |         if "typescript" in all_deps: stack.append("TypeScript")
+   |
+
+E701 Multiple statements on one line (colon)
+  --> .agent\scripts\session_manager.py:44:32
+   |
+43 |         if "tailwindcss" in all_deps: stack.append("Tailwind CSS")
+44 |         if "prisma" in all_deps: stack.append("Prisma")
+   |                                ^
+45 |         if "typescript" in all_deps: stack.append("TypeScript")
+   |
+
+E701 Multiple statements on one line (colon)
+  --> .agent\scripts\session_manager.py:45:36
+   |
+43 |         if "tailwindcss" in all_deps: stack.append("Tailwind CSS")
+44 |         if "prisma" in all_deps: stack.append("Prisma")
+45 |         if "typescript" in all_deps: stack.append("TypeScript")
+   |                                    ^
+46 |         
+47 |         return {
+   |
+
+E722 Do not use bare `except`
+  --> .agent\skills\database-design\scripts\schema_validator.py:25:1
+   |
+23 | try:
+24 |     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+25 | except:
+   | ^^^^^^
+26 |     pass
+   |
+
+E722 Do not use bare `except`
+  --> .agent\skills\frontend-design\scripts\accessibility_checker.py:26:1
+   |
+24 | try:
+25 |     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+26 | except:
+   | ^^^^^^
+27 |     pass
+   |
+
+E722 Do not use bare `except`
+   --> .agent\skills\frontend-design\scripts\ux_audit.py:109:9
+    |
+107 |             with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+108 |                 content = f.read()
+109 |         except: return
+    |         ^^^^^^
+110 |         
+111 |         self.files_checked += 1
+    |
+
+E701 Multiple statements on one line (colon)
+   --> .agent\skills\frontend-design\scripts\ux_audit.py:109:15
+    |
+107 |             with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+108 |                 content = f.read()
+109 |         except: return
+    |               ^
+110 |         
+111 |         self.files_checked += 1
+    |
+
+E701 Multiple statements on one line (colon)
+   --> .agent\skills\frontend-design\scripts\ux_audit.py:253:31
+    |
+251 |         font_family_css = re.findall(r'font-family:\s*([^;]+)', content, re.IGNORECASE)
+252 |
+253 |         for font in font_faces: font_families.add(font.strip().lower())
+    |                               ^
+254 |         for font in google_fonts:
+255 |             for f in font.replace('+', ' ').split('|'):
+    |
+
+E722 Do not use bare `except`
+   --> .agent\skills\frontend-design\scripts\ux_audit.py:308:17
+    |
+306 |                 try:
+307 |                     weight_values.append(int(val))
+308 |                 except: pass
+    |                 ^^^^^^
+309 |
+310 |         # Check for adjacent weights (400/500, 500/600, etc.)
+    |
+
+E701 Multiple statements on one line (colon)
+   --> .agent\skills\frontend-design\scripts\ux_audit.py:308:23
+    |
+306 |                 try:
+307 |                     weight_values.append(int(val))
+308 |                 except: pass
+    |                       ^
+309 |
+310 |         # Check for adjacent weights (400/500, 500/600, etc.)
+    |
+
+E701 Multiple statements on one line (colon)
+   --> .agent\skills\frontend-design\scripts\ux_audit.py:692:25
+    |
+691 | def main():
+692 |     if len(sys.argv) < 2: sys.exit(1)
+    |                         ^
+693 |     
+694 |     path = sys.argv[1]
+    |
+
+E701 Multiple statements on one line (colon)
+   --> .agent\skills\frontend-design\scripts\ux_audit.py:698:28
+    |
+697 |     auditor = UXAuditor()
+698 |     if os.path.isfile(path): auditor.audit_file(path)
+    |                            ^
+699 |     else: auditor.audit_directory(path)
+    |
+
+E701 Multiple statements on one line (colon)
+   --> .agent\skills\frontend-design\scripts\ux_audit.py:699:9
+    |
+697 |     auditor = UXAuditor()
+698 |     if os.path.isfile(path): auditor.audit_file(path)
+699 |     else: auditor.audit_directory(path)
+    |         ^
+700 |     
+701 |     report = auditor.get_report()
+    |
+
+E701 Multiple statements on one line (colon)
+   --> .agent\skills\frontend-design\scripts\ux_audit.py:711:43
+    |
+709 |         if report['issues']:
+710 |             print(f"[!] ISSUES ({len(report['issues'])}):")
+711 |             for i in report['issues'][:10]: print(f"  - {i}")
+    |                                           ^
+712 |         if report['warnings']:
+713 |             print(f"[*] WARNINGS ({len(report['warnings'])}):")
+    |
+
+E701 Multiple statements on one line (colon)
+   --> .agent\skills\frontend-design\scripts\ux_audit.py:714:45
+    |
+712 |         if report['warnings']:
+713 |             print(f"[*] WARNINGS ({len(report['warnings'])}):")
+714 |             for w in report['warnings'][:15]: print(f"  - {w}")
+    |                                             ^
+715 |         print(f"[+] PASSED CHECKS: {report['passed_checks']}")
+716 |         status = "PASS" if report['compliant'] else "FAIL"
+    |
+
+E722 Do not use bare `except`
+  --> .agent\skills\i18n-localization\scripts\i18n_checker.py:88:13
+   |
+86 |                     locales[lang] = {}
+87 |                 locales[lang][f.stem] = set(flatten_keys(content))
+88 |             except:
+   |             ^^^^^^
+89 |                 continue
+   |
+
+E722 Do not use bare `except`
+   --> .agent\skills\i18n-localization\scripts\i18n_checker.py:182:9
+    |
+180 |                 files_with_hardcoded += 1
+181 |                 
+182 |         except:
+    |         ^^^^^^
+183 |             continue
+    |
+
+E722 Do not use bare `except`
+  --> .agent\skills\lint-and-validate\scripts\lint_runner.py:24:1
+   |
+22 | try:
+23 |     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+24 | except:
+   | ^^^^^^
+25 |     pass
+   |
+
+E722 Do not use bare `except`
+  --> .agent\skills\lint-and-validate\scripts\lint_runner.py:54:9
+   |
+52 |                 result["linters"].append({"name": "tsc", "cmd": ["npx", "tsc", "--noEmit"]})
+53 |                 
+54 |         except:
+   |         ^^^^^^
+55 |             pass
+   |
+
+E722 Do not use bare `except`
+  --> .agent\skills\mobile-design\scripts\mobile_audit.py:85:9
+   |
+83 |             with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+84 |                 content = f.read()
+85 |         except:
+   |         ^^^^^^
+86 |             return
+   |
+
+F841 Local variable `has_large_title` is assigned to but never used
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:350:13
+    |
+348 |         if is_react_native:
+349 |             # Check for iOS text styles that match HIG
+350 |             has_large_title = bool(re.search(r'fontSize:\s*34|largeTitle|font-weight:\s*["\']?bold', content))
+    |             ^^^^^^^^^^^^^^^
+351 |             has_title_1 = bool(re.search(r'fontSize:\s*28', content))
+352 |             has_headline = bool(re.search(r'fontSize:\s*17.*semibold|headline', content))
+    |
+help: Remove assignment to unused variable `has_large_title`
+
+F841 Local variable `has_title_1` is assigned to but never used
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:351:13
+    |
+349 |             # Check for iOS text styles that match HIG
+350 |             has_large_title = bool(re.search(r'fontSize:\s*34|largeTitle|font-weight:\s*["\']?bold', content))
+351 |             has_title_1 = bool(re.search(r'fontSize:\s*28', content))
+    |             ^^^^^^^^^^^
+352 |             has_headline = bool(re.search(r'fontSize:\s*17.*semibold|headline', content))
+353 |             has_body = bool(re.search(r'fontSize:\s*17.*regular|body', content))
+    |
+help: Remove assignment to unused variable `has_title_1`
+
+F841 Local variable `has_headline` is assigned to but never used
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:352:13
+    |
+350 |             has_large_title = bool(re.search(r'fontSize:\s*34|largeTitle|font-weight:\s*["\']?bold', content))
+351 |             has_title_1 = bool(re.search(r'fontSize:\s*28', content))
+352 |             has_headline = bool(re.search(r'fontSize:\s*17.*semibold|headline', content))
+    |             ^^^^^^^^^^^^
+353 |             has_body = bool(re.search(r'fontSize:\s*17.*regular|body', content))
+    |
+help: Remove assignment to unused variable `has_headline`
+
+F841 Local variable `has_body` is assigned to but never used
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:353:13
+    |
+351 |             has_title_1 = bool(re.search(r'fontSize:\s*28', content))
+352 |             has_headline = bool(re.search(r'fontSize:\s*17.*semibold|headline', content))
+353 |             has_body = bool(re.search(r'fontSize:\s*17.*regular|body', content))
+    |             ^^^^^^^^
+354 |
+355 |             # Check if following iOS scale roughly
+    |
+help: Remove assignment to unused variable `has_body`
+
+F841 Local variable `has_title_material` is assigned to but never used
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:368:13
+    |
+366 |             has_display = bool(re.search(r'fontSize:\s*[456][0-9]|display', content))
+367 |             has_headline_material = bool(re.search(r'fontSize:\s*[23][0-9]|headline', content))
+368 |             has_title_material = bool(re.search(r'fontSize:\s*2[12][0-9].*medium|title', content))
+    |             ^^^^^^^^^^^^^^^^^^
+369 |             has_body_material = bool(re.search(r'fontSize:\s*1[456].*regular|body', content))
+370 |             has_label = bool(re.search(r'fontSize:\s*1[1234].*medium|label', content))
+    |
+help: Remove assignment to unused variable `has_title_material`
+
+F841 Local variable `has_body_material` is assigned to but never used
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:369:13
+    |
+367 |             has_headline_material = bool(re.search(r'fontSize:\s*[23][0-9]|headline', content))
+368 |             has_title_material = bool(re.search(r'fontSize:\s*2[12][0-9].*medium|title', content))
+369 |             has_body_material = bool(re.search(r'fontSize:\s*1[456].*regular|body', content))
+    |             ^^^^^^^^^^^^^^^^^
+370 |             has_label = bool(re.search(r'fontSize:\s*1[1234].*medium|label', content))
+    |
+help: Remove assignment to unused variable `has_body_material`
+
+E722 Do not use bare `except`
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:413:17
+    |
+411 |                 try:
+412 |                     numeric_weights.append(int(val))
+413 |                 except:
+    |                 ^^^^^^
+414 |                     pass
+    |
+
+E722 Do not use bare `except`
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:450:13
+    |
+448 |                     if saturation > 0.8:  # Highly saturated
+449 |                         saturated_count += 1
+450 |             except:
+    |             ^^^^^^
+451 |                 pass
+    |
+
+F841 Local variable `light_colors` is assigned to but never used
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:458:9
+    |
+456 |         # 10.3 Outdoor Visibility Check
+457 |         # Low contrast combinations fail in outdoor sunlight
+458 |         light_colors = re.findall(r'#[0-9A-Fa-f]{6}|rgba?\([^)]+\)', content)
+    |         ^^^^^^^^^^^^
+459 |         # Check for potential low contrast (light gray on white, dark gray on black)
+460 |         potential_low_contrast = bool(re.search(r'#[EeEeEeEe].*#ffffff|#999999.*#ffffff|#333333.*#000000|#666666.*#000000', content))
+    |
+help: Remove assignment to unused variable `light_colors`
+
+F841 Local variable `has_systemBackground` is assigned to but never used
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:485:13
+    |
+483 |             has_label = bool(re.search(r'color:\s*["\']?label|\.label', content))
+484 |             has_secondaryLabel = bool(re.search(r'secondaryLabel|\.secondaryLabel', content))
+485 |             has_systemBackground = bool(re.search(r'systemBackground|\.systemBackground', content))
+    |             ^^^^^^^^^^^^^^^^^^^^
+486 |
+487 |             has_hardcoded_gray = bool(re.search(r'#[78]0{4}', content))
+    |
+help: Remove assignment to unused variable `has_systemBackground`
+
+E701 Multiple statements on one line (colon)
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:567:20
+    |
+566 |         testing_tools = []
+567 |         if has_jest: testing_tools.append('Jest')
+    |                    ^
+568 |         if has_rntl: testing_tools.append('RNTL')
+569 |         if has_detox: testing_tools.append('Detox')
+    |
+
+E701 Multiple statements on one line (colon)
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:568:20
+    |
+566 |         testing_tools = []
+567 |         if has_jest: testing_tools.append('Jest')
+568 |         if has_rntl: testing_tools.append('RNTL')
+    |                    ^
+569 |         if has_detox: testing_tools.append('Detox')
+570 |         if has_maestro: testing_tools.append('Maestro')
+    |
+
+E701 Multiple statements on one line (colon)
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:569:21
+    |
+567 |         if has_jest: testing_tools.append('Jest')
+568 |         if has_rntl: testing_tools.append('RNTL')
+569 |         if has_detox: testing_tools.append('Detox')
+    |                     ^
+570 |         if has_maestro: testing_tools.append('Maestro')
+    |
+
+E701 Multiple statements on one line (colon)
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:570:23
+    |
+568 |         if has_rntl: testing_tools.append('RNTL')
+569 |         if has_detox: testing_tools.append('Detox')
+570 |         if has_maestro: testing_tools.append('Maestro')
+    |                       ^
+571 |
+572 |         if len(testing_tools) == 0:
+    |
+
+F841 Local variable `has_debugger` is assigned to but never used
+   --> .agent\skills\mobile-design\scripts\mobile_audit.py:594:9
+    |
+592 |         has_performance = bool(re.search(r'Performance|systrace|profile|Flipper', content))
+593 |         has_console_log = len(re.findall(r'console\.(log|warn|error|debug|info)', content))
+594 |         has_debugger = bool(re.search(r'debugger|__DEV__|React\.DevTools', content))
+    |         ^^^^^^^^^^^^
+595 |
+596 |         if has_console_log > 10:
+    |
+help: Remove assignment to unused variable `has_debugger`
+
+E722 Do not use bare `except`
+  --> .agent\skills\seo-fundamentals\scripts\seo_checker.py:29:1
+   |
+27 | try:
+28 |     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+29 | except:
+   | ^^^^^^
+30 |     pass
+   |
+
+E722 Do not use bare `except`
+  --> .agent\skills\testing-patterns\scripts\test_runner.py:23:1
+   |
+21 | try:
+22 |     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+23 | except:
+   | ^^^^^^
+24 |     pass
+   |
+
+E722 Do not use bare `except`
+  --> .agent\skills\testing-patterns\scripts\test_runner.py:66:9
+   |
+64 |                 result["coverage_cmd"] = ["npx", "jest", "--coverage"]
+65 |                 
+66 |         except:
+   |         ^^^^^^
+67 |             pass
+   |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+  --> backend\app\api\routers\admin.py:31:9
+   |
+29 |         return {"success": True, "data": response.data}
+30 |     except Exception as e:
+31 |         raise HTTPException(500, str(e))
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+32 |
+33 | @router.post("/shops/{shop_id}/approve")
+   |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+  --> backend\app\api\routers\admin.py:78:9
+   |
+77 |     except Exception as e:
+78 |         raise HTTPException(500, str(e))
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+79 |
+80 | @router.post("/shops/{shop_id}/reject")
+   |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+  --> backend\app\api\routers\admin.py:99:9
+   |
+98 |     except Exception as e:
+99 |         raise HTTPException(500, str(e))
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+
+E402 Module level import not at top of file
+  --> backend\app\api\routers\analytics.py:20:1
+   |
+18 |     visitor_id: str | None = None
+19 |
+20 | from app.services.analytics_service import analytics_buffer
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\geodata.py:210:9
+    |
+208 |     except httpx.RequestError as e:
+209 |         logger.error(f"Overpass request failed: {e}")
+210 |         raise HTTPException(status_code=502, detail="Overpass API failed")
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+211 |     except Exception as e:
+212 |         logger.error(f"Error processing OSM data: {e}")
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\geodata.py:213:9
+    |
+211 |     except Exception as e:
+212 |         logger.error(f"Error processing OSM data: {e}")
+213 |         raise HTTPException(status_code=500, detail=str(e))
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\owner.py:429:9
+    |
+427 |         owner_id = repository.get_owner(shop_id)
+428 |     except Exception:
+429 |         raise HTTPException(status_code=500, detail="Failed to verify ownership")
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+430 |
+431 |     if not owner_id or str(owner_id) != str(user_id):
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\partner.py:400:13
+    |
+398 |         message = str(exc).lower()
+399 |         if "referral_code" in message and "duplicate" in message:
+400 |             raise HTTPException(status_code=409, detail="Referral code already in use")
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+401 |         raise HTTPException(status_code=400, detail="Unable to save partner profile")
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\partner.py:401:9
+    |
+399 |         if "referral_code" in message and "duplicate" in message:
+400 |             raise HTTPException(status_code=409, detail="Referral code already in use")
+401 |         raise HTTPException(status_code=400, detail="Unable to save partner profile")
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+402 |
+403 |     profile_data = res.data or payload
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\partner.py:475:9
+    |
+473 |         await _upsert_partner_bank_secret(str(partner.get("id")), bank_payload)
+474 |     except Exception:
+475 |         raise HTTPException(status_code=400, detail="Unable to persist secure payout details")
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+476 |
+477 |     await asyncio.to_thread(
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\payments.py:267:9
+    |
+265 |             },
+266 |         )
+267 |         raise HTTPException(status_code=502, detail="Payment provider error")
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+268 |     except Exception as e:
+269 |         logger.error(
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\payments.py:278:9
+    |
+276 |               },
+277 |           )
+278 | /         raise HTTPException(
+279 | |             status_code=400,
+280 | |             detail="Unable to create checkout session",
+281 | |         )
+    | |_________^
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\payments.py:413:17
+    |
+411 |                               "verification_status": existing_status,
+412 |                           }
+413 | /                 raise HTTPException(
+414 | |                     status_code=409,
+415 | |                     detail="This slip has already been submitted and is being processed",
+416 | |                 )
+    | |_________________^
+417 |               raise HTTPException(status_code=400, detail=message)
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\payments.py:417:13
+    |
+415 |                     detail="This slip has already been submitted and is being processed",
+416 |                 )
+417 |             raise HTTPException(status_code=400, detail=message)
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+418 |
+419 |     slip_audit_payload = {
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\payments.py:690:9
+    |
+688 |     except stripe.error.SignatureVerificationError:
+689 |         logger.warning("stripe_webhook_invalid_signature")
+690 |         raise HTTPException(status_code=400, detail="Invalid signature")
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+691 |     except Exception as e:
+692 |         logger.error("stripe_webhook_parse_error", extra={"error": str(e)})
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\payments.py:693:9
+    |
+691 |     except Exception as e:
+692 |         logger.error("stripe_webhook_parse_error", extra={"error": str(e)})
+693 |         raise HTTPException(status_code=400, detail="Bad payload")
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+694 |
+695 |     event_id = event.get("id", "")
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\payments.py:728:9
+    |
+726 |             extra={"event_id": event_id, "err": str(e)},
+727 |         )
+728 |         raise HTTPException(status_code=500, detail="Event processing error")
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+729 |
+730 |     event_type = event.get("type")
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+  --> backend\app\api\routers\redemption.py:35:9
+   |
+33 |     except Exception as e:
+34 |         print(f"Redemption error: {e}")
+35 |         raise HTTPException(500, detail="Transaction failed")
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+  --> backend\app\api\routers\rides.py:82:9
+   |
+80 |         }
+81 |     except Exception as e:
+82 |         raise HTTPException(status_code=500, detail=str(e))
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\seo.py:186:9
+    |
+184 |         raise
+185 |     except Exception as e:
+186 |         raise HTTPException(status_code=500, detail=str(e))
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\seo.py:302:9
+    |
+300 |         raise
+301 |     except Exception as e:
+302 |         raise HTTPException(status_code=500, detail=str(e))
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+
+UP007 Use `X | Y` for type annotations
+  --> backend\app\api\routers\ugc.py:18:16
+   |
+17 | router = APIRouter()
+18 | VenueIdInput = Union[str, int, UUID]
+   |                ^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Convert to `X | Y`
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\ugc.py:124:9
+    |
+122 |         raise
+123 |     except Exception as e:
+124 |         raise HTTPException(status_code=500, detail=str(e))
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\ugc.py:200:9
+    |
+198 |         raise
+199 |     except Exception as e:
+200 |         raise HTTPException(status_code=500, detail=str(e))
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\app\api\routers\ugc.py:246:9
+    |
+244 |         raise
+245 |     except Exception as e:
+246 |         raise HTTPException(status_code=500, detail=str(e))
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+  --> backend\app\core\auth.py:46:10
+   |
+44 |       except Exception:
+45 |            # print(f"Auth Error: {e}")
+46 | /          raise HTTPException(
+47 | |             status_code=status.HTTP_401_UNAUTHORIZED,
+48 | |             detail="Could not validate credentials",
+49 | |             headers={"WWW-Authenticate": "Bearer"},
+50 | |         )
+   | |_________^
+51 |
+52 |   async def verify_admin(user = Depends(verify_user)):
+   |
+
+F401 `app.services.vector.places_vector_service.COLLECTION_NAME` imported but unused; consider using `importlib.util.find_spec` to test for availability
+  --> backend\app\jobs\triad_reconcile.py:25:13
+   |
+23 |         from app.db.session import _qdrant_client
+24 |         from app.services.vector.places_vector_service import (
+25 |             COLLECTION_NAME,
+   |             ^^^^^^^^^^^^^^^
+26 |             configure_genai_once,
+27 |             embed_text,
+   |
+help: Remove unused import: `app.services.vector.places_vector_service.COLLECTION_NAME`
+
+F841 Local variable `sql` is assigned to but never used
+ --> backend\scripts\apply_phase2_migration.py:5:9
+  |
+3 |     print("Applying Phase 2 Migration...")
+4 |     with open("backend/scripts/phase2_schema.sql", encoding="utf-8") as f:
+5 |         sql = f.read()
+  |         ^^^
+6 |
+7 |     # Split by statement if needed, but postgrest's .rpc usually takes a function name,
+  |
+help: Remove assignment to unused variable `sql`
+
+F841 Local variable `result` is assigned to but never used
+   --> backend\scripts\data_pipeline.py:142:13
+    |
+140 |         try:
+141 |             # Upsert based on osm_id to avoid duplicates
+142 |             result = supabase.table("venues").upsert(
+    |             ^^^^^^
+143 |                 batch,
+144 |                 on_conflict="osm_id"
+    |
+help: Remove assignment to unused variable `result`
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\scripts\ingest_knowledge.py:181:9
+    |
+179 |     except KeyboardInterrupt:
+180 |         logger.info("Ingestion interrupted by user")
+181 |         raise SystemExit(130)
+    |         ^^^^^^^^^^^^^^^^^^^^^
+    |
+
+E402 Module level import not at top of file
+  --> backend\scripts\list_tables.py:25:1
+   |
+23 |     pass
+24 |
+25 | from app.db.session import _core_session_maker
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+
+B905 `zip()` without an explicit `strict=` parameter
+   --> backend\scripts\osm_scraper.py:292:29
+    |
+290 |         results = await asyncio.gather(*tasks)
+291 |
+292 |         for name, venues in zip(batch_names, results):
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^
+293 |             print(f"   Γ£à {name}: {len(venues)} venues")
+294 |             all_venues.extend(venues)
+    |
+help: Add explicit value for parameter `strict=`
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\scripts\osm_sync_ultimate.py:774:17
+    |
+772 |             except ImportError:
+773 |                 logger.error("Γ¥î Redis unavailable and fakeredis not installed.")
+774 |                 raise e
+    |                 ^^^^^^^
+775 |
+776 |         self.sb = create_client(conf.SUPABASE_URL, conf.SUPABASE_SERVICE_ROLE_KEY)
+    |
+
+F401 `google.generativeai` imported but unused; consider using `importlib.util.find_spec` to test for availability
+  --> backend\scripts\triad_doctor.py:18:12
+   |
+16 | # Check optional dependencies
+17 | try:
+18 |     import google.generativeai
+   |            ^^^^^^^^^^^^^^^^^^^
+19 |     GENAI_INSTALLED = True
+20 | except ImportError:
+   |
+help: Remove unused import: `google.generativeai`
+
+F401 `qdrant_client` imported but unused; consider using `importlib.util.find_spec` to test for availability
+  --> backend\scripts\triad_doctor.py:24:12
+   |
+23 | try:
+24 |     import qdrant_client
+   |            ^^^^^^^^^^^^^
+25 |     QDRANT_INSTALLED = True
+26 | except ImportError:
+   |
+help: Remove unused import: `qdrant_client`
+
+F401 `asyncpg` imported but unused; consider using `importlib.util.find_spec` to test for availability
+  --> backend\scripts\triad_doctor.py:30:12
+   |
+29 | try:
+30 |     import asyncpg
+   |            ^^^^^^^
+31 |     ASYNCPG_INSTALLED = True
+32 | except ImportError:
+   |
+help: Remove unused import: `asyncpg`
+
+E402 Module level import not at top of file
+  --> backend\scripts\workers.py:15:1
+   |
+13 | load_dotenv()
+14 |
+15 | import redis
+   | ^^^^^^^^^^^^
+16 |
+17 | logging.basicConfig(
+   |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> backend\scripts\workers.py:107:13
+    |
+105 |         except ImportError:
+106 |             logger.error("Γ¥î Redis unavailable and fakeredis not installed.")
+107 |             raise e
+    |             ^^^^^^^
+108 |
+109 | def ensure_group(r: redis.Redis, stream: str, group: str) -> None:
+    |
+
+F841 Local variable `ts` is assigned to but never used
+   --> backend\scripts\workers.py:235:9
+    |
+233 |         h3_cell = event.get("h3_cell")
+234 |         tile = event.get("tile")
+235 |         ts = event.get("ts")
+    |         ^^
+236 |
+237 |         if not venue_id or not h3_cell or not tile:
+    |
+help: Remove assignment to unused variable `ts`
+
+B905 `zip()` without an explicit `strict=` parameter
+   --> backend\scripts\workers.py:333:23
+    |
+331 |             pipe.zcard(f"{Config.H3_VENUES_PREFIX}{c}")
+332 |         inv_counts = pipe.execute()
+333 |         for c, cnt in zip(cells, inv_counts):
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+334 |             inv[c] = int(cnt or 0)
+    |
+help: Add explicit value for parameter `strict=`
+
+B905 `zip()` without an explicit `strict=` parameter
+   --> backend\scripts\workers.py:347:22
+    |
+345 |             pipe2.zscore(Config.USER_HEX_DENSITY_ZSET, c)
+346 |         dens_scores = pipe2.execute()
+347 |         for c, sc in zip(cells, dens_scores):
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^
+348 |             ud[c] = float(sc or 0.0)
+    |
+help: Add explicit value for parameter `strict=`
+
+B017 Do not assert blind exception: `Exception`
+   --> backend\tests\test_slip_verification.py:686:14
+    |
+685 |     def test_invalid_type_raises(self):
+686 |         with pytest.raises(Exception):
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^
+687 |             _to_decimal([123])
+    |
+
+F841 Local variable `engine` is assigned to but never used
+  --> backend\tests\test_triad.py:97:9
+   |
+96 |         from app.db.session import get_core_engine
+97 |         engine = get_core_engine()
+   |         ^^^^^^
+98 |
+99 |         # Verify NullPool was passed
+   |
+help: Remove assignment to unused variable `engine`
+
+Found 92 errors.
+No fixes available (19 hidden fixes can be enabled with the `--unsafe-fixes` option).

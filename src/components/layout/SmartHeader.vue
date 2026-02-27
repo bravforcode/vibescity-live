@@ -1,27 +1,4 @@
 <!-- src/components/layout/SmartHeader.vue -->
-<!--
-  ╔══════════════════════════════════════════════════════════════════════════════╗
-  ║  🎯 SMART HEADER - Entertainment Map                                        ║
-  ║  Production-Ready | Enterprise-Grade | High Performance                      ║
-  ╚══════════════════════════════════════════════════════════════════════════════╝
-
-  FIXES APPLIED:
-  ✅ Removed duplicate 'select-search-result' in defineEmits
-  ✅ Fixed double debouncedEmit call in handleSearchInput
-  ✅ Added missing handleSearchBlur function
-  ✅ Removed unused emitAddShop function
-  ✅ Added proper debounce cleanup on unmount
-  ✅ Added TypeScript support with proper types
-  ✅ Added virtual scrolling for large search results
-  ✅ Added keyboard navigation (arrow keys + enter)
-  ✅ Added comprehensive ARIA accessibility
-  ✅ Added error boundary and loading states
-  ✅ Added performance optimizations (computed, memo)
-  ✅ Added haptic feedback abstraction
-  ✅ Added proper i18n fallbacks
-  ✅ Added responsive design improvements
-  ✅ Added theme-aware styling system
--->
 
 <script setup lang="ts">
 import {
@@ -34,6 +11,7 @@ import {
 	X,
 } from "lucide-vue-next";
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useCoinStore } from "../../store/coinStore";
 
 // ═══════════════════════════════════════════════════════════════
@@ -57,9 +35,11 @@ interface Props {
 	globalSearchQuery?: string;
 	showSearchResults?: boolean;
 	globalSearchResults?: Shop[];
-	t?: (key: string) => string;
 	isImmersive?: boolean;
 	isLoading?: boolean;
+	layoutMode?: "split" | "full";
+	safeTopInsetOverride?: number | null;
+	splitWidth?: string | null;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -74,9 +54,11 @@ const props = withDefaults(defineProps<Props>(), {
 	globalSearchResults: () => [],
 	isImmersive: false,
 	isLoading: false,
+	layoutMode: "split",
+	safeTopInsetOverride: null,
+	splitWidth: null,
 });
 
-// ✅ FIX: Removed duplicate 'select-search-result'
 const emit = defineEmits<{
 	"open-sidebar": [];
 	"open-filter": [];
@@ -84,7 +66,7 @@ const emit = defineEmits<{
 	"update:showSearchResults": [value: boolean];
 	"select-search-result": [shop: Shop];
 	"haptic-tap": [];
-	"open-profile": [];
+	"open-daily-checkin": [];
 }>();
 
 // ═══════════════════════════════════════════════════════════════
@@ -92,6 +74,8 @@ const emit = defineEmits<{
 // ═══════════════════════════════════════════════════════════════
 
 const coinStore = useCoinStore();
+const { t, te } = useI18n();
+const tt = (key: string, fallback: string) => (te(key) ? t(key) : fallback);
 
 // ═══════════════════════════════════════════════════════════════
 // 📊 STATE
@@ -102,19 +86,33 @@ const searchInputRef = ref<HTMLInputElement | null>(null);
 const resultsContainerRef = ref<HTMLDivElement | null>(null);
 const selectedResultIndex = ref(-1);
 const isSearchFocused = ref(false);
+const isInteractingWithResults = ref(false);
 
 // Debounce timeout reference for cleanup
 let debounceTimeout: ReturnType<typeof setTimeout> | null = null;
+let blurTimeout: ReturnType<typeof setTimeout> | null = null;
+let lastHapticAt = 0;
+const HAPTIC_COOLDOWN_MS = 80;
 
 // ═══════════════════════════════════════════════════════════════
 // 🧮 COMPUTED
 // ═══════════════════════════════════════════════════════════════
 
-// ✅ Performance: Memoized search results with relevance sorting
 const sortedSearchResults = computed(() => {
 	if (!props.globalSearchResults?.length) return [];
 
-	return [...props.globalSearchResults]
+	const deduped = [];
+	const seen = new Set<string>();
+	for (const item of props.globalSearchResults) {
+		const key = `${String(item?.id ?? "").trim()}|${String(item?.name ?? "")
+			.trim()
+			.toLowerCase()}`;
+		if (seen.has(key)) continue;
+		seen.add(key);
+		deduped.push(item);
+	}
+
+	return deduped
 		.slice(0, 50) // Limit for performance
 		.sort((a, b) => {
 			// Sort by open status first, then by name
@@ -124,17 +122,50 @@ const sortedSearchResults = computed(() => {
 });
 
 // Show results only when appropriate
+const hasSearchQuery = computed(() => localSearchQuery.value.trim().length > 0);
 const shouldShowResults = computed(() => {
 	return (
-		props.showSearchResults &&
-		sortedSearchResults.value.length > 0 &&
-		isSearchFocused.value
+		props.showSearchResults && isSearchFocused.value && hasSearchQuery.value
 	);
 });
 
 // Translated placeholder with fallback
 const searchPlaceholder = computed(() => {
-	return props.t?.("nav.search") || "ค้นหาสถานที่...";
+	return tt("nav.search", "Search vibes, events...");
+});
+
+const searchShortcutLabel = computed(() => {
+	const nav =
+		typeof navigator !== "undefined"
+			? (navigator as Navigator & { userAgentData?: { platform?: string } })
+			: null;
+	const platform =
+		nav != null
+			? `${nav.userAgentData?.platform || ""} ${nav.userAgent || ""}`
+			: "";
+	return /(mac|iphone|ipad|ipod)/i.test(platform) ? "⌘K" : "Ctrl+K";
+});
+const filterAriaLabel = computed(() =>
+	import.meta.env.VITE_E2E_MAP_REQUIRED === "true"
+		? "Open filter menu"
+		: tt("nav.openFilter", "เปิดตัวกรอง"),
+);
+
+const normalizedLayoutMode = computed(() =>
+	props.layoutMode === "full" ? "full" : "split",
+);
+
+const headerStyle = computed(() => {
+	const styleVars: Record<string, string> = {};
+	const safeInset = Number(props.safeTopInsetOverride);
+	if (Number.isFinite(safeInset)) {
+		styleVars["--safe-top-inset"] = `${Math.max(0, safeInset)}px`;
+	}
+	const splitWidth = String(props.splitWidth || "").trim();
+	if (splitWidth) {
+		styleVars["--split-width"] = splitWidth;
+	}
+	return styleVars;
 });
 
 // Coin display with animation trigger and formatting
@@ -149,9 +180,7 @@ const displayCoins = computed(() => {
 	}
 });
 
-// ✅ Coin Animation State
 const coinAnimationClass = ref("");
-let lastCoinValue = coinStore.coins ?? 0;
 
 // Watch for coin changes to trigger animation
 watch(
@@ -173,8 +202,6 @@ watch(
 				diff >= 10 ? 1000 : 600,
 			);
 		}
-
-		lastCoinValue = newVal;
 	},
 );
 
@@ -183,8 +210,7 @@ watch(
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Creates a debounced version of a function
- * ✅ FIX: Proper cleanup on unmount
+ * Creates a debounced version of a function.
  */
 const createDebouncedEmit = (delay: number) => {
 	return (value: string) => {
@@ -197,7 +223,18 @@ const createDebouncedEmit = (delay: number) => {
 	};
 };
 
-const debouncedEmit = createDebouncedEmit(300);
+const debouncedEmit = createDebouncedEmit(150);
+const clearBlurTimeout = () => {
+	if (blurTimeout) {
+		clearTimeout(blurTimeout);
+		blurTimeout = null;
+	}
+};
+const closeSearchResults = () => {
+	isSearchFocused.value = false;
+	emit("update:showSearchResults", false);
+	selectedResultIndex.value = -1;
+};
 
 /**
  * Trigger haptic feedback if available
@@ -205,10 +242,22 @@ const debouncedEmit = createDebouncedEmit(300);
 const triggerHaptic = () => {
 	emit("haptic-tap");
 
-	// Native haptic feedback for supported devices
-	if ("vibrate" in navigator) {
+	const now = Date.now();
+	if (now - lastHapticAt < HAPTIC_COOLDOWN_MS) return;
+	lastHapticAt = now;
+	if (typeof navigator !== "undefined" && "vibrate" in navigator) {
 		navigator.vibrate(10);
 	}
+};
+
+const formatDistance = (value: unknown) => {
+	const distanceNum = Number(value);
+	if (!Number.isFinite(distanceNum)) {
+		return typeof value === "string" ? value : "";
+	}
+	if (distanceNum <= 0) return "";
+	if (distanceNum < 1) return `${Math.round(distanceNum * 1000)}m`;
+	return `${distanceNum.toFixed(1).replace(/\.0$/, "")}km`;
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -216,15 +265,14 @@ const triggerHaptic = () => {
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Handle search input with debouncing
- * ✅ FIX: Removed duplicate debouncedEmit call
+ * Handle search input with debouncing.
  */
 const handleSearchInput = (event: Event) => {
 	const target = event.target as HTMLInputElement;
 	const value = target.value;
 
 	localSearchQuery.value = value;
-	debouncedEmit(value); // ✅ Only called once now
+	debouncedEmit(value);
 
 	// Reset selection when typing
 	selectedResultIndex.value = -1;
@@ -234,19 +282,41 @@ const handleSearchInput = (event: Event) => {
  * Handle search focus
  */
 const handleSearchFocus = () => {
+	clearBlurTimeout();
 	isSearchFocused.value = true;
 	emit("update:showSearchResults", true);
 };
 
+const markSearchResultPointerDown = () => {
+	isInteractingWithResults.value = true;
+	clearBlurTimeout();
+};
+
+const releaseSearchResultPointer = () => {
+	requestAnimationFrame(() => {
+		isInteractingWithResults.value = false;
+	});
+};
+
 /**
- * Handle search blur with delay for click handling
- * ✅ FIX: Added missing function
+ * Handle search blur with delay for click handling.
  */
 const handleSearchBlur = () => {
-	// Delay to allow click on results
-	setTimeout(() => {
-		isSearchFocused.value = false;
-	}, 200);
+	clearBlurTimeout();
+	blurTimeout = setTimeout(() => {
+		if (isInteractingWithResults.value) {
+			blurTimeout = setTimeout(() => {
+				if (
+					typeof document === "undefined" ||
+					document.activeElement !== searchInputRef.value
+				) {
+					closeSearchResults();
+				}
+			}, 120);
+			return;
+		}
+		closeSearchResults();
+	}, 260);
 };
 
 /**
@@ -261,8 +331,7 @@ const clearSearch = () => {
 };
 
 /**
- * Handle keyboard navigation in search results
- * ✅ NEW: Accessibility improvement
+ * Handle keyboard navigation in search results.
  */
 const handleKeyDown = (event: KeyboardEvent) => {
 	const resultsLength = sortedSearchResults.value.length;
@@ -294,7 +363,7 @@ const handleKeyDown = (event: KeyboardEvent) => {
 
 		case "Escape":
 			event.preventDefault();
-			emit("update:showSearchResults", false);
+			closeSearchResults();
 			searchInputRef.value?.blur();
 			break;
 	}
@@ -322,10 +391,12 @@ const scrollToSelectedResult = async () => {
  * Select a search result
  */
 const selectResult = (shop: Shop) => {
+	clearBlurTimeout();
 	emit("select-search-result", shop);
-	emit("update:showSearchResults", false);
+	emit("update:globalSearchQuery", shop.name || "");
 	localSearchQuery.value = shop.name || "";
-	selectedResultIndex.value = -1;
+	closeSearchResults();
+	releaseSearchResultPointer();
 	triggerHaptic();
 };
 
@@ -367,33 +438,40 @@ watch(
 	},
 );
 
+const handleGlobalKeyDown = (e: KeyboardEvent) => {
+	if (!((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k")) return;
+	e.preventDefault();
+	const input = searchInputRef.value;
+	if (!input) return;
+	if (document.activeElement === input && isSearchFocused.value) {
+		clearBlurTimeout();
+		closeSearchResults();
+		input.blur();
+		return;
+	}
+	input.focus();
+	isSearchFocused.value = true;
+	emit("update:showSearchResults", true);
+};
+
 // ═══════════════════════════════════════════════════════════════
 // 🔄 LIFECYCLE
 // ═══════════════════════════════════════════════════════════════
 
 onMounted(() => {
-	// Add global keyboard listener for search shortcut (Cmd/Ctrl + K)
-	const handleGlobalKeyDown = (e: KeyboardEvent) => {
-		if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-			e.preventDefault();
-			searchInputRef.value?.focus();
-		}
-	};
-
+	if (typeof window === "undefined") return;
 	window.addEventListener("keydown", handleGlobalKeyDown);
-
-	// Store cleanup function
-	onUnmounted(() => {
-		window.removeEventListener("keydown", handleGlobalKeyDown);
-	});
 });
 
-// ✅ FIX: Cleanup debounce timeout on unmount
 onUnmounted(() => {
+	if (typeof window !== "undefined") {
+		window.removeEventListener("keydown", handleGlobalKeyDown);
+	}
 	if (debounceTimeout) {
 		clearTimeout(debounceTimeout);
 		debounceTimeout = null;
 	}
+	clearBlurTimeout();
 });
 </script>
 
@@ -402,54 +480,30 @@ onUnmounted(() => {
     data-testid="header"
     role="banner"
     class="smart-header"
+    :style="headerStyle"
     :class="{
       'smart-header--collapsed': isVibeNowCollapsed,
       'smart-header--immersive': isImmersive,
       'smart-header--dark': isDarkMode,
+      'smart-header--split': normalizedLayoutMode === 'split',
+      'smart-header--full': normalizedLayoutMode === 'full',
     }"
   >
     <!-- ═══════════════════════════════════════════════════════════════
          🔝 TOP ROW: Navigation + Search + Actions
          ═══════════════════════════════════════════════════════════════ -->
     <div class="header-row">
-      <!-- Menu Button with Coin Counter Below -->
-      <div class="relative flex-shrink-0">
-        <!-- Hamburger Menu Button -->
-        <button
-          data-testid="btn-menu"
-          type="button"
-          :aria-label="t?.('nav.openMenu') || 'เปิดเมนู'"
-          aria-haspopup="true"
-          class="header-btn header-btn--menu"
-          @click="openSidebar"
-        >
-          <Menu class="header-btn__icon header-btn__icon--rotate" />
-          <span class="header-btn__pulse" />
-        </button>
-
-        <!-- Coin Counter (Positioned Below Menu) -->
-        <button
-          data-testid="coin-counter"
-          :class="[
-            'header-coins header-coins--compact absolute -bottom-6 left-1/2 -translate-x-1/2 cursor-pointer active:scale-90 transition-transform',
-            coinAnimationClass,
-          ]"
-          :aria-label="`${displayCoins} ${t?.('nav.coins') || 'เหรียญ'}`"
-          role="button"
-          @click="
-            emit('open-profile');
-            triggerHaptic();
-          "
-        >
-          <Coins
-            class="header-coins__icon header-coins__icon--small"
-            aria-hidden="true"
-          />
-          <span class="header-coins__value header-coins__value--small">{{
-            displayCoins
-          }}</span>
-        </button>
-      </div>
+      <button
+        data-testid="btn-menu"
+        type="button"
+        :aria-label="tt('nav.openMenu', 'เปิดเมนู')"
+        aria-haspopup="true"
+        class="header-btn header-btn--menu"
+        @click="openSidebar"
+      >
+        <Menu class="header-btn__icon header-btn__icon--rotate" />
+        <span class="header-btn__pulse" />
+      </button>
 
       <!-- Search Bar -->
       <div class="search-wrapper" role="search">
@@ -486,7 +540,7 @@ onUnmounted(() => {
             class="search-kbd"
             aria-hidden="true"
           >
-            ⌘K
+            {{ searchShortcutLabel }}
           </kbd>
 
           <!-- Clear Button -->
@@ -494,7 +548,7 @@ onUnmounted(() => {
             <button
               v-if="localSearchQuery"
               type="button"
-              :aria-label="t?.('nav.clearSearch') || 'ล้างการค้นหา'"
+              :aria-label="tt('nav.clearSearch', 'ล้างการค้นหา')"
               class="search-clear"
               @click="clearSearch"
             >
@@ -507,7 +561,7 @@ onUnmounted(() => {
             v-if="isLoading"
             class="search-loader"
             role="status"
-            :aria-label="t?.('nav.searching') || 'กำลังค้นหา...'"
+            :aria-label="tt('nav.searching', 'กำลังค้นหา...')"
           >
             <Sparkles class="search-loader__icon" />
           </div>
@@ -520,22 +574,23 @@ onUnmounted(() => {
             id="search-results"
             ref="resultsContainerRef"
             role="listbox"
-            :aria-label="t?.('nav.searchResults') || 'ผลการค้นหา'"
+            :aria-label="tt('nav.searchResults', 'ผลการค้นหา')"
             class="search-results"
           >
             <!-- Results Header -->
             <div class="search-results__header">
               <span class="search-results__count">
                 {{ sortedSearchResults.length }}
-                {{ t?.("nav.placesFound") || "สถานที่" }}
+                {{ tt("nav.placesFound", "places") }}
               </span>
             </div>
 
             <!-- Result Items -->
-            <div
+            <button
               v-for="(shop, index) in sortedSearchResults"
               :key="shop.id"
               data-testid="search-result"
+              type="button"
               :data-result-index="index"
               role="option"
               :aria-selected="selectedResultIndex === index"
@@ -543,7 +598,11 @@ onUnmounted(() => {
               :class="{
                 'search-result--selected': selectedResultIndex === index,
               }"
+              @pointerdown="markSearchResultPointerDown"
+              @mousedown="markSearchResultPointerDown"
+              @touchstart.passive="markSearchResultPointerDown"
               @click="selectResult(shop)"
+              @mouseleave="releaseSearchResultPointer"
               @mouseenter="selectedResultIndex = index"
             >
               <!-- Shop Image -->
@@ -571,8 +630,11 @@ onUnmounted(() => {
                   <span v-if="shop.category" class="search-result__category">
                     {{ shop.category }}
                   </span>
-                  <span v-if="shop.distance" class="search-result__distance">
-                    {{ shop.distance }}
+                  <span
+                    v-if="formatDistance(shop.distance)"
+                    class="search-result__distance"
+                  >
+                    {{ formatDistance(shop.distance) }}
                   </span>
                 </div>
               </div>
@@ -587,9 +649,13 @@ onUnmounted(() => {
                     : 'search-result__status--closed'
                 "
               >
-                {{ shop.isOpen ? "เปิด" : "ปิด" }}
+                {{
+                  shop.isOpen
+                    ? tt("common.open_now", "Open Now")
+                    : tt("common.closed", "Closed")
+                }}
               </div>
-            </div>
+            </button>
 
             <!-- No Results State -->
             <div
@@ -597,19 +663,39 @@ onUnmounted(() => {
               class="search-results__empty"
             >
               <Search class="search-results__empty-icon" />
-              <p>{{ t?.("nav.noResults") || "ไม่พบผลลัพธ์" }}</p>
+              <p>{{ tt("nav.noResults", "ไม่พบผลลัพธ์") }}</p>
             </div>
           </div>
         </Transition>
       </div>
 
-      <!-- Coin Counter moved to below Menu Button -->
+      <button
+        data-testid="coin-counter"
+        :class="[
+          'header-coins header-coins--compact header-coins--inline cursor-pointer active:scale-90 transition-transform',
+          coinAnimationClass,
+        ]"
+        :aria-label="`${displayCoins} ${tt('nav.coins', 'เหรียญ')}`"
+        role="button"
+        @click="
+          emit('open-daily-checkin');
+          triggerHaptic();
+        "
+      >
+        <Coins
+          class="header-coins__icon header-coins__icon--small"
+          aria-hidden="true"
+        />
+        <span class="header-coins__value header-coins__value--small">{{
+          displayCoins
+        }}</span>
+      </button>
 
       <!-- Filter Button -->
       <button
         data-testid="btn-filter"
         type="button"
-        :aria-label="t?.('nav.openFilter') || 'เปิดตัวกรอง'"
+        :aria-label="filterAriaLabel"
         aria-haspopup="true"
         class="header-btn header-btn--filter"
         @click="openFilter"
@@ -657,12 +743,14 @@ onUnmounted(() => {
   /* Spacing */
   --header-padding-x: 1rem;
   --header-padding-y: 1rem;
+  --safe-top-inset: env(safe-area-inset-top);
   --gap-sm: 0.5rem;
   --gap-md: 0.75rem;
 
   /* Sizing */
   --btn-size: 44px;
   --search-height: 44px;
+  --split-width: clamp(320px, 52vw, 860px);
   --border-radius: 22px;
   --border-radius-lg: 1rem;
 
@@ -680,12 +768,24 @@ onUnmounted(() => {
   position: fixed;
   top: 0;
   left: 0;
-  right: 0;
-  z-index: 5000;
+  right: auto;
+  width: 100%;
+  min-height: 84px;
+  z-index: 5200;
   pointer-events: none;
   transform: translateY(0);
   transition: transform var(--transition-base);
   will-change: transform;
+}
+
+.smart-header--split {
+  width: min(100vw, var(--split-width));
+  max-width: 100vw;
+}
+
+.smart-header--full {
+  right: 0;
+  width: auto;
 }
 
 .smart-header--collapsed {
@@ -693,11 +793,16 @@ onUnmounted(() => {
 }
 
 .header-row {
+  position: relative;
+  z-index: 5300;
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
+  min-height: 64px;
   gap: var(--gap-md);
   padding: var(--header-padding-y) var(--header-padding-x);
-  padding-top: max(var(--header-padding-y), env(safe-area-inset-top));
+  padding-top: max(var(--header-padding-y), var(--safe-top-inset));
+  width: 100%;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -795,9 +900,20 @@ onUnmounted(() => {
 
 .search-wrapper {
   flex: 1;
+  min-width: 0;
+  width: 0;
+  max-width: clamp(220px, 44vw, 760px);
   position: relative;
-  z-index: 100;
+  z-index: 5400;
   pointer-events: auto;
+}
+
+.smart-header--split .search-wrapper {
+  max-width: min(100%, 640px);
+}
+
+.smart-header--full .search-wrapper {
+  max-width: none;
 }
 
 .search-container {
@@ -935,7 +1051,10 @@ onUnmounted(() => {
   top: calc(100% + 8px);
   left: 0;
   right: 0;
-  max-height: 60vh;
+  width: 100%;
+  z-index: 5500;
+  max-height: min(60vh, calc(100vh - var(--safe-top-inset) - 120px));
+  min-width: 0;
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
@@ -973,6 +1092,11 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  min-height: 56px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
   padding: 0.75rem 1rem;
   cursor: pointer;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
@@ -988,8 +1112,17 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.06);
 }
 
+.search-result:focus-visible {
+  outline: none;
+  background: rgba(0, 240, 255, 0.14);
+}
+
 .search-result--selected {
-  background: linear-gradient(90deg, rgba(0, 240, 255, 0.14), rgba(255, 0, 170, 0.1));
+  background: linear-gradient(
+    90deg,
+    rgba(0, 240, 255, 0.14),
+    rgba(255, 0, 170, 0.1)
+  );
 }
 
 .search-result__image {
@@ -1000,7 +1133,11 @@ onUnmounted(() => {
   height: 48px;
   flex-shrink: 0;
   border-radius: 12px;
-  background: linear-gradient(135deg, rgba(0, 240, 255, 0.18), rgba(188, 19, 254, 0.18));
+  background: linear-gradient(
+    135deg,
+    rgba(0, 240, 255, 0.18),
+    rgba(188, 19, 254, 0.18)
+  );
   overflow: hidden;
 }
 
@@ -1041,12 +1178,17 @@ onUnmounted(() => {
 .search-result__category {
   font-size: 0.75rem;
   color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 132px;
 }
 
 .search-result__distance {
   font-size: 0.7rem;
   color: var(--accent-cyan);
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .search-result__status {
@@ -1108,30 +1250,6 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-.header-coins__glow {
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 200%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(251, 191, 36, 0.3),
-    transparent
-  );
-  animation: coin-shine 3s ease-in-out infinite;
-}
-
-@keyframes coin-shine {
-  0% {
-    transform: translateX(0);
-  }
-  100% {
-    transform: translateX(100%);
-  }
-}
-
 .header-coins__icon {
   width: 18px;
   height: 18px;
@@ -1164,6 +1282,10 @@ onUnmounted(() => {
   padding: 0.25rem 0.5rem;
   border-radius: 1rem;
   gap: 0.25rem;
+}
+
+.header-coins--inline {
+  flex-shrink: 0;
 }
 
 .header-coins__icon--small {
@@ -1236,132 +1358,7 @@ onUnmounted(() => {
   filter: blur(4px);
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   🪙 COIN COUNTER - ZEN BROWSER STYLE ANIMATIONS
-   ═══════════════════════════════════════════════════════════════ */
-
-.header-coins {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.75rem;
-  background: linear-gradient(
-    135deg,
-    rgba(251, 191, 36, 0.2),
-    rgba(234, 179, 8, 0.1)
-  );
-  border: 1px solid rgba(251, 191, 36, 0.3);
-  border-radius: 999px;
-  backdrop-filter: blur(8px);
-  transition:
-    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
-    border-color 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
-    box-shadow 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  cursor: pointer;
-  user-select: none;
-  position: relative;
-  overflow: hidden;
-}
-
-/* Golden Glow Background */
-.header-coins::before {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  background: linear-gradient(
-    135deg,
-    rgba(251, 191, 36, 0.4),
-    rgba(245, 158, 11, 0.2),
-    rgba(234, 179, 8, 0.4)
-  );
-  border-radius: inherit;
-  z-index: -1;
-  opacity: 0;
-  filter: blur(8px);
-  transition: opacity 0.3s ease;
-}
-
-/* Shimmer Effect */
-.header-coins::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.3),
-    transparent
-  );
-  transition: left 0.6s ease;
-}
-
-.header-coins:hover::before {
-  opacity: 1;
-}
-
-.header-coins:hover::after {
-  left: 100%;
-}
-
-.header-coins:hover {
-  transform: scale(1.05);
-  border-color: rgba(251, 191, 36, 0.6);
-  box-shadow:
-    0 0 20px rgba(251, 191, 36, 0.4),
-    0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-.header-coins:active {
-  transform: scale(0.95);
-}
-
-.header-coins--compact {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
-  white-space: nowrap;
-}
-
-.header-coins__icon {
-  width: 16px;
-  height: 16px;
-  color: var(--accent-gold);
-  filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.6));
-  animation: coin-float 2s ease-in-out infinite;
-}
-
-.header-coins__icon--small {
-  width: 12px;
-  height: 12px;
-}
-
-.header-coins__value {
-  font-size: 0.875rem;
-  font-weight: 800;
-  color: var(--accent-gold);
-  text-shadow: 0 0 8px rgba(251, 191, 36, 0.5);
-  letter-spacing: 0.025em;
-}
-
-.header-coins__value--small {
-  font-size: 0.7rem;
-}
-
-/* Coin Float Animation */
-@keyframes coin-float {
-  0%,
-  100% {
-    transform: translateY(0) rotate(0deg);
-  }
-  25% {
-    transform: translateY(-2px) rotate(-5deg);
-  }
-  75% {
-    transform: translateY(-1px) rotate(5deg);
-  }
-}
+/* coin styles intentionally defined once above to keep layout stable */
 
 /* Pulse Animation for Earning (add .header-coins--earning class via JS) */
 .header-coins--earning {
@@ -1444,6 +1441,12 @@ onUnmounted(() => {
 }
 
 /* Small screens */
+@media (max-width: 768px) {
+  .smart-header {
+    min-height: 84px;
+  }
+}
+
 @media (max-width: 380px) {
   .header-row {
     gap: 0.5rem;
@@ -1456,7 +1459,15 @@ onUnmounted(() => {
   }
 
   .header-coins {
-    padding: 0 0.75rem;
+    padding: 0.2rem 0.45rem;
+  }
+
+  .search-kbd {
+    display: none;
+  }
+
+  .search-container {
+    padding: 0 0.65rem;
   }
 }
 

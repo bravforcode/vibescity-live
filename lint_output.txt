@@ -1,0 +1,7 @@
+
+> vibescity-live@0.0.0 lint
+> biome lint src
+
+Checked 172 files in 97ms. No fixes applied.
+Found 2 errors.
+Found 1 warning.

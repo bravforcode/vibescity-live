@@ -29,10 +29,10 @@ const callEmergency = (number) => {
 
 <template>
   <transition
-    enter-active-class="transition-all duration-300 ease-out"
+    enter-active-class="transition duration-300 ease-out"
     enter-from-class="opacity-0 translate-y-4"
     enter-to-class="opacity-100 translate-y-0"
-    leave-active-class="transition-all duration-200 ease-in"
+    leave-active-class="transition duration-200 ease-in"
     leave-from-class="opacity-100"
     leave-to-class="opacity-0"
   >
@@ -49,7 +49,7 @@ const callEmergency = (number) => {
         </h2>
         <button
           @click="emit('close')"
-          class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white active:scale-90 transition-all hover:bg-white/20"
+          class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white active:scale-90 transition hover:bg-white/20"
         >
           <X class="w-4 h-4" />
         </button>
@@ -68,7 +68,7 @@ const callEmergency = (number) => {
               v-for="item in nearbyEmergency.emergencyNumbers"
               :key="item.number"
               @click="callEmergency(item.number)"
-              class="p-4 rounded-xl bg-gradient-to-br from-red-600/20 to-red-900/20 border border-red-500/30 hover:from-red-600/30 hover:to-red-900/30 transition-all active:scale-95 group relative overflow-hidden"
+              class="p-4 rounded-xl bg-gradient-to-br from-red-600/20 to-red-900/20 border border-red-500/30 hover:from-red-600/30 hover:to-red-900/30 transition active:scale-95 group relative overflow-hidden"
             >
               <div
                 class="absolute inset-0 bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity"

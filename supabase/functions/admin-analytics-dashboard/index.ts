@@ -1,18 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { isAdminUser } from "../_shared/admin.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-const isAdminUser = (user: { app_metadata?: Record<string, unknown> }) => {
-  const meta = user?.app_metadata || {};
-  const role = meta.role;
-  const roles = Array.isArray(meta.roles) ? meta.roles : [];
-  return role === "admin" || roles.includes("admin");
 };
 
 const clamp = (value: number, min: number, max: number) =>
@@ -34,6 +28,26 @@ const isUuidLike = (value: unknown) =>
     .test(value.trim());
 
 type SupabaseClient = ReturnType<typeof createClient>;
+
+const isMissingTableError = (error: unknown, tableName: string) => {
+  const payload = (error || {}) as Record<string, unknown>;
+  const code = String(payload.code || "").toUpperCase();
+  const message = String(payload.message || "").toLowerCase();
+  const table = String(tableName || "").toLowerCase();
+  return (
+    code === "PGRST205" ||
+    (message.includes("could not find the table") && message.includes(table))
+  );
+};
+
+const createEmptySessionAgg = () => ({
+  uniqueVisitors: new Set<string>(),
+  uniqueVisitorsByDayMap: new Map<string, Set<string>>(),
+  sessionsByDay: [] as Array<{ day: string; sessions: number; unique_visitors: number }>,
+  topCountries: [] as Array<{ country: string; sessions: number; unique_visitors: number }>,
+  truncated: false,
+  fetched: 0,
+});
 
 const pickSessionsTimeColumn = async (
   adminClient: SupabaseClient,
@@ -536,66 +550,87 @@ serve(async (req) => {
     const fromDay = toDay(rangeFrom);
     const toDayValue = toDay(rangeTo);
 
-    const sessionsTimeColumn = await pickSessionsTimeColumn(adminClient, fromIso, toIsoValue);
     const maxRows = clamp(
       Number(Deno.env.get("ANALYTICS_DASHBOARD_MAX_SESSION_ROWS") || "50000") || 50000,
       1000,
       250000,
     );
 
-    const sessionsTotal = await countSessions(
-      adminClient,
-      sessionsTimeColumn,
-      fromIso,
-      toIsoValue,
-      country || undefined,
-    );
-    const sessionAgg = await collectSessions(
-      adminClient,
-      sessionsTimeColumn,
-      fromIso,
-      toIsoValue,
-      country || undefined,
-      maxRows,
-    );
+    let sessionsTimeColumn: "started_at" | "created_at" | "last_seen_at" = "last_seen_at";
+    let sessionsSource = "analytics_sessions";
+    let sessionsTotal = 0;
+    let sessionAgg = createEmptySessionAgg();
+    let liveVisitors15m = 0;
+    let recentSessions: Array<Record<string, unknown>> = [];
+    let wauAgg = createEmptySessionAgg();
+    let mauAgg = createEmptySessionAgg();
 
-    const liveVisitors15m = await collectLiveVisitors(adminClient);
-    const recentSessions = await collectRecentSessions(
-      adminClient,
-      sessionsTimeColumn,
-      fromIso,
-      toIsoValue,
-      country || undefined,
-      recentLimit,
-    );
+    const { error: sessionsProbeError } = await adminClient
+      .from("analytics_sessions")
+      .select("id")
+      .limit(1);
+
+    if (sessionsProbeError) {
+      if (!isMissingTableError(sessionsProbeError, "analytics_sessions")) {
+        throw sessionsProbeError;
+      }
+      sessionsSource = "analytics_logs_only";
+    } else {
+      sessionsTimeColumn = await pickSessionsTimeColumn(adminClient, fromIso, toIsoValue);
+      sessionsTotal = await countSessions(
+        adminClient,
+        sessionsTimeColumn,
+        fromIso,
+        toIsoValue,
+        country || undefined,
+      );
+      sessionAgg = await collectSessions(
+        adminClient,
+        sessionsTimeColumn,
+        fromIso,
+        toIsoValue,
+        country || undefined,
+        maxRows,
+      );
+
+      liveVisitors15m = await collectLiveVisitors(adminClient);
+      recentSessions = await collectRecentSessions(
+        adminClient,
+        sessionsTimeColumn,
+        fromIso,
+        toIsoValue,
+        country || undefined,
+        recentLimit,
+      );
+
+      // WAU/MAU are computed within the selected range (bounded to 7/30 days).
+      const wauFrom = new Date(rangeTo.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const mauFrom = new Date(rangeTo.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const wauFromIso = toIso(wauFrom);
+      const mauFromIso = toIso(mauFrom);
+      const wauTimeColumn = sessionsTimeColumn;
+
+      wauAgg = await collectSessions(
+        adminClient,
+        wauTimeColumn,
+        wauFromIso,
+        toIsoValue,
+        country || undefined,
+        maxRows,
+      );
+      mauAgg = await collectSessions(
+        adminClient,
+        sessionsTimeColumn,
+        mauFromIso,
+        toIsoValue,
+        country || undefined,
+        maxRows,
+      );
+    }
 
     const sortedDays = sessionAgg.sessionsByDay.map((d) => d.day).sort();
     const lastDay = sortedDays[sortedDays.length - 1] || toDayValue;
     const dau = sessionAgg.sessionsByDay.find((d) => d.day === lastDay)?.unique_visitors || 0;
-
-    // WAU/MAU are computed within the selected range (bounded to 7/30 days).
-    const wauFrom = new Date(rangeTo.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const mauFrom = new Date(rangeTo.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const wauFromIso = toIso(wauFrom);
-    const mauFromIso = toIso(mauFrom);
-    const wauTimeColumn = sessionsTimeColumn;
-
-    const wauAgg = await collectSessions(
-      adminClient,
-      wauTimeColumn,
-      wauFromIso,
-      toIsoValue,
-      country || undefined,
-      maxRows,
-    );
-    const mauAgg = await collectSessions(
-      adminClient,
-      sessionsTimeColumn,
-      mauFromIso,
-      toIsoValue,
-      country || undefined,
-      maxRows,
-    );
 
     // Events (optional): prefer archive_daily when available.
     let eventsSource: "archive_daily" | "hotspot" | "none" = "none";
@@ -747,6 +782,7 @@ serve(async (req) => {
         from: fromIso,
         to: toIsoValue,
         days: Math.ceil(rangeDays),
+        sessions_source: sessionsSource,
         sessions_time_column: sessionsTimeColumn,
         truncated: sessionAgg.truncated,
         max_session_rows: maxRows,

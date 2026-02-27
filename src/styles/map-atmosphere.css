@@ -41,12 +41,16 @@
 		0 16px 32px rgba(2, 6, 23, 0.34),
 		inset 0 0 0 1px rgba(148, 163, 184, 0.08);
 	opacity: 0;
+	visibility: hidden;
 	pointer-events: none;
-	transform: translate3d(-9999px, -9999px, 0);
+	transform: translate(-50%, 0);
+	transition: opacity 160ms ease;
+}
+
+.building-info-popup.is-visible {
+	visibility: visible;
+	opacity: 1;
 	will-change: transform, opacity;
-	transition:
-		opacity 160ms ease,
-		transform 160ms ease;
 }
 
 .building-info-popup__row {
@@ -110,7 +114,7 @@
 		opacity: 0.7;
 	}
 	100% {
-		transform: translate3d(-10px, 116vh, 0);
+		transform: translate3d(-10px, 120dvh, 0);
 		opacity: 0;
 	}
 }
@@ -129,6 +133,12 @@
 	100% {
 		transform: translate3d(0, 330%, 0);
 		opacity: 0;
+	}
+}
+
+@media (max-width: 768px) {
+	.building-info-popup {
+		backdrop-filter: blur(8px);
 	}
 }
 

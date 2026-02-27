@@ -1,11 +1,17 @@
 <script setup>
 import { computed, nextTick, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useBodyScrollLock } from "../../composables/useBodyScrollLock";
 import { useShopFilters } from "../../composables/useShopFilters";
 import { Z } from "../../constants/zIndex";
 import { getStatusColorClass, isFlashActive } from "../../utils/shopUtils";
 
 const { t } = useI18n();
+const { lock, unlock } = useBodyScrollLock();
+
+const DEFAULT_STATUS_OPTIONS = Object.freeze(["ALL", "LIVE", "TONIGHT", "OFF"]);
+const FOCUSABLE_SELECTOR =
+	'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]):not([disabled])';
 
 // ==================== PROPS & EMITS ====================
 const props = defineProps({
@@ -22,6 +28,13 @@ const props = defineProps({
 	activeStatus: {
 		type: String,
 		default: "ALL",
+	},
+	statusOptions: {
+		type: Array,
+		default: () => ["ALL", "LIVE", "TONIGHT", "OFF"],
+		validator: (value) =>
+			Array.isArray(value) &&
+			value.every((status) => typeof status === "string"),
 	},
 });
 
@@ -40,6 +53,9 @@ const isClosing = ref(false);
 const sidebarRef = ref(null);
 const firstFocusableRef = ref(null);
 const lastFocusableRef = ref(null);
+const closeTimer = ref(null);
+const resetTimer = ref(null);
+const currentYear = new Date().getUTCFullYear();
 
 // ==================== COMPUTED PROPERTIES (Performance Optimization) ====================
 // ใช้ computed แทน toRefs เพื่อลด reactivity overhead
@@ -50,24 +66,35 @@ const { uniqueCategories, sortedShops } = useShopFilters(
 );
 
 // Pre-compute shop metadata เพื่อหลีกเลี่ยงการคำนวณซ้ำใน template
-const enrichedShops = computed(() => {
-	return sortedShops.value.map((shop) => ({
-		...shop,
-		_isFlash: isFlashActive(shop),
-		_statusClass: getStatusColorClass(shop.status),
-		_badgeType: shop.isGolden
-			? "highlight"
-			: isFlashActive(shop)
-				? "flash"
-				: "status",
-	}));
+const enrichedShopState = computed(() => {
+	let liveCount = 0;
+	const enriched = sortedShops.value.map((shop) => {
+		const isFlash = isFlashActive(shop);
+		if (shop.status === "LIVE") liveCount += 1;
+		return {
+			...shop,
+			_isFlash: isFlash,
+			_statusClass: getStatusColorClass(shop.status),
+			_badgeType: shop.isGolden ? "highlight" : isFlash ? "flash" : "status",
+		};
+	});
+	return { enriched, liveCount };
 });
 
-const liveShopsCount = computed(
-	() => enrichedShops.value.filter((s) => s.status === "LIVE").length,
-);
+const enrichedShops = computed(() => enrichedShopState.value.enriched);
+const liveShopsCount = computed(() => enrichedShopState.value.liveCount);
 const categories = computed(() => uniqueCategories.value);
-const statuses = ["ALL", "LIVE", "TONIGHT", "OFF"];
+const statusOptions = computed(() => {
+	const statuses = Array.isArray(props.statusOptions)
+		? props.statusOptions.filter(
+				(status) => typeof status === "string" && status.trim().length > 0,
+			)
+		: [];
+	const uniqueStatuses = [...new Set(statuses)];
+	return uniqueStatuses.length > 0
+		? uniqueStatuses
+		: [...DEFAULT_STATUS_OPTIONS];
+});
 
 // Active filter summary
 const activeFilterSummary = computed(() => {
@@ -109,31 +136,71 @@ const selectStatus = (stat) => {
 };
 
 const resetAllFilters = () => {
-	resetCategories();
-	selectStatus("ALL");
+	if (props.activeCategories.length > 0) {
+		resetCategories();
+	}
+	if (props.activeStatus !== "ALL") {
+		selectStatus("ALL");
+	}
+};
+
+const clearPendingTimers = () => {
+	if (closeTimer.value) {
+		clearTimeout(closeTimer.value);
+		closeTimer.value = null;
+	}
+	if (resetTimer.value) {
+		clearTimeout(resetTimer.value);
+		resetTimer.value = null;
+	}
+};
+
+const cloneShop = (shop) =>
+	shop && typeof shop === "object" ? { ...shop } : shop;
+
+const emitShopSelection = (shop) => {
+	const payload = cloneShop(shop);
+	emit("select-shop", payload);
+	return payload;
+};
+
+const handleRideClick = (shop) => {
+	const payload = emitShopSelection(shop);
+	emit("open-ride-modal", payload);
 };
 
 // Improved shop click handler with visual feedback before closing
-const handleShopClick = async (shop) => {
+const handleShopClick = (shop) => {
 	if (isClosing.value) return;
+	clearPendingTimers();
 
 	// Set selected state for visual feedback
 	selectedShopId.value = shop.id;
 
 	// Emit selection immediately
-	emit("select-shop", shop);
+	emitShopSelection(shop);
 
-	// Wait for animation feedback (300ms) before closing
-	await new Promise((resolve) => setTimeout(resolve, 300));
+	// Wait for animation feedback before closing
+	closeTimer.value = setTimeout(() => {
+		isClosing.value = true;
+		emit("close");
+		closeTimer.value = null;
 
-	// Close sidebar
-	isClosing.value = true;
-	emit("close");
+		// Reset states after transition
+		resetTimer.value = setTimeout(() => {
+			selectedShopId.value = null;
+			isClosing.value = false;
+			resetTimer.value = null;
+		}, 400);
+	}, 300);
+};
 
-	// Reset states after transition
-	await new Promise((resolve) => setTimeout(resolve, 400));
-	selectedShopId.value = null;
-	isClosing.value = false;
+const getFocusableElements = () => {
+	const root = sidebarRef.value;
+	if (!root) return [];
+	return Array.from(root.querySelectorAll(FOCUSABLE_SELECTOR)).filter(
+		(el) => el instanceof HTMLElement && el.getClientRects().length > 0,
+	);
 };
 
 // ==================== KEYBOARD NAVIGATION ====================
@@ -148,12 +215,8 @@ const handleKeyDown = (event) => {
 
 	// Tab trapping
 	if (event.key === "Tab") {
-		const focusableElements = sidebarRef.value?.querySelectorAll(
-			'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-		);
-
-		if (!focusableElements || focusableElements.length === 0) return;
-
+		const focusableElements = getFocusableElements();
+		if (focusableElements.length === 0) return;
 		const firstElement = focusableElements[0];
 		const lastElement = focusableElements[focusableElements.length - 1];
 
@@ -176,22 +239,23 @@ watch(
 	() => props.isOpen,
 	async (isOpen) => {
 		if (isOpen) {
+			clearPendingTimers();
 			// Add keyboard listener
 			document.addEventListener("keydown", handleKeyDown);
 
 			// Prevent body scroll
-			document.body.style.overflow = "hidden";
+			lock();
 
 			// Focus first element
 			await nextTick();
-			const firstButton = sidebarRef.value?.querySelector("button");
-			firstButton?.focus();
+			firstFocusableRef.value?.focus();
 		} else {
 			// Remove keyboard listener
 			document.removeEventListener("keydown", handleKeyDown);
 
 			// Restore body scroll
-			document.body.style.overflow = "";
+			unlock();
+			clearPendingTimers();
 
 			// Reset states
 			selectedShopId.value = null;
@@ -201,8 +265,9 @@ watch(
 );
 
 onUnmounted(() => {
+	clearPendingTimers();
 	document.removeEventListener("keydown", handleKeyDown);
-	document.body.style.overflow = "";
+	unlock();
 });
 </script>
 
@@ -227,7 +292,7 @@ onUnmounted(() => {
         role="dialog"
         aria-modal="true"
         aria-labelledby="sidebar-title"
-        class="fixed inset-y-0 left-0 w-[290px] bg-zinc-950/95 backdrop-blur-2xl border-r border-white/10 pointer-events-auto flex flex-col shadow-2xl p-0 m-0"
+        class="fixed inset-y-0 left-0 w-[85vw] max-w-[320px] sm:w-[290px] bg-zinc-950/95 backdrop-blur-2xl border-r border-white/10 pointer-events-auto flex flex-col shadow-2xl p-0 m-0"
         :style="{ zIndex: Z.SIDEBAR }"
       >
         <!-- Header -->
@@ -243,7 +308,7 @@ onUnmounted(() => {
           <button
             ref="firstFocusableRef"
             @click="emit('close')"
-            class="text-white/30 hover:text-white transition-all p-1 rounded-lg hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-white/20"
+            class="text-white/30 hover:text-white transition p-1 rounded-lg hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-white/20"
             aria-label="Close sidebar"
           >
             <svg
@@ -272,7 +337,7 @@ onUnmounted(() => {
               @click="isFiltersExpanded = !isFiltersExpanded"
               :aria-expanded="isFiltersExpanded"
               aria-controls="filters-panel"
-              class="w-full px-6 py-4 flex items-center justify-between hover:bg-white/5 transition-all group focus:outline-none focus:bg-white/5"
+              class="w-full px-6 py-4 flex items-center justify-between hover:bg-white/5 transition group focus:outline-none focus:bg-white/5"
             >
               <div class="flex flex-col items-start gap-0.5">
                 <span
@@ -291,7 +356,7 @@ onUnmounted(() => {
               </div>
               <div
                 :class="[
-                  'p-2 rounded-lg transition-all border border-white/10 group-hover:border-white/30',
+                  'p-2 rounded-lg transition border border-white/10 group-hover:border-white/30',
                   isFiltersExpanded
                     ? 'bg-white text-black'
                     : 'bg-black/50 text-white',
@@ -337,13 +402,13 @@ onUnmounted(() => {
                   </span>
                   <div class="grid grid-cols-2 gap-2">
                     <button
-                      v-for="status in statuses"
+                      v-for="status in statusOptions"
                       :key="status"
                       @click="selectStatus(status)"
                       :aria-pressed="activeStatus === status"
                       :aria-label="`Filter by ${status.toLowerCase()} status`"
                       :class="[
-                        'h-9 px-3 text-left text-[10px] font-black uppercase tracking-widest transition-all border rounded-sm focus:outline-none focus:ring-2 focus:ring-white/30',
+                        'h-9 px-3 text-left text-[10px] font-black uppercase tracking-widest transition border rounded-sm focus:outline-none focus:ring-2 focus:ring-white/30',
                         activeStatus === status
                           ? 'bg-white text-black border-white shadow-lg'
                           : 'bg-white/5 text-white/50 border-white/5 hover:bg-white/10 hover:text-white/70',
@@ -389,7 +454,7 @@ onUnmounted(() => {
                       :aria-pressed="activeCategories.includes(cat)"
                       :aria-label="`Toggle ${cat} category`"
                       :class="[
-                        'px-3 py-1.5 text-[9px] font-black uppercase tracking-widest transition-all border rounded-sm focus:outline-none focus:ring-2 focus:ring-white/30',
+                        'px-3 py-1.5 text-[9px] font-black uppercase tracking-widest transition border rounded-sm focus:outline-none focus:ring-2 focus:ring-white/30',
                         activeCategories.includes(cat)
                           ? 'bg-red-600 text-white border-red-600 shadow-md scale-105'
                           : 'bg-white/5 text-white/50 border-white/5 hover:border-white/20 hover:bg-white/10',
@@ -413,7 +478,7 @@ onUnmounted(() => {
               </span>
               <div class="flex items-center gap-1.5" aria-live="polite">
                 <div
-                  class="w-1 h-1 bg-red-500 rounded-full animate-ping"
+                  class="live-ping w-1 h-1 bg-red-500 rounded-full animate-ping"
                   aria-hidden="true"
                 ></div>
                 <span
@@ -436,7 +501,7 @@ onUnmounted(() => {
                 @keydown.space.prevent="handleShopClick(shop)"
                 :aria-label="`${shop.name}, ${shop.status} status${shop._isFlash ? ', flash sale active' : ''}${shop.isGolden ? ', highlighted' : ''}`"
                 :class="[
-                  'group bg-white/5 hover:bg-white/10 border border-white/5 p-3 flex flex-col gap-2 cursor-pointer transition-all rounded-sm focus:outline-none focus:ring-2 focus:ring-white/30',
+                  'group bg-white/5 hover:bg-white/10 border border-white/5 p-3 flex flex-col gap-2 cursor-pointer transition rounded-sm focus:outline-none focus:ring-2 focus:ring-white/30',
                   selectedShopId === shop.id
                     ? 'bg-white/20 border-white/20 scale-[0.98] ring-2 ring-white/50'
                     : 'active:scale-[0.98]',
@@ -504,10 +569,7 @@ onUnmounted(() => {
                   </div>
                   <!-- ✅ Ride Button -->
                   <button
-                    @click.stop="
-                      emit('select-shop', shop);
-                      emit('open-ride-modal', shop);
-                    "
+                    @click.stop="handleRideClick(shop)"
                     class="px-2 py-1 rounded bg-blue-600/20 text-blue-400 text-[10px] font-bold border border-blue-500/30 hover:bg-blue-600 hover:text-white transition-colors flex items-center gap-1"
                   >
                     <span>🚗 Ride</span>
@@ -561,7 +623,7 @@ onUnmounted(() => {
                 <button
                   ref="lastFocusableRef"
                   @click="resetAllFilters"
-                  class="mx-auto px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-[10px] font-black uppercase tracking-widest rounded-sm transition-all border border-white/10 hover:border-white/30 focus:outline-none focus:ring-2 focus:ring-white/30"
+                  class="mx-auto px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-[10px] font-black uppercase tracking-widest rounded-sm transition border border-white/10 hover:border-white/30 focus:outline-none focus:ring-2 focus:ring-white/30"
                   aria-label="Clear all filters"
                 >
                   {{ t("sidebar.clear_all") }}
@@ -576,7 +638,7 @@ onUnmounted(() => {
           <p
             class="text-[9px] text-white/20 font-medium uppercase tracking-widest text-center"
           >
-            {{ t("sidebar.footer", { year: new Date().getFullYear() }) }}
+            {{ t("sidebar.footer", { year: currentYear }) }}
           </p>
         </div>
       </div>
@@ -656,6 +718,13 @@ onUnmounted(() => {
   }
   50% {
     background-position: 100% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-flash-badge,
+  .live-ping {
+    animation: none !important;
   }
 }
 

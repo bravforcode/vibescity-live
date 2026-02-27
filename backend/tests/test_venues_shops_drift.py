@@ -80,3 +80,13 @@ def test_repository_falls_back_to_shops_when_venues_fails():
     assert pending.data[0]["id"] == "legacy-1"
     assert owner_id == "legacy-owner"
     assert client.calls[:2] == ["venues", "shops"]
+
+
+def test_repository_reject_sets_archived_status():
+    client = _FakeClient({"venues": [{"id": "v1"}]})
+    repository = VenueRepository(client)
+
+    res = repository.reject("v1", "spam")
+
+    assert res.data[0]["status"] == "archived"
+    assert res.data[0]["metadata"]["rejection_reason"] == "spam"

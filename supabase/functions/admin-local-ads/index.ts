@@ -1,18 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { isAdminUser } from "../_shared/admin.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
-};
-
-const isAdminUser = (user: { app_metadata?: Record<string, unknown> }) => {
-  const meta = user?.app_metadata || {};
-  const role = meta.role;
-  const roles = Array.isArray(meta.roles) ? meta.roles : [];
-  return role === "admin" || role === "super_admin" || roles.includes("admin");
 };
 
 const asBool = (value: string | null) => {
@@ -36,6 +30,25 @@ const buildLocationPoint = (lat: unknown, lng: unknown) => {
     throw new Error("Invalid coordinates");
   }
   return `POINT(${lngNum} ${latNum})`;
+};
+
+const getErrorMessage = (error: unknown) => {
+  if (error instanceof Error && error.message) return error.message;
+  if (error && typeof error === "object") {
+    const payload = error as Record<string, unknown>;
+    const candidates = [
+      payload.message,
+      payload.error,
+      payload.details,
+      payload.hint,
+    ];
+    for (const candidate of candidates) {
+      if (typeof candidate === "string" && candidate.trim()) {
+        return candidate.trim();
+      }
+    }
+  }
+  return String(error);
 };
 
 serve(async (req) => {
@@ -274,7 +287,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = getErrorMessage(error);
     return new Response(JSON.stringify({ error: message }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

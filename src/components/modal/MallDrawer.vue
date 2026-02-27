@@ -13,6 +13,7 @@ import {
 import { computed, nextTick, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useNotifications } from "@/composables/useNotifications";
+import { resolveVenueMedia } from "@/domain/venue/viewModel";
 import { Z } from "../../constants/zIndex";
 
 const { t } = useI18n();
@@ -33,6 +34,11 @@ const isFavorited = (shopId) => {
 	const id = normalizeId(shopId);
 	if (!id) return false;
 	return (props.favorites || []).some((fav) => normalizeId(fav) === id);
+};
+
+const getShopImage = (shop) => {
+	const media = resolveVenueMedia(shop || {});
+	return media.primaryImage || shop?.Image_URL1 || "";
 };
 
 // import ShopCard from "../panel/ShopCard.vue"; // Optional: Reuse if needed, but custom list item is better for this view
@@ -710,8 +716,8 @@ onUnmounted(() => {
                 class="w-16 h-16 rounded-xl overflow-hidden relative flex-shrink-0 bg-gray-500"
               >
                 <img
-                  v-if="shop.Image_URL1"
-                  :src="shop.Image_URL1"
+                  v-if="getShopImage(shop)"
+                  :src="getShopImage(shop)"
                   class="w-full h-full object-cover"
                   loading="lazy"
                 />

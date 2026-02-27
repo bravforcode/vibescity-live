@@ -1,8 +1,8 @@
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
-from app.main import app
 import app.api.routers.analytics as analytics
+from app.main import app
 
 
 class _FakeQuery:

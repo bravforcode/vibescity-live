@@ -1,0 +1,90 @@
+Debugger listening on ws://127.0.0.1:64640/d5b53928-df36-46e5-9f1f-5e58951a6c27
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger attached.
+
+> vibescity-live@0.0.0 lint
+> biome lint src
+
+Debugger listening on ws://127.0.0.1:64646/f5e58aa1-af7c-42f6-9bdc-a0bac10c4b3f
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger attached.
+src\components\map\MapboxContainer.vue:291:1 lint/style/useConst  FIXABLE  ΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöü
+
+  ! This let declares a variable that is only assigned once.
+  
+    289 Γöé const nowTick = ref(Date.now());
+    290 Γöé let nowTickInterval = null;
+  > 291 Γöé let mapHapticAt = 0;
+        Γöé ^^^
+    292 Γöé const MAP_HAPTIC_COOLDOWN_MS = 220;
+    293 Γöé const currentMapZoom = ref(zoom.value);
+  
+  i 'mapHapticAt' is never reassigned.
+  
+    286 Γöé const mapLoaded = ref(false);
+    287 Γöé const activePopup = shallowRef(null);
+  > 288 Γöé const mapInitRequested = ref(false);
+        Γöé                    ^^^^^^^^^^^
+    289 Γöé const nowTick = ref(Date.now());
+    290 Γöé let nowTickInterval = null;
+  
+  i Safe fix: Use const instead.
+  
+     286  286 Γöé   const nowTick = ref(Date.now());
+     287  287 Γöé   let nowTickInterval = null;
+     288      Γöé - let┬╖mapHapticAt┬╖=┬╖0;
+          288 Γöé + const┬╖mapHapticAt┬╖=┬╖0;
+     289  289 Γöé   const MAP_HAPTIC_COOLDOWN_MS = 220;
+     290  290 Γöé   const currentMapZoom = ref(zoom.value);
+  
+
+src\components\map\MapboxContainer.vue:111:17 lint/correctness/noInvalidUseBeforeDeclaration ΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöü
+
+  ├ù This variable is used before its declaration.
+  
+    110 Γöé const { updateHeatmapData, addHeatmapLayer, removeHeatmapLayer } =
+  > 111 Γöé   useMapHeatmap(map, allowHeatmap);
+        Γöé                 ^^^
+    112 Γöé 
+    113 Γöé const getFirstExistingLayerId = (candidateIds = []) => {
+  
+  i The variable is declared here:
+  
+    199 Γöé   "open-building",
+    200 Γöé   "exit-indoor",
+  > 201 Γöé   "open-ride-modal",
+        Γöé              ^^^
+    202 Γöé ]);
+    203 Γöé 
+  
+
+src\components\map\MapboxContainer.vue:111:22 lint/correctness/noInvalidUseBeforeDeclaration ΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöü
+
+  ├ù This variable is used before its declaration.
+  
+    110 Γöé const { updateHeatmapData, addHeatmapLayer, removeHeatmapLayer } =
+  > 111 Γöé   useMapHeatmap(map, allowHeatmap);
+        Γöé                      ^^^^^^^^^^^^
+    112 Γöé 
+    113 Γöé const getFirstExistingLayerId = (candidateIds = []) => {
+  
+  i The variable is declared here:
+  
+    152 Γöé   () => prefs.isAmbientFxEnabled && !isPerfRestricted.value,
+    153 Γöé );
+  > 154 Γöé const allowNeonPulse = computed(
+        Γöé                     ^^^^^^^^^^^^
+    155 Γöé   () => prefs.isNeonPulseEnabled && !isPerfRestricted.value,
+    156 Γöé );
+  
+
+Checked 172 files in 88ms. No fixes applied.
+Found 2 errors.
+Found 1 warning.
+lint ΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöü
+
+  ├ù Some errors were emitted while running checks.
+  
+
+Waiting for the debugger to disconnect...
+Waiting for the debugger to disconnect...

@@ -126,7 +126,7 @@ const shareToApp = (app) => {
       <button
         @click="copyCode"
         :class="[
-          'px-4 py-2 rounded-lg font-bold text-sm transition-all',
+          'px-4 py-2 rounded-lg font-bold text-sm transition',
           isCopied
             ? 'bg-green-500 text-white'
             : 'bg-purple-500 text-white hover:bg-purple-600',

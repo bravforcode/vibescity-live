@@ -43,11 +43,12 @@ if (workbox) {
     }),
   );
 
-  // 3. Supabase Storage Images - Stale While Revalidate
+  // 3. Supabase Storage Images - Stale While Revalidate (exclude videos: Cache API can't handle Range requests)
   workbox.routing.registerRoute(
     ({ url }) =>
       url.origin.includes("supabase.co") &&
-      url.pathname.includes("/storage/v1/object/public/"),
+      url.pathname.includes("/storage/v1/object/public/") &&
+      !url.pathname.match(/\.(mp4|webm|mov|avi|mkv|m4v)$/i),
     new workbox.strategies.StaleWhileRevalidate({
       cacheName: "supabase-images",
       plugins: [

@@ -19,6 +19,11 @@ export const paymentService = {
 		const returnUrl = window.location.origin + window.location.pathname;
 		const sku = items?.[0]?.sku;
 		const purchaseMode = options?.purchaseMode || undefined;
+		const paymentPreferences =
+			options?.paymentPreferences &&
+			typeof options.paymentPreferences === "object"
+				? options.paymentPreferences
+				: undefined;
 		const sanitizePartnerToken = (value) => {
 			const raw = String(value || "").trim();
 			if (!raw) return "";
@@ -63,16 +68,18 @@ export const paymentService = {
 			// ignore
 		}
 
+		const headers = { "Content-Type": "application/json" };
+		if (session?.access_token) {
+			headers.Authorization = `Bearer ${session.access_token}`;
+		}
 		const res = await fetch(`${edgeUrl}/create-checkout-session`, {
 			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: session ? `Bearer ${session.access_token}` : "", // Optional Bearer
-			},
+			headers,
 			body: JSON.stringify({
 				venue_id: shopId, // Mapped locally
 				sku, // Simplified for single item
 				purchase_mode: purchaseMode,
+				payment_preferences: paymentPreferences,
 				partner_ref: partnerRef || undefined,
 				partner_code: partnerCode || undefined,
 				visitor_id: visitorId, // ✅ Pass Visitor ID
@@ -85,7 +92,7 @@ export const paymentService = {
 			throw new Error(err.error || "Failed to create checkout session");
 		}
 
-		return await res.json(); // { url: "..." }
+		return await res.json(); // { url: "…" }
 	},
 
 	/**
@@ -165,9 +172,15 @@ export const paymentService = {
 	 * Fetch user's orders (Protected by RLS via Visitor ID)
 	 */
 	async getMyOrders() {
+		const {
+			data: { user },
+		} = await supabase.auth.getUser();
+		if (!user?.id) return [];
+
 		const { data, error } = await supabase
 			.from("orders")
 			.select("*")
+			.eq("user_id", user.id)
 			.order("created_at", { ascending: false });
 
 		if (error) {

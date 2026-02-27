@@ -1,0 +1,23 @@
+VibeCity DB Compat Smoke Report
+pass=6 warn=0 fail=15
+FAIL	table:venue_slug_history	 unknown
+FAIL	table:partner_referrals	 unknown
+FAIL	table:partner_commission_ledger	 unknown
+FAIL	table:analytics_events	 unknown
+FAIL	table:check_ins	 unknown
+FAIL	table:visitor_gamification_stats	 unknown
+FAIL	rpc:search_venues	PGRST002 Could not query the database for the schema cache. Retrying.
+FAIL	rpc:get_feed_cards	PGRST002 Could not query the database for the schema cache. Retrying.
+FAIL	rpc:get_map_pins	PGRST002 Could not query the database for the schema cache. Retrying.
+FAIL	rpc:increment_venue_views	PGRST002 Could not query the database for the schema cache. Retrying.
+FAIL	rpc:get_venue_stats	PGRST002 Could not query the database for the schema cache. Retrying.
+FAIL	rpc:update_venue_anonymous	PGRST002 Could not query the database for the schema cache. Retrying.
+FAIL	rpc:get_daily_checkin_status	PGRST002 Could not query the database for the schema cache. Retrying.
+FAIL	rpc:claim_daily_checkin	PGRST002 Could not query the database for the schema cache. Retrying.
+FAIL	rpc:get_lucky_wheel_status	PGRST002 Could not query the database for the schema cache. Retrying.
+PASS	rpc:spin_lucky_wheel	ok
+PASS	rpc:create_partner_profile	exists (auth required)
+PASS	rpc:upsert_partner_secrets	exists (auth required)
+PASS	rpc:get_partner_dashboard_metrics	ok
+PASS	storage:payment-slips	ok
+PASS	storage:sensitive-uploads	ok

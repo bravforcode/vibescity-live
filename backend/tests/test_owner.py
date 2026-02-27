@@ -33,7 +33,7 @@ def test_owner_stats_success(client, override_auth, monkeypatch):
     monkeypatch.setattr(owner, "supabase", fake_db)
     monkeypatch.setattr(owner, "supabase_admin", None)
 
-    response = client.get(f"/api/v1/owner/stats/123")
+    response = client.get("/api/v1/owner/stats/123")
     assert response.status_code == 200
     data = response.json()
     assert data["shop_id"] == "123"
@@ -44,5 +44,5 @@ def test_owner_stats_forbidden(client, override_auth, monkeypatch):
     monkeypatch.setattr(owner, "supabase", fake_db)
     monkeypatch.setattr(owner, "supabase_admin", None)
 
-    response = client.get(f"/api/v1/owner/stats/123")
+    response = client.get("/api/v1/owner/stats/123")
     assert response.status_code == 403

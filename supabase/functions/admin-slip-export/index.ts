@@ -1,18 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { ZipWriter } from "https://deno.land/std@0.168.0/archive/zip.ts";
+import JSZip from "https://esm.sh/jszip@3.10.1";
+import { isAdminUser } from "../_shared/admin.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
-};
-
-const isAdminUser = (user: { app_metadata?: Record<string, unknown> }) => {
-  const meta = user?.app_metadata || {};
-  const role = meta.role;
-  const roles = Array.isArray(meta.roles) ? meta.roles : [];
-  return role === "admin" || roles.includes("admin");
 };
 
 const escapeCsv = (value: unknown) => {
@@ -296,8 +290,7 @@ serve(async (req) => {
     }
 
     // Zip export grouped by status or date (YYYY-MM-DD)
-    const buffer = new Deno.Buffer();
-    const zip = new ZipWriter(buffer);
+    const zip = new JSZip();
     const groups = new Map<string, Array<Record<string, unknown>>>();
 
     const keyFn = (order: Record<string, unknown>) => {
@@ -314,10 +307,13 @@ serve(async (req) => {
 
     for (const [group, dataRows] of groups.entries()) {
       const csv = buildCsv(dataRows);
-      await zip.add(`${group}.csv`, new TextEncoder().encode(csv));
+      zip.file(`${group}.csv`, csv);
     }
 
-    const zipBytes = await zip.close();
+    const zipBytes = await zip.generateAsync({
+      type: "uint8array",
+      compression: "DEFLATE",
+    });
     const filename = `slip-export-${zipBy}-${new Date().toISOString()}.zip`;
 
     return new Response(zipBytes, {

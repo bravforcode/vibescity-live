@@ -85,7 +85,7 @@ const handleRideSelect = (provider) => {
           <p
             class="text-zinc-500 text-xs uppercase tracking-widest animate-pulse"
           >
-            Finding drivers...
+            Finding drivers…
           </p>
         </div>
 
@@ -104,7 +104,7 @@ const handleRideSelect = (provider) => {
             v-for="ride in estimates"
             :key="ride.name"
             @click="handleRideSelect(ride)"
-            class="group relative flex items-center justify-between p-4 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 hover:border-neon-purple/50 transition-all cursor-pointer active:scale-[0.98]"
+            class="group relative flex items-center justify-between p-4 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 hover:border-neon-purple/50 transition cursor-pointer active:scale-[0.98]"
           >
             <!-- Left: Icon & Name -->
             <div class="flex items-center gap-4">

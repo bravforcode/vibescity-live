@@ -1,0 +1,321 @@
+Debugger listening on ws://127.0.0.1:61592/36073079-650a-4579-a386-9ffbf49f2ceb
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger attached.
+open supabase\.temp\profile: The system cannot find the file specified.
+Loading project ref from file: supabase\.temp\project-ref
+Resolved DNS: [2406:da18:243:741c:6552:667e:9e57:54f2]:5432
+Initialising login role...
+Using access token for profile: supabase
+Supabase CLI 2.76.14
+Using profile: supabase (supabase.co)
+Connecting to remote database...
+2026/02/24 18:07:06 PG Send: {"Type":"StartupMessage","ProtocolVersion":196608,"Parameters":{"database":"postgres","user":"cli_login_postgres"}}
+2026/02/24 18:07:06 PG Recv: {"Type":"AuthenticationSASL","AuthMechanisms":["SCRAM-SHA-256"]}
+2026/02/24 18:07:06 PG Send: {"Type":"SASLInitialResponse","AuthMechanism":"SCRAM-SHA-256","Data":"n,,n=,r=rHsaQfn5oNZoq6xqbwYTMTGm"}
+2026/02/24 18:07:06 PG Recv: {"Type":"AuthenticationSASLContinue","Data":"r=rHsaQfn5oNZoq6xqbwYTMTGmf4xEr9lajOHR5hfUcRHK3KZh,s=wU+Wo9NOip45R77xlAtbkQ==,i=4096"}
+2026/02/24 18:07:07 PG Send: {"Type":"SASLResponse","Data":"c=biws,r=rHsaQfn5oNZoq6xqbwYTMTGmf4xEr9lajOHR5hfUcRHK3KZh,p=QSOub7eGh+z3rDydOIzULoF9pZTZHOPYI0gd2aFwAbM="}
+2026/02/24 18:07:07 PG Recv: {"Type":"AuthenticationSASLFinal","Data":"v=YoonSTtgHCCaTQOcICbFynyrv159ImQnq4/EulNfzX8="}
+2026/02/24 18:07:07 PG Recv: {"Type":"AuthenticationOK"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParameterStatus","Name":"in_hot_standby","Value":"off"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParameterStatus","Name":"integer_datetimes","Value":"on"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParameterStatus","Name":"TimeZone","Value":"UTC"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParameterStatus","Name":"IntervalStyle","Value":"postgres"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParameterStatus","Name":"is_superuser","Value":"off"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParameterStatus","Name":"application_name","Value":""}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParameterStatus","Name":"default_transaction_read_only","Value":"off"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParameterStatus","Name":"scram_iterations","Value":"4096"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParameterStatus","Name":"DateStyle","Value":"ISO, MDY"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParameterStatus","Name":"standard_conforming_strings","Value":"on"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParameterStatus","Name":"session_authorization","Value":"cli_login_postgres"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParameterStatus","Name":"client_encoding","Value":"UTF8"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParameterStatus","Name":"server_version","Value":"17.6"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParameterStatus","Name":"server_encoding","Value":"UTF8"}
+2026/02/24 18:07:07 PG Recv: {"Type":"BackendKeyData","ProcessID":422995,"SecretKey":1520838671}
+2026/02/24 18:07:07 PG Recv: {"Type":"ReadyForQuery","TxStatus":"I"}
+2026/02/24 18:07:07 PG Send: {"Type":"Query","String":"SET SESSION ROLE postgres"}
+2026/02/24 18:07:07 PG Recv: {"Type":"CommandComplete","CommandTag":"SET"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ReadyForQuery","TxStatus":"I"}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"lrupsc_1_0","Query":"SELECT version FROM supabase_migrations.schema_migrations ORDER BY version","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"S","Name":"lrupsc_1_0"}
+2026/02/24 18:07:07 PG Send: {"Type":"Sync"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParseComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParameterDescription","ParameterOIDs":[]}
+2026/02/24 18:07:07 PG Recv: {"Type":"RowDescription","Fields":[{"Name":"version","TableOID":21791,"TableAttributeNumber":1,"DataTypeOID":25,"DataTypeSize":-1,"TypeModifier":-1,"Format":0}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"ReadyForQuery","TxStatus":"I"}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"lrupsc_1_0","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[0]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Sync"}
+2026/02/24 18:07:07 PG Recv: {"Type":"BindComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"RowDescription","Fields":[{"Name":"version","TableOID":21791,"TableAttributeNumber":1,"DataTypeOID":25,"DataTypeSize":-1,"TypeModifier":-1,"Format":0}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260212100000"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260212110000"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260212120000"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260212130000"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260212140000"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260213100000"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260213100001"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260213110000"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260216153000"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260217000001"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260217000002"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260217000003"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260217130000"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260218120000"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260218121000"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260219000100"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260219000101"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260219000200"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260219000300"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260219000400"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260220000100"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260220000200"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260220000300"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260220000400"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260220000500"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260220000600"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260220000700"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260220000800"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260220000900"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260220001000"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260221000100"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260221000200"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260221000300"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260221000400"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260221000500"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260222000000"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260222010000"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260222020000"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260223000001"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260223120000"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260223130000"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260223153000"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260223170000"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260223173000"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260223200000"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260223210000"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260223210001"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260223213000"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260223223000"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260223231500"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260224120000"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260224120002"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"DataRow","Values":[{"text":"20260224121500"}]}
+2026/02/24 18:07:07 PG Recv: {"Type":"CommandComplete","CommandTag":"SELECT 53"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ReadyForQuery","TxStatus":"I"}
+Do you want to push these migrations to the remote database?
+ ΓÇó 20260224135000_ultrathink_schema_optimization_part1.sql
+ ΓÇó 20260224160000_map_pins_dual_branch_and_backfill.sql
+ ΓÇó 20260224161000_owner_dashboard_indexes.sql
+ ΓÇó 20260224190000_ultrathink_schema_optimization_part2.sql
+
+ [Y/n] y
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"SET lock_timeout = '4s'","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"CREATE SCHEMA IF NOT EXISTS supabase_migrations","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"CREATE TABLE IF NOT EXISTS supabase_migrations.schema_migrations (version text NOT NULL PRIMARY KEY)","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"ALTER TABLE supabase_migrations.schema_migrations ADD COLUMN IF NOT EXISTS statements text[]","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"ALTER TABLE supabase_migrations.schema_migrations ADD COLUMN IF NOT EXISTS name text","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Sync"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParseComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"BindComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"NoData"}
+2026/02/24 18:07:07 PG Recv: {"Type":"CommandComplete","CommandTag":"SET"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParseComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"BindComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"NoData"}
+2026/02/24 18:07:07 PG Recv: {"Severity":"NOTICE","SeverityUnlocalized":"NOTICE","Code":"42P06","Message":"schema \"supabase_migrations\" already exists, skipping","Detail":"","Hint":"","Position":0,"InternalPosition":0,"InternalQuery":"","Where":"","SchemaName":"","TableName":"","ColumnName":"","DataTypeName":"","ConstraintName":"","File":"schemacmds.c","Line":132,"Routine":"CreateSchemaCommand","UnknownFields":null}
+2026/02/24 18:07:07 PG Recv: {"Type":"CommandComplete","CommandTag":"CREATE SCHEMA"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParseComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"BindComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"NoData"}
+2026/02/24 18:07:07 PG Recv: {"Severity":"NOTICE","SeverityUnlocalized":"NOTICE","Code":"42P07","Message":"relation \"schema_migrations\" already exists, skipping","Detail":"","Hint":"","Position":0,"InternalPosition":0,"InternalQuery":"","Where":"","SchemaName":"","TableName":"","ColumnName":"","DataTypeName":"","ConstraintName":"","File":"parse_utilcmd.c","Line":207,"Routine":"transformCreateStmt","UnknownFields":null}
+2026/02/24 18:07:07 PG Recv: {"Type":"CommandComplete","CommandTag":"CREATE TABLE"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParseComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"BindComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"NoData"}
+2026/02/24 18:07:07 PG Recv: {"Severity":"NOTICE","SeverityUnlocalized":"NOTICE","Code":"42701","Message":"column \"statements\" of relation \"schema_migrations\" already exists, skipping","Detail":"","Hint":"","Position":0,"InternalPosition":0,"InternalQuery":"","Where":"","SchemaName":"","TableName":"","ColumnName":"","DataTypeName":"","ConstraintName":"","File":"tablecmds.c","Line":7471,"Routine":"check_for_column_name_collision","UnknownFields":null}
+2026/02/24 18:07:07 PG Recv: {"Type":"CommandComplete","CommandTag":"ALTER TABLE"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParseComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"BindComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"NoData"}
+2026/02/24 18:07:07 PG Recv: {"Severity":"NOTICE","SeverityUnlocalized":"NOTICE","Code":"42701","Message":"column \"name\" of relation \"schema_migrations\" already exists, skipping","Detail":"","Hint":"","Position":0,"InternalPosition":0,"InternalQuery":"","Where":"","SchemaName":"","TableName":"","ColumnName":"","DataTypeName":"","ConstraintName":"","File":"tablecmds.c","Line":7471,"Routine":"check_for_column_name_collision","UnknownFields":null}
+2026/02/24 18:07:07 PG Recv: {"Type":"CommandComplete","CommandTag":"ALTER TABLE"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ReadyForQuery","TxStatus":"I"}
+Applying migration 20260224135000_ultrathink_schema_optimization_part1.sql...
+2026/02/24 18:07:07 PG Send: {"Type":"Query","String":"RESET ALL"}
+2026/02/24 18:07:07 PG Recv: {"Type":"CommandComplete","CommandTag":"RESET"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ReadyForQuery","TxStatus":"I"}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"-- Phase 3: Database Schema Refactoring - Integrity \u0026 Performance (VibeCity Analysis)\r\n-- Addressing points 1-30 from the 80-point analysis map\r\n\r\nBEGIN","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"-------------------------------------------------------------------------------\r\n-- 1. FOREIGN KEYS \u0026 RELATIONSHIPS\r\n-------------------------------------------------------------------------------\r\n\r\n-- A1 \u0026 A2: check_ins \u0026 daily_checkins (venue_id from text -\u003e uuid)\r\n-- Note: Assuming venue_id in these tables currently stores valid UUID strings.\r\n-- We must cast them and add the constraint.\r\nALTER TABLE public.check_ins\r\n    ALTER COLUMN venue_id TYPE uuid USING (venue_id::uuid)","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"ALTER TABLE public.check_ins\r\n    ADD CONSTRAINT fk_check_ins_venue\r\n    FOREIGN KEY (venue_id) REFERENCES public.venues(id) ON DELETE CASCADE","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"ALTER TABLE public.daily_checkins\r\n    ALTER COLUMN venue_id TYPE uuid USING (venue_id::uuid)","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"ALTER TABLE public.daily_checkins\r\n    ADD CONSTRAINT fk_daily_checkins_venue\r\n    FOREIGN KEY (venue_id) REFERENCES public.venues(id) ON DELETE CASCADE","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"-- A3: user_favorites missing FK to auth.users\r\nALTER TABLE public.user_favorites\r\n    ADD CONSTRAINT fk_user_favorites_user\r\n    FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"ALTER TABLE public.user_favorites\r\n    ADD CONSTRAINT fk_user_favorites_venue\r\n    FOREIGN KEY (venue_id) REFERENCES public.venues(id) ON DELETE CASCADE","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"-- A4: partners.visitor_id is missing FK to auth.users (if it's supposed to link there)\r\n-- OR if visitor_id is an anonymous text ID, we should standardize.\r\n-- We will add an index on visitor_id for all analytics tables to speed up joins.\r\n\r\n-------------------------------------------------------------------------------\r\n-- 2. CONSTRAINT \u0026 INDEX OMISSIONS (PERFORMANCE)\r\n-------------------------------------------------------------------------------\r\n\r\n-- B2: Missing Analytics Indexes (GIN on JSONB)\r\nCREATE INDEX IF NOT EXISTS idx_analytics_events_data_gin\r\n    ON public.analytics_events USING GIN (data jsonb_path_ops)","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"CREATE INDEX IF NOT EXISTS idx_analytics_logs_data_gin\r\n    ON public.analytics_logs USING GIN (data jsonb_path_ops)","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"-- B3: Map Ads Metadata Index\r\nCREATE INDEX IF NOT EXISTS idx_ad_clicks_metadata_gin\r\n    ON public.ad_clicks USING GIN (metadata jsonb_path_ops)","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"-- B4: Redemption Bottleneck\r\nCREATE INDEX IF NOT EXISTS idx_redemptions_user_id\r\n    ON public.redemptions (user_id)","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"-- B6: Case Insensitivity Missing (Venue Tags)\r\n-- Create a unique index on lowercase name instead of altering column type\r\nDROP INDEX IF EXISTS venue_tags_name_key","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"ALTER TABLE public.venue_tags DROP CONSTRAINT IF EXISTS venue_tags_name_key","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"CREATE UNIQUE INDEX IF NOT EXISTS idx_venue_tags_name_lower\r\n    ON public.venue_tags (LOWER(name))","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"-------------------------------------------------------------------------------\r\n-- 3. DANGER \u0026 OVER-ENGINEERING (SOFT DELETES)\r\n-------------------------------------------------------------------------------\r\n\r\n-- E3: Lethal Deletes. Add soft-deletes to core structural tables.\r\nALTER TABLE public.venues\r\n    ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ NULL","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"CREATE INDEX IF NOT EXISTS idx_venues_deleted_at\r\n    ON public.venues (deleted_at)","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"ALTER TABLE public.events\r\n    ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ NULL","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"-- E8: Missing updated_at triggers\r\n-- Add to user_achievements\r\nALTER TABLE public.user_achievements\r\n    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now()","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"DROP TRIGGER IF EXISTS trg_user_achievements_updated_at ON public.user_achievements","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"CREATE TRIGGER trg_user_achievements_updated_at\r\n    BEFORE UPDATE ON public.user_achievements\r\n    FOR EACH ROW\r\n    EXECUTE FUNCTION moddatetime(updated_at)","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"-- Add to lucky_wheel_spins\r\nALTER TABLE public.lucky_wheel_spins\r\n    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now()","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"DROP TRIGGER IF EXISTS trg_lucky_wheel_spins_updated_at ON public.lucky_wheel_spins","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"CREATE TRIGGER trg_lucky_wheel_spins_updated_at\r\n    BEFORE UPDATE ON public.lucky_wheel_spins\r\n    FOR EACH ROW\r\n    EXECUTE FUNCTION moddatetime(updated_at)","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"COMMIT","ParameterOIDs":null}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Parse","Name":"","Query":"INSERT INTO supabase_migrations.schema_migrations(version, name, statements) VALUES($1, $2, $3)","ParameterOIDs":[25,25,1009]}
+2026/02/24 18:07:07 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"","ParameterFormatCodes":[0,0,1],"Parameters":[{"text":"20260224135000"},{"text":"ultrathink_schema_optimization_part1"},{"binary":"0000000100000000000000190000001800000001000000982d2d20506861736520333a20446174616261736520536368656d61205265666163746f72696e67202d20496e74656772697479202620506572666f726d616e63652028566962654369747920416e616c79736973290d0a2d2d2041646472657373696e6720706f696e747320312d33302066726f6d207468652038302d706f696e7420616e616c79736973206d61700d0a0d0a424547494e000001e42d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d0d0a2d2d20312e20464f524549474e204b45595320262052454c4154494f4e53484950530d0a2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d0d0a0d0a2d2d20413120262041323a20636865636b5f696e732026206461696c795f636865636b696e73202876656e75655f69642066726f6d2074657874202d3e2075756964290d0a2d2d204e6f74653a20417373756d696e672076656e75655f696420696e207468657365207461626c65732063757272656e746c792073746f7265732076616c6964205555494420737472696e67732e0d0a2d2d205765206d7573742063617374207468656d20616e64206164642074686520636f6e73747261696e742e0d0a414c544552205441424c45207075626c69632e636865636b5f696e730d0a20202020414c54455220434f4c554d4e2076656e75655f696420545950452075756964205553494e47202876656e75655f69643a3a75756964290000008e414c544552205441424c45207075626c69632e636865636b5f696e730d0a2020202041444420434f4e53545241494e5420666b5f636865636b5f696e735f76656e75650d0a20202020464f524549474e204b4559202876656e75655f696429205245464552454e434553207075626c69632e76656e75657328696429204f4e2044454c45544520434153434144450000005d414c544552205441424c45207075626c69632e6461696c795f636865636b696e730d0a20202020414c54455220434f4c554d4e2076656e75655f696420545950452075756964205553494e47202876656e75655f69643a3a757569642900000098414c544552205441424c45207075626c69632e6461696c795f636865636b696e730d0a2020202041444420434f4e53545241494e5420666b5f6461696c795f636865636b696e735f76656e75650d0a20202020464f524549474e204b4559202876656e75655f696429205245464552454e434553207075626c69632e76656e75657328696429204f4e2044454c4554452043415343414445000000c32d2d2041333a20757365725f6661766f7269746573206d697373696e6720464b20746f20617574682e75736572730d0a414c544552205441424c45207075626c69632e757365725f6661766f72697465730d0a2020202041444420434f4e53545241494e5420666b5f757365725f6661766f72697465735f757365720d0a20202020464f524549474e204b45592028757365725f696429205245464552454e43455320617574682e757365727328696429204f4e2044454c455445204341534341444500000098414c544552205441424c45207075626c69632e757365725f6661766f72697465730d0a2020202041444420434f4e53545241494e5420666b5f757365725f6661766f72697465735f76656e75650d0a20202020464f524549474e204b4559202876656e75655f696429205245464552454e434553207075626c69632e76656e75657328696429204f4e2044454c4554452043415343414445000002722d2d2041343a20706172746e6572732e76697369746f725f6964206973206d697373696e6720464b20746f20617574682e757365727320286966206974277320737570706f73656420746f206c696e6b207468657265290d0a2d2d204f522069662076697369746f725f696420697320616e20616e6f6e796d6f757320746578742049442c2077652073686f756c64207374616e64617264697a652e0d0a2d2d2057652077696c6c2061646420616e20696e646578206f6e2076697369746f725f696420666f7220616c6c20616e616c7974696373207461626c657320746f207370656564207570206a6f696e732e0d0a0d0a2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d0d0a2d2d20322e20434f4e53545241494e54202620494e444558204f4d495353494f4e532028504552464f524d414e4345290d0a2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d0d0a0d0a2d2d2042323a204d697373696e6720416e616c797469637320496e6465786573202847494e206f6e204a534f4e42290d0a43524541544520494e444558204946204e4f5420455849535453206964785f616e616c79746963735f6576656e74735f646174615f67696e0d0a202020204f4e207075626c69632e616e616c79746963735f6576656e7473205553494e472047494e202864617461206a736f6e625f706174685f6f7073290000007443524541544520494e444558204946204e4f5420455849535453206964785f616e616c79746963735f6c6f67735f646174615f67696e0d0a202020204f4e207075626c69632e616e616c79746963735f6c6f6773205553494e472047494e202864617461206a736f6e625f706174685f6f707329000000912d2d2042333a204d617020416473204d6574616461746120496e6465780d0a43524541544520494e444558204946204e4f5420455849535453206964785f61645f636c69636b735f6d657461646174615f67696e0d0a202020204f4e207075626c69632e61645f636c69636b73205553494e472047494e20286d65746164617461206a736f6e625f706174685f6f707329000000752d2d2042343a20526564656d7074696f6e20426f74746c656e65636b0d0a43524541544520494e444558204946204e4f5420455849535453206964785f726564656d7074696f6e735f757365725f69640d0a202020204f4e207075626c69632e726564656d7074696f6e732028757365725f696429000000a42d2d2042363a204361736520496e73656e7369746976697479204d697373696e67202856656e75652054616773290d0a2d2d20437265617465206120756e6971756520696e646578206f6e206c6f77657263617365206e616d6520696e7374656164206f6620616c746572696e6720636f6c756d6e20747970650d0a44524f5020494e444558204946204558495354532076656e75655f746167735f6e616d655f6b65790000004b414c544552205441424c45207075626c69632e76656e75655f746167732044524f5020434f4e53545241494e54204946204558495354532076656e75655f746167735f6e616d655f6b65790000006343524541544520554e4951554520494e444558204946204e4f5420455849535453206964785f76656e75655f746167735f6e616d655f6c6f7765720d0a202020204f4e207075626c69632e76656e75655f7461677320284c4f574552286e616d6529290000016b2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d0d0a2d2d20332e2044414e4745522026204f5645522d454e47494e454552494e472028534f46542044454c45544553290d0a2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d0d0a0d0a2d2d2045333a204c657468616c2044656c657465732e2041646420736f66742d64656c6574657320746f20636f7265207374727563747572616c207461626c65732e0d0a414c544552205441424c45207075626c69632e76656e7565730d0a2020202041444420434f4c554d4e204946204e4f54204558495354532064656c657465645f61742054494d455354414d50545a204e554c4c0000005343524541544520494e444558204946204e4f5420455849535453206964785f76656e7565735f64656c657465645f61740d0a202020204f4e207075626c69632e76656e756573202864656c657465645f61742900000053414c544552205441424c45207075626c69632e6576656e74730d0a2020202041444420434f4c554d4e204946204e4f54204558495354532064656c657465645f61742054494d455354414d50545a204e554c4c000000a82d2d2045383a204d697373696e6720757064617465645f61742074726967676572730d0a2d2d2041646420746f20757365725f616368696576656d656e74730d0a414c544552205441424c45207075626c69632e757365725f616368696576656d656e74730d0a2020202041444420434f4c554d4e204946204e4f542045584953545320757064617465645f61742054494d455354414d50545a2044454641554c54206e6f7728290000005344524f50205452494747455220494620455849535453207472675f757365725f616368696576656d656e74735f757064617465645f6174204f4e207075626c69632e757365725f616368696576656d656e74730000009e4352454154452054524947474552207472675f757365725f616368696576656d656e74735f757064617465645f61740d0a202020204245464f524520555044415445204f4e207075626c69632e757365725f616368696576656d656e74730d0a20202020464f52204541434820524f570d0a20202020455845435554452046554e4354494f4e206d6f646461746574696d6528757064617465645f617429000000842d2d2041646420746f206c75636b795f776865656c5f7370696e730d0a414c544552205441424c45207075626c69632e6c75636b795f776865656c5f7370696e730d0a2020202041444420434f4c554d4e204946204e4f542045584953545320757064617465645f61742054494d455354414d50545a2044454641554c54206e6f7728290000005344524f50205452494747455220494620455849535453207472675f6c75636b795f776865656c5f7370696e735f757064617465645f6174204f4e207075626c69632e6c75636b795f776865656c5f7370696e730000009e4352454154452054524947474552207472675f6c75636b795f776865656c5f7370696e735f757064617465645f61740d0a202020204245464f524520555044415445204f4e207075626c69632e6c75636b795f776865656c5f7370696e730d0a20202020464f52204541434820524f570d0a20202020455845435554452046554e4354494f4e206d6f646461746574696d6528757064617465645f61742900000006434f4d4d4954"}],"ResultFormatCodes":[]}
+2026/02/24 18:07:07 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 18:07:07 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 18:07:07 PG Send: {"Type":"Sync"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParseComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"BindComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"NoData"}
+2026/02/24 18:07:07 PG Recv: {"Type":"CommandComplete","CommandTag":"BEGIN"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParseComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"BindComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"NoData"}
+2026/02/24 18:07:07 PG Recv: {"Type":"CommandComplete","CommandTag":"ALTER TABLE"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParseComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"BindComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"NoData"}
+2026/02/24 18:07:07 PG Recv: {"Type":"CommandComplete","CommandTag":"ALTER TABLE"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParseComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"BindComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"NoData"}
+2026/02/24 18:07:07 PG Recv: {"Type":"CommandComplete","CommandTag":"ALTER TABLE"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParseComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"BindComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"NoData"}
+2026/02/24 18:07:07 PG Recv: {"Type":"CommandComplete","CommandTag":"ALTER TABLE"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParseComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"BindComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"NoData"}
+2026/02/24 18:07:07 PG Recv: {"Type":"CommandComplete","CommandTag":"ALTER TABLE"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParseComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"BindComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"NoData"}
+2026/02/24 18:07:07 PG Recv: {"Type":"CommandComplete","CommandTag":"ALTER TABLE"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParseComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"BindComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"NoData"}
+2026/02/24 18:07:07 PG Recv: {"Type":"CommandComplete","CommandTag":"CREATE INDEX"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParseComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"BindComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"NoData"}
+2026/02/24 18:07:07 PG Recv: {"Type":"CommandComplete","CommandTag":"CREATE INDEX"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParseComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"BindComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"NoData"}
+2026/02/24 18:07:07 PG Recv: {"Type":"CommandComplete","CommandTag":"CREATE INDEX"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParseComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"BindComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"NoData"}
+2026/02/24 18:07:07 PG Recv: {"Severity":"NOTICE","SeverityUnlocalized":"NOTICE","Code":"42P07","Message":"relation \"idx_redemptions_user_id\" already exists, skipping","Detail":"","Hint":"","Position":0,"InternalPosition":0,"InternalQuery":"","Where":"","SchemaName":"","TableName":"","ColumnName":"","DataTypeName":"","ConstraintName":"","File":"index.c","Line":889,"Routine":"index_create","UnknownFields":null}
+NOTICE (42P07): relation "idx_redemptions_user_id" already exists, skipping
+2026/02/24 18:07:07 PG Recv: {"Type":"CommandComplete","CommandTag":"CREATE INDEX"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ParseComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"BindComplete"}
+2026/02/24 18:07:07 PG Recv: {"Type":"NoData"}
+2026/02/24 18:07:07 PG Recv: {"Type":"ErrorResponse","Severity":"ERROR","SeverityUnlocalized":"ERROR","Code":"2BP01","Message":"cannot drop index venue_tags_name_key because constraint venue_tags_name_key on table venue_tags requires it","Detail":"","Hint":"You can drop constraint venue_tags_name_key on table venue_tags instead.","Position":0,"InternalPosition":0,"InternalQuery":"","Where":"","SchemaName":"","TableName":"","ColumnName":"","DataTypeName":"","ConstraintName":"","File":"dependency.c","Line":787,"Routine":"findDependentObjects","UnknownFields":null}
+2026/02/24 18:07:07 PG Recv: {"Type":"ReadyForQuery","TxStatus":"E"}
+2026/02/24 18:07:07 PG Send: {"Type":"Terminate"}
+ERROR: cannot drop index venue_tags_name_key because constraint venue_tags_name_key on table venue_tags requires it (SQLSTATE 2BP01)
+At statement: 11                                                                                                                    
+-- B6: Case Insensitivity Missing (Venue Tags)                                                                                      
+-- Create a unique index on lowercase name instead of altering column type                                                          
+DROP INDEX IF EXISTS venue_tags_name_key                                                                                            
+Waiting for the debugger to disconnect...

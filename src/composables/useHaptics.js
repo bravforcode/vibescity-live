@@ -3,12 +3,14 @@ import { useUserPreferencesStore } from "../store/userPreferencesStore";
 export const useHaptics = () => {
 	const prefs = useUserPreferencesStore();
 
-	// Check if vibration API is supported AND enabled
+	// Check if vibration API is supported, enabled, AND user has interacted with the page.
+	// Browsers block navigator.vibrate until after a tap/click/keypress event.
 	const isSupported = () => {
 		return (
 			typeof navigator !== "undefined" &&
 			"vibrate" in navigator &&
-			prefs.isHapticsEnabled
+			prefs.isHapticsEnabled &&
+			(navigator.userActivation?.hasBeenActive ?? true)
 		);
 	};
 

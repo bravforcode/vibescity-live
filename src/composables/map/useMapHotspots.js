@@ -10,14 +10,21 @@ export function useMapHotspots(mapRef, shops) {
 		if (!allowHeatmap || !mapRef.value || !shops.value) return;
 
 		const features = [];
+
+		// Optimization: O(1) hash map lookup instead of O(N^2) array finding
+		const shopMap = new Map();
+		shops.value.forEach((s) => {
+			shopMap.set(String(s.id), s);
+		});
+
 		Object.entries(densityData).forEach(([shopId, count]) => {
-			const shop = shops.value.find((s) => s.id == shopId);
+			const shop = shopMap.get(String(shopId));
 			if (shop?.lat && shop?.lng) {
 				features.push({
 					type: "Feature",
 					geometry: {
 						type: "Point",
-						coordinates: [shop.lng, shop.lat],
+						coordinates: [Number(shop.lng), Number(shop.lat)],
 					},
 					properties: {
 						density: count,

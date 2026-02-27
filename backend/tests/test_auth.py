@@ -1,7 +1,8 @@
-import pytest
 from types import SimpleNamespace
-from fastapi.security import HTTPAuthorizationCredentials
+
+import pytest
 from fastapi import HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
 
 import app.core.auth as auth
 
@@ -42,3 +43,13 @@ async def test_verify_user_invalid(monkeypatch):
 async def test_verify_admin(monkeypatch):
     admin_user = SimpleNamespace(app_metadata={"role": "admin"})
     assert await auth.verify_admin(admin_user) == admin_user
+
+
+@pytest.mark.asyncio
+async def test_verify_admin_allowlist_email(monkeypatch):
+    monkeypatch.setattr(auth.settings, "ADMIN_EMAIL_ALLOWLIST", "omchai.g44@gmail.com")
+    allowlisted_user = SimpleNamespace(
+        app_metadata={"role": "viewer"},
+        email="omchai.g44@gmail.com",
+    )
+    assert await auth.verify_admin(allowlisted_user) == allowlisted_user

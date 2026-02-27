@@ -1,0 +1,6 @@
+Debugger listening on ws://127.0.0.1:49364/e94f6b67-d34d-45b8-8e79-9169c04bf8cf
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger attached.
+[dotenv@17.3.1] injecting env (86) from .env -- tip: ΓÜÖ∩╕Å  load multiple .env files with { path: ['.env.local', '.env'] }
+Error: { message: '' }
+Waiting for the debugger to disconnect...

@@ -1,0 +1,117 @@
+Debugger listening on ws://127.0.0.1:52933/bca26c62-620e-429b-9e48-8fe858d33deb
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger attached.
+open supabase\.temp\profile: The system cannot find the file specified.
+Loading project ref from file: supabase\.temp\project-ref
+Resolved DNS: [2406:da18:243:741c:6552:667e:9e57:54f2]:5432
+Initialising login role...
+Using access token for profile: supabase
+Supabase CLI 2.76.14
+Using profile: supabase (supabase.co)
+Connecting to remote database...
+2026/02/24 20:25:07 PG Send: {"Type":"StartupMessage","ProtocolVersion":196608,"Parameters":{"database":"postgres","user":"cli_login_postgres"}}
+2026/02/24 20:25:07 PG Recv: {"Type":"AuthenticationSASL","AuthMechanisms":["SCRAM-SHA-256"]}
+2026/02/24 20:25:07 PG Send: {"Type":"SASLInitialResponse","AuthMechanism":"SCRAM-SHA-256","Data":"n,,n=,r=leBiqt6WJQ7W6XiKLyMiaKvv"}
+2026/02/24 20:25:07 PG Recv: {"Type":"AuthenticationSASLContinue","Data":"r=leBiqt6WJQ7W6XiKLyMiaKvvSjnYOdYCrwRvks1KebeXaqoG,s=h7LmagqRq3ZNDIIB5BrGog==,i=4096"}
+2026/02/24 20:25:07 PG Send: {"Type":"SASLResponse","Data":"c=biws,r=leBiqt6WJQ7W6XiKLyMiaKvvSjnYOdYCrwRvks1KebeXaqoG,p=5bnWNSsfMoS3cwUDbUxIOywBSVPjXKXF2D0W0RMdKOQ="}
+2026/02/24 20:25:08 PG Recv: {"Type":"AuthenticationSASLFinal","Data":"v=1NPqtVB3Zrh6pMCShnhA8bbhAiYWkad/aPhI0EDyAGY="}
+2026/02/24 20:25:08 PG Recv: {"Type":"AuthenticationOK"}
+2026/02/24 20:25:08 PG Recv: {"Type":"ParameterStatus","Name":"in_hot_standby","Value":"off"}
+2026/02/24 20:25:08 PG Recv: {"Type":"ParameterStatus","Name":"integer_datetimes","Value":"on"}
+2026/02/24 20:25:08 PG Recv: {"Type":"ParameterStatus","Name":"TimeZone","Value":"UTC"}
+2026/02/24 20:25:08 PG Recv: {"Type":"ParameterStatus","Name":"IntervalStyle","Value":"postgres"}
+2026/02/24 20:25:08 PG Recv: {"Type":"ParameterStatus","Name":"is_superuser","Value":"off"}
+2026/02/24 20:25:08 PG Recv: {"Type":"ParameterStatus","Name":"application_name","Value":""}
+2026/02/24 20:25:08 PG Recv: {"Type":"ParameterStatus","Name":"default_transaction_read_only","Value":"off"}
+2026/02/24 20:25:08 PG Recv: {"Type":"ParameterStatus","Name":"scram_iterations","Value":"4096"}
+2026/02/24 20:25:08 PG Recv: {"Type":"ParameterStatus","Name":"DateStyle","Value":"ISO, MDY"}
+2026/02/24 20:25:08 PG Recv: {"Type":"ParameterStatus","Name":"standard_conforming_strings","Value":"on"}
+2026/02/24 20:25:08 PG Recv: {"Type":"ParameterStatus","Name":"session_authorization","Value":"cli_login_postgres"}
+2026/02/24 20:25:08 PG Recv: {"Type":"ParameterStatus","Name":"client_encoding","Value":"UTF8"}
+2026/02/24 20:25:08 PG Recv: {"Type":"ParameterStatus","Name":"server_version","Value":"17.6"}
+2026/02/24 20:25:08 PG Recv: {"Type":"ParameterStatus","Name":"server_encoding","Value":"UTF8"}
+2026/02/24 20:25:08 PG Recv: {"Type":"BackendKeyData","ProcessID":430555,"SecretKey":2880720106}
+2026/02/24 20:25:08 PG Recv: {"Type":"ReadyForQuery","TxStatus":"I"}
+2026/02/24 20:25:08 PG Send: {"Type":"Query","String":"SET SESSION ROLE postgres"}
+2026/02/24 20:25:08 PG Recv: {"Type":"CommandComplete","CommandTag":"SET"}
+2026/02/24 20:25:08 PG Recv: {"Type":"ReadyForQuery","TxStatus":"I"}
+2026/02/24 20:25:08 PG Send: {"Type":"Parse","Name":"lrupsc_1_0","Query":"SELECT version FROM supabase_migrations.schema_migrations ORDER BY version","ParameterOIDs":null}
+2026/02/24 20:25:08 PG Send: {"Type":"Describe","ObjectType":"S","Name":"lrupsc_1_0"}
+2026/02/24 20:25:08 PG Send: {"Type":"Sync"}
+2026/02/24 20:25:08 PG Recv: {"Type":"ParseComplete"}
+2026/02/24 20:25:08 PG Recv: {"Type":"ParameterDescription","ParameterOIDs":[]}
+2026/02/24 20:25:08 PG Recv: {"Type":"RowDescription","Fields":[{"Name":"version","TableOID":21791,"TableAttributeNumber":1,"DataTypeOID":25,"DataTypeSize":-1,"TypeModifier":-1,"Format":0}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"ReadyForQuery","TxStatus":"I"}
+2026/02/24 20:25:08 PG Send: {"Type":"Bind","DestinationPortal":"","PreparedStatement":"lrupsc_1_0","ParameterFormatCodes":null,"Parameters":[],"ResultFormatCodes":[0]}
+2026/02/24 20:25:08 PG Send: {"Type":"Describe","ObjectType":"P","Name":""}
+2026/02/24 20:25:08 PG Send: {"Type":"Execute","Portal":"","MaxRows":0}
+2026/02/24 20:25:08 PG Send: {"Type":"Sync"}
+2026/02/24 20:25:08 PG Recv: {"Type":"BindComplete"}
+2026/02/24 20:25:08 PG Recv: {"Type":"RowDescription","Fields":[{"Name":"version","TableOID":21791,"TableAttributeNumber":1,"DataTypeOID":25,"DataTypeSize":-1,"TypeModifier":-1,"Format":0}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260212100000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260212110000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260212120000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260212130000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260212140000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260213100000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260213100001"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260213110000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260216153000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260217000001"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260217000002"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260217000003"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260217130000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260218120000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260218121000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260219000100"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260219000101"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260219000200"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260219000300"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260219000400"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260220000100"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260220000200"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260220000300"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260220000400"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260220000500"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260220000600"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260220000700"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260220000800"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260220000900"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260220001000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260221000100"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260221000200"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260221000300"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260221000400"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260221000500"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260222000000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260222010000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260222020000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260223000001"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260223120000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260223130000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260223153000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260223170000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260223173000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260223200000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260223210000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260223210001"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260223213000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260223223000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260223231500"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260224120000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260224120002"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260224121500"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260224135000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260224160000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260224161000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260224190000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"DataRow","Values":[{"text":"20260224201000"}]}
+2026/02/24 20:25:08 PG Recv: {"Type":"CommandComplete","CommandTag":"SELECT 58"}
+2026/02/24 20:25:08 PG Recv: {"Type":"ReadyForQuery","TxStatus":"I"}
+Found local migration files to be inserted before the last migration on remote database.
+
+Rerun the command with --include-all flag to apply these migrations:
+supabase\migrations\20260224190100_ultrathink_schema_optimization_part3.sql
+
+2026/02/24 20:25:08 PG Send: {"Type":"Terminate"}
+Waiting for the debugger to disconnect...

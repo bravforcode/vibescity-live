@@ -73,6 +73,13 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
+            urlPattern: /.*\.mp4$/i,
+            handler: "NetworkOnly",
+            options: {
+              cacheName: "supabase-video-bypass",
+            },
+          },
+          {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: "CacheFirst",
             options: {

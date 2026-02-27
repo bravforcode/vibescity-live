@@ -1,4 +1,5 @@
-import { supabase } from "../lib/supabase";
+import { apiFetch, parseApiError } from "./apiClient";
+import { bootstrapVisitor, getOrCreateVisitorId } from "./visitorIdentity";
 
 const sanitizeCode = (value) =>
 	String(value || "")
@@ -7,77 +8,103 @@ const sanitizeCode = (value) =>
 		.toUpperCase()
 		.slice(0, 24);
 
+const ensureVisitorContext = async () => {
+	const visitorId = getOrCreateVisitorId();
+	await bootstrapVisitor();
+	return visitorId;
+};
+
+const buildPartnerError = (message, fallback) => {
+	const text = String(message || "").trim();
+	if (!text) return fallback;
+	const lowered = text.toLowerCase();
+	if (
+		lowered.includes("failed to fetch") ||
+		lowered.includes("networkerror") ||
+		lowered.includes("load failed")
+	) {
+		return "Partner API unreachable (network/CORS). Please redeploy backend and allow visitor headers in CORS.";
+	}
+	return text;
+};
+
+const parseJson = async (response, fallback) => {
+	if (!response.ok) {
+		if (response.status === 404) {
+			throw new Error(
+				"Partner API endpoint not found. Deploy backend with /api/v1/partner routes.",
+			);
+		}
+		if (response.status === 401) {
+			throw new Error("Visitor session expired. Please refresh and try again.");
+		}
+		if (response.status === 402) {
+			throw new Error(
+				"Partner subscription is required before this action can be used.",
+			);
+		}
+		const message = await parseApiError(response, fallback);
+		throw new Error(message);
+	}
+	return response.json();
+};
+
+const safePartnerCall = async (operation, fallbackMessage) => {
+	try {
+		return await operation();
+	} catch (error) {
+		throw new Error(buildPartnerError(error?.message, fallbackMessage));
+	}
+};
+
 export const partnerService = {
 	sanitizeCode,
 
-	async getMyPartnerProfile() {
-		const {
-			data: { user },
-		} = await supabase.auth.getUser();
-		if (!user?.id) return null;
-
-		const { data, error } = await supabase
-			.from("partners")
-			.select("*")
-			.eq("user_id", user.id)
-			.maybeSingle();
-		if (error) throw error;
-		return data || null;
+	async getStatus() {
+		return safePartnerCall(async () => {
+			const visitorId = await ensureVisitorContext();
+			const response = await apiFetch(
+				`/partner/status?visitor_id=${encodeURIComponent(visitorId)}`,
+				{
+					method: "GET",
+					includeVisitor: true,
+					refreshVisitorTokenIfNeeded: true,
+				},
+			);
+			return parseJson(response, "Unable to load partner status");
+		}, "Unable to load partner status");
 	},
 
-	async createPartnerProfile({ displayName, referralCode }) {
-		const { data, error } = await supabase.rpc("create_partner_profile", {
-			p_display_name: String(displayName || "").trim(),
-			p_referral_code: sanitizeCode(referralCode) || null,
-		});
-		if (error) throw error;
-		return data || null;
+	async getDashboard() {
+		return safePartnerCall(async () => {
+			const visitorId = await ensureVisitorContext();
+			const response = await apiFetch(
+				`/partner/dashboard?visitor_id=${encodeURIComponent(visitorId)}`,
+				{
+					method: "GET",
+					includeVisitor: true,
+					refreshVisitorTokenIfNeeded: true,
+				},
+			);
+			return parseJson(response, "Unable to load partner dashboard");
+		}, "Unable to load partner dashboard");
 	},
 
-	async getDashboardMetrics() {
-		const { data, error } = await supabase.rpc("get_partner_dashboard_metrics");
-		if (error) throw error;
-		return Array.isArray(data) ? data[0] || null : data || null;
-	},
-
-	async getRecentReferrals(partnerId, limit = 20) {
-		if (!partnerId) return [];
-		const { data, error } = await supabase
-			.from("partner_referrals")
-			.select("id,venue_id,source,referral_code,attributed_at")
-			.eq("partner_id", partnerId)
-			.order("attributed_at", { ascending: false })
-			.limit(limit);
-		if (error) throw error;
-		return data || [];
-	},
-
-	async getRecentPayouts(partnerId, limit = 12) {
-		if (!partnerId) return [];
-		const { data, error } = await supabase
-			.from("partner_payouts")
-			.select(
-				"id,payout_week_start,payout_week_end,net_amount_thb,status,transfer_reference,paid_at",
-			)
-			.eq("partner_id", partnerId)
-			.order("payout_week_end", { ascending: false })
-			.limit(limit);
-		if (error) throw error;
-		return data || [];
-	},
-
-	async getLedgerEntries(partnerId, limit = 30) {
-		if (!partnerId) return [];
-		const { data, error } = await supabase
-			.from("partner_commission_ledger")
-			.select(
-				"id,entry_type,amount_thb,status,period_end,created_at,order_id,venue_id",
-			)
-			.eq("partner_id", partnerId)
-			.order("created_at", { ascending: false })
-			.limit(limit);
-		if (error) throw error;
-		return data || [];
+	async upsertProfile({ displayName, referralCode }) {
+		return safePartnerCall(async () => {
+			const visitorId = await ensureVisitorContext();
+			const response = await apiFetch("/partner/profile", {
+				method: "POST",
+				includeVisitor: true,
+				refreshVisitorTokenIfNeeded: true,
+				body: {
+					visitor_id: visitorId,
+					display_name: String(displayName || "").trim(),
+					referral_code: sanitizeCode(referralCode) || null,
+				},
+			});
+			return parseJson(response, "Unable to save partner profile");
+		}, "Unable to save partner profile");
 	},
 
 	async upsertBankSecrets({
@@ -85,13 +112,47 @@ export const partnerService = {
 		accountName,
 		accountNumber,
 		promptpayId,
+		bankCountry,
+		currency,
+		swiftCode,
+		iban,
+		routingNumber,
+		bankName,
+		branchName,
+		accountType,
 	}) {
-		const { error } = await supabase.rpc("upsert_partner_secrets", {
-			p_bank_code: String(bankCode || "").toUpperCase(),
-			p_account_name: String(accountName || "").trim(),
-			p_account_number: String(accountNumber || "").trim() || null,
-			p_promptpay_id: String(promptpayId || "").trim() || null,
-		});
-		if (error) throw error;
+		return safePartnerCall(async () => {
+			const visitorId = await ensureVisitorContext();
+			const response = await apiFetch("/partner/bank", {
+				method: "POST",
+				includeVisitor: true,
+				refreshVisitorTokenIfNeeded: true,
+				body: {
+					visitor_id: visitorId,
+					bank_code: String(bankCode || "").toUpperCase(),
+					account_name: String(accountName || "").trim(),
+					account_number: String(accountNumber || "").trim() || null,
+					promptpay_id: String(promptpayId || "").trim() || null,
+					bank_country: String(bankCountry || "").trim() || null,
+					currency:
+						String(currency || "")
+							.trim()
+							.toUpperCase() || null,
+					swift_code:
+						String(swiftCode || "")
+							.trim()
+							.toUpperCase() || null,
+					iban:
+						String(iban || "")
+							.trim()
+							.toUpperCase() || null,
+					routing_number: String(routingNumber || "").trim() || null,
+					bank_name: String(bankName || "").trim() || null,
+					branch_name: String(branchName || "").trim() || null,
+					account_type: String(accountType || "").trim() || null,
+				},
+			});
+			return parseJson(response, "Unable to save payout settings");
+		}, "Unable to save payout settings");
 	},
 };

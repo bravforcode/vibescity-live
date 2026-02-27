@@ -1,151 +1,314 @@
 import { storeToRefs } from "pinia";
 import { computed, ref } from "vue";
+import { normalizeVenueViewModel } from "../domain/venue/viewModel";
 import { getAllEvents } from "../services/eventService";
 import { useShopStore } from "../store/shopStore";
 
+const EVENT_FUTURE_WINDOW_DAYS = 14;
+const EVENT_PAST_GRACE_HOURS = 12;
+const EVENT_CATEGORY_HINTS = [
+	"event",
+	"festival",
+	"concert",
+	"market",
+	"fair",
+	"expo",
+	"party",
+];
+
+const normalizeText = (value) =>
+	String(value || "")
+		.trim()
+		.toLowerCase();
+const toFiniteNumber = (value) => {
+	const num = Number(value);
+	return Number.isFinite(num) ? num : null;
+};
+
+const parseEventTimeWindow = (event) => {
+	const startRaw =
+		event?.startTime ||
+		event?.start_time ||
+		event?.startDate ||
+		event?.start_date ||
+		event?.date;
+	if (!startRaw) return null;
+
+	const start = new Date(startRaw);
+	if (Number.isNaN(start.getTime())) return null;
+
+	const endRaw =
+		event?.endTime || event?.end_time || event?.endDate || event?.end_date;
+	const end = endRaw
+		? new Date(endRaw)
+		: new Date(start.getTime() + 6 * 60 * 60 * 1000);
+	if (Number.isNaN(end.getTime())) return null;
+
+	return { start, end };
+};
+
+const shouldKeepEventInWindow = (event, now) => {
+	const range = parseEventTimeWindow(event);
+	if (!range) return false;
+
+	const futureBoundary = new Date(
+		now.getTime() + EVENT_FUTURE_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+	);
+	const pastBoundary = new Date(
+		now.getTime() - EVENT_PAST_GRACE_HOURS * 60 * 60 * 1000,
+	);
+	return range.start <= futureBoundary && range.end >= pastBoundary;
+};
+
+const resolveEventCoordinates = (event, buildingsData, venues) => {
+	const directLat = toFiniteNumber(event?.lat ?? event?.latitude);
+	const directLng = toFiniteNumber(
+		event?.lng ?? event?.longitude ?? event?.lon,
+	);
+	if (directLat !== null && directLng !== null)
+		return { lat: directLat, lng: directLng };
+
+	const buildingKey = String(
+		event?.buildingId || event?.building_id || event?.building || "",
+	).trim();
+	if (buildingKey) {
+		const directBuilding = buildingsData?.[buildingKey];
+		const buildingLat = toFiniteNumber(
+			directBuilding?.lat ?? directBuilding?.latitude,
+		);
+		const buildingLng = toFiniteNumber(
+			directBuilding?.lng ?? directBuilding?.longitude,
+		);
+		if (buildingLat !== null && buildingLng !== null) {
+			return { lat: buildingLat, lng: buildingLng };
+		}
+	}
+
+	const locationText = normalizeText(event?.location || event?.venue || "");
+	if (locationText && buildingsData && typeof buildingsData === "object") {
+		for (const building of Object.values(buildingsData)) {
+			const bName = normalizeText(building?.name || building?.shortName || "");
+			if (!bName) continue;
+			if (!locationText.includes(bName) && !bName.includes(locationText))
+				continue;
+			const bLat = toFiniteNumber(building?.lat ?? building?.latitude);
+			const bLng = toFiniteNumber(building?.lng ?? building?.longitude);
+			if (bLat !== null && bLng !== null) {
+				return { lat: bLat, lng: bLng };
+			}
+		}
+	}
+
+	const venueId = String(
+		event?.venue_id || event?.venueId || event?.shop_id || "",
+	).trim();
+	if (venueId) {
+		const byId = venues.find(
+			(shop) => String(shop?.id ?? "").trim() === venueId,
+		);
+		if (byId) {
+			const lat = toFiniteNumber(byId?.lat ?? byId?.latitude);
+			const lng = toFiniteNumber(byId?.lng ?? byId?.longitude);
+			if (lat !== null && lng !== null) return { lat, lng };
+		}
+	}
+
+	const nameHint = normalizeText(event?.name || event?.title || "");
+	for (const shop of venues) {
+		const lat = toFiniteNumber(shop?.lat ?? shop?.latitude);
+		const lng = toFiniteNumber(shop?.lng ?? shop?.longitude);
+		if (lat === null || lng === null) continue;
+		const shopName = normalizeText(shop?.name);
+		const shopAddress = normalizeText(
+			shop?.address || shop?.district || shop?.zone,
+		);
+		if (
+			(nameHint &&
+				(shopName.includes(nameHint) || nameHint.includes(shopName))) ||
+			(locationText &&
+				(shopAddress.includes(locationText) ||
+					locationText.includes(shopAddress)))
+		) {
+			return { lat, lng };
+		}
+	}
+
+	return null;
+};
+
+const normalizePrimaryEvent = (event, coords, now, sourceTag) => {
+	const normalized = normalizeVenueViewModel(
+		{
+			...event,
+			id: event?.id || `event-${Date.now()}`,
+			name: event?.name || event?.title || "Event",
+			category: event?.category || "Event",
+			lat: coords.lat,
+			lng: coords.lng,
+			pin_type: "giant",
+			is_event: true,
+			has_coin: false,
+			status: event?.isLive ? "live" : "off",
+			video_url: event?.video_url || event?.video || event?.videoUrl,
+			Image_URL1:
+				event?.Image_URL1 ||
+				event?.cover_image ||
+				event?.coverImage ||
+				event?.image,
+		},
+		{ userLocation: null, collectedCoinIds: null },
+	);
+
+	const range = parseEventTimeWindow(event);
+	const isLive = range
+		? now >= range.start && now <= range.end
+		: Boolean(event?.isLive);
+
+	return {
+		...normalized,
+		id: String(normalized.id),
+		eventId: String(event?.id || normalized.id),
+		venueId: event?.venue_id || event?.venueId || null,
+		source: sourceTag,
+		isEvent: true,
+		is_event: true,
+		pin_state: "event",
+		pin_type: "giant",
+		is_live: isLive,
+		status: isLive ? "LIVE" : normalized.status,
+		startTime:
+			range?.start?.toISOString?.() || event?.startTime || event?.date || null,
+		endTime: range?.end?.toISOString?.() || event?.endTime || null,
+		description: event?.description || normalized.description || "",
+		location: event?.location || event?.venue || "",
+	};
+};
+
+const isVenueEventFallback = (shop) => {
+	const pinType = normalizeText(shop?.pin_type || shop?.pinType);
+	const category = normalizeText(shop?.category);
+	if (shop?.is_event || shop?.isEvent) return true;
+	if (pinType === "event" || pinType === "giant") return true;
+	if (shop?.is_giant_active || shop?.giantActive || shop?.isGiantPin)
+		return true;
+	return EVENT_CATEGORY_HINTS.some((hint) => category.includes(hint));
+};
+
+const normalizeVenueFallbackEvent = (shop, now) => {
+	const normalized = normalizeVenueViewModel(
+		{
+			...shop,
+			is_event: true,
+			pin_type: "giant",
+			has_coin: false,
+		},
+		{ userLocation: null, collectedCoinIds: null },
+	);
+	const isLive =
+		normalizeText(shop?.status) === "live" || Boolean(shop?.is_live);
+
+	return {
+		...normalized,
+		id: `venue-${normalized.id}`,
+		eventId: `venue-${normalized.id}`,
+		venueId: normalized.id,
+		source: "venue-fallback",
+		isEvent: true,
+		is_event: true,
+		pin_state: "event",
+		pin_type: "giant",
+		is_live: isLive,
+		status: isLive ? "LIVE" : normalized.status,
+		startTime: now.toISOString(),
+		endTime: null,
+	};
+};
+
+const uniqueEventKey = (event) => {
+	const venueId = String(event?.venueId || "").trim();
+	if (venueId) return `venue:${venueId}`;
+	const eventId = String(event?.eventId || event?.id || "").trim();
+	if (eventId) return `event:${eventId}`;
+	const lat = Number(event?.lat ?? event?.latitude);
+	const lng = Number(event?.lng ?? event?.longitude);
+	const name = normalizeText(event?.name);
+	if (Number.isFinite(lat) && Number.isFinite(lng)) {
+		return `${name}:${lat.toFixed(4)}:${lng.toFixed(4)}`;
+	}
+	return name || `event:${Math.random()}`;
+};
+
 export function useEventLogic() {
 	const shopStore = useShopStore();
-	const { currentTime } = storeToRefs(shopStore);
+	const { currentTime, processedShops } = storeToRefs(shopStore);
 
-	const realTimeEvents = ref([]); // ✅ Real-time events from API
-	const timedEvents = ref([]); // ✅ Dynamic events from events.json
-	const buildingsData = ref({}); // ✅ Building metadata
+	const realTimeEvents = ref([]);
+	const timedEvents = ref([]);
+	const buildingsData = ref({});
 
-	// ✅ MOCK EVENTS DATA (To be replaced by API later)
-	const mockEvents = {
-		oneNimman: {
-			id: "event-onenimman-01",
-			buildingId: "oneNimman",
-			name: "Chiang Mai Food Festival 2024",
-			shortName: "Food Fest",
-			image:
-				"https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1000&auto=format&fit=crop",
-			video: "https://www.w3schools.com/html/mov_bbb.mp4", // Placeholder
-			description:
-				"ที่สุดของมหกรรมอาหารเหนือและสตรีทฟู้ดร้านดังกว่า 50 ร้าน พร้อมดนตรีสดตลอดคืน!",
-			startTime: "2024-01-01T10:00:00", // Long running for demo
-			endTime: "2030-12-31T22:00:00",
-			status: "LIVE",
-			highlights: [
-				{
-					type: "image",
-					src: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1",
-				},
-				{
-					type: "image",
-					src: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38",
-				},
-			],
-			zones: [
-				{
-					title: "Street Food Zone",
-					description: "รวมร้านเด็ดเชียงใหม่",
-					image: "https://images.unsplash.com/photo-1504674900247-0877df9cc836",
-				},
-				{
-					title: "Craft Beer Garden",
-					description: "เบียร์คราฟต์ไทย",
-					image: "https://images.unsplash.com/photo-1575037614876-c38a4d44f5b8",
-				},
-			],
-			timeline: [
-				{ time: "17:00", activity: "Opening Ceremony" },
-				{ time: "18:30", activity: "Live Band: The Yers" },
-				{ time: "20:00", activity: "DJ Stage" },
-			],
-		},
-		maya: {
-			id: "event-maya-01",
-			buildingId: "maya",
-			name: "MAYA Rooftop Cinema",
-			shortName: "Rooftop Cinema",
-			image:
-				"https://images.unsplash.com/photo-1517604931442-710c8ef5ad25?q=80&w=1000",
-			description: "ดูหนังกลางแปลงบนดาดฟ้า บรรยากาศสุดชิล",
-			startTime: "2024-01-01T18:00:00",
-			endTime: "2025-12-31T23:00:00",
-			status: "UPCOMING",
-		},
-	};
-
-	/**
-	 * Fetches real-time events from the API and local sources.
-	 */
 	const updateEventsData = async () => {
 		try {
 			const events = await getAllEvents();
-			realTimeEvents.value = events;
+			realTimeEvents.value = Array.isArray(events) ? events : [];
 		} catch (err) {
-			console.warn("Real-time events sync failed:", err.message);
+			console.warn("Real-time events sync failed:", err?.message || err);
 		}
 	};
 
-	// ✅ Computed: Active Events
-	// Returns buildings object but decorated with event data IF event is active
 	const activeEvents = computed(() => {
-		const result = [];
-		if (!buildingsData.value) return [];
+		const now =
+			currentTime.value instanceof Date ? currentTime.value : new Date();
+		const venues = Array.isArray(processedShops.value)
+			? processedShops.value
+			: [];
+		const buildings =
+			buildingsData.value && typeof buildingsData.value === "object"
+				? buildingsData.value
+				: {};
 
-		const now = currentTime.value;
+		const primary = [];
+		for (const event of [
+			...(timedEvents.value || []),
+			...(realTimeEvents.value || []),
+		]) {
+			if (!event || !shouldKeepEventInWindow(event, now)) continue;
+			const coords = resolveEventCoordinates(event, buildings, venues);
+			if (!coords) continue;
+			primary.push(normalizePrimaryEvent(event, coords, now, "event-feed"));
+		}
 
-		// 1. Process mockEvents (Fixed buildings with events)
-		Object.keys(mockEvents).forEach((key) => {
-			const building = buildingsData.value[key];
-			const event = mockEvents[key];
-			if (building && event) {
-				const start = new Date(event.startTime);
-				const end = new Date(event.endTime);
-				if (now >= start && now <= end) {
-					result.push({
-						...building,
-						...event,
-						key: key,
-						isEvent: true,
-					});
-				}
+		const fallback = venues
+			.filter(isVenueEventFallback)
+			.filter(
+				(shop) =>
+					Number.isFinite(Number(shop?.lat)) &&
+					Number.isFinite(Number(shop?.lng)),
+			)
+			.map((shop) => normalizeVenueFallbackEvent(shop, now));
+
+		const merged = new Map();
+		for (const event of [...primary, ...fallback]) {
+			const key = uniqueEventKey(event);
+			if (!merged.has(key)) {
+				merged.set(key, event);
+				continue;
 			}
-		});
-
-		// 2. Process timedEvents (from events.json)
-		if (Array.isArray(timedEvents.value)) {
-			timedEvents.value.forEach((event) => {
-				const start = new Date(event.startTime || event.date);
-				const end = new Date(
-					event.endTime || new Date(new Date(event.date).getTime() + 86400000),
-				);
-				if (now >= start && now <= end) {
-					result.push({
-						...event,
-						key: event.id,
-						isEvent: true,
-					});
-				}
-			});
+			const current = merged.get(key);
+			if (
+				String(current?.source || "") !== "event-feed" &&
+				event.source === "event-feed"
+			) {
+				merged.set(key, event);
+			}
 		}
 
-		// 3. Process realTimeEvents (from API)
-		if (Array.isArray(realTimeEvents.value)) {
-			realTimeEvents.value.forEach((event) => {
-				const start = new Date(event.startTime);
-				const end = new Date(event.endTime);
-				if (now >= start && now <= end) {
-					result.push({
-						...event,
-						key: event.id,
-						isEvent: true,
-					});
-				}
-			});
-		}
-
-		return result;
+		return Array.from(merged.values());
 	});
 
 	return {
 		realTimeEvents,
 		timedEvents,
 		buildingsData,
-		mockEvents,
 		updateEventsData,
 		activeEvents,
 	};

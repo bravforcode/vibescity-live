@@ -21,26 +21,32 @@ verify_jwt = false
 [functions.easyslip-healthcheck]
 verify_jwt = false # Deprecated: EasySlip no longer used
 
+[functions.admin-local-ads]
+verify_jwt = false
+
+[functions.admin-sheet-sync]
+verify_jwt = false
+
 [functions.admin-slip-dashboard]
-verify_jwt = true
+verify_jwt = false
 
 [functions.admin-slip-export]
-verify_jwt = true
+verify_jwt = false
 
 [functions.admin-analytics-dashboard]
-verify_jwt = true
+verify_jwt = false
 
 [functions.admin-analytics-export]
-verify_jwt = true
+verify_jwt = false
 
 [functions.admin-pii-audit-dashboard]
-verify_jwt = true
+verify_jwt = false
 
 [functions.admin-pii-audit-export]
-verify_jwt = true
+verify_jwt = false
 
 [functions.admin-pii-audit-access-export]
-verify_jwt = true
+verify_jwt = false
 
 [functions.seo-sitemap]
 verify_jwt = false

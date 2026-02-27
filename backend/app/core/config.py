@@ -1,7 +1,8 @@
-from functools import lru_cache
-from typing import List, Optional
 import logging
+from functools import lru_cache
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Settings(BaseSettings):
     ENV: str = "development"
@@ -10,17 +11,24 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
 
     # CORS
-    BACKEND_CORS_ORIGINS: List[str] = [
+    BACKEND_CORS_ORIGINS: list[str] = [
         "http://localhost:3000",
         "http://localhost:5173",
+        "http://localhost:5417",
+        "http://localhost:5418",
         "https://vibecity.live",
-        "http://127.0.0.1:3000"
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5417",
+        "http://127.0.0.1:5418",
     ]
+    VISITOR_SIGNING_SECRET: str = ""
+    VISITOR_TOKEN_TTL_SECONDS: int = 604800
 
     # External APIs
     STRIPE_SECRET_KEY: str = ""
     STRIPE_PUBLISHABLE_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
+    MAPBOX_ACCESS_TOKEN: str = ""
 
     # Real-time
     MAX_CONNECTIONS: int = 1000
@@ -32,6 +40,8 @@ class Settings(BaseSettings):
     SUPABASE_URL: str = "https://your-project.supabase.co"
     SUPABASE_KEY: str = "your-anon-key"
     SUPABASE_SERVICE_ROLE_KEY: str = ""
+    DATABASE_URL: str = "postgresql://test:test@localhost:5432/core"
+    NEON_DATABASE_URL: str = "postgresql://test:test@localhost:5432/history"
 
     # Redis / Queues
     REDIS_URL: str = ""
@@ -41,7 +51,7 @@ class Settings(BaseSettings):
 
     # Frontend / Redirect Safety
     FRONTEND_URL: str = "https://vibecity.live"
-    ALLOWED_CHECKOUT_REDIRECT_HOSTS: List[str] = [
+    ALLOWED_CHECKOUT_REDIRECT_HOSTS: list[str] = [
         "vibecity.live",
         "localhost",
         "127.0.0.1"
@@ -52,6 +62,19 @@ class Settings(BaseSettings):
     ONESIGNAL_API_KEY: str = ""
     DISCORD_WEBHOOK_URL: str = ""
     IPINFO_TOKEN: str = ""
+
+    # Google Sheets Server Logger
+    SHEETS_LOGGER_ENABLED: bool = False
+    SHEETS_LOGGER_FULL_DETAIL: bool = True
+    SHEETS_LOGGER_TIMEOUT_MS: int = 2200
+    SHEETS_WEBHOOK_EVENTS_URL: str = ""
+    SHEETS_WEBHOOK_PARTNER_URL: str = ""
+    SHEETS_WEBHOOK_PAYMENTS_URL: str = ""
+    SHEETS_WEBHOOK_SECRET: str = ""
+    SHEETS_STRATEGY: str = "db_sync"  # db_sync | legacy_webhook
+
+    # Admin access fallback (email allowlist, comma-separated)
+    ADMIN_EMAIL_ALLOWLIST: str = "omchai.g44@gmail.com"
 
     # Slip Verification (OCR)
     SLIP_EXPECT_RECEIVER_NAME: str = ""
@@ -66,8 +89,8 @@ class Settings(BaseSettings):
     GCV_OCR_MAX_BYTES: int = 5242880
 
     # PayPal
-    PAYPAL_CLIENT_ID: Optional[str] = None
-    PAYPAL_SECRET: Optional[str] = None
+    PAYPAL_CLIENT_ID: str | None = None
+    PAYPAL_SECRET: str | None = None
     PAYPAL_MODE: str = "sandbox"  # sandbox or live
 
     # Observability
@@ -80,13 +103,13 @@ class Settings(BaseSettings):
 
     # Memory (mem0 + pgvector)
     MEMORY_ENABLED: bool = False
-    OPENAI_API_KEY: Optional[str] = None
-    MEMORY_DATABASE_URL: Optional[str] = None  # postgres://... (Supabase direct DB URL)
-    GOOGLE_API_KEY: Optional[str] = None  # For Gemini support
+    OPENAI_API_KEY: str | None = None
+    MEMORY_DATABASE_URL: str | None = None  # postgres://... (Supabase direct DB URL)
+    GOOGLE_API_KEY: str | None = None  # For Gemini support
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
-@lru_cache()
+@lru_cache
 def get_settings():
     return Settings()
 

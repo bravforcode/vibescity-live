@@ -31,7 +31,7 @@
         <!-- Currency Toggle -->
         <button
           @click="currencyStore.toggleCurrency()"
-          class="bg-black/40 hover:bg-black/60 text-white px-3 py-1.5 rounded-lg text-xs font-bold border border-white/10 transition-all flex items-center gap-2"
+          class="bg-black/40 hover:bg-black/60 text-white px-3 py-1.5 rounded-lg text-xs font-bold border border-white/10 transition flex items-center gap-2"
         >
           <span>{{
             currencyStore.currentCurrency === "THB" ? "🇹🇭 THB" : "🇺🇸 USD"
@@ -52,11 +52,11 @@
                 ? 'bg-white/10 text-white shadow-lg'
                 : 'text-gray-500 hover:text-gray-300'
             "
-            class="px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 capitalize"
+            class="px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 capitalize"
           >
-            <span v-if="method === 'stripe'">💳 Card</span>
+            <span v-if="method === 'stripe'">💳 Stripe TH+Global</span>
             <span v-else-if="method === 'paypal'">🅿️ PayPal</span>
-            <span v-else>🏦 Transfer</span>
+            <span v-else>🏦 Thai / Intl Wire</span>
           </button>
         </div>
       </div>
@@ -92,7 +92,7 @@
             ? `bg-gradient-to-r ${tier.grad} text-white shadow-lg scale-105`
             : 'bg-white/5 text-gray-400 hover:bg-white/10'
         "
-        class="px-6 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap border border-white/5"
+        class="px-6 py-2 rounded-full text-xs font-bold transition whitespace-nowrap border border-white/5"
       >
         {{ tier.icon }} {{ tier.name }}
       </button>
@@ -114,7 +114,7 @@
       <div
         v-for="(pkg, idx) in filteredPackages"
         :key="pkg.sku"
-        class="bg-white/5 rounded-2xl p-1 border border-white/10 hover:border-white/30 transition-all group relative min-w-[280px] md:min-w-0 snap-center flex flex-col h-full"
+        class="bg-white/5 rounded-2xl p-1 border border-white/10 hover:border-white/30 transition group relative min-w-[280px] md:min-w-0 snap-center flex flex-col h-full"
         :class="{ 'hover:-translate-y-1 shadow-2xl': true }"
         :style="{ animationDelay: `${idx * 50}ms` }"
       >
@@ -141,7 +141,7 @@
           </div>
 
           <div
-            class="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-3xl mb-4 group-hover:scale-110 group-hover:rotate-6 transition-all duration-300 shadow-inner"
+            class="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-3xl mb-4 group-hover:scale-110 group-hover:rotate-6 transition duration-300 shadow-inner"
           >
             {{ pkg.icon }}
           </div>
@@ -224,7 +224,7 @@
               v-else
               @click="handleBuy(pkg)"
               :disabled="loading"
-              class="w-full font-bold py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wide shadow-lg active:scale-95"
+              class="w-full font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-2 text-xs uppercase tracking-wide shadow-lg active:scale-95"
               :class="
                 pkg.btnClass ||
                 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white'
@@ -259,7 +259,7 @@
             </h3>
             <button
               @click="closeManualModal"
-              class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-all"
+              class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition"
             >
               ✕
             </button>
@@ -297,9 +297,9 @@
                     ? 'bg-green-600 text-white shadow-lg'
                     : 'text-gray-400 hover:text-white'
                 "
-                class="flex-1 py-2 rounded-lg text-xs font-bold transition-all capitalize"
+                class="flex-1 py-2 rounded-lg text-xs font-bold transition capitalize"
               >
-                {{ tab === "qr" ? "📲 Scan QR" : "🏛️ Bank Account" }}
+                {{ tab === "qr" ? "📲 Scan QR" : "🏛️ Bank / Wire" }}
               </button>
             </div>
 
@@ -317,12 +317,28 @@
                 />
               </div>
               <p class="text-gray-400 text-xs mt-3">
-                Scan with any Thai banking app
+                Scan with Thai banking apps (PromptPay) or use account/wire tab for international transfer
               </p>
             </div>
 
             <!-- Bank Account -->
             <div v-else class="space-y-4 animate-fade-in-up">
+              <div class="bg-white/5 p-4 rounded-xl border border-white/10">
+                <p class="text-gray-400 text-xs mb-2">Transfer Profile</p>
+                <select
+                  v-model="selectedTransferProfileId"
+                  class="w-full bg-black/40 text-white text-xs border border-white/10 rounded-lg p-2 outline-none focus:border-cyan-400 transition-colors"
+                >
+                  <option
+                    v-for="profile in manualTransferProfiles"
+                    :key="profile.id"
+                    :value="profile.id"
+                  >
+                    {{ profile.label }} · {{ profile.currency || "THB" }}
+                  </option>
+                </select>
+              </div>
+
               <div
                 class="bg-white/5 p-4 rounded-xl border border-white/5 flex items-center gap-4"
               >
@@ -332,29 +348,76 @@
                   🏦
                 </div>
                 <div>
-                  <p class="text-gray-400 text-xs">Bank</p>
-                  <p class="text-white font-bold">Kasikorn Bank (K-Bank)</p>
+                  <p class="text-gray-400 text-xs">Receiving Bank</p>
+                  <p class="text-white font-bold">
+                    {{ selectedTransferProfile.bankName || selectedTransferProfile.label }}
+                  </p>
+                  <p class="text-[11px] text-white/60">
+                    {{
+                      selectedTransferProfile.bankCode
+                        ? `${selectedTransferProfile.bankCode} · ${selectedTransferProfile.currency || "THB"}`
+                        : `${selectedTransferProfile.bankCountry || "TH"} · ${selectedTransferProfile.currency || "USD"}`
+                    }}
+                  </p>
                 </div>
               </div>
+
               <div
-                @click="copyToClipboard('0113222743')"
-                class="bg-white/5 p-4 rounded-xl border border-white/5 cursor-pointer hover:bg-white/10 transition-all group"
+                v-if="selectedTransferProfile.accountNumber"
+                @click="copyToClipboard(selectedTransferProfile.accountNumber)"
+                class="bg-white/5 p-4 rounded-xl border border-white/5 cursor-pointer hover:bg-white/10 transition group"
               >
                 <p class="text-gray-400 text-xs mb-1">Account Number</p>
                 <div class="flex items-center justify-between">
                   <span
                     class="text-white font-mono text-lg font-bold tracking-wider"
-                    >011-3-22274-3</span
-                  >
+                  >{{ selectedTransferProfile.accountNumber }}</span>
                   <span
                     class="text-[10px] bg-white/10 px-2 py-1 rounded text-gray-300 group-hover:bg-green-500 group-hover:text-white transition-colors"
-                    >COPY</span
-                  >
+                  >COPY</span>
                 </div>
               </div>
-              <div class="bg-white/5 p-4 rounded-xl border border-white/5">
+
+              <div
+                v-if="selectedTransferProfile.accountName"
+                class="bg-white/5 p-4 rounded-xl border border-white/5"
+              >
                 <p class="text-gray-400 text-xs">Account Name</p>
-                <p class="text-white font-bold">Somchai Suwanwiang</p>
+                <p class="text-white font-bold">{{ selectedTransferProfile.accountName }}</p>
+              </div>
+
+              <div
+                v-if="selectedTransferProfile.swiftCode || selectedTransferProfile.iban || selectedTransferProfile.routingNumber"
+                class="bg-white/5 p-4 rounded-xl border border-white/5 space-y-2"
+              >
+                <p class="text-gray-400 text-xs">International Wire Details</p>
+                <p v-if="selectedTransferProfile.swiftCode" class="text-white text-sm">
+                  SWIFT: <span class="font-bold">{{ selectedTransferProfile.swiftCode }}</span>
+                </p>
+                <p v-if="selectedTransferProfile.iban" class="text-white text-sm">
+                  IBAN: <span class="font-bold">{{ selectedTransferProfile.iban }}</span>
+                </p>
+                <p v-if="selectedTransferProfile.routingNumber" class="text-white text-sm">
+                  Routing: <span class="font-bold">{{ selectedTransferProfile.routingNumber }}</span>
+                </p>
+              </div>
+
+              <div class="bg-cyan-500/10 p-4 rounded-xl border border-cyan-400/25">
+                <p class="text-cyan-200 text-xs font-bold uppercase tracking-wide mb-2">
+                  Supported Thai Banks
+                </p>
+                <div class="flex flex-wrap gap-2">
+                  <span
+                    v-for="bank in supportedThaiBanks"
+                    :key="bank.code"
+                    class="rounded-full border border-cyan-300/35 px-2 py-1 text-[11px] text-cyan-100"
+                  >
+                    {{ bank.code }} · {{ bank.name }}
+                  </span>
+                </div>
+                <p v-if="selectedTransferProfile.notes" class="mt-2 text-[11px] text-cyan-100/90">
+                  {{ selectedTransferProfile.notes }}
+                </p>
               </div>
             </div>
 
@@ -424,7 +487,7 @@
                 />
                 <label
                   for="slip-upload"
-                  class="flex items-center justify-center w-full h-32 border-2 border-dashed border-white/20 rounded-xl cursor-pointer hover:border-green-500/50 hover:bg-green-500/5 transition-all text-gray-400 flex-col gap-2"
+                  class="flex items-center justify-center w-full h-32 border-2 border-dashed border-white/20 rounded-xl cursor-pointer hover:border-green-500/50 hover:bg-green-500/5 transition text-gray-400 flex-col gap-2"
                 >
                   <div v-if="previewUrl" class="w-full h-full p-2">
                     <img
@@ -442,7 +505,7 @@
               <button
                 @click="confirmManualPayment"
                 :disabled="uploading || !slipUrl"
-                class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-green-900/20 active:scale-95 transition-all disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2"
+                class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-green-900/20 active:scale-95 transition disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2"
               >
                 <span v-if="uploading" class="animate-spin">⏳</span>
                 {{ uploading ? "Verifying..." : "Confirm Transfer" }}
@@ -464,6 +527,7 @@ import { useCurrency } from "@/composables/useCurrency";
 import { useNotifications } from "@/composables/useNotifications";
 import { usePayPal } from "@/composables/usePayPal";
 import { featureFlags } from "@/config/featureFlags";
+import { THAI_BANK_OPTIONS } from "@/constants/bankCatalog";
 import { supabase } from "../../lib/supabase";
 import { paymentService } from "../../services/paymentService";
 
@@ -495,6 +559,7 @@ const selectedPkg = ref(null);
 const successMessage = ref(null);
 const showManualModal = ref(false);
 const manualTab = ref("qr");
+const selectedTransferProfileId = ref("th-kbank");
 const qrPayload = ref("");
 const slipUrl = ref(null);
 const previewUrl = ref(null);
@@ -515,6 +580,67 @@ const partnerReferralCode = ref("");
 
 // Config
 const PROMPTPAY_ID = "0113222743";
+const DEFAULT_TRANSFER_PROFILES = [
+	{
+		id: "th-kbank",
+		type: "thai_bank",
+		label: "Kasikornbank",
+		bankCode: "KBANK",
+		accountName: "Somchai Suwanwiang",
+		accountNumber: "011-3-22274-3",
+		currency: "THB",
+		promptpayId: PROMPTPAY_ID,
+	},
+	{
+		id: "th-scb",
+		type: "thai_bank",
+		label: "Siam Commercial Bank",
+		bankCode: "SCB",
+		accountName: "Somchai Suwanwiang",
+		accountNumber: "404-0-88999-1",
+		currency: "THB",
+		promptpayId: PROMPTPAY_ID,
+	},
+	{
+		id: "intl-wire",
+		type: "international_wire",
+		label: "International Wire",
+		bankCountry: "Thailand",
+		bankName: "VibeCity Settlement",
+		currency: "USD",
+		swiftCode: "BKKBTHBK",
+		iban: "N/A",
+		routingNumber: "N/A",
+		notes:
+			"Use SWIFT transfer from overseas banks. Upload transfer slip for verification.",
+	},
+];
+
+const parseTransferProfiles = () => {
+	const raw = String(
+		import.meta.env.VITE_MANUAL_TRANSFER_PROFILES || "",
+	).trim();
+	if (!raw) return DEFAULT_TRANSFER_PROFILES;
+	try {
+		const parsed = JSON.parse(raw);
+		if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+	} catch {
+		// ignore malformed env value
+	}
+	return DEFAULT_TRANSFER_PROFILES;
+};
+
+const manualTransferProfiles = computed(() => parseTransferProfiles());
+const selectedTransferProfile = computed(
+	() =>
+		manualTransferProfiles.value.find(
+			(profile) => profile.id === selectedTransferProfileId.value,
+		) || manualTransferProfiles.value[0],
+);
+const qrPromptPayId = computed(
+	() => selectedTransferProfile.value?.promptpayId || PROMPTPAY_ID,
+);
+const supportedThaiBanks = computed(() => THAI_BANK_OPTIONS);
 
 // 💎 Package Tiers Configuration
 const tiers = [
@@ -744,6 +870,13 @@ onMounted(() => {
 	for (const pkg of packages) {
 		purchaseModeBySku[pkg.sku] = pkg.isRecurring ? "subscription" : "one_time";
 	}
+	if (
+		!manualTransferProfiles.value.some(
+			(profile) => profile.id === selectedTransferProfileId.value,
+		)
+	) {
+		selectedTransferProfileId.value = manualTransferProfiles.value[0]?.id || "";
+	}
 	const params = new URLSearchParams(globalThis.location.search);
 	if (params.get("success") === "true") {
 		successMessage.value = "Payment Successful! Your features are active. 🎉";
@@ -780,7 +913,7 @@ const handleBuy = (pkg) => {
 		}
 		showManualModal.value = true;
 		const amount = getPrice(pkg);
-		qrPayload.value = generatePayload(PROMPTPAY_ID, { amount });
+		qrPayload.value = generatePayload(qrPromptPayId.value, { amount });
 	} else {
 		// Stripe
 		loading.value = true;
@@ -789,6 +922,13 @@ const handleBuy = (pkg) => {
 			.createCheckoutSession(props.shopId, [{ sku, quantity: 1 }], {
 				purchaseMode: getPurchaseMode(pkg),
 				partnerCode: partnerReferralCode.value,
+				paymentPreferences: {
+					methodStrategy: "dynamic",
+					allowInternational: true,
+					preferPromptPay: true,
+					bankCountry: String(buyerProfile.country || "TH").toUpperCase(),
+					currency: currencyStore.currentCurrency === "USD" ? "USD" : "THB",
+				},
 			})
 			.then(({ url }) => {
 				if (url) globalThis.location.href = url;
@@ -844,6 +984,7 @@ const confirmManualPayment = async () => {
 
 	uploading.value = true;
 	try {
+		const profile = selectedTransferProfile.value || {};
 		await paymentService.createManualOrder({
 			venue_id: props.shopId,
 			sku: getSku(selectedPkg.value),
@@ -851,11 +992,22 @@ const confirmManualPayment = async () => {
 			slip_url: slipUrl.value,
 			consent_personal_data: true,
 			buyer_profile: { ...buyerProfile },
+			metadata: {
+				manual_transfer_profile_id: profile.id || null,
+				manual_transfer_type: profile.type || null,
+				bank_code: profile.bankCode || null,
+				bank_label: profile.label || null,
+				bank_country: profile.bankCountry || "TH",
+				currency: profile.currency || "THB",
+				swift_code: profile.swiftCode || null,
+				iban: profile.iban || null,
+				routing_number: profile.routingNumber || null,
+			},
 		});
 		notifySuccess("Transfer submitted! Pending verification.");
 		showManualModal.value = false;
 	} catch (err) {
-		notifyError(err.message);
+		notifyError(err?.message || "Unable to submit transfer.");
 	} finally {
 		uploading.value = false;
 	}

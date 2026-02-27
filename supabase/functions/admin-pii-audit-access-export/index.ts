@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { canViewPiiAudit } from "../_shared/admin.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -27,25 +28,18 @@ const csvEscape = (value: unknown) => {
   return s;
 };
 
-const collectRoles = (user: { app_metadata?: Record<string, unknown> }) => {
-  const roles = new Set<string>();
-  const meta = user?.app_metadata || {};
-  const role = meta.role;
-  const roleArray = Array.isArray(meta.roles) ? meta.roles : [];
-
-  if (typeof role === "string" && role.trim()) roles.add(role.trim());
-  for (const r of roleArray) {
-    if (typeof r === "string" && r.trim()) roles.add(r.trim());
-  }
-  return roles;
-};
-
-const canViewPiiAudit = (user: { app_metadata?: Record<string, unknown> }) => {
-  const roles = collectRoles(user);
-  return roles.has("admin") || roles.has("pii_audit_viewer");
-};
-
 type SupabaseClient = ReturnType<typeof createClient>;
+
+const isMissingTableError = (error: unknown, tableName: string) => {
+  const payload = (error || {}) as Record<string, unknown>;
+  const code = String(payload.code || "").toUpperCase();
+  const message = String(payload.message || "").toLowerCase();
+  const table = String(tableName || "").toLowerCase();
+  return (
+    code === "PGRST205" ||
+    (message.includes("could not find the table") && message.includes(table))
+  );
+};
 
 const fetchAccessLogsPaged = async (
   adminClient: SupabaseClient,
@@ -164,6 +158,23 @@ serve(async (req) => {
     const fromIso = toIso(rangeFrom);
     const toIsoValue = toIso(rangeTo);
 
+    const accessLogProbe = await adminClient
+      .from("pii_audit_access_log")
+      .select("id")
+      .limit(1);
+    if (isMissingTableError(accessLogProbe.error, "pii_audit_access_log")) {
+      return new Response(
+        JSON.stringify({
+          error:
+            "PII audit access log table is missing. Run the PII audit migrations before exporting.",
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
     const maxRows = clamp(
       Number(Deno.env.get("PII_AUDIT_ACCESS_EXPORT_MAX_ROWS") || "5000") || 5000,
       100,
@@ -215,9 +226,10 @@ serve(async (req) => {
       },
     });
   } catch (error) {
-    console.warn("[admin-pii-audit-access-export]", requestId, "error", error?.message || error);
-    return new Response(JSON.stringify({ error: "Internal error" }), {
-      status: 500,
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn("[admin-pii-audit-access-export]", requestId, "error", message);
+    return new Response(JSON.stringify({ error: message }), {
+      status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

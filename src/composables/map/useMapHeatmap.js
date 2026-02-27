@@ -1,17 +1,19 @@
-export function useMapHeatmap(mapRef, allowHeatmapRef) {
+const IS_E2E = import.meta.env.VITE_E2E === "true";
+
+export function useMapHeatmap(mapRef, allowHeatmapRef, shopsByIdRef) {
 	const heatmapGeoJson = {
 		type: "FeatureCollection",
 		features: [],
 	};
 
-	const updateHeatmapData = (densityData, shops) => {
+	const updateHeatmapData = (densityData) => {
 		if (!allowHeatmapRef.value) return;
 		// densityData: { shopId: count }
-		if (!shops) return;
+		if (!shopsByIdRef?.value || !densityData) return;
 
 		const features = [];
 		Object.entries(densityData).forEach(([shopId, count]) => {
-			const shop = shops.find((s) => s.id == shopId);
+			const shop = shopsByIdRef.value.get(String(shopId));
 			if (shop?.lat && shop?.lng) {
 				features.push({
 					type: "Feature",
@@ -132,7 +134,9 @@ export function useMapHeatmap(mapRef, allowHeatmapRef) {
 					mapRef.value.addLayer(layer);
 				}
 			} catch (e) {
-				console.warn("Heatmap layer insertion failed:", e);
+				if (!IS_E2E) {
+					console.warn("Heatmap layer insertion failed:", e);
+				}
 			}
 		}
 	};

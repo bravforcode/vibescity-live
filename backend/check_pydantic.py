@@ -1,5 +1,6 @@
 import pydantic
 import pydantic_settings
+
 print(f"Pydantic Version: {pydantic.VERSION}")
 print(f"Pydantic Settings Version: {pydantic_settings.__version__}")
 

@@ -1,0 +1,56 @@
+C:\vibecity.live\backend\scripts\triad_doctor.py:18: FutureWarning: 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai
+C:\vibecity.live\backend\scripts\triad_doctor.py:135: UserWarning: Api key is used with an insecure connection.
+  client = QdrantClient(
+=== TRIAD Configuration ===
+
+[OK]  DATABASE_URL: postgresql://db.nluuvnttweesnkrmgzsm.supabase.co:5432/***
+[OK]  SUPABASE_DIRECT_URL: postgresql://localhost:5432/***
+[OK]  NEON_DATABASE_URL: postgresql://localhost:5432/***
+[OK]  NEON_DIRECT_DATABASE_URL: postgresql://localhost:5432/***
+[OK]  QDRANT_URL: http://localhost:6333/***
+[MIS] QDRANT_API_KEY: ***
+[OK]  QDRANT_GRPC_PORT: 6334
+[MIS] GOOGLE_API_KEY: ***
+
+[OK]  SAFE_MODE: True
+[OFF] MEMORY_ENABLED: False
+
+=== Dependencies ===
+
+[OK]  google-generativeai: installed
+[OK]  qdrant-client: installed
+[OK]  asyncpg: installed
+
+[WARN] Missing/default TRIAD vars: QDRANT_API_KEY, GOOGLE_API_KEY
+   Set these in .env for production use.
+
+
+=== Next Steps ===
+
+1. python scripts/bootstrap_new_db.py --dry-run
+2. python scripts/bootstrap_new_db.py
+3. python scripts/ingest_knowledge.py .
+4. pytest -q tests/test_triad.py
+5. python -m compileall app -q
+
+Optional: python scripts/triad_doctor.py --ping (network probes)
+
+=== Network Probes ===
+
+[ERR] Supabase CORE: [WinError 1225] The remote computer refused the network connection
+[ERR] Neon HISTORY: [WinError 1225] The remote computer refused the network connection
+[ERR] Qdrant MEMORY: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.UNAVAILABLE
+	details = "failed to connect to all addresses; last error: UNAVAILABLE: ipv4:127.0.0.1:6334: ConnectEx: Connection refused (No connection could be made because the target machine actively refused it.
+
+ -- 10061)"
+	debug_error_string = "UNKNOWN:Error received from peer  {grpc_message:"failed to connect to all addresses; last error: UNAVAILABLE: ipv4:127.0.0.1:6334: ConnectEx: Connection refused (No connection could be made because the target machine actively refused it.\r\n -- 10061)", grpc_status:14}"
+>

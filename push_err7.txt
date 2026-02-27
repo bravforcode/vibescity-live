@@ -1,0 +1,87 @@
+Debugger listening on ws://127.0.0.1:50566/c082a38f-c9ba-4cac-a40c-d5b81120c4c9
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger attached.
+Initialising login role...
+Connecting to remote database...
+Do you want to push these migrations to the remote database?
+ • 20260224202000_ultrathink_schema_optimization_part3.sql
+ • 20260224202100_ultrathink_schema_optimization_part3a_status_and_deps.sql
+ • 20260224202200_ultrathink_schema_optimization_part3b_sync_triggers_backfills.sql
+ • 20260224202300_ultrathink_schema_optimization_part3c_views_and_rpcs.sql
+ • 20260224202400_ultrathink_schema_optimization_part3d_indexes.sql
+ • 20260224202500_ultrathink_schema_optimization_part3a1_venues_status.sql
+ • 20260224202600_ultrathink_schema_optimization_part3a2_orders_status.sql
+ • 20260224202700_ultrathink_schema_optimization_part3a3_subscriptions_status.sql
+ • 20260224202800_ultrathink_schema_optimization_part3a4_partners_status.sql
+ • 20260224213000_partner_bank_secrets_extended.sql
+ • 20260224220000_hotfix_get_map_pins_status_cast.sql
+
+ [Y/n] y
+Applying migration 20260224202000_ultrathink_schema_optimization_part3.sql...
+NOTICE (00000): constraint "venues_status_check" of relation "venues" does not exist, skipping
+NOTICE (00000): constraint "orders_status_check" of relation "orders" does not exist, skipping
+NOTICE (00000): constraint "orders_status_check" of relation "orders" does not exist, skipping
+NOTICE (00000): constraint "subscriptions_status_check" of relation "subscriptions" does not exist, skipping
+NOTICE (00000): constraint "subscriptions_status_check" of relation "subscriptions" does not exist, skipping
+NOTICE (00000): constraint "partners_status_check" of relation "partners" does not exist, skipping
+NOTICE (00000): constraint "partners_status_check" of relation "partners" does not exist, skipping
+NOTICE (42701): column "visitor_id_uuid" of relation "orders" already exists, skipping
+NOTICE (42701): column "visitor_id_uuid" of relation "subscriptions" already exists, skipping
+NOTICE (42P07): relation "idx_orders_visitor_id_uuid" already exists, skipping
+NOTICE (42P07): relation "idx_subscriptions_visitor_id_uuid" already exists, skipping
+NOTICE (00000): function public.get_feed_cards(pg_catalog.float8,pg_catalog.float8) does not exist, skipping
+NOTICE (42P07): relation "idx_venues_location_gist" already exists, skipping
+NOTICE (42P07): relation "idx_venues_deleted_at" already exists, skipping
+NOTICE (42P07): relation "idx_subscriptions_status" already exists, skipping
+Applying migration 20260224202100_ultrathink_schema_optimization_part3a_status_and_deps.sql...
+NOTICE (00000): constraint "venues_status_check" of relation "venues" does not exist, skipping
+NOTICE (00000): constraint "orders_status_check" of relation "orders" does not exist, skipping
+NOTICE (00000): constraint "subscriptions_status_check" of relation "subscriptions" does not exist, skipping
+NOTICE (00000): constraint "partners_status_check" of relation "partners" does not exist, skipping
+Applying migration 20260224202200_ultrathink_schema_optimization_part3b_sync_triggers_backfills.sql...
+NOTICE (42701): column "visitor_id_uuid" of relation "orders" already exists, skipping
+NOTICE (42701): column "visitor_id_uuid" of relation "subscriptions" already exists, skipping
+NOTICE (42P07): relation "idx_partners_visitor_id" already exists, skipping
+NOTICE (42P07): relation "idx_orders_visitor_id_uuid" already exists, skipping
+NOTICE (42P07): relation "idx_subscriptions_visitor_id_uuid" already exists, skipping
+Applying migration 20260224202300_ultrathink_schema_optimization_part3c_views_and_rpcs.sql...
+Applying migration 20260224202400_ultrathink_schema_optimization_part3d_indexes.sql...
+NOTICE (42P07): relation "idx_venues_location_gist" already exists, skipping
+NOTICE (42P07): relation "idx_venues_lat" already exists, skipping
+NOTICE (42P07): relation "idx_venues_lng" already exists, skipping
+NOTICE (42P07): relation "idx_venues_deleted_at" already exists, skipping
+NOTICE (42P07): relation "idx_venues_visibility_name_live" already exists, skipping
+NOTICE (42P07): relation "idx_venues_status_lower_map" already exists, skipping
+NOTICE (42P07): relation "idx_venues_status_h3_cell" already exists, skipping
+NOTICE (42P07): relation "idx_venues_status_category_id" already exists, skipping
+NOTICE (42P07): relation "idx_venues_status_category" already exists, skipping
+NOTICE (42P07): relation "idx_venues_status_live" already exists, skipping
+NOTICE (42P07): relation "idx_venues_lat_lng_active" already exists, skipping
+NOTICE (42P07): relation "idx_subscriptions_status" already exists, skipping
+Applying migration 20260224202500_ultrathink_schema_optimization_part3a1_venues_status.sql...
+NOTICE (00000): constraint "venues_status_check" of relation "venues" does not exist, skipping
+Applying migration 20260224202600_ultrathink_schema_optimization_part3a2_orders_status.sql...
+NOTICE (00000): constraint "orders_status_check" of relation "orders" does not exist, skipping
+Applying migration 20260224202700_ultrathink_schema_optimization_part3a3_subscriptions_status.sql...
+NOTICE (00000): constraint "subscriptions_status_check" of relation "subscriptions" does not exist, skipping
+Applying migration 20260224202800_ultrathink_schema_optimization_part3a4_partners_status.sql...
+NOTICE (00000): constraint "partners_status_check" of relation "partners" does not exist, skipping
+Applying migration 20260224213000_partner_bank_secrets_extended.sql...
+NOTICE (42701): column "bank_code" of relation "partner_bank_secrets" already exists, skipping
+NOTICE (42701): column "account_name" of relation "partner_bank_secrets" already exists, skipping
+NOTICE (42701): column "account_number" of relation "partner_bank_secrets" already exists, skipping
+NOTICE (42701): column "promptpay_id" of relation "partner_bank_secrets" already exists, skipping
+NOTICE (42701): column "bank_country" of relation "partner_bank_secrets" already exists, skipping
+NOTICE (42701): column "currency" of relation "partner_bank_secrets" already exists, skipping
+NOTICE (42701): column "swift_code" of relation "partner_bank_secrets" already exists, skipping
+NOTICE (42701): column "iban" of relation "partner_bank_secrets" already exists, skipping
+NOTICE (42701): column "routing_number" of relation "partner_bank_secrets" already exists, skipping
+NOTICE (42701): column "bank_name" of relation "partner_bank_secrets" already exists, skipping
+NOTICE (42701): column "branch_name" of relation "partner_bank_secrets" already exists, skipping
+NOTICE (42701): column "account_type" of relation "partner_bank_secrets" already exists, skipping
+NOTICE (42701): column "created_at" of relation "partner_bank_secrets" already exists, skipping
+NOTICE (42701): column "updated_at" of relation "partner_bank_secrets" already exists, skipping
+NOTICE (00000): policy "partner_bank_secrets_service_role_all" for relation "public.partner_bank_secrets" does not exist, skipping
+Applying migration 20260224220000_hotfix_get_map_pins_status_cast.sql...
+Finished supabase db push.
+Waiting for the debugger to disconnect...

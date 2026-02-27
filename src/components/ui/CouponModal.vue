@@ -5,13 +5,18 @@
   >
     <div
       class="bg-gray-800 rounded-2xl max-w-sm w-full p-6 text-center border border-neon-blue shadow-lg relative overflow-hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="coupon-modal-title"
     >
       <!-- Glow Effect -->
       <div
         class="absolute inset-0 pointer-events-none bg-gradient-to-tr from-neon-blue/10 to-neon-purple/10"
       ></div>
 
-      <h2 class="text-2xl font-bold text-white mb-2">Claim Coupon?</h2>
+      <h2 id="coupon-modal-title" class="text-2xl font-bold text-white mb-2">
+        Claim Coupon?
+      </h2>
       <p class="text-gray-300 mb-6">
         Redeem <strong>{{ couponName }}</strong> for
         <span class="text-yellow-400 font-bold">{{ cost }} Coins</span>?
@@ -23,7 +28,7 @@
           :disabled="loading"
           class="bg-gradient-to-r from-neon-blue to-neon-purple text-white px-6 py-2 rounded-full font-bold shadow-lg hover:shadow-neon-blue/50 transition transform hover:scale-105 disabled:opacity-50"
         >
-          {{ loading ? "Claiming..." : "Yes, Claim It!" }}
+          {{ loading ? "Claiming…" : "Yes, Claim It!" }}
         </button>
         <button
           @click="$emit('close')"

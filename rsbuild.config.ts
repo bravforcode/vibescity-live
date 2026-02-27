@@ -1,7 +1,11 @@
+import { readFileSync } from "node:fs";
 import { defineConfig, loadEnv } from "@rsbuild/core";
 import { pluginVue } from "@rsbuild/plugin-vue";
 
 const { publicVars } = loadEnv({ prefixes: ["VITE_"] });
+const { version } = JSON.parse(readFileSync("./package.json", "utf8")) as {
+  version: string;
+};
 
 export default defineConfig({
   plugins: [pluginVue()],
@@ -9,7 +13,11 @@ export default defineConfig({
     entry: {
       index: "./src/main.js",
     },
-    define: publicVars,
+    define: {
+      ...publicVars,
+      // Inject app version from package.json at build time — single source of truth
+      __APP_VERSION__: JSON.stringify(version),
+    },
   },
   resolve: {
     alias: {

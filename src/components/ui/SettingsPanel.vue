@@ -30,6 +30,10 @@ const emit = defineEmits(["close"]);
 const prefs = useUserPreferencesStore();
 const { t } = useI18n();
 const showClearDataConfirm = ref(false);
+const mapEffectsLocked = false;
+// Injected at build time from package.json — single source of truth
+// eslint-disable-next-line no-undef
+const appVersion = __APP_VERSION__;
 
 const clearOwnedLocalData = () => {
 	const ownedPrefixes = ["vibe_", "pinia-", "vibecity_"];
@@ -60,20 +64,24 @@ const confirmClearData = () => {
 </script>
 
 <template>
-  <div
-    v-if="isOpen"
-    class="fixed inset-0 z-[7000] flex items-end sm:items-center justify-center pointer-events-auto"
-  >
-    <!-- Backdrop -->
-    <div
-      class="absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity"
-      @click="emit('close')"
-    ></div>
+  <Teleport to="body">
+    <Transition name="fade">
+      <div
+        v-if="isOpen"
+        class="fixed inset-0 z-[7000] flex items-end sm:items-center justify-center pointer-events-auto"
+      >
+        <!-- Backdrop -->
+        <div
+          class="absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity"
+          @click="emit('close')"
+        ></div>
 
-    <!-- Panel -->
-    <div
-      class="relative w-full max-w-md bg-zinc-900 border-t sm:border border-white/10 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl transform transition-transform duration-300"
-    >
+        <!-- Panel -->
+        <Transition name="slide-up" appear>
+          <div
+            v-if="isOpen"
+            class="relative w-full max-w-md bg-zinc-900 border-t sm:border border-white/10 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl"
+          >
       <!-- Header -->
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-xl font-bold text-white flex items-center gap-2">
@@ -89,7 +97,9 @@ const confirmClearData = () => {
       </div>
 
       <!-- Settings List -->
-      <div class="space-y-4">
+      <div
+        class="space-y-4 overflow-y-auto max-h-[70vh] pr-1 -mr-1 overscroll-contain"
+      >
         <!-- Visual Preset -->
         <div class="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-3">
           <div class="flex items-center gap-3">
@@ -107,7 +117,7 @@ const confirmClearData = () => {
             <button
               @click="prefs.applyMapPreset('smooth')"
               :class="[
-                'py-2 rounded-lg text-xs font-black transition-all',
+                'py-2 rounded-lg text-xs font-black transition',
                 prefs.mapVisualPreset === 'smooth'
                   ? 'bg-white text-black'
                   : 'bg-white/10 text-white/80',
@@ -118,7 +128,7 @@ const confirmClearData = () => {
             <button
               @click="prefs.applyMapPreset('colorful')"
               :class="[
-                'py-2 rounded-lg text-xs font-black transition-all',
+                'py-2 rounded-lg text-xs font-black transition',
                 prefs.mapVisualPreset === 'colorful'
                   ? 'bg-white text-black'
                   : 'bg-white/10 text-white/80',
@@ -129,7 +139,7 @@ const confirmClearData = () => {
             <button
               @click="prefs.applyMapPreset('cinematic')"
               :class="[
-                'py-2 rounded-lg text-xs font-black transition-all',
+                'py-2 rounded-lg text-xs font-black transition',
                 prefs.mapVisualPreset === 'cinematic'
                   ? 'bg-white text-black'
                   : 'bg-white/10 text-white/80',
@@ -157,7 +167,7 @@ const confirmClearData = () => {
             <button
               @click="prefs.setMotionBudget('micro')"
               :class="[
-                'py-2 rounded-lg text-xs font-black transition-all',
+                'py-2 rounded-lg text-xs font-black transition',
                 prefs.motionBudget === 'micro'
                   ? 'bg-white text-black'
                   : 'bg-white/10 text-white/80',
@@ -168,7 +178,7 @@ const confirmClearData = () => {
             <button
               @click="prefs.setMotionBudget('balanced')"
               :class="[
-                'py-2 rounded-lg text-xs font-black transition-all',
+                'py-2 rounded-lg text-xs font-black transition',
                 prefs.motionBudget === 'balanced'
                   ? 'bg-white text-black'
                   : 'bg-white/10 text-white/80',
@@ -179,7 +189,7 @@ const confirmClearData = () => {
             <button
               @click="prefs.setMotionBudget('full')"
               :class="[
-                'py-2 rounded-lg text-xs font-black transition-all',
+                'py-2 rounded-lg text-xs font-black transition',
                 prefs.motionBudget === 'full'
                   ? 'bg-white text-black'
                   : 'bg-white/10 text-white/80',
@@ -314,6 +324,13 @@ const confirmClearData = () => {
           </button>
         </div>
 
+        <div
+          v-if="mapEffectsLocked"
+          class="p-4 rounded-2xl bg-amber-500/10 border border-amber-400/20 text-amber-200 text-xs font-semibold"
+        >
+          Cars-only mode is active near your location. Atmosphere effects are disabled.
+        </div>
+
         <!-- Ambient FX -->
         <div
           class="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5"
@@ -330,9 +347,10 @@ const confirmClearData = () => {
             </div>
           </div>
           <button
-            @click="prefs.toggleAmbientFx"
+            @click="!mapEffectsLocked && prefs.toggleAmbientFx()"
+            :disabled="mapEffectsLocked"
             :class="[
-              'w-12 h-7 rounded-full transition-colors relative',
+              'w-12 h-7 rounded-full transition-colors relative disabled:opacity-40 disabled:cursor-not-allowed',
               prefs.isAmbientFxEnabled ? 'bg-blue-500' : 'bg-white/20',
             ]"
           >
@@ -361,9 +379,10 @@ const confirmClearData = () => {
             </div>
           </div>
           <button
-            @click="prefs.toggleNeonPulse"
+            @click="!mapEffectsLocked && prefs.toggleNeonPulse()"
+            :disabled="mapEffectsLocked"
             :class="[
-              'w-12 h-7 rounded-full transition-colors relative',
+              'w-12 h-7 rounded-full transition-colors relative disabled:opacity-40 disabled:cursor-not-allowed',
               prefs.isNeonPulseEnabled ? 'bg-blue-500' : 'bg-white/20',
             ]"
           >
@@ -392,9 +411,10 @@ const confirmClearData = () => {
             </div>
           </div>
           <button
-            @click="prefs.toggleHeatmap"
+            @click="!mapEffectsLocked && prefs.toggleHeatmap()"
+            :disabled="mapEffectsLocked"
             :class="[
-              'w-12 h-7 rounded-full transition-colors relative',
+              'w-12 h-7 rounded-full transition-colors relative disabled:opacity-40 disabled:cursor-not-allowed',
               prefs.isHeatmapEnabled ? 'bg-blue-500' : 'bg-white/20',
             ]"
           >
@@ -423,9 +443,10 @@ const confirmClearData = () => {
             </div>
           </div>
           <button
-            @click="prefs.toggle3dBuildings"
+            @click="!mapEffectsLocked && prefs.toggle3dBuildings()"
+            :disabled="mapEffectsLocked"
             :class="[
-              'w-12 h-7 rounded-full transition-colors relative',
+              'w-12 h-7 rounded-full transition-colors relative disabled:opacity-40 disabled:cursor-not-allowed',
               prefs.is3dBuildingsEnabled ? 'bg-blue-500' : 'bg-white/20',
             ]"
           >
@@ -454,9 +475,10 @@ const confirmClearData = () => {
             </div>
           </div>
           <button
-            @click="prefs.toggleMapFog"
+            @click="!mapEffectsLocked && prefs.toggleMapFog()"
+            :disabled="mapEffectsLocked"
             :class="[
-              'w-12 h-7 rounded-full transition-colors relative',
+              'w-12 h-7 rounded-full transition-colors relative disabled:opacity-40 disabled:cursor-not-allowed',
               prefs.isMapFogEnabled ? 'bg-blue-500' : 'bg-white/20',
             ]"
           >
@@ -516,9 +538,10 @@ const confirmClearData = () => {
             </div>
           </div>
           <button
-            @click="prefs.toggleViewportGlow"
+            @click="!mapEffectsLocked && prefs.toggleViewportGlow()"
+            :disabled="mapEffectsLocked"
             :class="[
-              'w-12 h-7 rounded-full transition-colors relative',
+              'w-12 h-7 rounded-full transition-colors relative disabled:opacity-40 disabled:cursor-not-allowed',
               prefs.isViewportGlowEnabled ? 'bg-blue-500' : 'bg-white/20',
             ]"
           >
@@ -560,13 +583,16 @@ const confirmClearData = () => {
         </div>
 
         <div class="text-center text-[10px] text-white/20 font-mono pt-4">
-          VibeCity v2.0.0 (Build 2026.02.05)
+          {{ t('profile.version', { version: appVersion }) }}
         </div>
       </div>
+      </div>
+    </Transition>
     </div>
-  </div>
+  </Transition>
+</Teleport>
 
-  <ConfirmDialog
+<ConfirmDialog
     :is-open="showClearDataConfirm"
     :title="t('settings.clear_data') || 'Clear local app data'"
     :message="

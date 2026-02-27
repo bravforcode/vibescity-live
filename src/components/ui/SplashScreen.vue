@@ -1,6 +1,6 @@
 <template>
   <div
-    class="fixed inset-0 z-[9999] bg-dark flex flex-col items-center justify-center transition-opacity duration-700"
+    class="fixed inset-0 z-[6000] bg-dark flex flex-col items-center justify-center transition-opacity duration-700"
     :class="{ 'opacity-0 pointer-events-none': !isLoading }"
     data-testid="splash-screen"
   >

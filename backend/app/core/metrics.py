@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Optional
 
 from fastapi import Request
-from prometheus_client import Counter, Gauge, Histogram, CONTENT_TYPE_LATEST, generate_latest
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
@@ -59,7 +58,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         path = _route_template(request)
         start = time.perf_counter()
         IN_PROGRESS.labels(method, path).inc()
-        status_code: Optional[int] = None
+        status_code: int | None = None
 
         try:
             response = await call_next(request)

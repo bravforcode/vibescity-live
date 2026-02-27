@@ -37,9 +37,14 @@ export function useMapAtmosphere(
 
 	// --- Fireflies Logic ---
 	const initFireflies = () => {
-		const centerLat = DEFAULT_CITY.lat;
-		const centerLng = DEFAULT_CITY.lng;
-		const count = 40;
+		const center = map.value
+			? map.value.getCenter()
+			: { lat: DEFAULT_CITY.lat, lng: DEFAULT_CITY.lng };
+		const centerLat = center.lat;
+		const centerLng = center.lng;
+		// Adaptive count based on screen size: 40 for mobile, up to 100 for desktop
+		const count =
+			typeof window !== "undefined" && window.innerWidth > 768 ? 100 : 40;
 		const features = [];
 
 		for (let i = 0; i < count; i++) {
@@ -148,42 +153,48 @@ export function useMapAtmosphere(
 
 		// 1. Neon Road Pulse
 		if (allowNeonPulse.value) {
-			const pulse = (Math.sin(time / 1000) + 1) / 2;
-			if (map.value.getLayer("neon-roads-outer")) {
-				map.value.setPaintProperty(
-					"neon-roads-outer",
-					"line-opacity",
-					0.1 + pulse * 0.2,
-				);
-			}
-			if (map.value.getLayer("neon-roads-inner")) {
-				map.value.setPaintProperty(
-					"neon-roads-inner",
-					"line-opacity",
-					0.4 + pulse * 0.4,
-				);
-				map.value.setPaintProperty(
-					"neon-roads-inner",
-					"line-width",
-					0.5 + pulse * 1.5,
-				);
-			}
-
 			const canAnimateTrafficDash =
 				!IS_E2E &&
 				!isPerfRestricted.value &&
 				currentMapZoom.value >= 13 &&
 				Boolean(map.value.getLayer("neon-roads-inner"));
 
-			if (canAnimateTrafficDash && time - lastTrafficDashUpdate >= 120) {
+			// Throttle neon updates to 120ms to save massive repaint costs
+			if (time - lastTrafficDashUpdate >= 120) {
 				lastTrafficDashUpdate = time;
-				trafficDashFrameIndex =
-					(trafficDashFrameIndex + 1) % TRAFFIC_DASH_FRAMES.length;
-				map.value.setPaintProperty(
-					"neon-roads-inner",
-					"line-dasharray",
-					TRAFFIC_DASH_FRAMES[trafficDashFrameIndex],
-				);
+
+				// Pulse Math
+				const pulse = (Math.sin(time / 1000) + 1) / 2;
+				if (map.value.getLayer("neon-roads-outer")) {
+					map.value.setPaintProperty(
+						"neon-roads-outer",
+						"line-opacity",
+						0.1 + pulse * 0.2,
+					);
+				}
+
+				if (map.value.getLayer("neon-roads-inner")) {
+					map.value.setPaintProperty(
+						"neon-roads-inner",
+						"line-opacity",
+						0.4 + pulse * 0.4,
+					);
+					map.value.setPaintProperty(
+						"neon-roads-inner",
+						"line-width",
+						0.5 + pulse * 1.5,
+					);
+
+					if (canAnimateTrafficDash) {
+						trafficDashFrameIndex =
+							(trafficDashFrameIndex + 1) % TRAFFIC_DASH_FRAMES.length;
+						map.value.setPaintProperty(
+							"neon-roads-inner",
+							"line-dasharray",
+							TRAFFIC_DASH_FRAMES[trafficDashFrameIndex],
+						);
+					}
+				}
 			} else if (!canAnimateTrafficDash && trafficDashFrameIndex !== 0) {
 				resetTrafficDashState();
 			}
@@ -242,30 +253,34 @@ export function useMapAtmosphere(
 			: "normal";
 	});
 
+	let fogDebounceTimer = null;
 	const applyFogSettings = () => {
-		if (!map.value) return;
-		if (!map.value.isStyleLoaded?.()) return;
-		if (!allowMapFog.value) {
-			try {
-				map.value.setFog(null);
-			} catch {}
-			return;
-		}
-		const density = fogDensityProfile.value;
-		const useNightPalette = Boolean(isWeatherNight.value);
+		if (fogDebounceTimer) clearTimeout(fogDebounceTimer);
+		fogDebounceTimer = setTimeout(() => {
+			if (!map.value) return;
+			if (!map.value.isStyleLoaded?.()) return;
+			if (!allowMapFog.value) {
+				try {
+					map.value.setFog(null);
+				} catch {}
+				return;
+			}
+			const density = fogDensityProfile.value;
+			const useNightPalette = Boolean(isWeatherNight.value);
 
-		try {
-			map.value.setFog({
-				range: density === "thick" ? [0.35, 7.2] : [0.8, 9.5],
-				color: useNightPalette ? "#1f2937" : "#2a3147",
-				"horizon-blend": density === "thick" ? 0.44 : 0.26,
-				"high-color": useNightPalette ? "#111827" : "#1f2937",
-				"space-color": useNightPalette ? "#090b13" : "#111827",
-				"star-intensity": useNightPalette ? 0.72 : 0.28,
-			});
-		} catch (e) {
-			// Ignore style loading errors
-		}
+			try {
+				map.value.setFog({
+					range: density === "thick" ? [0.35, 7.2] : [0.8, 9.5],
+					color: useNightPalette ? "#1f2937" : "#2a3147",
+					"horizon-blend": density === "thick" ? 0.44 : 0.26,
+					"high-color": useNightPalette ? "#111827" : "#1f2937",
+					"space-color": useNightPalette ? "#090b13" : "#111827",
+					"star-intensity": useNightPalette ? 0.72 : 0.28,
+				});
+			} catch (e) {
+				// Ignore style loading errors
+			}
+		}, 150); // Debounce map.setFog to prevent style thrashing during rapid state changes
 	};
 
 	const getFirstExistingLayerId = (candidateIds = []) => {
@@ -325,8 +340,7 @@ export function useMapAtmosphere(
 
 	// Watchers to trigger updates
 	watch(shouldRunAtmosphere, (shouldRun) => {
-		if (shouldRun) startAtmosphereLoop();
-		else stopAtmosphereLoop();
+		if (!shouldRun) stopAtmosphereLoop();
 	});
 
 	// Watch for Fog/Weather changes

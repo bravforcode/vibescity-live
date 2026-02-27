@@ -2,13 +2,13 @@
 Rides Router - Ride-hailing price comparison and booking
 Provides estimates from multiple providers with deep links
 """
-from fastapi import APIRouter, HTTPException, Query
+
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional
 from starlette.requests import Request
 
 from app.core.rate_limit import limiter
-from app.services.ride_service import ride_service, Location
+from app.services.ride_service import Location, ride_service
 
 router = APIRouter()
 
@@ -21,7 +21,7 @@ class LocationInput(BaseModel):
 class RideEstimateRequest(BaseModel):
     origin: LocationInput
     destination: LocationInput
-    province: Optional[str] = "กรุงเทพมหานคร"
+    province: str | None = "กรุงเทพมหานคร"
 
 
 class RideEstimateResponse(BaseModel):

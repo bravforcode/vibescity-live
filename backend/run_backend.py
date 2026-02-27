@@ -1,6 +1,7 @@
-import uvicorn
 import os
 import sys
+
+import uvicorn
 
 # Ensure backend dir is in path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))

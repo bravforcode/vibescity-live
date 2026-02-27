@@ -1,0 +1,24 @@
+Debugger listening on ws://127.0.0.1:63987/11fc933a-0b3b-4c15-baef-02e33ad611ce
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger attached.
+Initialising login role...
+Connecting to remote database...
+Do you want to push these migrations to the remote database?
+ ΓÇó 20260225113000_get_map_pins_timeout_stability.sql
+
+ [Y/n] Applying migration 20260225113000_get_map_pins_timeout_stability.sql...
+ERROR: canceling statement due to statement timeout (SQLSTATE 57014)                
+At statement: 0                                                                     
+-- -----------------------------------------------------------------------------    
+-- Stabilize get_map_pins under load                                                
+-- - Keep enum-safe casts for status/pin_type                                       
+-- - Add active-only map pin indexes                                                
+-- - Split zoom branches to avoid wide OR predicates on hot path                    
+-- -----------------------------------------------------------------------------    
+                                                                                    
+CREATE INDEX IF NOT EXISTS idx_venues_map_active_geom_gix                           
+  ON public.venues USING gist ((location::geometry))                                
+  WHERE location IS NOT NULL                                                        
+    AND (status IS NULL OR status NOT IN ('off', 'inactive', 'disabled', 'deleted'))
+Try rerunning the command with --debug to troubleshoot the error.
+Waiting for the debugger to disconnect...

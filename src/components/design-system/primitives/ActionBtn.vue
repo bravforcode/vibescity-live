@@ -1,6 +1,6 @@
 <template>
   <button
-    class="relative flex items-center justify-center font-bold text-white transition-all duration-normal ease-standard active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed group"
+    class="relative flex items-center justify-center font-bold text-white transition-all duration-normal ease-emphasized active:scale-[0.96] active:animate-press-spring hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:brightness-100 group"
     :aria-label="label || $slots.default?.[0]?.children || 'Button'"
     :class="[
       variantClasses,
@@ -52,13 +52,13 @@ const props = defineProps({
 const variantClasses = computed(() => {
 	switch (props.variant) {
 		case "primary":
-			return "bg-vibe-gradient shadow-elevation-2 hover:shadow-glow border border-transparent";
+			return "bg-vibe-gradient shadow-elevation-2 hover:shadow-glow hover:translate-y-[-1px] border border-transparent";
 		case "secondary":
-			return "bg-surface-glass border border-white/10 hover:bg-white/10 shadow-elevation-1";
+			return "bg-surface-glass border border-white/10 hover:bg-white/10 hover:border-white/20 shadow-elevation-1 hover:shadow-elevation-2";
 		case "ghost":
 			return "bg-transparent hover:bg-white/5 text-text-primary";
-		case "glass": // Special for Map Controls
-			return "bg-black/40 backdrop-blur-md border border-white/10 hover:bg-black/60 shadow-elevation-2";
+		case "glass":
+			return "bg-black/40 backdrop-blur-md border border-white/10 hover:bg-black/60 hover:border-white/15 shadow-elevation-2";
 		default:
 			return "";
 	}

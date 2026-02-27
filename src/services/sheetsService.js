@@ -1,6 +1,94 @@
 import axios from "axios";
 import Papa from "papaparse";
 
+// ─── Anonymous Analytics Logger ──────────────────────────────────────────────
+// Uses VITE_GOOGLE_SHEET_URL_ORDERS / VITE_GOOGLE_SHEET_URL_STATS (Apps Script)
+const _ORDERS_URL = import.meta.env.VITE_GOOGLE_SHEET_URL_ORDERS || "";
+const _STATS_URL = import.meta.env.VITE_GOOGLE_SHEET_URL_STATS || "";
+const _BATCH_SIZE = 20;
+const _FLUSH_MS = 8_000;
+const _statsBatch = [];
+let _flushTimer = null;
+
+const _getVid = () => {
+	try {
+		return localStorage.getItem("vibe_visitor_id") || "anon";
+	} catch {
+		return "anon";
+	}
+};
+const _post = async (url, payload) => {
+	if (!url) return;
+	try {
+		await fetch(url, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(payload),
+			keepalive: true,
+		});
+	} catch {
+		/* silent */
+	}
+};
+const _flush = () => {
+	if (!_statsBatch.length) return;
+	_post(_STATS_URL, { rows: _statsBatch.splice(0, _BATCH_SIZE) });
+};
+
+/**
+ * Log anonymous user event to Stats sheet (batched, fire-and-forget).
+ * @param {string} eventType - 'shop_view' | 'search' | 'location_grant' | etc.
+ * @param {object} data
+ */
+export const logUserEvent = (eventType, data = {}) => {
+	_statsBatch.push({
+		timestamp: new Date().toISOString(),
+		visitor_id: _getVid(),
+		event_type: eventType,
+		lat: data.lat ?? "",
+		lng: data.lng ?? "",
+		shop_id: data.shopId ?? "",
+		shop_name: data.shopName ?? "",
+		query: data.query ?? "",
+		ua:
+			typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 100) : "",
+	});
+	clearTimeout(_flushTimer);
+	if (_statsBatch.length >= _BATCH_SIZE) {
+		_flush();
+		return;
+	}
+	_flushTimer = setTimeout(_flush, _FLUSH_MS);
+};
+
+/**
+ * Log payment transaction to Orders sheet (immediate, fire-and-forget).
+ */
+export const logPaymentTransaction = ({
+	amount,
+	currency = "THB",
+	shopId = "",
+	shopName = "",
+	chargeId = "",
+	status = "success",
+} = {}) => {
+	_post(_ORDERS_URL, {
+		rows: [
+			{
+				timestamp: new Date().toISOString(),
+				visitor_id: _getVid(),
+				amount,
+				currency,
+				shop_id: shopId,
+				shop_name: shopName,
+				charge_id: chargeId,
+				status,
+			},
+		],
+	});
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
 const getVal = (obj, key) => {
 	const foundKey = Object.keys(obj).find(
 		(k) => k.trim().toLowerCase() === key.toLowerCase(),

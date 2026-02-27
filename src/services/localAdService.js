@@ -1,10 +1,120 @@
+import { getSupabaseEdgeBaseUrl } from "@/lib/runtimeConfig";
 import { supabase } from "@/lib/supabase";
+
+const TRANSIENT_ERROR_PATTERNS = [
+	"schema cache",
+	"upstream request timeout",
+	"service unavailable",
+	"temporarily unavailable",
+	"network error",
+	"failed to fetch",
+	"gateway timeout",
+];
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isTransientStatus = (status) =>
+	status === 429 || status === 408 || status === 425 || status >= 500;
+
+const isTransientMessage = (message) => {
+	const lower = String(message || "").toLowerCase();
+	return TRANSIENT_ERROR_PATTERNS.some((pattern) => lower.includes(pattern));
+};
+
+const extractErrorMessage = (payload, fallback) => {
+	if (typeof payload === "string" && payload.trim()) return payload.trim();
+	if (payload && typeof payload === "object") {
+		const candidates = [
+			payload.error,
+			payload.message,
+			payload.msg,
+			payload.details,
+			payload.hint,
+		];
+		for (const candidate of candidates) {
+			if (typeof candidate === "string" && candidate.trim()) {
+				return candidate.trim();
+			}
+		}
+	}
+	return fallback;
+};
+
+const parseJsonSafe = async (res) => {
+	try {
+		return await res.json();
+	} catch {
+		try {
+			return await res.text();
+		} catch {
+			return null;
+		}
+	}
+};
+
+const requestWithRetry = async (
+	run,
+	{ maxAttempts = 3, baseDelayMs = 350 } = {},
+) => {
+	let lastError;
+	for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+		try {
+			return await run();
+		} catch (error) {
+			lastError = error;
+			const status = Number(error?.status) || 0;
+			const message = String(error?.message || error || "");
+			const shouldRetry =
+				attempt < maxAttempts &&
+				(isTransientStatus(status) || isTransientMessage(message));
+			if (!shouldRetry) break;
+			await sleep(baseDelayMs * attempt);
+		}
+	}
+	throw lastError;
+};
 
 /**
  * Service for managing geofenced local ads.
  * Provides CRUD + location-based retrieval through the Supabase `get_local_ads` RPC.
  */
 class LocalAdService {
+	async _authHeaders() {
+		const {
+			data: { session },
+		} = await supabase.auth.getSession();
+		return {
+			"Content-Type": "application/json",
+			Authorization: `Bearer ${session?.access_token || ""}`,
+		};
+	}
+
+	async _adminFetch(path = "", options = {}) {
+		const edgeUrl = getSupabaseEdgeBaseUrl();
+		const headers = await this._authHeaders();
+
+		return await requestWithRetry(async () => {
+			const res = await fetch(`${edgeUrl}/admin-local-ads${path}`, {
+				...options,
+				headers: {
+					...headers,
+					...(options.headers || {}),
+				},
+			});
+			if (!res.ok) {
+				const payload = await parseJsonSafe(res);
+				const message = extractErrorMessage(
+					payload,
+					"Local Ads admin request failed",
+				);
+				const error = new Error(message);
+				error.status = res.status;
+				throw error;
+			}
+			return await res.json();
+		});
+	}
+
 	/* ───────── read ───────── */
 
 	/** Fetch ads that fall within range of a given lat/lng. */
@@ -19,23 +129,15 @@ class LocalAdService {
 
 	/** Fetch all ads (admin). */
 	async getAll() {
-		const { data, error } = await supabase
-			.from("local_ads")
-			.select("*")
-			.order("created_at", { ascending: false });
-		if (error) throw error;
-		return data || [];
+		const payload = await this._adminFetch("", { method: "GET" });
+		return payload?.data || [];
 	}
 
 	/** Fetch a single ad by ID. */
 	async getById(id) {
-		const { data, error } = await supabase
-			.from("local_ads")
-			.select("*")
-			.eq("id", id)
-			.single();
-		if (error) throw error;
-		return data;
+		const query = `?id=${encodeURIComponent(String(id || ""))}`;
+		const payload = await this._adminFetch(query, { method: "GET" });
+		return payload?.data || null;
 	}
 
 	/* ───────── write ───────── */
@@ -45,19 +147,11 @@ class LocalAdService {
 	 * @param {{ title:string, description?:string, image_url?:string, link_url?:string, lat:number, lng:number, radius_km?:number, starts_at?:string, ends_at?:string }} payload
 	 */
 	async create(payload) {
-		const { lat, lng, ...rest } = payload;
-		const record = {
-			...rest,
-			location: `POINT(${lng} ${lat})`, // WKT
-			radius_km: payload.radius_km ?? 5,
-		};
-		const { data, error } = await supabase
-			.from("local_ads")
-			.insert(record)
-			.select()
-			.single();
-		if (error) throw error;
-		return data;
+		const data = await this._adminFetch("", {
+			method: "POST",
+			body: JSON.stringify(payload),
+		});
+		return data?.data || null;
 	}
 
 	/**
@@ -66,20 +160,12 @@ class LocalAdService {
 	 * @param {object} payload - fields to update; lat/lng handled like create.
 	 */
 	async update(id, payload) {
-		const record = { ...payload };
-		if (payload.lat !== undefined && payload.lng !== undefined) {
-			record.location = `POINT(${payload.lng} ${payload.lat})`;
-			delete record.lat;
-			delete record.lng;
-		}
-		const { data, error } = await supabase
-			.from("local_ads")
-			.update(record)
-			.eq("id", id)
-			.select()
-			.single();
-		if (error) throw error;
-		return data;
+		const query = `?id=${encodeURIComponent(String(id || ""))}`;
+		const data = await this._adminFetch(query, {
+			method: "PATCH",
+			body: JSON.stringify(payload),
+		});
+		return data?.data || null;
 	}
 
 	/** Toggle ad status between 'active' and 'paused'. */
@@ -90,8 +176,8 @@ class LocalAdService {
 
 	/** Delete an ad by ID. */
 	async remove(id) {
-		const { error } = await supabase.from("local_ads").delete().eq("id", id);
-		if (error) throw error;
+		const query = `?id=${encodeURIComponent(String(id || ""))}`;
+		await this._adminFetch(query, { method: "DELETE" });
 		return true;
 	}
 }

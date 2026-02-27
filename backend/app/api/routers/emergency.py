@@ -2,8 +2,8 @@
 Emergency Router - API endpoints for emergency services
 Find nearby hospitals, police, fire stations using OpenStreetMap
 """
+
 from fastapi import APIRouter, Query
-from typing import Optional
 from starlette.requests import Request
 
 from app.core.rate_limit import limiter

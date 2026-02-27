@@ -1,0 +1,25 @@
+Debugger listening on ws://127.0.0.1:63400/af284c5e-c64b-4b34-aefb-6bb97c1122ac
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger attached.
+Initialising login role...
+Connecting to remote database...
+Do you want to push these migrations to the remote database?
+ ΓÇó 20260224135000_ultrathink_schema_optimization_part1.sql
+ ΓÇó 20260224160000_map_pins_dual_branch_and_backfill.sql
+ ΓÇó 20260224161000_owner_dashboard_indexes.sql
+ ΓÇó 20260224190000_ultrathink_schema_optimization_part2.sql
+ ΓÇó 20260224201000_partner_owner_perf_followup.sql
+
+ [Y/n] y
+Applying migration 20260224135000_ultrathink_schema_optimization_part1.sql...
+NOTICE (42P07): relation "idx_redemptions_user_id" already exists, skipping
+NOTICE (00000): index "venue_tags_name_key" does not exist, skipping
+NOTICE (00000): trigger "trg_user_achievements_updated_at" for relation "public.user_achievements" does not exist, skipping
+ERROR: function moddatetime() does not exist (SQLSTATE 42883)
+At statement: 18                                             
+CREATE TRIGGER trg_user_achievements_updated_at              
+    BEFORE UPDATE ON public.user_achievements                
+    FOR EACH ROW                                             
+    EXECUTE FUNCTION moddatetime(updated_at)                 
+Try rerunning the command with --debug to troubleshoot the error.
+Waiting for the debugger to disconnect...

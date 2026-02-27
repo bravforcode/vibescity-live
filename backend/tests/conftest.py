@@ -2,9 +2,9 @@ import os
 import socket
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
-from types import SimpleNamespace
 from fastapi.testclient import TestClient
 
 
@@ -38,8 +38,8 @@ os.environ.setdefault("METRICS_ENABLED", "true")
 os.environ.setdefault("OTEL_ENABLED", "false")
 os.environ.setdefault("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 
-from app.main import app  # noqa: E402
 from app.core.auth import verify_user  # noqa: E402
+from app.main import app  # noqa: E402
 
 
 @pytest.fixture(scope="session", autouse=True)

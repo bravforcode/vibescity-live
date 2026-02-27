@@ -62,6 +62,10 @@ const userLevel = computed(() => currentLevel.value.level);
 const levelTitle = computed(() => currentLevel.value.title);
 const totalCoins = computed(() => coins.value);
 const progressPercent = computed(() => Math.floor(levelProgress.value * 100));
+const displayName = computed(() => {
+	const name = String(profile.value?.displayName || "").trim();
+	return name || "Vibe Explorer";
+});
 
 // Status map for order statuses
 const statusMap = {
@@ -99,9 +103,16 @@ const handleLogout = async () => {
 };
 
 const fetchOrders = async () => {
+	if (!userStore.isAuthenticated) {
+		myOrders.value = [];
+		return;
+	}
 	loadingOrders.value = true;
 	try {
 		myOrders.value = await paymentService.getMyOrders();
+	} catch (error) {
+		console.error("Error fetching orders:", error);
+		myOrders.value = [];
 	} finally {
 		loadingOrders.value = false;
 	}
@@ -118,6 +129,10 @@ const showComingSoon = () => {
 const handleMenuItemClick = (item) => {
 	selectFeedback();
 	if (item.id === "orders") {
+		if (!userStore.isAuthenticated) {
+			showComingSoon();
+			return;
+		}
 		activeView.value = "orders";
 		fetchOrders();
 	} else {
@@ -182,60 +197,67 @@ onUnmounted(() => {
 	clearTimeout(comingSoonTimer);
 });
 
-const menuSections = computed(() => [
-	{
-		title: t("profile.vibe_discovery"),
-		items: [
-			{
-				id: "events",
-				label: t("profile.nearby_events"),
-				icon: Zap,
-				color: "text-amber-400",
-			},
-			{
-				id: "quests",
-				label: t("profile.vibe_quests"),
-				icon: Trophy,
-				color: "text-purple-400",
-			},
-			{
-				id: "history",
-				label: t("profile.visit_history"),
-				icon: History,
-				color: "text-blue-400",
-			},
-		],
-	},
-	{
-		title: t("profile.account"),
-		items: [
-			{
-				id: "orders",
-				label: t("profile.my_orders"),
-				icon: ShoppingBag,
-				color: "text-green-400", // Green for money
-			},
-			{
-				id: "profile",
-				label: t("profile.edit_profile"),
-				icon: User,
-				color: "text-zinc-400",
-			},
-			{
-				id: "settings",
-				label: t("profile.preferences"),
-				icon: Settings,
-				color: "text-zinc-400",
-			},
-			{
-				id: "support",
-				label: t("profile.help_support"),
-				icon: HelpCircle,
-				color: "text-zinc-400",
-			},
-		],
-	},
-]);
+const menuSections = computed(() => {
+	const accountItems = [];
+	if (userStore.isAuthenticated) {
+		accountItems.push({
+			id: "orders",
+			label: t("profile.my_orders"),
+			icon: ShoppingBag,
+			color: "text-green-400",
+		});
+	}
+	accountItems.push(
+		{
+			id: "profile",
+			label: t("profile.edit_profile"),
+			icon: User,
+			color: "text-zinc-400",
+		},
+		{
+			id: "settings",
+			label: t("profile.preferences"),
+			icon: Settings,
+			color: "text-zinc-400",
+		},
+		{
+			id: "support",
+			label: t("profile.help_support"),
+			icon: HelpCircle,
+			color: "text-zinc-400",
+		},
+	);
+
+	return [
+		{
+			title: t("profile.vibe_discovery"),
+			items: [
+				{
+					id: "events",
+					label: t("profile.nearby_events"),
+					icon: Zap,
+					color: "text-amber-400",
+				},
+				{
+					id: "quests",
+					label: t("profile.vibe_quests"),
+					icon: Trophy,
+					color: "text-purple-400",
+				},
+				{
+					id: "history",
+					label: t("profile.visit_history"),
+					icon: History,
+					color: "text-blue-400",
+				},
+			],
+		},
+		{
+			title: t("profile.account"),
+			items: accountItems,
+		},
+	];
+});
 </script>
 
 <template>
@@ -308,69 +330,55 @@ const menuSections = computed(() => [
               :id="drawerTitleId"
               class="text-xl font-black text-white tracking-tight uppercase drop-shadow-md"
             >
-              {{ profile?.displayName || "Guest User" }}
+              {{ displayName }}
             </h2>
-            <template v-if="userStore.isAuthenticated">
-              <div class="flex items-center gap-2 mt-1">
-                <span
-                  class="px-2 py-0.5 rounded-md bg-white/10 border border-white/10 text-[10px] font-bold text-blue-300 uppercase tracking-widest backdrop-blur-sm"
-                >
-                  {{ levelTitle }}
-                </span>
-                <span
-                  class="text-[10px] font-bold text-white/40 uppercase tracking-widest"
-                >
-                  LV.{{ userLevel }}
-                </span>
-              </div>
+            <div class="flex items-center gap-2 mt-1">
+              <span
+                class="px-2 py-0.5 rounded-md bg-white/10 border border-white/10 text-[10px] font-bold text-blue-300 uppercase tracking-widest backdrop-blur-sm"
+              >
+                {{ levelTitle }}
+              </span>
+              <span
+                class="text-[10px] font-bold text-white/40 uppercase tracking-widest"
+              >
+                LV.{{ userLevel }}
+              </span>
+            </div>
 
-              <!-- Stats Row -->
-              <div class="flex gap-2 mt-6 w-full">
-                <div
-                  class="flex-1 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-3 flex flex-col items-center shadow-inner group hover:bg-white/10 transition-colors"
+            <!-- Stats Row -->
+            <div class="flex gap-2 mt-6 w-full">
+              <div
+                class="flex-1 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-3 flex flex-col items-center shadow-inner group hover:bg-white/10 transition-colors"
+              >
+                <span
+                  class="text-[8px] font-black text-white/30 uppercase tracking-widest mb-1 group-hover:text-white/50 transition-colors"
+                  >{{ t("profile.total_coins") }}</span
                 >
-                  <span
-                    class="text-[8px] font-black text-white/30 uppercase tracking-widest mb-1 group-hover:text-white/50 transition-colors"
-                    >{{ t("profile.total_coins") }}</span
-                  >
-                  <span class="text-lg font-black text-yellow-400 drop-shadow-sm"
-                    >🪙 {{ totalCoins.toLocaleString() }}</span
-                  >
-                </div>
-                <div
-                  class="flex-1 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-3 flex flex-col items-center shadow-inner group hover:bg-white/10 transition-colors"
+                <span class="text-lg font-black text-yellow-400 drop-shadow-sm"
+                  >🪙 {{ totalCoins.toLocaleString() }}</span
                 >
-                  <span
-                    class="text-[8px] font-black text-white/30 uppercase tracking-widest mb-1 group-hover:text-white/50 transition-colors"
-                    >{{ t("profile.next_level") }}</span
+              </div>
+              <div
+                class="flex-1 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-3 flex flex-col items-center shadow-inner group hover:bg-white/10 transition-colors"
+              >
+                <span
+                  class="text-[8px] font-black text-white/30 uppercase tracking-widest mb-1 group-hover:text-white/50 transition-colors"
+                  >{{ t("profile.next_level") }}</span
+                >
+                <div class="flex flex-col items-center w-full px-2">
+                  <span class="text-lg font-black text-blue-400 drop-shadow-sm"
+                    >{{ progressPercent }}%</span
                   >
-                  <div class="flex flex-col items-center w-full px-2">
-                    <span class="text-lg font-black text-blue-400 drop-shadow-sm"
-                      >{{ progressPercent }}%</span
-                    >
-                    <!-- Mini Progress Bar -->
+                  <div
+                    class="w-full h-1 bg-white/10 rounded-full mt-1 overflow-hidden"
+                  >
                     <div
-                      class="w-full h-1 bg-white/10 rounded-full mt-1 overflow-hidden"
-                    >
-                      <div
-                        class="h-full bg-gradient-to-r from-blue-500 to-purple-500"
-                        :style="{ width: `${progressPercent}%` }"
-                      ></div>
-                    </div>
+                      class="h-full bg-gradient-to-r from-blue-500 to-purple-500"
+                      :style="{ width: `${progressPercent}%` }"
+                    ></div>
                   </div>
                 </div>
               </div>
-            </template>
-            <!-- Guest: Sign In CTA -->
-            <div v-else class="mt-4 w-full p-4 rounded-2xl bg-white/5 border border-white/10 text-center">
-              <p class="text-xs text-white/50 mb-3">{{ t('profile.sign_in_prompt') }}</p>
-              <button
-                type="button"
-                class="w-full py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs font-bold active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
-                @click="handleClose"
-              >
-                {{ t('checkin.sign_in') }}
-              </button>
             </div>
           </div>
         </div>

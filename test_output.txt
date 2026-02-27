@@ -1,0 +1,8 @@
+[dotenv@17.3.1] injecting env (86) from .env -- tip: ΓÜÖ∩╕Å  write to custom object with { processEnv: myObject }
+Testing get_map_pins...
+RPC Error: {
+  "code": "PGRST002",
+  "details": null,
+  "hint": null,
+  "message": "Could not query the database for the schema cache. Retrying."
+}

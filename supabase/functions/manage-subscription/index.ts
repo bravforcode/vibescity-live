@@ -1,17 +1,15 @@
 // supabase/functions/manage-subscription/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import Stripe from "https://esm.sh/stripe@12.0.0?target=deno";
 import { buildCorsHeaders, isOriginAllowed } from "../_shared/cors.ts";
-
-const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-  apiVersion: "2022-11-15",
-  httpClient: Stripe.createFetchHttpClient(),
-});
 
 type ManageAction = "cancel" | "resume";
 
-const jsonResponse = (payload: unknown, status: number, origin: string | null) =>
+const jsonResponse = (
+  payload: unknown,
+  status: number,
+  origin: string | null,
+) =>
   new Response(JSON.stringify(payload), {
     status,
     headers: {
@@ -32,20 +30,34 @@ serve(async (req) => {
   }
 
   if (!isOriginAllowed(origin)) {
-    return jsonResponse({ success: false, error: "Origin not allowed" }, 403, origin);
+    return jsonResponse(
+      { success: false, error: "Origin not allowed" },
+      403,
+      origin,
+    );
   }
 
   try {
-    if (!Deno.env.get("STRIPE_SECRET_KEY")) {
+    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    if (!stripeKey) {
       throw new Error("Stripe is not configured");
     }
+    const stripe = new Stripe(stripeKey, {
+      apiVersion: "2022-11-15",
+      httpClient: Stripe.createFetchHttpClient(),
+    });
+
     if (!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) {
       throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured");
     }
 
     const authHeader = req.headers.get("Authorization") || "";
     if (!authHeader) {
-      return jsonResponse({ success: false, error: "Missing authorization" }, 401, origin);
+      return jsonResponse(
+        { success: false, error: "Missing authorization" },
+        401,
+        origin,
+      );
     }
 
     const supabaseAuth = createClient(
@@ -63,24 +75,35 @@ serve(async (req) => {
       error: authError,
     } = await supabaseAuth.auth.getUser();
     if (authError || !user) {
-      return jsonResponse({ success: false, error: "Unauthorized" }, 401, origin);
+      return jsonResponse(
+        { success: false, error: "Unauthorized" },
+        401,
+        origin,
+      );
     }
 
     const body = await req.json();
     const action = String(body?.action || "").trim() as ManageAction;
     const subscriptionId = String(body?.subscriptionId || "").trim();
     if (!subscriptionId) throw new Error("Subscription ID required");
-    if (!["cancel", "resume"].includes(action)) throw new Error("Invalid action");
+    if (!["cancel", "resume"].includes(action))
+      throw new Error("Invalid action");
 
     const { data: subscription, error: subError } = await supabaseAdmin
       .from("subscriptions")
-      .select("id, user_id, stripe_subscription_id, cancel_at_period_end, status")
+      .select(
+        "id, user_id, stripe_subscription_id, cancel_at_period_end, status",
+      )
       .eq("stripe_subscription_id", subscriptionId)
       .maybeSingle();
 
     if (subError) throw subError;
     if (!subscription) {
-      return jsonResponse({ success: false, error: "Subscription not found" }, 404, origin);
+      return jsonResponse(
+        { success: false, error: "Subscription not found" },
+        404,
+        origin,
+      );
     }
 
     if (!subscription.user_id || subscription.user_id !== user.id) {

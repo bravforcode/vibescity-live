@@ -110,11 +110,11 @@ const saveChanges = async () => {
         <button
           @click="saveChanges"
           :disabled="isSaving"
-          class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all mt-4"
+          class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition mt-4"
         >
           <Loader2 v-if="isSaving" class="w-4 h-4 animate-spin" />
           <Save v-else class="w-4 h-4" />
-          {{ isSaving ? "Saving..." : "Save Changes" }}
+          {{ isSaving ? "Saving…" : "Save Changes" }}
         </button>
       </div>
     </div>

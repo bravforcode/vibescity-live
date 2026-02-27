@@ -1,21 +1,31 @@
 import mapboxgl from "mapbox-gl";
-import { onUnmounted, ref, shallowRef } from "vue";
+import { markRaw, onUnmounted, ref, shallowRef } from "vue";
 
 export function useMapCore(containerRef, _options = {}) {
 	const map = shallowRef(null);
 	const isMapReady = ref(false);
 	const isMapLoaded = ref(false);
 	const isStrictMapE2E = import.meta.env.VITE_E2E_MAP_REQUIRED === "true";
-	const FALLBACK_STYLE_URL = "mapbox://styles/mapbox/dark-v11";
+	const HARDCODED_MAPBOX_TOKEN =
+		"pk.eyJ1IjoicGhpcnJyIiwiYSI6ImNta21tbzNobDBndXMzZHB2N3V3cXdtMXQifQ.HlJvxxRdjzhbOLw5WgRPQA";
+	const PRIMARY_STYLE_URL = "mapbox://styles/phirrr/cmlktq68u002601se295iazmm";
+	const FALLBACK_STYLE_URL = PRIMARY_STYLE_URL;
+	const STYLE_ENDPOINT_PATH = "/styles/v1/";
+	const EMPTY_VECTOR_TILE_DATA_URI = "data:application/x-protobuf;base64,";
 	let lastRequestedStyleUrl = "";
 	let styleFallbackInProgress = false;
 
-	// Access Token from environment - no hardcoded fallback for security
-	const token = (import.meta.env.VITE_MAPBOX_TOKEN || "")
+	const token = (
+		import.meta.env.VITE_MAPBOX_TOKEN ||
+		HARDCODED_MAPBOX_TOKEN ||
+		""
+	)
 		.trim()
 		.replace(/^['"]|['"]$/g, "");
 	if (!token) {
-		console.error("VITE_MAPBOX_TOKEN is not configured in .env");
+		console.error(
+			"VITE_MAPBOX_TOKEN is not configured and fallback token missing",
+		);
 	}
 	mapboxgl.accessToken = token || "";
 	mapboxgl.setTelemetryEnabled?.(false);
@@ -32,6 +42,7 @@ export function useMapCore(containerRef, _options = {}) {
 		"pin-giant": "/images/pins/pin-purple.png",
 	};
 	const pendingPinImages = new Set();
+	const warnedMissingTerrainSources = new Set();
 
 	const ensurePinImagesLoaded = () => {
 		if (!map.value) return;
@@ -54,11 +65,64 @@ export function useMapCore(containerRef, _options = {}) {
 		}
 	};
 
+	const ensureTerrainSourceConsistency = () => {
+		if (!map.value || typeof map.value.getStyle !== "function") return;
+		try {
+			const style = map.value.getStyle();
+			const terrainSourceId = style?.terrain?.source;
+			if (!terrainSourceId) return;
+			if (map.value.getSource(terrainSourceId)) return;
+			map.value.setTerrain?.(null);
+			if (
+				import.meta.env.DEV &&
+				!warnedMissingTerrainSources.has(terrainSourceId)
+			) {
+				warnedMissingTerrainSources.add(terrainSourceId);
+				console.warn(
+					`Terrain source "${terrainSourceId}" not found in style; terrain disabled for stability.`,
+				);
+			}
+		} catch {
+			// Ignore style transition races.
+		}
+	};
+
 	const isStyleNotFoundError = (err) => {
 		const status = err?.status;
 		const url = typeof err?.url === "string" ? err.url : "";
-		return status === 404 && url.includes("/styles/v1/");
+		return status === 404 && url.includes(STYLE_ENDPOINT_PATH);
 	};
+
+	const isStyleAccessDeniedError = (err) => {
+		const status = Number(err?.status);
+		const url = typeof err?.url === "string" ? err.url : "";
+		const msg = String(err?.message || "").toLowerCase();
+		if (!url.includes(STYLE_ENDPOINT_PATH)) return false;
+		if (status === 401 || status === 403) return true;
+		return msg.includes("unauthorized") || msg.includes("forbidden");
+	};
+
+	const isTileLikeError = (err) => {
+		const status = Number(err?.status);
+		const url = typeof err?.url === "string" ? err.url : "";
+		if (![401, 403, 404].includes(status)) return false;
+		if (url.includes(STYLE_ENDPOINT_PATH)) return false;
+		return (
+			url.includes("/v4/") ||
+			url.includes("/tiles/") ||
+			url.endsWith(".vector.pbf") ||
+			url.endsWith(".mvt") ||
+			url.endsWith(".png") ||
+			url.endsWith(".jpg") ||
+			url.endsWith(".jpeg") ||
+			url.endsWith(".webp")
+		);
+	};
+
+	const isSuppressedTilesetRequest = (url) =>
+		typeof url === "string" &&
+		(url.includes("mapbox.procedural-buildings-v1") ||
+			url.includes("mapbox.mapbox-landmark-pois-v1"));
 
 	const applyFallbackStyle = (reason = "") => {
 		if (!map.value) return;
@@ -80,7 +144,12 @@ export function useMapCore(containerRef, _options = {}) {
 			return;
 		}
 
+		const fallbackGuard = setTimeout(() => {
+			styleFallbackInProgress = false;
+		}, 6_000);
+
 		map.value.once("style.load", () => {
+			clearTimeout(fallbackGuard);
 			styleFallbackInProgress = false;
 		});
 	};
@@ -88,7 +157,7 @@ export function useMapCore(containerRef, _options = {}) {
 	const initMap = (
 		initialCenter = [98.968, 18.7985],
 		initialZoom = 15,
-		style = "mapbox://styles/phirrr/cmlkql2fl002101sfarlm0ptr",
+		style = PRIMARY_STYLE_URL,
 	) => {
 		if (!containerRef.value) return;
 
@@ -96,26 +165,31 @@ export function useMapCore(containerRef, _options = {}) {
 		containerRef.value.innerHTML = "";
 
 		lastRequestedStyleUrl = style;
-		map.value = new mapboxgl.Map({
-			container: containerRef.value,
-			style: style,
-			center: initialCenter,
-			zoom: initialZoom,
-			pitch: 60, // Default pitch for 3D feel (stronger 3D)
-			bearing: 0,
-			antialias: true,
-			attributionControl: false,
-		});
+		map.value = markRaw(
+			new mapboxgl.Map({
+				container: containerRef.value,
+				style: style,
+				center: initialCenter,
+				zoom: initialZoom,
+				minZoom: 3,
+				maxZoom: 22,
+				pitch: 60, // 3D perspective without showing beyond map world
+				bearing: 0,
+				antialias: false, // Saves ~50% VRAM on mobile/retina
+				attributionControl: false,
+				fadeDuration: 0, // Eliminate tile fade-in stutter on mobile
+				maxTileCacheSize: 100, // Limit memory for tile cache
+				transformRequest: (url, _resourceType) => {
+					// Suppress noisy 404 tileset fetches that some custom styles reference.
+					if (isSuppressedTilesetRequest(url)) {
+						return { url: EMPTY_VECTOR_TILE_DATA_URI };
+					}
+					return { url };
+				},
+			}),
+		);
 
-		// Add Controls
-		map.value.addControl(
-			new mapboxgl.AttributionControl({ compact: true }),
-			"bottom-right",
-		);
-		map.value.addControl(
-			new mapboxgl.NavigationControl({ showCompass: true, showZoom: false }),
-			"top-right",
-		);
+		// Attribution & Navigation controls removed for clean UI
 
 		const markMapReady = () => {
 			if (isMapReady.value) return;
@@ -126,9 +200,34 @@ export function useMapCore(containerRef, _options = {}) {
 			}
 		};
 
+		const readyTimeoutMs = isStrictMapE2E ? 8_000 : 12_000;
+		const readyFallbackTimer = setTimeout(() => {
+			if (isMapReady.value || !map.value) return;
+			const styleLoaded =
+				typeof map.value.isStyleLoaded === "function"
+					? map.value.isStyleLoaded()
+					: false;
+			const mapLoaded =
+				typeof map.value.loaded === "function" ? map.value.loaded() : false;
+			if (styleLoaded || mapLoaded) {
+				markMapReady();
+			}
+		}, readyTimeoutMs);
+
+		const clearReadyFallbackTimer = () => {
+			clearTimeout(readyFallbackTimer);
+		};
+
+		// Amplify scroll zoom speed (default rate is 1/450 — lower = faster)
+		map.value.scrollZoom.setWheelZoomRate(1 / 180);
+
 		map.value.on("load", markMapReady);
 		map.value.on("style.load", markMapReady);
 		map.value.on("idle", markMapReady);
+		map.value.on("load", clearReadyFallbackTimer);
+		map.value.on("style.load", clearReadyFallbackTimer);
+		map.value.on("idle", clearReadyFallbackTimer);
+		map.value.on("remove", clearReadyFallbackTimer);
 
 		// Track last requested style even when callers use map.value.setStyle directly.
 		const baseSetStyle = map.value.setStyle.bind(map.value);
@@ -139,21 +238,37 @@ export function useMapCore(containerRef, _options = {}) {
 
 		map.value.on("load", ensurePinImagesLoaded);
 		map.value.on("style.load", ensurePinImagesLoaded);
-		if (isStrictMapE2E) {
-			setTimeout(() => {
-				if (isMapReady.value || !map.value) return;
-				if (map.value.getCanvas?.()) {
-					markMapReady();
-				}
-			}, 8_000);
-		}
-
-		// Error handling
+		map.value.on("load", ensureTerrainSourceConsistency);
+		map.value.on("style.load", ensureTerrainSourceConsistency);
+		map.value.on("styledata", ensureTerrainSourceConsistency);
+		// Error handling — suppress expected tile 404s during style transitions
 		map.value.on("error", (e) => {
-			console.error("Mapbox Error:", e);
-			if (isStyleNotFoundError(e?.error)) {
-				applyFallbackStyle(e?.error?.url || "");
+			const err = e?.error;
+			const status = err?.status;
+			const url = typeof err?.url === "string" ? err.url : "";
+			const msg = String(err?.message || e?.message || "");
+
+			// Suppress harmless featureNamespace / place-labels style warnings
+			if (msg.includes("featureNamespace") || msg.includes("place-labels")) {
+				return;
 			}
+
+			// Style endpoint unauthorized/not found -> apply fallback
+			if (isStyleNotFoundError(err) || isStyleAccessDeniedError(err)) {
+				applyFallbackStyle(`${status || "unknown"} ${url}`.trim());
+				return;
+			}
+
+			// Tile errors are expected when styles reference premium/missing tilesets
+			if (isTileLikeError(err)) {
+				if (import.meta.env.DEV) {
+					console.warn("Mapbox tile error (suppressed):", url || e);
+				}
+				return;
+			}
+
+			// Genuine errors
+			console.error("Mapbox Error:", e);
 		});
 
 		// Handle missing images (loaded on demand for symbol layers)

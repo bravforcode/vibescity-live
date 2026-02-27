@@ -79,5 +79,20 @@ export const CONSOLE_WARNING_ALLOWLIST: ConsoleAllowlistRule[] = [
     source: /mapbox|mapbox-gl|mapbox\.com/i,
     note: "Mapbox internals emit this on touch listeners.",
   },
+  {
+    id: "mapbox-style-missing-terrain-source",
+    severity: "warning",
+    message: /Couldn'?t find terrain source "mapbox-dem"/i,
+    source: /mapbox|mapbox-gl|mapbox\.com/i,
+    note: "Custom studio style can omit mapbox-dem while terrain metadata still exists.",
+  },
+  {
+    id: "mapbox-style-featureset-source-mismatch",
+    severity: "warning",
+    message:
+      /featureNamespace .* featureset place-labels.*not associated to the same source/i,
+    source: /mapbox|mapbox-gl|mapbox\.com/i,
+    note: "Mapbox style featureset metadata mismatch warning from custom style.",
+  },
   ...LOCAL_DEV_ALLOWLIST_RULES,
 ];

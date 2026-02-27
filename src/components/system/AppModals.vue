@@ -1,19 +1,15 @@
 <!-- src/components/system/AppModals.vue -->
 <script setup>
-import { defineAsyncComponent, onMounted } from "vue";
+import { AlertTriangle, X } from "lucide-vue-next";
+import { computed, defineAsyncComponent } from "vue";
 import { useI18n } from "vue-i18n";
-import { useAppLogic } from "../../composables/useAppLogic";
+import {
+	normalizeVenueCollection,
+	normalizeVenueViewModel,
+} from "@/domain/venue/viewModel";
 import PortalLayer from "./PortalLayer.vue";
 
 const { t } = useI18n();
-
-const {
-	closeShopDetail,
-	activeBuildingId,
-	closeBuildingDetail,
-	isOwnerDashboardOpen,
-	toggleOwnerDashboard,
-} = useAppLogic();
 
 const MallDrawer = defineAsyncComponent(
 	() => import("../modal/MallDrawer.vue"),
@@ -76,22 +72,36 @@ const emit = defineEmits([
 	"retry",
 ]);
 
-onMounted(() => {
-	setTimeout(() => {
-		import("../modal/MallDrawer.vue");
-		import("../modal/ProfileDrawer.vue");
-		import("../modal/VibeModal.vue");
-		import("../ui/ConfettiEffect.vue");
-	}, 5000);
-});
+const normalizedSelectedShop = computed(() =>
+	props.selectedShop
+		? normalizeVenueViewModel(props.selectedShop, {
+				userLocation: props.userLocation,
+			})
+		: null,
+);
+
+const normalizedRideShop = computed(() =>
+	props.rideModalShop
+		? normalizeVenueViewModel(props.rideModalShop, {
+				userLocation: props.userLocation,
+			})
+		: null,
+);
+
+const normalizedMallShops = computed(() =>
+	normalizeVenueCollection(props.mallShops || [], {
+		userLocation: props.userLocation,
+	}),
+);
 </script>
 
 <template>
   <PortalLayer>
-    <transition name="modal-fade">
-      <div v-if="props.selectedShop">
+    <transition name="modal">
+      <div v-if="normalizedSelectedShop">
         <VibeModal
-          :shop="props.selectedShop"
+          :shop="normalizedSelectedShop"
+          :userLocation="props.userLocation"
           :userCount="props.activeUserCount"
           @close="emit('close-vibe-modal')"
           @toggle-favorite="(id) => emit('toggle-favorite', id)"
@@ -100,8 +110,8 @@ onMounted(() => {
     </transition>
 
     <RideComparisonModal
-      :isOpen="!!props.rideModalShop"
-      :shop="props.rideModalShop"
+      :isOpen="!!normalizedRideShop"
+      :shop="normalizedRideShop"
       :userLocation="props.userLocation"
       @close="emit('close-ride-modal')"
       @open-app="(appName) => emit('open-ride-app', appName)"
@@ -111,7 +121,7 @@ onMounted(() => {
       v-if="props.showMallDrawer"
       :is-open="props.showMallDrawer"
       :building="props.activeMall"
-      :shops="props.mallShops"
+      :shops="normalizedMallShops"
       :is-dark-mode="props.isDarkMode"
       :selected-shop-id="props.activeShopId"
       @close="emit('close-mall-drawer')"
@@ -142,7 +152,7 @@ onMounted(() => {
         role="status"
         aria-live="polite"
         aria-busy="true"
-        class="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#09090b]"
+        class="fixed inset-0 z-[6000] flex flex-col items-center justify-center bg-[#09090b]"
       >
         <div class="relative w-24 h-24">
           <div
@@ -168,40 +178,36 @@ onMounted(() => {
       </div>
     </Transition>
 
-    <Transition
-      enter-active-class="transition duration-500 ease-out"
-      enter-from-class="opacity-0 translate-y-10"
-      enter-to-class="opacity-100 translate-y-0"
-      leave-active-class="transition duration-300 ease-in"
-      leave-from-class="opacity-100 translate-y-0"
-      leave-to-class="opacity-0 translate-y-10"
-    >
+    <transition name="toast">
       <div
         v-if="props.errorMessage"
-        class="fixed top-20 left-1/2 -translate-x-1/2 z-[8000] w-[90%] max-w-md"
+        class="fixed top-20 left-1/2 -translate-x-1/2 z-[6100] w-[90%] max-w-md"
       >
-        <div
-          class="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 backdrop-blur-xl flex items-center gap-4 shadow-2xl"
-        >
+        <div class="toast-notification flex items-center gap-4">
           <div
-            class="w-10 h-10 rounded-xl bg-red-500 flex items-center justify-center text-xl shrink-0"
+            class="w-10 h-10 rounded-xl bg-red-500 flex items-center justify-center shrink-0"
+            aria-hidden="true"
           >
-            ⚠️
+            <AlertTriangle class="w-5 h-5 text-white" />
           </div>
           <div class="flex-1">
-            <h4 class="text-white font-bold text-sm">{{ t("app.system_alert") }}</h4>
+            <h4 class="text-white font-bold text-sm">
+              {{ t("app.system_alert") }}
+            </h4>
             <p class="text-white/60 text-xs">{{ props.errorMessage }}</p>
           </div>
           <button
             @click="emit('clear-error')"
-            aria-label="Dismiss system alert"
-            class="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-white/40"
+            :aria-label="t('common.close')"
+            class="w-11 h-11 rounded-full hover:bg-white/10 flex items-center justify-center text-white/40"
           >
-            ✕
+            <X class="w-4 h-4" aria-hidden="true" />
           </button>
+          <!-- Auto-dismiss progress bar -->
+          <div class="toast-progress" style="--toast-duration: 6s"></div>
         </div>
       </div>
-    </Transition>
+    </transition>
 
     <ConfettiEffect v-if="props.showConfetti" />
   </PortalLayer>
@@ -242,11 +248,14 @@ onMounted(() => {
 }
 
 .modal-scale-enter-active {
-  transition: opacity 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+  transition:
+    opacity 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
     transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .modal-scale-leave-active {
-  transition: opacity 0.2s ease-in, transform 0.2s ease-in;
+  transition:
+    opacity 0.2s ease-in,
+    transform 0.2s ease-in;
 }
 .modal-scale-enter-from {
   opacity: 0;
@@ -263,6 +272,8 @@ onMounted(() => {
     animation: none !important;
   }
 
+  .fade-enter-active,
+  .fade-leave-active,
   .modal-fade-enter-active,
   .modal-fade-leave-active,
   .modal-scale-enter-active,
