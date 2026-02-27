@@ -6,12 +6,17 @@ export function useMapCore(containerRef, _options = {}) {
 	const isMapReady = ref(false);
 	const isMapLoaded = ref(false);
 	const isStrictMapE2E = import.meta.env.VITE_E2E_MAP_REQUIRED === "true";
-	const FALLBACK_STYLE_URL = "mapbox://styles/mapbox/dark-v11";
+	const PRIMARY_STYLE_URL = "mapbox://styles/phirrr/cmlktq68u002601se295iazmm";
+	const FALLBACK_STYLE_URL = PRIMARY_STYLE_URL;
+	const STYLE_ENDPOINT_PATH = "/styles/v1/";
+	const EMPTY_VECTOR_TILE_DATA_URI = "data:application/x-protobuf;base64,";
 	let lastRequestedStyleUrl = "";
 	let styleFallbackInProgress = false;
 
-	// Access Token from environment - no hardcoded fallback for security
-	const token = (import.meta.env.VITE_MAPBOX_TOKEN || "")
+	const token = (
+		import.meta.env.VITE_MAPBOX_TOKEN ||
+		""
+	)
 		.trim()
 		.replace(/^['"]|['"]$/g, "");
 	if (!token) {
