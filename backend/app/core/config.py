@@ -14,7 +14,10 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://localhost:5173",
         "https://vibecity.live",
-        "http://127.0.0.1:3000"
+        "https://www.vibescity.live",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5417",
+        "http://127.0.0.1:5418",
     ]
 
     # External APIs
