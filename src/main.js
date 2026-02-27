@@ -10,6 +10,7 @@ import "./assets/vibe-animations.css";
 
 import { headSymbol } from "@unhead/vue";
 import { createHead } from "@unhead/vue/client";
+import { inject as injectVercelAnalytics } from "@vercel/analytics";
 import { vTestId } from "./directives/testid.js";
 import i18n from "./i18n.js";
 import { vueQueryOptions } from "./plugins/queryClient";
@@ -66,7 +67,24 @@ const maybeInitClarity = () => {
 	Clarity.init(clarityId);
 };
 
-maybeInitClarity();
+// Defer Clarity initialization to after main-thread critical work.
+const deferTask = (fn) => {
+	if (typeof requestIdleCallback === "function") {
+		requestIdleCallback(fn, { timeout: 3000 });
+	} else {
+		window.addEventListener("load", () => setTimeout(fn, 0), { once: true });
+	}
+};
+
+deferTask(() => {
+	maybeInitClarity();
+	// Initialize Vercel Analytics (Privacy-first hashing, no cookies needed)
+	if (analyticsEnabled) {
+		injectVercelAnalytics({
+			mode: import.meta.env.MODE === "production" ? "production" : "development",
+		});
+	}
+});
 if (typeof window !== "undefined") {
 	window.addEventListener("vibecity:consent", (evt) => {
 		if (evt?.detail?.analytics === "granted") {
