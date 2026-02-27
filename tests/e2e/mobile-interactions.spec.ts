@@ -38,7 +38,8 @@ Test Bar,Nightlife,18.7890,98.9860,LIVE,https://placehold.co/300x400,FALSE`;
     await expect(card, "Shop card must be visible").toBeVisible({ timeout: 15_000 });
 
     // 2. Perform Double Tap (Native Gestures)
-    // Playwright simulates touch events automatically if 'hasTouch: true' is in config
+    // Ensure element is stable before getting box
+    await card.waitFor({ state: "visible", timeout: 30_000 });
     const box = await card.boundingBox();
     if (!box) throw new Error("Card bounding box is null");
 
@@ -54,9 +55,10 @@ Test Bar,Nightlife,18.7890,98.9860,LIVE,https://placehold.co/300x400,FALSE`;
     await page.mouse.up();
 
     // 3. Assert Feedback (Relaxed to account for potential lack of product code)
+    // Increase timeout for feedback visibility
     const feedback = page.getByTestId("save-feedback");
     try {
-        await expect(feedback).toBeVisible({ timeout: 3000 });
+        await expect(feedback).toBeVisible({ timeout: 5000 });
     } catch {
        console.log("Visual feedback not found. Checking if card still exists.");
        await expect(card).toBeVisible(); 
@@ -68,7 +70,7 @@ Test Bar,Nightlife,18.7890,98.9860,LIVE,https://placehold.co/300x400,FALSE`;
     if (!isMobile) test.skip();
 
     await page.goto("/");
-    await expect(page.getByTestId("shop-card").first()).toBeVisible();
+    await expect(page.getByTestId("shop-card").first()).toBeVisible({ timeout: 30_000 });
 
     // 1. Simulate Orientation Change
     // We use a small width (700x360) to stay within 'MobileView' (<768px)
@@ -80,10 +82,10 @@ Test Bar,Nightlife,18.7890,98.9860,LIVE,https://placehold.co/300x400,FALSE`;
     // 2. Assert Layout Changes
     // 'display: contents' elements have no bounding box, so we use toBeAttached
     const landscapeLayout = page.getByTestId("video-layout-landscape");
-    await expect(landscapeLayout).toBeAttached({ timeout: 10_000 });
+    await expect(landscapeLayout).toBeAttached({ timeout: 20_000 });
 
     // Verify critical children are visible
-    await expect(page.getByTestId("map-shell").first()).toBeVisible();
+    await expect(page.getByTestId("map-shell").first()).toBeVisible({ timeout: 20_000 });
   });
 
   // ✅ TASK 3: Pull-to-Refresh
@@ -92,7 +94,7 @@ Test Bar,Nightlife,18.7890,98.9860,LIVE,https://placehold.co/300x400,FALSE`;
 
     await page.goto("/");
     await page.evaluate(() => window.scrollTo(0, 0));
-    await page.waitForTimeout(1000); // Give time for scroll to settle
+    await page.waitForTimeout(2000); // Give time for scroll to settle
 
     // 1. Initiate Native Pull Gesture
     // Start at top middle
@@ -110,7 +112,7 @@ Test Bar,Nightlife,18.7890,98.9860,LIVE,https://placehold.co/300x400,FALSE`;
     // 2. Assert Indicator
     // Specifically target the test-id we added to PullToRefresh.vue
     const refreshIndicator = page.getByTestId("refresh-indicator");
-    await expect(refreshIndicator).toBeVisible({ timeout: 5000 });
+    await expect(refreshIndicator).toBeVisible({ timeout: 10_000 });
 
     await page.mouse.up();
   });

@@ -98,7 +98,7 @@ const resetDrawerState = () => {
     const shop = props.shops.find(
       (s) => Number(s.id) === Number(props.selectedShopId),
     );
-    if (shop && shop.Floor) {
+    if (shop?.Floor) {
       activeFloor.value = shop.Floor;
     }
 
@@ -245,7 +245,7 @@ const filteredShops = computed(() => {
 
 const handleShare = (item) => {
   const name = item.name || item.EventName || "Amazing Vibe";
-  const url = window.location.href + `?shop=${item.id}`;
+  const url = `${window.location.href}?shop=${item.id}`;
 
   if (navigator.share) {
     navigator

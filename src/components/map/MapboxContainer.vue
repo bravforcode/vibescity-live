@@ -11,6 +11,7 @@ import {
   watch,
 } from "vue";
 import { useI18n } from "vue-i18n";
+import { useTimeTheme } from "../../composables/useTimeTheme";
 import { useShopStore } from "../../store/shopStore";
 import { calculateDistance } from "../../utils/shopUtils";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -22,6 +23,9 @@ const { t, te, locale } = useI18n();
 const tt = (key, fallback) => (te(key) ? t(key) : fallback);
 
 const shopStore = useShopStore();
+
+// ✅ Phase 2: Dynamic Vibe Shifting
+const { isNightMode, mapStyle, currentHour } = useTimeTheme();
 
 const props = defineProps({
   shops: Array,
@@ -39,6 +43,21 @@ const props = defineProps({
   legendHeight: { type: Number, default: 0 },
   selectedShopCoords: { type: Array, default: null },
   isLowPowerMode: { type: Boolean, default: false },
+  priorityShopIds: { type: Array, default: () => [] },
+});
+
+// Watch for Theme Changes and update Mapbox Style dynamically
+watch(mapStyle, (newStyle) => {
+  if (map.value && isMapReady.value) {
+    // Preserve layers before switching style (optional advanced logic, for MVP we reload style)
+    // Mapbox GL JS setStyle removes custom layers. We need to re-add them.
+    map.value.setStyle(newStyle);
+    map.value.once("style.load", () => {
+      setupMapLayers();
+      updateMapSources();
+      updateEventMarkers(); // Restore markers
+    });
+  }
 });
 
 const emit = defineEmits([
@@ -55,6 +74,7 @@ const map = shallowRef(null);
 const zoom = ref(15);
 const center = ref([98.968, 18.7985]); // Mapbox uses [lng, lat]
 const isMapReady = ref(false);
+const mapLoaded = ref(false); // ✅ Fade-in control
 const activePopup = shallowRef(null);
 const markersMap = shallowRef(new Map());
 const eventMarkersMap = shallowRef(new Map());
@@ -80,7 +100,7 @@ const updateRoadDirections = async () => {
   ) {
     roadDistance.value = null;
     roadDuration.value = null;
-    if (map.value && map.value.getSource("distance-line")) {
+    if (map.value?.getSource("distance-line")) {
       map.value.getSource("distance-line").setData({
         type: "FeatureCollection",
         features: [],
@@ -92,14 +112,24 @@ const updateRoadDirections = async () => {
   const [uLat, uLng] = props.userLocation;
   const [sLat, sLng] = props.selectedShopCoords;
 
+  if (!mapboxgl?.accessToken) return;
+
   try {
+    // Check network status to avoid "Failed to fetch" noise
+    if (!navigator.onLine) {
+      return; // Silent return
+    }
+
     const res = await fetch(
       `https://api.mapbox.com/directions/v5/mapbox/walking/${uLng},${uLat};${sLng},${sLat}?geometries=geojson&access_token=${mapboxgl.accessToken}`,
     );
+
+    if (!res.ok) return;
+
     const data = await res.json();
-    if (data.routes && data.routes[0]) {
+    if (data.routes?.[0]) {
       const route = data.routes[0].geometry;
-      if (map.value && map.value.getSource("distance-line")) {
+      if (map.value?.getSource("distance-line")) {
         map.value.getSource("distance-line").setData({
           type: "Feature",
           geometry: route,
@@ -109,7 +139,7 @@ const updateRoadDirections = async () => {
       roadDuration.value = data.routes[0].duration;
 
       // Update popup if open
-      if (activePopup.value && activePopup.value.isOpen()) {
+      if (activePopup.value?.isOpen()) {
         const popupEl = activePopup.value.getElement();
         const distLabel = popupEl.querySelector(".road-dist-label");
         if (distLabel) {
@@ -123,7 +153,7 @@ const updateRoadDirections = async () => {
       }
     }
   } catch (err) {
-    console.error("Directions Error:", err);
+    // Silent catch for network/fetch errors to prevent console spam
   }
 };
 
@@ -387,15 +417,80 @@ const setupMapLayers = () => {
     });
   }
 
-  // 3. Shops Source with Clustering
-  if (!map.value.getSource("vibe-shops")) {
-    map.value.addSource("vibe-shops", {
+  // 3. Shops Source (Split Layers)
+
+  // A. Regular Shops (Clustered)
+  if (!map.value.getSource("vibe-shops-regular")) {
+    map.value.addSource("vibe-shops-regular", {
       type: "geojson",
       data: { type: "FeatureCollection", features: [] },
-      cluster: false, // ✅ Disable clustering as requested
+      cluster: true,
+      clusterMaxZoom: 14, // Stop clustering at zoom 14
+      clusterRadius: 50,
     });
 
-    // ❌ Cluster layers removed for "Lively" view
+    // Cluster Circles
+    map.value.addLayer({
+      id: "clusters",
+      type: "circle",
+      source: "vibe-shops-regular",
+      filter: ["has", "point_count"],
+      paint: {
+        "circle-color": [
+          "step",
+          ["get", "point_count"],
+          "#60a5fa", // Blue (< 10)
+          10,
+          "#a855f7", // Purple (< 30)
+          30,
+          "#ec4899", // Pink (> 30)
+        ],
+        "circle-radius": ["step", ["get", "point_count"], 20, 100, 30, 750, 40],
+        "circle-stroke-width": 2,
+        "circle-stroke-color": "#fff",
+        "circle-opacity": 0.8,
+      },
+    });
+
+    // Cluster Count Text
+    map.value.addLayer({
+      id: "cluster-count",
+      type: "symbol",
+      source: "vibe-shops-regular",
+      filter: ["has", "point_count"],
+      layout: {
+        "text-field": "{point_count_abbreviated}",
+        "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
+        "text-size": 12,
+      },
+      paint: {
+        "text-color": "#ffffff",
+      },
+    });
+
+    // Unclustered Point (Layer for interactions when zoomed in)
+    // Note: We don't render actual dots here because we use `updateMarkers` (HtmlMarker)
+    // But we need this layer to detect where "regular items" are for click logic if we wanted GL-based markers.
+    // However, our existing system uses DOM Markers.
+    // PROBLEM: Mapbox GL Clustering requires GL Layers to visualize clusters.
+    // DOM Markers *cannot* easily be clustered by Mapbox logic unless we manually query the cluster source.
+    // SOLUTION: We will keep DOM Markers for Zoom >= 14 (Individual) and handling updates.
+    // But for clusters (Zoom < 14), we use the GL layers above.
+    // We need to sync `updateMarkers` to ONLY show DOM markers that are NOT in a cluster. (? No, better: only show DOM markers when not clustered at all?)
+    // Actually, `updateMarkers` iterates `props.shops`.
+    // We need to modify `updateMarkers` to Check if map zoom < 14 and verify visibility?
+    // A simpler approach for "Hybrid":
+    // 1. Zoom < 14: Show Clusters (GL). Hide individual DOM markers for regular shops.
+    // 2. Zoom >= 14: Show individual DOM markers.
+  }
+
+  // B. Giant Shops (Unclustered / Always Visible)
+  if (!map.value.getSource("vibe-shops-giant")) {
+    map.value.addSource("vibe-shops-giant", {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: [] },
+      cluster: false,
+    });
   }
 };
 
@@ -415,41 +510,64 @@ const updateMapSources = () => {
     });
   }
 
-  // 2. Update shops source for clustering
-  const shopSource = map.value.getSource("vibe-shops");
-  if (shopSource && props.shops) {
-    shopSource.setData({
-      type: "FeatureCollection",
-      features: props.shops
-        .filter((shop) => {
-          const lng = Number(shop.lng);
-          const lat = Number(shop.lat);
-          return (
-            Number.isFinite(lng) &&
-            Number.isFinite(lat) &&
-            Math.abs(lng) <= 180 &&
-            Math.abs(lat) <= 90
-          );
-        })
-        .map((shop) => ({
-          type: "Feature",
-          geometry: {
-            type: "Point",
-            coordinates: [Number(shop.lng), Number(shop.lat)],
-          },
-          properties: {
-            id: shop.id,
-            name: shop.name,
-            category: shop.category,
-            status: shop.status,
-            has_coin: !shopStore.collectedCoins.has(shop.id),
-          },
-        })),
+  // 2. Shops Source - Split into Regular (Clustered) vs Giant/Promoted (Always Visible)
+  const regularSource = map.value.getSource("vibe-shops-regular");
+  const giantSource = map.value.getSource("vibe-shops-giant");
+
+  if (props.shops) {
+    const validShops = props.shops.filter((s) => {
+      const lng = Number(s.lng);
+      const lat = Number(s.lat);
+      return (
+        Number.isFinite(lng) &&
+        Number.isFinite(lat) &&
+        Math.abs(lng) <= 180 &&
+        Math.abs(lat) <= 90
+      );
     });
+
+    // Split Logic
+    const regularFeatures = [];
+    const giantFeatures = [];
+
+    validShops.forEach((shop) => {
+      const feature = {
+        type: "Feature",
+        geometry: {
+          type: "Point",
+          coordinates: [Number(shop.lng), Number(shop.lat)],
+        },
+        properties: {
+          id: shop.id,
+          name: shop.name,
+          category: shop.category,
+          status: shop.status,
+          is_giant: shop.is_giant_active,
+          has_coin: !shopStore.collectedCoins.has(shop.id),
+        },
+      };
+
+      if (shop.is_giant_active) {
+        giantFeatures.push(feature);
+      } else {
+        regularFeatures.push(feature);
+      }
+    });
+
+    if (regularSource)
+      regularSource.setData({
+        type: "FeatureCollection",
+        features: regularFeatures,
+      });
+    if (giantSource)
+      giantSource.setData({
+        type: "FeatureCollection",
+        features: giantFeatures,
+      });
   }
 };
-const COLLECT_DISTANCE_KM = 0.05; // 50 meters to collect
 
+const COLLECT_DISTANCE_KM = 0.05; // 50 meters to collect
 // Check if user is close enough to collect
 const checkCoinCollection = (shop) => {
   if (!props.userLocation || shopStore.collectedCoins.has(shop.id)) return;
@@ -472,8 +590,8 @@ const activeEvents = computed(() => {
   });
 });
 
-// ✅ Day/Night Cycle
-const currentHour = ref(new Date().getHours());
+// ✅ Legacy: Day/Night computed property removed or kept for overlay background logic.
+// We kept `useTimeTheme` for map style. The gradient overlay for map can still use `currentHour`.
 const dayNightStyle = computed(() => {
   const h = currentHour.value;
   if (h >= 5 && h < 7)
@@ -547,31 +665,80 @@ const ensureMapboxLoaded = async () => {
   return true;
 };
 
+// ✅ WebGL Support Detection
+const checkWebGLSupport = () => {
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (!gl) return false;
+    // Check for required extensions
+    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+    if (debugInfo) {
+      const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+      // Some software renderers may cause issues
+      if (renderer && renderer.toLowerCase().includes('swiftshader')) {
+        console.warn('⚠️ Software WebGL renderer detected, map may be slow');
+      }
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
+
+const webGLSupported = ref(true);
+
 // ✅ Initialize Map (async)
 const initializeMap = async () => {
   if (!mapContainer.value) return;
 
+  // Check WebGL support first
+  if (!checkWebGLSupport()) {
+    console.error('❌ WebGL not supported');
+    webGLSupported.value = false;
+    isMapReady.value = true; // Allow UI to render fallback
+    return;
+  }
+
   const ok = await ensureMapboxLoaded();
   if (!ok || !mapContainer.value) return;
 
-  map.value = new mapboxgl.Map({
-    container: mapContainer.value,
-    style: props.isDarkMode ? DARK_STYLE : LIGHT_STYLE,
-    center: center.value,
-    zoom: zoom.value,
-    maxBounds: [
-      [97.6, 18.0],
-      [100.3, 20.6],
-    ],
-    attributionControl: false,
-    antialias: false,
-  });
+  try {
+    map.value = new mapboxgl.Map({
+      container: mapContainer.value,
+      style: props.isDarkMode ? DARK_STYLE : LIGHT_STYLE,
+      center: center.value,
+      zoom: zoom.value,
+      // ✅ Expanded to cover all of Thailand (not just Chiang Mai)
+      maxBounds: [
+        [97.0, 5.5],   // Southwest: Myanmar border to Malaysia border
+        [106.0, 21.0], // Northeast: Laos/Cambodia to Northern Thailand
+      ],
+      attributionControl: false,
+      antialias: false,
+      failIfMajorPerformanceCaveat: false, // Allow software rendering
+      preserveDrawingBuffer: true,
+    });
+  } catch (err) {
+    console.error('❌ Map initialization failed:', err.message);
+    webGLSupported.value = false;
+    isMapReady.value = true;
+    return;
+  }
 
   // Navigation controls removed (user prefers cleaner map)
 
   // Enable smooth scrolling and pinch-zoom
   map.value.scrollZoom.setWheelZoomRate(1 / 300);
   map.value.dragRotate.disable();
+
+  // Handle map errors gracefully
+  map.value.on("error", (e) => {
+    console.error("🗺️ Map error:", e.error?.message || e);
+    if (e.error?.message?.includes("WebGL")) {
+      webGLSupported.value = false;
+    }
+  });
 
   map.value.on("load", () => {
     isMapReady.value = true;
@@ -583,6 +750,11 @@ const initializeMap = async () => {
     // ✅ Start Atmospheric Animations
     initFireflies();
     atmosphericAnimationRequest = requestAnimationFrame(animateAtmosphere);
+
+    // ✅ Fade In Map
+    setTimeout(() => {
+      mapLoaded.value = true;
+    }, 100);
   });
 
   // Sync maps state on movement
@@ -604,25 +776,24 @@ const initializeMap = async () => {
   });
 };
 
-// MVP Unicorn Popup - Real-time vibe, distance, compact buttons
+// MVP Unicorn Popup - Real-time vibe, distance, compact buttons (Reverted to Floating Bubble)
 const createPopupHTML = (item) => {
   const isLive = item.status === "LIVE";
   const bgClass = props.isDarkMode ? "bg-zinc-900/95" : "bg-white/95";
   const textClass = props.isDarkMode ? "text-white" : "text-gray-900";
   const hasCoins = !shopStore.collectedCoins.has(item.id);
 
-  // Real-time Vibe calculation based on hour and venue type
+  // Real-time Vibe calculation
   const currentHour = new Date().getHours();
+  // ... (Keep existing vibe logic logic is implicitly same as before refactor)
   const isNightVenue = ["Bar", "Club", "Live Music", "Nightlife"].includes(
     item.category,
   );
   const isCafe = item.category === "Cafe";
   const isRestaurant = item.category === "Restaurant";
-
   let vibeLevel = 3;
-  if (isLive) {
-    vibeLevel = 5;
-  } else if (isNightVenue) {
+  if (isLive) vibeLevel = 5;
+  else if (isNightVenue) {
     if (currentHour >= 21 || currentHour < 2) vibeLevel = 5;
     else if (currentHour >= 19) vibeLevel = 4;
     else if (currentHour >= 17) vibeLevel = 3;
@@ -651,18 +822,17 @@ const createPopupHTML = (item) => {
     )
     .join("");
 
-  // Crowd emoji based on vibe
   const crowdMap = {
-    5: tt("status.vibe_5", "คึกคัก"),
-    4: tt("status.vibe_4", "มาก"),
-    3: tt("status.vibe_3", "ปานกลาง"),
-    2: tt("status.vibe_2", "น้อย"),
-    1: tt("status.vibe_1", "เงียบ"),
+    5: "คึกคัก",
+    4: "มาก",
+    3: "ปานกลาง",
+    2: "น้อย",
+    1: "เงียบ",
   };
   const crowdEmoji = vibeLevel >= 4 ? "🔥" : vibeLevel >= 3 ? "👥" : "😌";
   const crowdText = crowdMap[vibeLevel] || "ปานกลาง";
 
-  // Distance (Managed by Road API or fallback)
+  // Distance
   let distanceHtml = "";
   if (roadDistance.value) {
     const distTxt =
@@ -679,7 +849,7 @@ const createPopupHTML = (item) => {
     distanceHtml = `<div class="road-dist-label absolute bottom-2 right-2 px-2 py-1 rounded-lg bg-black text-white text-[11px] font-black border border-white/30 shadow-xl">📍 ${fallbackTxt}</div>`;
   }
 
-  // 🚀 HIGH-VIBE DESCRIPTIONS (Human-written style for MVP)
+  // Descriptions
   const defaultDescs = {
     Cafe: tt(
       "categories.cafe_desc",
@@ -707,7 +877,7 @@ const createPopupHTML = (item) => {
     "✨ สถานที่ยอดนิยมที่คุณต้องมาสัมผัสด้วยตัวเองในยามค่ำคืนนี้";
   const shortDesc =
     description.length > 85
-      ? description.substring(0, 85) + "..."
+      ? `${description.substring(0, 85)}...`
       : description;
 
   const openHours = item.open_hours || item.Open || "";
@@ -715,7 +885,6 @@ const createPopupHTML = (item) => {
   return `
     <div class="vibe-popup ${bgClass} rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] border-2 border-white/20 overflow-hidden w-[280px] backdrop-blur-3xl" data-shop-id="${item.id}">
      <div class="relative w-full aspect-[9/16] max-h-[360px] overflow-hidden">
-
 
         <div class="absolute inset-0 bg-gradient-to-br from-purple-700 via-pink-600 to-red-600"></div>
         ${item.Image_URL1 ? `<img src="${item.Image_URL1}" class="absolute inset-0 w-full h-full object-cover" />` : ""}
@@ -770,10 +939,10 @@ const createPopupHTML = (item) => {
 
 // ✅ Close Active Popup
 const closeActivePopup = () => {
-  if (activePopup.value) {
+  if (activePopup.value && typeof activePopup.value.remove === "function") {
     activePopup.value.remove();
-    activePopup.value = null;
   }
+  activePopup.value = null;
 };
 
 // ✅ Show Popup for Item (Fixed button handling)
@@ -785,10 +954,9 @@ const showPopup = (item) => {
   const popup = new mapboxgl.Popup({
     closeButton: false,
     closeOnClick: false,
-    container: document.body, // ✅ Portal to body to overlap ANY UI
     className: "vibe-mapbox-popup",
-    maxWidth: "320px",
-    offset: [0, -60],
+    maxWidth: "280px",
+    offset: [0, -10], // Standard pin offset
     anchor: "bottom",
   })
     .setLngLat([item.lng, item.lat])
@@ -1020,171 +1188,159 @@ const MAX_VISIBLE_MARKERS = 120; // Increased to show more activity
 const updateMarkers = () => {
   if (!map.value || !isMapReady.value) return;
 
-  const currentMarkers = markersMap.value;
+  // Clear existing DOM markers
+  markersMap.value.forEach(({ marker }) => {
+    marker.remove();
+  });
+  markersMap.value.clear();
 
-  // ✅ Get current viewport bounds
-  const bounds = map.value.getBounds();
-  const currentZoom = map.value.getZoom();
+  if (!props.shops) return;
 
-  // ✅ Filter shops to only those in viewport + prioritize LIVE and highlighted
-  let visibleShops = (props.shops || []).filter((item) => {
+  props.shops.forEach((shop) => {
+    // Optimization: Only render DOM for Giant Pins
     if (
-      !item.lat ||
-      !item.lng ||
-      !Number.isFinite(item.lat) ||
-      !Number.isFinite(item.lng)
-    ) {
-      return false;
+      !shop.is_giant_active &&
+      Number(shop.id) !== Number(props.highlightedShopId)
+    )
+      return;
+
+    const lat = Number(shop.lat);
+    const lng = Number(shop.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+    const idStr = String(shop.id);
+    const isGiant = shop.is_giant_active;
+    const isSelected = Number(shop.id) === Number(props.highlightedShopId);
+
+    // Create DOM Element
+    const el = document.createElement("div");
+    el.className = `marker-container transition-all duration-500 will-change-transform ${
+      isGiant ? "z-[1000]" : "z-[50]"
+    } ${isSelected ? "z-[1100] scale-125" : ""}`;
+
+    if (isGiant) {
+      el.innerHTML = `
+            <div class="relative group cursor-pointer w-12 h-12">
+                <div class="absolute inset-0 bg-red-500 rounded-full blur-xl opacity-60 animate-pulse"></div>
+                <div class="relative w-full h-full rounded-2xl bg-gradient-to-br from-red-600 via-pink-600 to-purple-600 border-2 border-white shadow-2xl flex items-center justify-center transform group-hover:scale-110 transition-transform">
+                <span class="text-xl">🔥</span>
+                </div>
+                <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-black text-white text-[9px] font-black uppercase tracking-widest border border-white/20 whitespace-nowrap shadow-xl">
+                GIANT
+                </div>
+            </div>
+        `;
+    } else if (isSelected) {
+      el.innerHTML = `
+            <div class="relative group cursor-pointer">
+                <div class="w-10 h-10 rounded-full bg-blue-600 border-2 border-white shadow-lg flex items-center justify-center animate-bounce">
+                    <span class="text-lg">👇</span>
+                </div>
+            </div>
+            `;
     }
-    const id = Number(item.id);
-    const highlightedId =
-      props.highlightedShopId != null ? Number(props.highlightedShopId) : null;
 
-    // 1. Always include highlighted shop
-    if (id === highlightedId) return true;
+    const marker = new mapboxgl.Marker({
+      element: el,
+      anchor: "bottom",
+    })
+      .setLngLat([lng, lat])
+      .addTo(map.value);
 
-    // 2. Zoom threshold check: If extremely zoomed out, only show LIVE
-    // Pins start appearing from zoom 12 for a lively city feel
-    if (currentZoom < 12) {
-      if (item.status === "LIVE") return true;
-      return false;
-    }
-
-    // 3. Always include LIVE shops in viewport
-    if (item.status === "LIVE") return true;
-
-    // 4. Check if in viewport
-    return bounds.contains([item.lng, item.lat]);
-  });
-
-  // ✅ Limit markers to prevent WebGL overload
-  if (visibleShops.length > MAX_VISIBLE_MARKERS) {
-    // Sort: highlighted first, then LIVE, then by distance to center
-    const center = map.value.getCenter();
-    visibleShops.sort((a, b) => {
-      const aId = Number(a.id);
-      const bId = Number(b.id);
-      const highlightedId =
-        props.highlightedShopId != null
-          ? Number(props.highlightedShopId)
-          : null;
-
-      if (aId === highlightedId) return -1;
-      if (bId === highlightedId) return 1;
-      if (a.status === "LIVE" && b.status !== "LIVE") return -1;
-      if (a.status !== "LIVE" && b.status === "LIVE") return 1;
-      // Distance to viewport center
-      const distA = Math.hypot(a.lng - center.lng, a.lat - center.lat);
-      const distB = Math.hypot(b.lng - center.lng, b.lat - center.lat);
-      return distA - distB;
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      activePopup.value = shop;
+      if (isGiant) {
+        emit("open-building", shop);
+      } else {
+        emit("select-shop", shop);
+      }
     });
-    visibleShops = visibleShops.slice(0, MAX_VISIBLE_MARKERS);
+
+    markersMap.value.set(idStr, { marker, shop });
+  });
+};
+
+// ✅ Interaction for GL Layers (Regular Shops)
+const setupMapInteractions = () => {
+  if (!map.value) return;
+
+  // Click on Unclustered Point Logic (Regular Shops)
+  // We need to add a layer for unclustered points first!
+  if (!map.value.getLayer("unclustered-point")) {
+    map.value.addLayer({
+      id: "unclustered-point",
+      type: "circle",
+      source: "vibe-shops-regular",
+      filter: ["!", ["has", "point_count"]],
+      paint: {
+        "circle-color": "#3b82f6", // Blue
+        "circle-radius": 6,
+        "circle-stroke-width": 2,
+        "circle-stroke-color": "#fff",
+      },
+    });
+
+    // Add text label for name? Maybe too cluttered.
   }
 
-  const shopIds = new Set(visibleShops.map((s) => Number(s.id)));
+  // Click Event
+  map.value.on("click", "unclustered-point", (e) => {
+    const features = e.features;
+    if (!features.length) return;
 
-  // Remove markers not in current view (BUT NEVER remove the highlighted one!)
-  const highlightedId =
-    props.highlightedShopId != null ? Number(props.highlightedShopId) : null;
-  currentMarkers.forEach((marker, id) => {
-    const numId = Number(id);
-    // ✅ CRITICAL: Never delete the highlighted marker, even if temporarily not in props.shops
-    if (numId === highlightedId) return;
-    if (!shopIds.has(numId)) {
-      marker.remove();
-      currentMarkers.delete(id);
+    const feature = features[0];
+    // Geometry to LatLng
+    const coordinates = feature.geometry.coordinates.slice();
+    const props = feature.properties; // has id, name, etc.
+
+    // Fix logic for wrapped worlds
+    while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+      coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
     }
+
+    // Trigger Select
+    // Note: feature.properties values are serialised. ID might be number or string.
+    // We need to find the full shop object from props.shops usually,
+    // OR pass enough data in properties.
+    const fullShop = props.shops
+      ? props.shops.find((s) => String(s.id) === String(props.id))
+      : { ...props };
+
+    emit("select-shop", fullShop);
   });
 
-  // Add/update visible markers
-  visibleShops.forEach((item) => {
-    const itemId = Number(item.id);
-    const highlightedId =
-      props.highlightedShopId != null ? Number(props.highlightedShopId) : null;
-    const isHighlighted = itemId === highlightedId;
-    const isLive = item.status === "LIVE";
+  // Pointer Cursor
+  map.value.on("mouseenter", "unclustered-point", () => {
+    map.value.getCanvas().style.cursor = "pointer";
+  });
+  map.value.on("mouseleave", "unclustered-point", () => {
+    map.value.getCanvas().style.cursor = "";
+  });
 
-    let marker = currentMarkers.get(itemId);
-
-    // ✅ CRITICAL: Check if marker is actually attached to the map
-    // Markers can become detached if the map style changes or other issues occur
-    const isMarkerAttached =
-      marker &&
-      marker._map &&
-      marker.getElement()?.classList.contains("mapboxgl-marker");
-
-    if (marker && isMarkerAttached) {
-      // ✅ Update only if state changed (saves GPU/CPU)
-      const el = marker.getElement();
-      const wasHighlighted = el.dataset.highlighted === "true";
-      const wasLive = el.dataset.live === "true";
-
-      if (wasHighlighted !== isHighlighted || wasLive !== isLive) {
-        const newEl = createMarkerElement(item, isHighlighted, isLive);
-        el.innerHTML = newEl.innerHTML;
-        el.className = newEl.className;
-        el.dataset.highlighted = isHighlighted;
-        el.dataset.live = isLive;
-      }
-
-      // ✅ Update z-index even if element didn't change (for layering)
-      if (isHighlighted || isLive) {
-        el.style.zIndex = "200"; // Give priority
-      } else {
-        el.style.zIndex = "50";
-      }
-    } else {
-      // Remove detached marker if it exists (silently recreate)
-      if (marker) {
-        try {
-          marker.remove();
-        } catch (e) {
-          /* ignore */
-        }
-        currentMarkers.delete(itemId);
-      }
-      // Create new marker
-      const el = createMarkerElement(item, isHighlighted, isLive);
-      el.dataset.highlighted = isHighlighted;
-      el.dataset.live = isLive;
-
-      // ✅ Extra safety for map.value to prevent "appendChild of undefined" crash
-      // Mapbox needs the canvas container to be ready to append markers
-      if (!map.value || !map.value.getCanvasContainer) return;
-
-      marker = new mapboxgl.Marker({
-        element: el,
-        anchor: "bottom",
-      })
-        .setLngLat([item.lng, item.lat])
-        .addTo(map.value);
-
-      // ✅ Click handler
-      el.addEventListener("click", (e) => {
-        e.stopPropagation();
-        handleMarkerClick(item);
+  // Cluster Click -> Zoom
+  map.value.on("click", "clusters", (e) => {
+    const features = map.value.queryRenderedFeatures(e.point, {
+      layers: ["clusters"],
+    });
+    const clusterId = features[0].properties.cluster_id;
+    map.value
+      .getSource("vibe-shops-regular")
+      .getClusterExpansionZoom(clusterId, (err, zoom) => {
+        if (err) return;
+        map.value.easeTo({
+          center: features[0].geometry.coordinates,
+          zoom: zoom,
+        });
       });
-
-      // ✅ Set higher z-index for highlighted/live markers
-      if (isHighlighted || isLive) {
-        marker.getElement().style.zIndex = "250";
-      } else {
-        marker.getElement().style.zIndex = "50";
-      }
-
-      currentMarkers.set(itemId, marker);
-    }
   });
 
-  // ✅ IMPORTANT: Reassign to trigger state update on shallowRef
-  markersMap.value = new Map(currentMarkers);
-
-  // Check coin collection for all shops when user location changes
-  if (props.userLocation) {
-    visibleShops.forEach((shop) => {
-      checkCoinCollection(shop);
-    });
-  }
+  map.value.on("mouseenter", "clusters", () => {
+    map.value.getCanvas().style.cursor = "pointer";
+  });
+  map.value.on("mouseleave", "clusters", () => {
+    map.value.getCanvas().style.cursor = "";
+  });
 };
 
 // ✅ Update Giant Pin Markers for Events
@@ -1280,7 +1436,7 @@ const updateUserLocation = () => {
 };
 
 // ✅ Smart Focus Offset (visual center between top UI & bottom UI)
-const getSmartYOffset = (popupPx = 0) => {
+const getSmartYOffset = (_popupPx = 0) => {
   const top = Number(props.uiTopOffset || 64);
   const bottom =
     Number(props.uiBottomOffset || 0) + Number(props.legendHeight || 0);
@@ -1450,14 +1606,23 @@ defineExpose({
   focusLocation,
   centerOnUser,
   resize: () => map.value?.resize(),
-  flyTo: (coords, zoom) =>
-    map.value?.flyTo({
-      center: coords,
-      zoom,
-      essential: true,
-      speed: 0.8,
-      curve: 1.4,
-    }),
+  // ✅ Robust flyTo: handles (options) object OR (coords, zoom) legacy
+  flyTo: (arg1, arg2) => {
+    if (!map.value) return;
+    if (typeof arg1 === "object" && !Array.isArray(arg1)) {
+      // It's a Mapbox options object { center, zoom, ... }
+      map.value.flyTo(arg1);
+    } else {
+      // Legacy args: coords, zoom
+      map.value.flyTo({
+        center: arg1,
+        zoom: arg2,
+        essential: true,
+        speed: 0.8,
+        curve: 1.4,
+      });
+    }
+  },
 });
 </script>
 
@@ -1473,25 +1638,44 @@ defineExpose({
     <div
       ref="mapContainer"
       data-testid="map-canvas"
-      id="map"
-      class="w-full h-full min-h-[100dvh]"
+      :class="[
+        'w-full h-full absolute inset-0 transition-opacity duration-1000',
+        mapLoaded ? 'opacity-100' : 'opacity-0',
+      ]"
     ></div>
 
     <!-- Zeppelin removed for cleaner UI -->
 
-    <!-- ✅ Coin Counter Display (moved to bottom-right, above cards) -->
+    <!-- ✅ WebGL Not Supported Fallback -->
     <div
-      class="absolute bottom-[260px] right-4 z-[50] flex items-center gap-2 px-3 py-1.5 rounded-full backdrop-blur-xl border shadow-lg transition-all duration-500"
-      :class="
-        isDarkMode
-          ? 'bg-zinc-900/80 border-yellow-500/30 text-yellow-400'
-          : 'bg-white/90 border-yellow-400/50 text-yellow-600'
-      "
+      v-if="!webGLSupported"
+      class="absolute inset-0 z-[100] flex items-center justify-center bg-gradient-to-br from-zinc-900 to-black"
     >
-      <span class="text-lg">🪙</span>
-      <span class="text-sm font-bold font-mono">{{
-        shopStore.totalCoins
-      }}</span>
+      <div class="max-w-sm p-8 rounded-3xl bg-zinc-800/50 border border-white/10 text-center backdrop-blur-xl">
+        <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-orange-500/20 flex items-center justify-center text-4xl">
+          🗺️
+        </div>
+        <h2 class="text-xl font-black text-white mb-3">Map Not Available</h2>
+        <p class="text-sm text-zinc-400 mb-6 leading-relaxed">
+          Your browser doesn't support WebGL which is required to display the map.
+          Try enabling hardware acceleration in your browser settings or use a different browser.
+        </p>
+        <div class="space-y-3">
+          <button
+            @click="window.location.reload()"
+            class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all"
+          >
+            Reload Page
+          </button>
+          <a
+            href="https://get.webgl.org/"
+            target="_blank"
+            class="block w-full py-3 bg-white/10 text-white/80 font-bold rounded-xl hover:bg-white/20 transition-all"
+          >
+            Check WebGL Support
+          </a>
+        </div>
+      </div>
     </div>
 
     <!-- ✅ Entertainment Atmosphere Effects (simplified) -->
@@ -1577,6 +1761,26 @@ defineExpose({
 
 .vibe-mapbox-popup .mapboxgl-popup-content {
   overflow: visible;
+}
+
+.coin-badge {
+  position: absolute;
+  top: -10px;
+  right: -5px;
+  font-size: 14px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+  z-index: 300;
+  animation: bounce-slow 2s infinite ease-in-out;
+}
+
+@keyframes bounce-slow {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
 }
 
 .vibe-mapbox-popup {
@@ -2099,6 +2303,17 @@ defineExpose({
   }
   to {
     transform: translate(-50%, -50%) scale(1.3);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(100%) scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
     opacity: 1;
   }
 }

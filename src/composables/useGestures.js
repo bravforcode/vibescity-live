@@ -1,3 +1,4 @@
+/* <!-- src/components/feed/BottomFeed.vue --> */
 import { ref, onMounted, onUnmounted } from "vue";
 import { useHaptics } from "./useHaptics";
 

@@ -5,12 +5,12 @@ function Show-Menu {
     Write-Host "============================" -ForegroundColor Cyan
     Write-Host "   VibeCity Dev Console     " -ForegroundColor Yellow
     Write-Host "============================" -ForegroundColor Cyan
-    Write-Host "1. Run Dev Server (npm run dev)"
-    Write-Host "2. Run Unit Tests (npm run test:unit)"
+    Write-Host "1. Run Dev Server (bun run dev)"
+    Write-Host "2. Run Unit Tests (bun run test:unit)"
     Write-Host "3. Run E2E Tests (npx playwright test)"
-    Write-Host "4. Build Production (npm run build)"
-    Write-Host "5. Preview Build (npm run preview)"
-    Write-Host "6. Lint & Fix (npm run lint)"
+    Write-Host "4. Build Production (bun run build)"
+    Write-Host "5. Preview Build (bun run preview)"
+    Write-Host "6. Lint & Fix (bun run lint)"
     Write-Host "q. Quit"
     Write-Host "============================" -ForegroundColor Cyan
 }
@@ -25,7 +25,7 @@ do {
         "3" { Write-Host "Running E2E Tests..." -ForegroundColor Green; npx playwright test }
         "4" { Write-Host "Building Project..." -ForegroundColor Green; npm run build }
         "5" { Write-Host "Previewing Build..." -ForegroundColor Green; npm run preview }
-        "6" { Write-Host "Linting Code..." -ForegroundColor Green; npm run lint }
+        "6" { Write-Host "Linting Code..." -ForegroundColor Green; bun run lint }
         "q" { Write-Host "Exiting..." -ForegroundColor Gray }
         default { Write-Host "Invalid option, please try again." -ForegroundColor Red }
     }

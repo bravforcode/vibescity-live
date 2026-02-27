@@ -9,15 +9,18 @@
     "preview": "rsbuild preview",
     "check": "biome check --write src",
     "format": "biome format --write src",
-    "lint": "biome lint \"src/**/*.{js,jsx,ts,tsx,vue,json,mjs,cjs}\"",
-    "lint:fix": "biome lint --write \"src/**/*.{js,jsx,ts,tsx,vue,json,mjs,cjs}\"",
+    "lint": "biome lint src",
+    "lint:fix": "biome lint --write src",
     "build:roads:cm": "node scripts/build-chiangmai-roads.mjs",
     "build:roads:cm:lanes": "node scripts/road-lanes.mjs",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "test:unit:coverage": "vitest run --coverage",
-        "test:unit": "vitest",
-    "test:e2e": "playwright test"
+    "test:unit": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:smoke": "PW_GREP=@smoke playwright test",
+    "test:e2e:debug": "PW_SLOWMO=150 playwright test --debug"
   },
   "dependencies": {
     "@mapbox/mapbox-gl-geocoder": "^5.1.2",
@@ -33,6 +36,7 @@
     "aos": "^2.3.4",
     "axios": "^1.13.2",
     "csv-parser": "^3.2.0",
+    "dayjs": "^1.11.19",
     "dotenv": "^17.2.3",
     "lucide-vue-next": "^0.562.0",
     "mapbox-gl": "^3.18.0",
@@ -65,6 +69,7 @@
     "storybook-vue3-rsbuild": "^3.2.2",
     "tailwindcss": "^3.4.19",
     "vite": "^7.2.4",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "xml2js": "^0.6.2"
   }
 }

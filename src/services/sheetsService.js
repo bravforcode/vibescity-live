@@ -16,7 +16,7 @@ export const fetchShopData = async (sheetUrl) => {
 
 		// Only add cache buster for remote URLs
 		if (sheetUrl.startsWith("http")) {
-			const cacheBuster = `&t=${new Date().getTime()}`;
+			const cacheBuster = `&t=${Date.now()}`;
 			finalUrl = sheetUrl.includes("?")
 				? `${sheetUrl}${cacheBuster}`
 				: `${sheetUrl}?${cacheBuster}`;

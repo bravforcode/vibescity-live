@@ -78,7 +78,7 @@ const badges = [
     name: "VIP",
     icon: "⭐",
     description: "Unlock all other badges",
-    condition: (s) => false, // Special condition
+    condition: () => false, // Special condition
     tier: "platinum",
   },
 ];

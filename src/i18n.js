@@ -150,7 +150,8 @@ const messages = {
 };
 
 // ✅ Locale persistence (จำภาษาที่เลือกไว้)
-const DEFAULT_LOCALE = "th";
+// Default to English, Thai available in settings
+const DEFAULT_LOCALE = "en";
 const savedLocale = localStorage.getItem("locale");
 const locale = savedLocale || DEFAULT_LOCALE;
 
