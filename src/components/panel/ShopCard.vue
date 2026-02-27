@@ -1,18 +1,21 @@
 <script setup>
-import { useNotifications } from "@/composables/useNotifications";
-import { BarChart, Clock, Heart, MapPin, Share2 } from "lucide-vue-next";
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useSmartVideo } from "../../composables/useSmartVideo";
-import { useCoinStore } from "../../store/coinStore";
-import { openExternal } from "../../utils/browserUtils";
-import { isFlashActive } from "../../utils/shopUtils";
+import { getStatusColorClass, isFlashActive } from "../../utils/shopUtils";
+import {
+  MapPin,
+  Clock,
+  Heart,
+  Eye,
+  Navigation,
+  BarChart,
+  Share2,
+} from "lucide-vue-next";
 import VisitorCount from "../ui/VisitorCount.vue";
 import MerchantStats from "./MerchantStats.vue";
+import { useSmartVideo } from "../../composables/useSmartVideo";
 
-const coinStore = useCoinStore();
 const { videoRef } = useSmartVideo();
-const { notifySuccess } = useNotifications();
 
 const { t } = useI18n();
 
@@ -55,12 +58,12 @@ let lastTapTime = 0;
 const handleCardTap = (e) => {
   const now = Date.now();
   const timeSinceLastTap = now - lastTapTime;
-
+  
   if (timeSinceLastTap < 300) {
     // Double tap detected - toggle favorite
     e.stopPropagation();
     emit("toggle-favorite", props.shop.id);
-    coinStore.awardCoins(1); // Gamification
+    // Show heart animation would be nice here
   }
   lastTapTime = now;
 };
@@ -68,26 +71,26 @@ const handleCardTap = (e) => {
 // ✅ Share functionality with deep link
 const handleShare = async (e) => {
   e.stopPropagation();
-
-  const shopUrl = `${globalThis.location.origin}?shop=${props.shop.id}`;
+  
+  const shopUrl = `${window.location.origin}?shop=${props.shop.id}`;
   const shareData = {
     title: props.shop.name,
     text: `Check out ${props.shop.name} on VibeCity! 🎉`,
     url: shopUrl,
   };
-
+  
   try {
     if (navigator.share) {
       await navigator.share(shareData);
     } else {
       // Fallback: copy to clipboard
       await navigator.clipboard.writeText(shopUrl);
-      notifySuccess("Link copied to clipboard!");
+      alert('Link copied to clipboard!');
     }
     emit("share", props.shop);
-    coinStore.awardCoins(5); // Higher reward for sharing
   } catch (err) {
     // User cancelled or error
+    console.log('Share cancelled or failed');
   }
 };
 
@@ -95,23 +98,28 @@ const handleShare = async (e) => {
 const openGoogleMaps = (e) => {
   e.stopPropagation();
   const url = `https://www.google.com/maps/dir/?api=1&destination=${props.shop.lat},${props.shop.lng}`;
-  openExternal(url);
+  window.open(url, "_blank");
 };
 
-// Check if favorited - normalize types for comparison
+// Status display
+const statusLabel = computed(() => {
+  const s = props.shop.status || "OFF";
+  return t(`status.${s.toLowerCase()}`) || s;
+});
+
+// Check if favorited
 const isFavorited = computed(() => {
-  const shopId =
-    props.shop?.id === null || props.shop?.id === undefined
-      ? ""
-      : String(props.shop.id).trim();
-  if (!shopId) return false;
-  return props.favorites.some((fav) => String(fav).trim() === shopId);
+  return props.favorites.includes(Number(props.shop.id));
 });
 
 // Helper to optimize Supabase/remote images
 const getOptimizedUrl = (url, width) => {
   if (!url) return "";
+  // Check if it's already a Supabase Storage URL or similar that supports transformation
+  // For MVP, if it contains 'supabase.co', append params.
+  // Otherwise, return original.
   if (url.includes("supabase.co")) {
+    // Check if already has params
     const separator = url.includes("?") ? "&" : "?";
     return `${url}${separator}width=${width}&format=webp&quality=80`;
   }
@@ -136,6 +144,7 @@ const handleMouseEnter = () => {
     ]"
     @click="emit('click', shop)"
     @touchend="handleCardTap"
+    @dblclick="emit('toggle-favorite', shop.id)"
     @mouseenter="handleMouseEnter"
   >
     <!-- Image/Video Section - FULL CARD COVERAGE -->
@@ -149,13 +158,13 @@ const handleMouseEnter = () => {
         muted
         loop
         playsinline
+        preload="none"
         class="smart-video absolute inset-0 w-full h-full object-cover"
       />
       <!-- Fallback Image if no video (or while loading handled by poster) -->
       <img
         v-else-if="shop.Image_URL1"
         :src="getOptimizedUrl(shop.Image_URL1, 600)"
-        :alt="shop.name || shop.title || 'Shop thumbnail'"
         class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
         loading="lazy"
       />
@@ -169,213 +178,180 @@ const handleMouseEnter = () => {
         class="absolute inset-0 pointer-events-none"
         style="
           background: linear-gradient(
-            to bottom,
-            rgba(0, 0, 0, 0) 0%,
-            rgba(0, 0, 0, 0.2) 40%,
-            rgba(0, 0, 0, 0.9) 100%
+            to top,
+            rgba(0, 0, 0, 0.9) 10%,
+            rgba(0, 0, 0, 0.4) 50%,
+            transparent 100%
           );
         "
       ></div>
+    </div>
 
-      <!-- Content Overlay -->
-      <div class="absolute inset-0 p-3 flex flex-col justify-between z-10">
-        <!-- Top Left: Badges -->
-        <div class="flex flex-col gap-1.5">
-          <!-- LIVE Badge -->
-          <div
-            v-if="shop.status === 'LIVE' || shop.Status === 'LIVE'"
-            class="relative px-2.5 py-1.5 rounded-xl bg-red-600/90 backdrop-blur-md text-white text-[10px] font-black border border-red-500/50 shadow-lg"
-          >
-            <span class="flex items-center gap-1.5">
-              <span
-                class="relative flex w-1.5 h-1.5 rounded-full bg-white shadow-sm"
-              >
-                <span
-                  class="absolute inline-flex h-full w-full rounded-full bg-white opacity-75 animate-ping"
-                ></span>
-              </span>
-              LIVE
-            </span>
-          </div>
-
-          <!-- Giant Pin Badge (Building) -->
-          <div
-            v-if="shop.is_giant_active || shop.isGiantPin"
-            class="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white text-[10px] font-black border border-amber-400/50 shadow-lg flex items-center gap-1.5 animate-pulse"
-          >
-            <span>🏢</span> GIANT PIN
-          </div>
-
-          <!-- Flash/Golden Badges -->
-          <div
-            v-else-if="isFlashActive(shop)"
-            class="px-2.5 py-1.5 rounded-xl text-white text-[10px] font-black shadow-lg border border-orange-400/60 bg-gradient-to-r from-red-500 to-orange-500"
-          >
-            🔥 FLASH
-          </div>
-          <div
-            v-else-if="shop.isGolden || shop.isPromoted"
-            class="px-2.5 py-1.5 rounded-xl text-black text-[10px] font-black shadow-lg border border-yellow-300/60 bg-gradient-to-br from-yellow-300 to-yellow-500"
-          >
-            ✨ GOLDEN
-          </div>
-        </div>
-
-        <!-- Distance Badge -->
+    <!-- Top Badges Row -->
+    <div
+      class="absolute top-3 left-3 right-3 flex items-start justify-between gap-2 z-10"
+    >
+      <!-- Left Badges Stack -->
+      <div class="flex flex-col gap-1.5">
+        <!-- LIVE Badge -->
         <div
-          class="px-2.5 py-1.5 rounded-xl bg-black/40 backdrop-blur-xl border border-white/20 shadow-lg self-start"
+          v-if="shop.status === 'LIVE' || shop.Status === 'LIVE'"
+          class="relative px-2.5 py-1.5 rounded-xl bg-red-600/90 backdrop-blur-md text-white text-[10px] font-black border border-red-500/50 shadow-lg"
         >
-          <span
-            class="text-[10px] font-black text-blue-300 flex items-center gap-1"
-          >
-            <MapPin class="w-3 h-3" stroke-width="2.5" />
-            <template
-              v-if="shop.distance != null && typeof shop.distance === 'number'"
+          <span class="flex items-center gap-1.5">
+            <span
+              class="relative flex w-1.5 h-1.5 rounded-full bg-white shadow-sm"
             >
-              {{ shop.distance.toFixed(1) }}km
-            </template>
-            <template v-else>
-              {{ t("shop.nearby") }}
-            </template>
+              <span
+                class="absolute inline-flex h-full w-full rounded-full bg-white opacity-75 animate-ping"
+              ></span>
+            </span>
+            LIVE
           </span>
         </div>
+
+        <!-- Giant Pin Badge (Building) -->
+        <div
+          v-if="shop.is_giant_active || shop.isGiantPin"
+          class="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white text-[10px] font-black border border-amber-400/50 shadow-lg flex items-center gap-1.5 animate-pulse"
+        >
+          <span>🏢</span> GIANT PIN
+        </div>
+
+        <!-- Flash/Golden Badges -->
+        <div
+          v-else-if="isFlashActive(shop)"
+          class="px-2.5 py-1.5 rounded-xl text-white text-[10px] font-black shadow-lg border border-orange-400/60 bg-gradient-to-r from-red-500 to-orange-500"
+        >
+          🔥 FLASH
+        </div>
+        <div
+          v-else-if="shop.isGolden || shop.isPromoted"
+          class="px-2.5 py-1.5 rounded-xl text-black text-[10px] font-black shadow-lg border border-yellow-300/60 bg-gradient-to-br from-yellow-300 to-yellow-500"
+        >
+          ✨ GOLDEN
+        </div>
       </div>
 
-      <!-- Right Top: Action Buttons (Absolute) -->
-      <div class="absolute top-12 right-3 flex flex-col gap-2 z-20">
-        <!-- Favorite Button -->
-        <button
-          @click.stop="
-            () => {
-              emit('toggle-favorite', shop.id);
-              coinStore.awardCoins(1);
-            }
-          "
-          class="w-9 h-9 flex items-center justify-center rounded-full backdrop-blur-md border transition-all active:scale-90 shadow-xl"
-          :class="[
-            isFavorited
-              ? 'bg-pink-500/80 border-pink-400 text-white'
-              : 'bg-black/30 border-white/20 text-white/70 hover:bg-black/50',
-          ]"
-        >
-          <Heart
-            class="w-4 h-4"
-            :fill="isFavorited ? 'currentColor' : 'none'"
-            stroke-width="2.5"
-          />
-        </button>
-
-        <!-- Share Button -->
-        <button
-          @click.stop="handleShare"
-          class="w-9 h-9 flex items-center justify-center rounded-full bg-black/30 backdrop-blur-md border border-white/20 text-white/70 hover:bg-black/50 transition-all active:scale-90 shadow-xl"
-        >
-          <Share2 class="w-4 h-4" stroke-width="2.5" />
-        </button>
-      </div>
-
-      <!-- Content Section (Overlaid at Bottom) -->
+      <!-- Distance Badge -->
       <div
-        class="absolute bottom-0 left-0 right-0 p-4 pb-2 z-10 flex flex-col justify-end h-full pointer-events-none"
+        v-if="shop.distance !== undefined"
+        class="px-2.5 py-1.5 rounded-xl bg-black/40 backdrop-blur-xl border border-white/20 shadow-lg"
       >
-        <div class="pointer-events-auto">
-          <!-- Stats Mode Toggle (Merchant Only) -->
-          <div v-if="showStats" class="mb-2">
-            <MerchantStats :shopId="shop.id" :isDarkMode="isDarkMode" />
-            <button
-              @click.stop="showStats = false"
-              class="mt-2 w-full py-2 bg-black/40 text-white text-[10px] rounded-lg border border-white/10 hover:bg-black/60"
+        <span
+          class="text-[10px] font-black text-blue-300 flex items-center gap-1"
+        >
+          <MapPin class="w-3 h-3" stroke-width="2.5" />
+          {{ shop.distance.toFixed(1) }}km
+        </span>
+      </div>
+    </div>
+
+    <!-- Right Top: Action Buttons (Absolute) -->
+    <div class="absolute top-12 right-3 flex flex-col gap-2 z-20">
+      <!-- Favorite Button -->
+      <button
+        @click.stop="emit('toggle-favorite', shop.id)"
+        class="w-9 h-9 flex items-center justify-center rounded-full backdrop-blur-md border transition-all active:scale-90 shadow-xl"
+        :class="[
+          isFavorited
+            ? 'bg-pink-500/80 border-pink-400 text-white'
+            : 'bg-black/30 border-white/20 text-white/70 hover:bg-black/50',
+        ]"
+      >
+        <Heart
+          class="w-4 h-4"
+          :fill="isFavorited ? 'currentColor' : 'none'"
+          stroke-width="2.5"
+        />
+      </button>
+      
+      <!-- Share Button -->
+      <button
+        @click.stop="handleShare"
+        class="w-9 h-9 flex items-center justify-center rounded-full bg-black/30 backdrop-blur-md border border-white/20 text-white/70 hover:bg-black/50 transition-all active:scale-90 shadow-xl"
+      >
+        <Share2 class="w-4 h-4" stroke-width="2.5" />
+      </button>
+    </div>
+
+    <!-- Content Section (Overlaid at Bottom) -->
+    <div
+      class="absolute bottom-0 left-0 right-0 p-4 pb-2 z-10 flex flex-col justify-end h-full pointer-events-none"
+    >
+      <div class="pointer-events-auto">
+        <!-- Stats Mode Toggle (Merchant Only) -->
+        <div v-if="showStats" class="mb-2">
+          <MerchantStats :shopId="shop.id" :isDarkMode="isDarkMode" />
+          <button
+            @click.stop="showStats = false"
+            class="mt-2 w-full py-2 bg-black/40 text-white text-[10px] rounded-lg border border-white/10 hover:bg-black/60"
+          >
+            Back to Details
+          </button>
+        </div>
+
+        <div v-else>
+          <!-- Header -->
+          <div class="flex items-start justify-between">
+            <h3
+              class="text-xl font-black text-white leading-none mb-1 drop-shadow-xl tracking-tighter font-sans"
             >
-              Back to Details
+              {{ shop.name }}
+            </h3>
+            <!-- Chart Toggle Button -->
+            <button
+              @click.stop="showStats = true"
+              class="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white/80 border border-white/10 backdrop-blur-md"
+              title="View Stats"
+            >
+              <BarChart class="w-4 h-4" />
             </button>
           </div>
 
-          <div v-else>
-            <!-- Header -->
-            <div class="flex items-start justify-between">
-              <h3
-                class="text-xl font-black text-white leading-none mb-1 drop-shadow-xl tracking-tighter font-sans line-clamp-1"
-              >
-                {{ shop.name }}
-              </h3>
-              <!-- Chart Toggle Button -->
-              <button
-                @click.stop="showStats = true"
-                class="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white/80 border border-white/10 backdrop-blur-md"
-                title="View Stats"
-              >
-                <BarChart class="w-4 h-4" />
-              </button>
-            </div>
-
-            <!-- Sub-info -->
-            <div
-              class="flex items-center gap-3 mb-2 text-white/90 text-[10px] font-bold uppercase tracking-wider"
+          <!-- Sub-info -->
+          <div
+            class="flex items-center gap-3 mb-2 text-white/90 text-[10px] font-bold uppercase tracking-wider"
+          >
+            <span
+              class="px-1.5 py-0.5 rounded-md bg-white/20 backdrop-blur-sm border border-white/10"
+              >{{ shop.category || "Shop" }}</span
             >
-              <span
-                class="px-1.5 py-0.5 rounded-md bg-white/20 backdrop-blur-sm border border-white/10"
-                >{{ shop.category || "Shop" }}</span
-              >
-              <span
-                v-if="shop.rating"
-                class="px-1.5 py-0.5 rounded-md bg-yellow-500/30 backdrop-blur-sm border border-yellow-400/30 flex items-center gap-0.5"
-              >
-                ⭐ {{ shop.rating.toFixed(1) }}
-              </span>
-              <span
-                v-else
-                class="px-1.5 py-0.5 rounded-md bg-purple-500/30 backdrop-blur-sm border border-purple-400/30"
-              >
-                {{ t("shop.new") }}
-              </span>
-              <span class="flex items-center gap-1"
-                ><Clock class="w-2.5 h-2.5" /> {{ shop.openTime || "--" }} -
-                {{ shop.closeTime || "--" }}</span
-              >
-            </div>
-
-            <!-- Visitor Count -->
-            <div class="mb-2 origin-left scale-90">
-              <VisitorCount :shopId="shop.id" :isDarkMode="true" />
-            </div>
-
-            <!-- Promotion Info -->
-            <div
-              v-if="shop.promotionInfo"
-              class="mb-2 px-2 py-1 rounded-lg bg-gradient-to-r from-orange-500/20 to-red-500/20 border border-orange-400/30"
+            <span class="flex items-center gap-1"
+              ><Clock class="w-2.5 h-2.5" /> {{ shop.openTime || "--" }} -
+              {{ shop.closeTime || "--" }}</span
             >
-              <span
-                class="text-[9px] font-black text-orange-300 uppercase tracking-wide"
-              >
-                🔥 {{ shop.promotionInfo }}
-              </span>
-            </div>
+          </div>
 
-            <!-- Action Buttons -->
-            <div class="grid grid-cols-2 gap-2 mt-1">
+          <!-- Visitor Count -->
+          <div class="mb-2 origin-left scale-90">
+            <VisitorCount :shopId="shop.id" :isDarkMode="true" />
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="grid grid-cols-2 gap-2 mt-1">
+            <button
+              v-if="useRideButton"
+              @click.stop="emit('open-ride', shop)"
+              class="col-span-2 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white text-[10px] font-black shadow-lg border border-blue-400/30 flex items-center justify-center gap-2 active:scale-95 transition-all"
+            >
+              🚗 เรียกรถ
+            </button>
+
+            <template v-else>
               <button
-                v-if="useRideButton"
-                @click.stop="emit('open-ride', shop)"
-                class="col-span-2 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white text-[10px] font-black shadow-lg border border-blue-400/30 flex items-center justify-center gap-2 active:scale-95 transition-all"
+                @click.stop="emit('open-detail', shop)"
+                class="py-2.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-white text-[10px] font-bold hover:bg-white/20 transition-all"
               >
-                {{ t("shop.call_ride") }}
+                รายละเอียด
               </button>
-
-              <template v-else>
-                <button
-                  @click.stop="emit('open-detail', shop)"
-                  class="py-2.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-white text-[10px] font-bold hover:bg-white/20 transition-all"
-                >
-                  {{ t("shop.details") }}
-                </button>
-                <button
-                  @click.stop="openGoogleMaps"
-                  class="py-2.5 rounded-xl bg-green-500/20 backdrop-blur-md border border-green-500/30 text-green-300 text-[10px] font-bold hover:bg-green-500/30 transition-all"
-                >
-                  {{ t("shop.navigate") }}
-                </button>
-              </template>
-            </div>
+              <button
+                @click.stop="openGoogleMaps"
+                class="py-2.5 rounded-xl bg-green-500/20 backdrop-blur-md border border-green-500/30 text-green-300 text-[10px] font-bold hover:bg-green-500/30 transition-all"
+              >
+                นำทาง
+              </button>
+            </template>
           </div>
         </div>
       </div>
@@ -399,5 +375,9 @@ const handleMouseEnter = () => {
   line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.shop-card-panel {
+  backdrop-filter: blur(10px);
 }
 </style>

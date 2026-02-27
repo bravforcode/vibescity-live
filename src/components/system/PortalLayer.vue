@@ -1,4 +1,4 @@
-<!-- src/components/system/PortalLayer.vue --> 
+<!-- src/components/feed/BottomFeed.vue --> 
 
 <script setup></script>
 

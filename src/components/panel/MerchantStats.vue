@@ -1,37 +1,34 @@
 <script setup>
-import { BarChart, Eye, Navigation, Play, TrendingUp } from "lucide-vue-next";
+import { BarChart, Eye, Play, Navigation, TrendingUp } from "lucide-vue-next";
 import { computed } from "vue";
 
 const props = defineProps({
-	shopId: {
-		type: [Number, String],
-		required: true,
-	},
-	isDarkMode: {
-		type: Boolean,
-		default: true,
-	},
+  shopId: {
+    type: [Number, String],
+    required: true,
+  },
+  isDarkMode: {
+    type: Boolean,
+    default: true,
+  },
 });
 
 // Mock Data (In production, fetch from Supabase 'venues' table)
 const stats = computed(() => ({
-	impressions: 1240, // 👁️
-	videoPlays: 856, // ▶️
-	actions: 142, // 🚀 (Navigate/Ride)
-	growth: 12.5, // +12.5% this week
+  impressions: 1240, // 👁️
+  videoPlays: 856, // ▶️
+  actions: 142, // 🚀 (Navigate/Ride)
+  growth: 12.5, // +12.5% this week
 }));
 
-// ✅ Make maxVal reactive so it recalculates when stats change
-const maxVal = computed(
-	() =>
-		Math.max(
-			stats.value.impressions,
-			stats.value.videoPlays,
-			stats.value.actions,
-		) * 1.2,
-);
+const maxVal =
+  Math.max(
+    stats.value.impressions,
+    stats.value.videoPlays,
+    stats.value.actions,
+  ) * 1.2;
 
-const getBarHeight = (val) => `${(val / maxVal.value) * 100}%`;
+const getBarHeight = (val) => `${(val / maxVal) * 100}%`;
 </script>
 
 <template>
@@ -64,8 +61,7 @@ const getBarHeight = (val) => `${(val / maxVal.value) * 100}%`;
       <!-- Bar 1: Impressions -->
       <div class="flex flex-col items-center gap-2 w-1/3 group">
         <div
-          class="relative w-full rounded-t-lg h-full flex items-end overflow-hidden"
-          :class="isDarkMode ? 'bg-zinc-800/50' : 'bg-gray-200/50'"
+          class="relative w-full bg-zinc-800/50 rounded-t-lg h-full flex items-end overflow-hidden"
         >
           <div
             class="w-full bg-blue-500/80 group-hover:bg-blue-400 transition-all duration-500 ease-out"
@@ -82,8 +78,7 @@ const getBarHeight = (val) => `${(val / maxVal.value) * 100}%`;
       <!-- Bar 2: Video Plays -->
       <div class="flex flex-col items-center gap-2 w-1/3 group">
         <div
-          class="relative w-full rounded-t-lg h-full flex items-end overflow-hidden"
-          :class="isDarkMode ? 'bg-zinc-800/50' : 'bg-gray-200/50'"
+          class="relative w-full bg-zinc-800/50 rounded-t-lg h-full flex items-end overflow-hidden"
         >
           <div
             class="w-full bg-purple-500/80 group-hover:bg-purple-400 transition-all duration-500 ease-out delay-75"
@@ -100,8 +95,7 @@ const getBarHeight = (val) => `${(val / maxVal.value) * 100}%`;
       <!-- Bar 3: Actions -->
       <div class="flex flex-col items-center gap-2 w-1/3 group">
         <div
-          class="relative w-full rounded-t-lg h-full flex items-end overflow-hidden"
-          :class="isDarkMode ? 'bg-zinc-800/50' : 'bg-gray-200/50'"
+          class="relative w-full bg-zinc-800/50 rounded-t-lg h-full flex items-end overflow-hidden"
         >
           <div
             class="w-full bg-green-500/80 group-hover:bg-green-400 transition-all duration-500 ease-out delay-150"
@@ -118,12 +112,7 @@ const getBarHeight = (val) => `${(val / maxVal.value) * 100}%`;
 
     <!-- CTA -->
     <button
-      :class="[
-        'w-full py-2 rounded-lg text-[10px] font-semibold border transition-all text-center',
-        isDarkMode
-          ? 'bg-zinc-800 hover:bg-zinc-700 text-white/50 border-white/5'
-          : 'bg-gray-100 hover:bg-gray-200 text-gray-500 border-gray-200'
-      ]"
+      class="w-full py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white/50 text-[10px] font-semibold border border-white/5 transition-all text-center"
     >
       Upgrade to Pro for detailed analytics
     </button>

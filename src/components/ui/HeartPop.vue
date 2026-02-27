@@ -1,10 +1,10 @@
 <script setup>
-import { Heart } from "lucide-vue-next";
 import { onMounted } from "vue";
+import { Heart } from "lucide-vue-next";
 
 const props = defineProps({
-	x: { type: Number, required: true },
-	y: { type: Number, required: true },
+  x: { type: Number, required: true },
+  y: { type: Number, required: true },
 });
 
 // Optional: clean up self? Usually parent handles list splicing.

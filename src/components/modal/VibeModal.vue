@@ -1,537 +1,355 @@
 <script setup>
 import { useMotion } from "@vueuse/motion";
 import {
-	computed,
-	defineAsyncComponent,
-	nextTick,
-	onMounted,
-	onUnmounted,
-	ref,
-	watchEffect,
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  ref,
+  watchEffect,
 } from "vue";
 import { useHaptics } from "../../composables/useHaptics";
+const { selectFeedback, successFeedback, impactFeedback } = useHaptics();
 import { Z } from "../../constants/zIndex";
 import { getMediaDetails } from "../../utils/linkHelper";
 
-// ==========================================
-// ✅ LAZY LOADED COMPONENTS
-// ==========================================
-const VisitorCount = defineAsyncComponent({
-	loader: () => import("../ui/VisitorCount.vue"),
-	delay: 200,
-	timeout: 10000,
-});
+// ✅ Lazy Load Components
+const VisitorCount = defineAsyncComponent(
+  () => import("../ui/VisitorCount.vue"),
+);
+const ReviewSystem = defineAsyncComponent(
+  () => import("../ui/ReviewSystem.vue"),
+);
 
-const ReviewSystem = defineAsyncComponent({
-	loader: () => import("../ui/ReviewSystem.vue"),
-	delay: 200,
-	timeout: 10000,
-});
-
-// ==========================================
-// ✅ IMPORTS
-// ==========================================
 import {
-	Car,
-	ChevronLeft,
-	ChevronRight,
-	Clock,
-	Facebook,
-	Heart,
-	Instagram,
-	MapPin,
-	Navigation,
-	Share2,
-	Sparkles,
-	Users,
-	X,
+  Car,
+  Facebook,
+  Heart,
+  Instagram,
+  Navigation,
+  Share2,
+  X,
+  MapPin,
+  Clock,
+  Users,
+  Sparkles,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
+import { useShopStore } from "../../store/shopStore";
 import {
-	openBoltApp,
-	openGrabApp,
-	openLinemanApp,
-} from "../../services/DeepLinkService";
-import {
-	copyToClipboard,
-	isMobileDevice,
-	openGoogleMapsDir,
-	shareLocation,
+  copyToClipboard,
+  isMobileDevice,
+  openGoogleMapsDir,
+  shareLocation,
 } from "../../utils/browserUtils";
+import {
+  openBoltApp,
+  openGrabApp,
+  openLinemanApp,
+} from "../../services/DeepLinkService";
 import { getStatusColorClass } from "../../utils/shopUtils";
 
-// ==========================================
-// ✅ CONSTANTS
-// ==========================================
-const FALLBACK_IMAGE =
-	"https://images.unsplash.com/photo-1534531173927-aeb928d54385?w=800&q=80";
-const DOUBLE_TAP_DELAY = 300;
-const MAX_FLASH_WINDOW = 1200000; // 20 minutes
-const DISMISS_THRESHOLD = {
-	DISTANCE: 150,
-	VELOCITY: 0.5,
-	QUICK_FLICK: 60,
-};
-
-// ==========================================
-// ✅ COMPOSABLES & PROPS
-// ==========================================
 const { t } = useI18n();
-const { selectFeedback, successFeedback, impactFeedback } = useHaptics();
 
 const props = defineProps({
-	shop: {
-		type: Object,
-		required: true,
-		validator: (shop) => shop && typeof shop === "object" && shop.id,
-	},
-	initialIndex: {
-		type: Number,
-		default: 0,
-	},
-	userCount: {
-		type: Number,
-		default: null,
-	},
+  shop: {
+    type: Object,
+    required: true,
+  },
+  initialIndex: {
+    type: Number,
+    default: 0,
+  },
 });
+
+const FALLBACK_IMAGE =
+  "https://images.unsplash.com/photo-1534531173927-aeb928d54385?w=800&q=80";
 
 const emit = defineEmits(["close", "toggle-favorite"]);
 
+// ✅ Smooth Exit Logic
+const handleClose = async () => {
+  impactFeedback("medium");
+
+  // Trigger animations
+  apply("leave");
+
+  // Wait for animation (350ms duration)
+  setTimeout(() => {
+    emit("close");
+  }, 300);
+};
+
 // ==========================================
-// ✅ STATE MANAGEMENT
+// ✅ iOS-STYLE MOTION SYSTEM
 // ==========================================
 
-// UI State
 const modalCard = ref(null);
-const scrollContentRef = ref(null);
-const imageCarouselRef = ref(null);
-const videoPlayer = ref(null);
+const { apply } = useMotion(modalCard, {
+  initial: {
+    y: "100%",
+    opacity: 0,
+    scale: 0.95,
+  },
+  enter: {
+    y: 0,
+    opacity: 1,
+    scale: 1,
+    transition: {
+      type: "spring",
+      stiffness: 260,
+      damping: 30,
+      mass: 0.8,
+    },
+  },
+  leave: {
+    y: "100%",
+    opacity: 0,
+    scale: 0.95,
+    transition: {
+      duration: 350,
+      ease: [0.25, 0.1, 0.25, 1], // iOS default easing
+    },
+  },
+});
 
-// Animation State
+// ==========================================
+// ✅ ENHANCED SWIPE GESTURE SYSTEM (S-TIER PHYSICS)
+// ==========================================
+
+const touchStart = ref({ y: 0, t: 0 });
 const isDragging = ref(false);
 const dragProgress = ref(0);
-const showHeartAnim = ref(false);
-const touchStart = ref({ y: 0, t: 0 });
+const scrollContentRef = ref(null);
 const initialScrollTop = ref(0);
 
-// Gallery State
-const currentImageIndex = ref(0);
-const lastHapticIndex = ref(-1); // For dots snap haptics
+const handleTouchStart = (e) => {
+  // Capture scroll position at start of touch
+  if (scrollContentRef.value) {
+    initialScrollTop.value = scrollContentRef.value.scrollTop;
+  }
 
-// Ride App State
+  touchStart.value = { y: e.touches[0].clientY, t: Date.now() };
+  isDragging.value = true;
+  // Don't trigger haptics immediately on touch start to prevent noise
+};
+
+const handleTouchMove = (e) => {
+  if (!isDragging.value) return;
+
+  const currentY = e.touches[0].clientY;
+  const deltaY = currentY - touchStart.value.y;
+
+  // ⛔️ BLOCKER 1: If we started scrolled down, NEVER drag
+  if (initialScrollTop.value > 0) return;
+
+  // ⛔️ BLOCKER 2: If we are currently scrolling content, NEVER drag
+  if (scrollContentRef.value && scrollContentRef.value.scrollTop > 0) return;
+
+  // ⛔️ BLOCKER 3: If dragging UP (scrolling content), allow native scroll
+  if (deltaY < 0) return;
+
+  // ✅ ACTIVE DRAG (At top, pulling down)
+  if (e.cancelable && deltaY > 0) {
+    e.preventDefault(); // Stop native pull-to-refresh or rubberband
+
+    // Logarithmic Resistance (iOS feel)
+    // Formula: y = limit * log(1 + x / limit)
+    // This gives a heavy, satisfying feel that gets harder the further you pull
+    const limit = 200;
+    const resistance = limit * Math.log10(1 + deltaY / (limit * 0.5)) * 2.5;
+
+    dragProgress.value = Math.min(deltaY / 600, 1);
+
+    apply({
+      y: resistance,
+      scale: 1 - deltaY / 3000, // Very subtle scale
+      opacity: 1, // Keep full opacity until release/threshold
+    });
+  }
+};
+
+const handleTouchEnd = (e) => {
+  if (!isDragging.value) return;
+  isDragging.value = false;
+
+  const currentY = e.changedTouches[0].clientY;
+  const deltaY = currentY - touchStart.value.y;
+  const time = Date.now() - touchStart.value.t;
+  const velocity = deltaY / time; // px/ms
+
+  // Only consider for dismissal if we were correctly in drag mode
+  // (i.e., we have some positive translation)
+  // We check deltaY > 0 to ensure we only close on "Pull Down"
+
+  const isScrolledToTop =
+    !scrollContentRef.value || scrollContentRef.value.scrollTop <= 0;
+
+  if (isScrolledToTop && deltaY > 0) {
+    // Dismiss conditions:
+    // 1. Fast flick (> 0.5px/ms)
+    // 2. Long drag (> 100px)
+    if ((deltaY > 60 && velocity > 0.5) || deltaY > 150) {
+      impactFeedback("medium");
+      emit("close");
+      return; // Exit, don't snap back
+    }
+  }
+
+  // Snap back (Reset)
+  if (deltaY > 0) {
+    apply("enter");
+  }
+
+  dragProgress.value = 0;
+};
+
+// ==========================================
+// ✅ MEDIA CAROUSEL SYSTEM
+// ==========================================
+
+const media = computed(() => getMediaDetails(props.shop.videoUrl));
+
+const processedImages = computed(() => {
+  return (props.shop.images || []).map((imgUrl) => getMediaDetails(imgUrl).url);
+});
+
+const currentImageIndex = ref(0);
+const imageCarouselRef = ref(null);
+
+const nextImage = () => {
+  if (currentImageIndex.value < processedImages.value.length - 1) {
+    currentImageIndex.value++;
+    scrollToImage(currentImageIndex.value);
+    impactFeedback("light");
+  }
+};
+
+const prevImage = () => {
+  if (currentImageIndex.value > 0) {
+    currentImageIndex.value--;
+    scrollToImage(currentImageIndex.value);
+    impactFeedback("light");
+  }
+};
+
+const scrollToImage = (index) => {
+  if (!imageCarouselRef.value) return;
+  const container = imageCarouselRef.value;
+  const itemWidth = container.clientWidth;
+  container.scrollTo({
+    left: itemWidth * index,
+    behavior: "smooth",
+  });
+};
+
+// ==========================================
+// ✅ DOUBLE TAP TO LIKE
+// ==========================================
+
+const lastTap = ref(0);
+const showHeartAnim = ref(false);
+
+const handleDoubleTap = () => {
+  const now = Date.now();
+  const DOUBLE_TAP_DELAY = 300;
+
+  if (now - lastTap.value < DOUBLE_TAP_DELAY) {
+    emit("toggle-favorite", props.shop.id);
+    showHeartAnim.value = true;
+    successFeedback();
+
+    setTimeout(() => {
+      showHeartAnim.value = false;
+    }, 1000);
+  }
+
+  lastTap.value = now;
+};
+
+// ==========================================
+// ✅ RIDE APP SYSTEM
+// ==========================================
+
 const showRidePopup = ref(false);
 const copyStatus = ref("");
 const rideLoading = ref("");
 const isMobile = ref(false);
-const modalTitleId = "vibe-modal-title";
 
-// Promotion State
+const openRide = (appName) => {
+  rideLoading.value = appName;
+  impactFeedback("medium");
+
+  // Copy shop name to clipboard
+  copyToClipboard(props.shop.name).then(() => {
+    copyStatus.value = "📋 Copied!";
+  });
+
+  let success = false;
+  switch (appName) {
+    case "grab":
+      success = openGrabApp(props.shop);
+      break;
+    case "bolt":
+      success = openBoltApp(props.shop);
+      break;
+    case "lineman":
+      success = openLinemanApp(props.shop);
+      break;
+  }
+
+  if (success) {
+    copyStatus.value = `🚗 Opening ${appName}...`;
+  } else {
+    copyStatus.value = "❌ App not found";
+  }
+
+  setTimeout(() => {
+    showRidePopup.value = false;
+    rideLoading.value = "";
+    setTimeout(() => {
+      copyStatus.value = "";
+    }, 1000);
+  }, 1500);
+};
+
+// ==========================================
+// ✅ PROMOTION COUNTDOWN
+// ==========================================
+
 const timeLeft = ref("");
 const isPromoActive = ref(false);
 let timerInterval = null;
 
-// Lazy Loading State
-const isMediaVisible = ref(false);
-const isReviewsVisible = ref(false);
-const mediaObserver = ref(null);
-const reviewsObserver = ref(null);
-
-// Visitor Count State
-const initialVisitorCount = ref(null);
-
-// Double Tap State
-const lastPointerTap = ref(0);
-
-// ==========================================
-// ✅ COMPUTED PROPERTIES
-// ==========================================
-
-const media = computed(() => {
-	try {
-		return getMediaDetails(props.shop?.videoUrl);
-	} catch (error) {
-		console.error("Error processing media:", error);
-		return { type: "image", url: FALLBACK_IMAGE };
-	}
-});
-
-const processedImages = computed(() => {
-	try {
-		const images = props.shop?.images || [];
-		return images
-			.map((imgUrl) => {
-				try {
-					return getMediaDetails(imgUrl)?.url;
-				} catch {
-					return null;
-				}
-			})
-			.filter(Boolean);
-	} catch (error) {
-		console.error("Error processing images:", error);
-		return [];
-	}
-});
-
-const hasGallery = computed(() => processedImages.value.length > 0);
-
-const hasSocialLinks = computed(
-	() => props.shop?.IG_URL || props.shop?.FB_URL || props.shop?.TikTok_URL,
-);
-
-const shopStatus = computed(() => props.shop?.status || "UNKNOWN");
-
-const isPromoted = computed(
-	() => props.shop?.isPromoted || props.shop?.IsPromoted === "TRUE",
-);
-
-// ==========================================
-// ✅ MOTION SYSTEM (iOS-STYLE)
-// ==========================================
-
-const { apply } = useMotion(modalCard, {
-	initial: {
-		y: "100%",
-		opacity: 0,
-		scale: 0.95,
-	},
-	enter: {
-		y: 0,
-		opacity: 1,
-		scale: 1,
-		transition: {
-			type: "spring",
-			stiffness: 260,
-			damping: 30,
-			mass: 0.8,
-		},
-	},
-	leave: {
-		y: "100%",
-		opacity: 0,
-		scale: 0.95,
-		transition: {
-			duration: 350,
-			ease: [0.25, 0.1, 0.25, 1],
-		},
-	},
-});
-
-// ==========================================
-// ✅ TOUCH GESTURE HANDLERS (OPTIMIZED)
-// ==========================================
-
-const handleTouchStart = (e) => {
-	if (!scrollContentRef.value) return;
-
-	initialScrollTop.value = scrollContentRef.value.scrollTop;
-	touchStart.value = { y: e.touches[0].clientY, t: Date.now() };
-	isDragging.value = true;
-};
-
-const handleTouchMove = (e) => {
-	if (!isDragging.value) return;
-
-	const currentY = e.touches[0].clientY;
-	const deltaY = currentY - touchStart.value.y;
-
-	// Block dragging if scrolled down or scrolling up
-	if (
-		initialScrollTop.value > 0 ||
-		(scrollContentRef.value && scrollContentRef.value.scrollTop > 0) ||
-		deltaY < 0
-	) {
-		return;
-	}
-
-	// Active drag (pulling down from top)
-	if (e.cancelable && deltaY > 0) {
-		e.preventDefault();
-
-		// Logarithmic resistance for iOS feel
-		const limit = 200;
-		const resistance = limit * Math.log10(1 + deltaY / (limit * 0.5)) * 2.5;
-
-		dragProgress.value = Math.min(deltaY / 600, 1);
-
-		apply({
-			y: resistance,
-			scale: 1 - deltaY / 3000,
-			opacity: 1,
-		});
-	}
-};
-
-const handleTouchEnd = (e) => {
-	if (!isDragging.value) return;
-	isDragging.value = false;
-
-	const currentY = e.changedTouches[0].clientY;
-	const deltaY = currentY - touchStart.value.y;
-	const time = Date.now() - touchStart.value.t;
-	const velocity = deltaY / time;
-
-	const isScrolledToTop =
-		!scrollContentRef.value || scrollContentRef.value.scrollTop <= 0;
-
-	// Dismiss conditions
-	if (isScrolledToTop && deltaY > 0) {
-		if (
-			(deltaY > DISMISS_THRESHOLD.QUICK_FLICK &&
-				velocity > DISMISS_THRESHOLD.VELOCITY) ||
-			deltaY > DISMISS_THRESHOLD.DISTANCE
-		) {
-			handleClose();
-			return;
-		}
-	}
-
-	// Snap back
-	if (deltaY > 0) {
-		apply("enter");
-	}
-
-	dragProgress.value = 0;
-};
-
-// ==========================================
-// ✅ MODAL CONTROL & FOCUS TRAP
-// ==========================================
-
-const handleClose = () => {
-	try {
-		impactFeedback("medium");
-		apply("leave");
-		setTimeout(() => emit("close"), 300);
-	} catch (error) {
-		console.error("Error closing modal:", error);
-		emit("close");
-	}
-};
-
-const focusableSelector =
-	'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
-
-const trapFocus = (e) => {
-	if (e.key !== "Tab") return;
-	if (!modalCard.value) return;
-
-	const focusables = modalCard.value.querySelectorAll(focusableSelector);
-	if (!focusables.length) return;
-
-	const first = focusables[0];
-	const last = focusables[focusables.length - 1];
-
-	if (e.shiftKey && document.activeElement === first) {
-		e.preventDefault();
-		last.focus();
-	} else if (!e.shiftKey && document.activeElement === last) {
-		e.preventDefault();
-		first.focus();
-	}
-};
-
-const handleKeydown = (e) => {
-	if (e.key === "Escape") handleClose();
-	trapFocus(e);
-};
-
-const lockBodyScroll = (locked) => {
-	document.documentElement.style.overflow = locked ? "hidden" : "";
-	document.body.style.overflow = locked ? "hidden" : "";
-};
-
-// ==========================================
-// ✅ GALLERY CAROUSEL (R-AF + HAPTICS)
-// ==========================================
-
-const fireSnapHaptic = (idx) => {
-	if (idx === lastHapticIndex.value) return;
-	lastHapticIndex.value = idx;
-	impactFeedback("light");
-};
-
-const nextImage = () => {
-	if (currentImageIndex.value < processedImages.value.length - 1) {
-		currentImageIndex.value++;
-		scrollToImage(currentImageIndex.value);
-		impactFeedback("light");
-	}
-};
-
-const prevImage = () => {
-	if (currentImageIndex.value > 0) {
-		currentImageIndex.value--;
-		scrollToImage(currentImageIndex.value);
-		impactFeedback("light");
-	}
-};
-
-const scrollToImage = (index) => {
-	if (!imageCarouselRef.value) return;
-
-	const container = imageCarouselRef.value;
-	const itemWidth = container.clientWidth;
-
-	container.scrollTo({
-		left: itemWidth * index,
-		behavior: "smooth",
-	});
-};
-
-const handleCarouselScroll = () => {
-	if (!imageCarouselRef.value) return;
-
-	const container = imageCarouselRef.value;
-	const newIndex = Math.round(container.scrollLeft / container.clientWidth);
-
-	if (
-		newIndex !== currentImageIndex.value &&
-		newIndex >= 0 &&
-		newIndex < processedImages.value.length
-	) {
-		currentImageIndex.value = newIndex;
-		fireSnapHaptic(newIndex);
-	}
-};
-
-let rafId = 0;
-const handleCarouselScrollRaf = () => {
-	if (rafId) return;
-	rafId = requestAnimationFrame(() => {
-		rafId = 0;
-		handleCarouselScroll();
-	});
-};
-
-// ==========================================
-// ✅ POINTER DOUBLE TAP (iOS/Android/Desktop)
-// ==========================================
-
-const handlePointerTap = (e) => {
-	// only primary pointer (avoid right click / secondary)
-	if (e.pointerType === "mouse" && e.button !== 0) return;
-
-	const now = Date.now();
-	if (now - lastPointerTap.value < DOUBLE_TAP_DELAY) {
-		emit("toggle-favorite", props.shop?.id);
-		showHeartAnim.value = true;
-		successFeedback();
-
-		setTimeout(() => {
-			showHeartAnim.value = false;
-		}, 900);
-	}
-	lastPointerTap.value = now;
-};
-
-// ==========================================
-// ✅ RIDE APP INTEGRATION
-// ==========================================
-
-const openRide = async (appName) => {
-	if (!appName || !props.shop?.name) return;
-
-	rideLoading.value = appName;
-	impactFeedback("medium");
-
-	try {
-		// Copy shop name to clipboard
-		await copyToClipboard(props.shop.name);
-		copyStatus.value = "📋 Copied!";
-
-		// Open appropriate app
-		let success = false;
-		switch (appName) {
-			case "grab":
-				success = openGrabApp(props.shop);
-				break;
-			case "bolt":
-				success = openBoltApp(props.shop);
-				break;
-			case "lineman":
-				success = openLinemanApp(props.shop);
-				break;
-			default:
-				copyStatus.value = "❌ Unknown app";
-				return;
-		}
-
-		if (success) {
-			copyStatus.value = `🚗 Opening ${appName}…`;
-		} else {
-			copyStatus.value = "❌ App not found";
-		}
-	} catch (error) {
-		console.error("Error opening ride app:", error);
-		copyStatus.value = "❌ Failed to open app";
-	} finally {
-		setTimeout(() => {
-			showRidePopup.value = false;
-			rideLoading.value = "";
-			setTimeout(() => {
-				copyStatus.value = "";
-			}, 1000);
-		}, 1500);
-	}
-};
-
-// ==========================================
-// ✅ PROMOTION COUNTDOWN (Overnight Support)
-// ==========================================
-
-const buildTargetTime = (hh, mm) => {
-	const now = new Date();
-	const target = new Date(now);
-	target.setHours(hh, mm, 0, 0);
-
-	// If target is in the past, assume it's for the next day (overnight)
-	if (target <= now) target.setDate(target.getDate() + 1);
-	return target;
-};
-
 const updateCountdown = () => {
-	if (!props.shop?.promotionEndtime || !props.shop?.promotionInfo) {
-		isPromoActive.value = false;
-		return;
-	}
+  if (!props.shop.promotionEndtime || !props.shop.promotionInfo) {
+    isPromoActive.value = false;
+    return;
+  }
 
-	try {
-		const now = new Date();
-		const [hours, minutes] = props.shop.promotionEndtime.split(":");
+  const now = new Date();
+  const [hours, minutes] = props.shop.promotionEndtime.split(":");
 
-		const hh = Number.parseInt(hours, 10);
-		const mm = Number.parseInt(minutes, 10);
+  const target = new Date();
+  target.setHours(parseInt(hours), parseInt(minutes), 0, 0);
 
-		if (Number.isNaN(hh) || Number.isNaN(mm)) {
-			isPromoActive.value = false;
-			return;
-		}
+  const diff = target - now;
+  const maxFlashWindow = 1200000; // 20 min
 
-		const target = buildTargetTime(hh, mm);
-		const diff = target - now;
+  if (diff <= 0 || diff > maxFlashWindow) {
+    isPromoActive.value = false;
+    return;
+  }
 
-		if (diff <= 0) {
-			timeLeft.value = t("promo.expired");
-			isPromoActive.value = true;
-			return;
-		}
+  const totalSeconds = Math.floor(diff / 1000);
+  const mins = Math.floor(totalSeconds / 60);
+  const secs = totalSeconds % 60;
 
-		if (diff > MAX_FLASH_WINDOW) {
-			isPromoActive.value = false;
-			return;
-		}
-
-		const totalSeconds = Math.floor(diff / 1000);
-		const mins = Math.floor(totalSeconds / 60);
-		const secs = totalSeconds % 60;
-
-		timeLeft.value = `${mins}:${secs.toString().padStart(2, "0")}`;
-		isPromoActive.value = true;
-	} catch (error) {
-		console.error("Error updating countdown:", error);
-		isPromoActive.value = false;
-	}
+  timeLeft.value = `${mins}:${secs.toString().padStart(2, "0")}`;
+  isPromoActive.value = true;
 };
 
 // ==========================================
@@ -539,183 +357,99 @@ const updateCountdown = () => {
 // ==========================================
 
 const handleShare = async () => {
-	if (!props.shop?.name || !props.shop?.lat || !props.shop?.lng) return;
+  impactFeedback("medium");
+  const success = await shareLocation(
+    props.shop.name,
+    props.shop.lat,
+    props.shop.lng,
+  );
 
-	try {
-		impactFeedback("medium");
-		const success = await shareLocation(
-			props.shop.name,
-			props.shop.lat,
-			props.shop.lng,
-		);
+  if (success) {
+    copyStatus.value = "✅ Shared!";
+    successFeedback();
+  } else {
+    copyStatus.value = "📋 Link copied!";
+  }
 
-		if (success) {
-			copyStatus.value = "✅ Shared!";
-			successFeedback();
-		} else {
-			copyStatus.value = "📋 Link copied!";
-		}
-	} catch (error) {
-		console.error("Error sharing:", error);
-		copyStatus.value = "❌ Share failed";
-	} finally {
-		setTimeout(() => {
-			copyStatus.value = "";
-		}, 2000);
-	}
+  setTimeout(() => {
+    copyStatus.value = "";
+  }, 2000);
 };
 
 const openGoogleMaps = () => {
-	if (!props.shop?.lat || !props.shop?.lng) return;
-
-	try {
-		impactFeedback("medium");
-		openGoogleMapsDir(props.shop.lat, props.shop.lng);
-	} catch (error) {
-		console.error("Error opening Google Maps:", error);
-	}
+  impactFeedback("medium");
+  openGoogleMapsDir(props.shop.lat, props.shop.lng);
 };
 
 // ==========================================
-// ✅ LAZY LOADING (Unobserve Once)
+// ✅ LAZY LOADING SYSTEM
 // ==========================================
 
+const isMediaVisible = ref(false);
+const isReviewsVisible = ref(false);
+const mediaObserver = ref(null);
+const reviewsObserver = ref(null);
+
 const setupIntersectionObservers = () => {
-	try {
-		// Media Observer
-		mediaObserver.value = new IntersectionObserver(
-			(entries, obs) => {
-				entries.forEach((entry) => {
-					if (entry.isIntersecting) {
-						isMediaVisible.value = true;
-						obs.unobserve(entry.target); // ✅ Stop observing
-					}
-				});
-			},
-			{ threshold: 0.1 },
-		);
+  // Media Observer
+  mediaObserver.value = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          isMediaVisible.value = true;
+        }
+      });
+    },
+    { threshold: 0.1 },
+  );
 
-		// Reviews Observer
-		reviewsObserver.value = new IntersectionObserver(
-			(entries, obs) => {
-				entries.forEach((entry) => {
-					if (entry.isIntersecting) {
-						isReviewsVisible.value = true;
-						obs.unobserve(entry.target); // ✅ Stop observing
-					}
-				});
-			},
-			{ threshold: 0.1 },
-		);
+  // Reviews Observer
+  reviewsObserver.value = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          isReviewsVisible.value = true;
+        }
+      });
+    },
+    { threshold: 0.1 },
+  );
 
-		nextTick(() => {
-			const mediaEl = document.querySelector("#media-container");
-			const reviewsEl = document.querySelector("#reviews-container");
+  nextTick(() => {
+    const mediaEl = document.querySelector("#media-container");
+    const reviewsEl = document.querySelector("#reviews-container");
 
-			if (mediaEl && mediaObserver.value) {
-				mediaObserver.value.observe(mediaEl);
-			}
-			if (reviewsEl && reviewsObserver.value) {
-				reviewsObserver.value.observe(reviewsEl);
-			}
-		});
-	} catch (error) {
-		console.error("Error setting up observers:", error);
-		// Fallback: show content immediately
-		isMediaVisible.value = true;
-		isReviewsVisible.value = true;
-	}
+    if (mediaEl) mediaObserver.value.observe(mediaEl);
+    if (reviewsEl) reviewsObserver.value.observe(reviewsEl);
+  });
 };
 
 // ==========================================
 // ✅ VIDEO SYNC
 // ==========================================
 
+const videoPlayer = ref(null);
 watchEffect(() => {
-	if (videoPlayer.value && props.shop?.initialTime) {
-		try {
-			videoPlayer.value.currentTime = props.shop.initialTime;
-		} catch (error) {
-			console.error("Error setting video time:", error);
-		}
-	}
+  if (videoPlayer.value && props.shop.initialTime) {
+    videoPlayer.value.currentTime = props.shop.initialTime;
+  }
 });
 
 // ==========================================
-// ✅ PARTICLE EFFECTS
-// ==========================================
-
-const getParticleStyle = (index) => {
-	const hue = (index * 30) % 360;
-	return {
-		"--particle-delay": `${index * 0.2}s`,
-		"--particle-duration": `${3 + Math.random() * 2}s`,
-		"--particle-x": `${Math.random() * 100}%`,
-		"--particle-color": `hsla(${hue}, 80%, 60%, 0.6)`,
-	};
-};
-
-// ==========================================
-// ✅ LIFECYCLE HOOKS
+// ✅ LIFECYCLE
 // ==========================================
 
 onMounted(() => {
-	try {
-		isMobile.value = isMobileDevice();
-		initialVisitorCount.value = Math.floor(Math.random() * 50) + 10;
-
-		updateCountdown();
-		timerInterval = setInterval(updateCountdown, 1000);
-
-		setupIntersectionObservers();
-
-		// ✅ Add carousel scroll listener (Passive + Throttled)
-		if (imageCarouselRef.value) {
-			imageCarouselRef.value.addEventListener(
-				"scroll",
-				handleCarouselScrollRaf,
-				{ passive: true },
-			);
-		}
-
-		// ✅ Add desktop keyboard support
-		document.addEventListener("keydown", handleKeydown);
-		lockBodyScroll(true);
-
-		// ✅ Focus close button for accessibility
-		nextTick(() => {
-			const closeBtn = modalCard.value?.querySelector(
-				'button[aria-label="Close details"]',
-			);
-			closeBtn?.focus?.();
-		});
-	} catch (error) {
-		console.error("Error in onMounted:", error);
-	}
+  isMobile.value = isMobileDevice();
+  updateCountdown();
+  timerInterval = setInterval(updateCountdown, 1000);
+  setupIntersectionObservers();
 });
 
 onUnmounted(() => {
-	try {
-		if (timerInterval) clearInterval(timerInterval);
-
-		if (mediaObserver.value) mediaObserver.value.disconnect();
-		if (reviewsObserver.value) reviewsObserver.value.disconnect();
-
-		// ✅ Remove listener & cancel rAF
-		if (imageCarouselRef.value) {
-			imageCarouselRef.value.removeEventListener(
-				"scroll",
-				handleCarouselScrollRaf,
-			);
-		}
-		if (rafId) cancelAnimationFrame(rafId);
-
-		// ✅ Clean up desktop listeners
-		document.removeEventListener("keydown", handleKeydown);
-		lockBodyScroll(false);
-	} catch (error) {
-		console.error("Error in onUnmounted:", error);
-	}
+  if (timerInterval) clearInterval(timerInterval);
+  if (mediaObserver.value) mediaObserver.value.disconnect();
+  if (reviewsObserver.value) reviewsObserver.value.disconnect();
 });
 </script>
 
@@ -725,14 +459,14 @@ onUnmounted(() => {
     class="fixed inset-0 flex items-end md:items-center justify-center pointer-events-auto font-sans overflow-hidden"
     :style="{ zIndex: Z.MODAL }"
   >
-    <!-- iOS-Style Backdrop with Blur -->
+    <!-- ✅ iOS-Style Backdrop with Blur -->
     <div
       class="absolute inset-0 bg-black/70 backdrop-blur-xl transition-opacity duration-300"
       :style="{ opacity: 1 - dragProgress * 0.5 }"
-      @click="handleClose"
-    />
+      @click="emit('close')"
+    ></div>
 
-    <!-- Main Modal Container -->
+    <!-- ✅ Main Modal Container - iOS Bottom Sheet Style -->
     <div
       ref="modalCard"
       @touchstart.stop="handleTouchStart"
@@ -744,45 +478,43 @@ onUnmounted(() => {
         '--safe-area-top': 'env(safe-area-inset-top)',
         '--safe-area-bottom': 'env(safe-area-inset-bottom)',
       }"
-      role="dialog"
-      aria-modal="true"
-      :aria-labelledby="modalTitleId"
-      tabindex="-1"
     >
-      <!-- iOS-Style Drag Handle -->
+      <!-- ✅ iOS-Style Drag Handle -->
       <div
         class="flex justify-center pt-3 pb-1 cursor-grab active:cursor-grabbing"
       >
         <div
-          class="w-10 h-1 bg-gray-300 dark:bg-gray-500 rounded-full transition-[width,background-color] duration-200"
+          class="w-10 h-1 bg-gray-300 dark:bg-gray-500 rounded-full transition-all duration-200"
           :style="{
             width: dragProgress > 0 ? `${10 + dragProgress * 20}px` : '40px',
             backgroundColor: dragProgress > 0.3 ? '#10b981' : undefined,
           }"
-        />
+        ></div>
       </div>
 
-      <!-- Close Button -->
+      <!-- ✅ Close Button (iOS-style) -->
       <button
-        @click="handleClose"
+        @click="
+          emit('close');
+          selectFeedback();
+        "
         aria-label="Close details"
-        class="absolute top-4 right-4 z-50 w-8 h-8 flex items-center justify-center rounded-full bg-black/10 dark:bg-white/10 backdrop-blur-xl border border-white/20 active:scale-90 transition-colors transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+        class="absolute top-4 right-4 z-50 w-8 h-8 flex items-center justify-center rounded-full bg-black/10 dark:bg-white/10 backdrop-blur-xl border border-white/20 active:scale-90 transition-all"
       >
         <X class="w-5 h-5 text-gray-700 dark:text-white" />
       </button>
 
-      <!-- Scrollable Content -->
+      <!-- ✅ Scrollable Content -->
       <div
         ref="scrollContentRef"
         class="flex-1 overflow-y-auto overflow-x-hidden -webkit-overflow-scrolling-touch"
       >
-        <!-- Header Section -->
+        <!-- ✅ Header Section -->
         <div class="px-5 py-4 space-y-3">
           <!-- Title Row -->
           <div class="flex items-start justify-between gap-3">
             <div class="flex-1 min-w-0">
               <h2
-                :id="modalTitleId"
                 class="text-2xl font-black text-gray-900 dark:text-white leading-tight break-words"
               >
                 {{ shop.name }}
@@ -810,7 +542,7 @@ onUnmounted(() => {
 
               <transition name="scale">
                 <div
-                  v-if="isPromoted"
+                  v-if="shop.isPromoted || shop.IsPromoted === 'TRUE'"
                   class="px-2.5 py-1 text-[10px] font-black rounded-full uppercase tracking-tight bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg"
                 >
                   ⭐ HOT
@@ -820,14 +552,14 @@ onUnmounted(() => {
               <div
                 :class="[
                   'px-2.5 py-1 text-[10px] font-black rounded-full uppercase tracking-wide text-white shadow-lg flex items-center gap-1.5',
-                  getStatusColorClass(shopStatus),
+                  getStatusColorClass(shop.status),
                 ]"
               >
                 <span
-                  v-if="shopStatus === 'LIVE'"
+                  v-if="shop.status === 'LIVE'"
                   class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"
-                />
-                {{ shopStatus }}
+                ></span>
+                {{ shop.status }}
               </div>
             </div>
           </div>
@@ -835,120 +567,22 @@ onUnmounted(() => {
           <!-- Visitor Count -->
           <VisitorCount
             v-if="isMediaVisible"
-            :shop-id="shop.id"
-            :initial-count="initialVisitorCount"
-            :live-count="userCount"
+            :shopId="shop.id"
+            :initialCount="Math.floor(Math.random() * 50) + 10"
           />
-
-          <!-- Stats Grid -->
-          <div class="grid grid-cols-4 gap-2 mt-4">
-            <div
-              class="flex flex-col items-center bg-gray-50 dark:bg-zinc-800/50 rounded-xl p-2 backdrop-blur-sm border border-black/5 dark:border-white/5"
-            >
-              <span
-                class="text-[10px] font-semibold text-gray-500 dark:text-gray-400"
-              >
-                {{ t("vibe.rating") }}
-              </span>
-              <div class="flex items-center gap-1 mt-0.5">
-                <span class="text-sm font-black text-gray-900 dark:text-white">
-                  {{ shop.rating ? shop.rating.toFixed(1) : "-" }}
-                </span>
-                <Sparkles v-if="shop.rating" class="w-3 h-3 text-yellow-500" />
-              </div>
-            </div>
-
-            <div
-              class="flex flex-col items-center bg-gray-50 dark:bg-zinc-800/50 rounded-xl p-2 backdrop-blur-sm border border-black/5 dark:border-white/5"
-            >
-              <span
-                class="text-[10px] font-semibold text-gray-500 dark:text-gray-400"
-              >
-                {{ t("vibe.reviews") }}
-              </span>
-              <span
-                class="text-sm font-black text-gray-900 dark:text-white mt-0.5"
-              >
-                {{ shop.reviewCount || 0 }}
-              </span>
-            </div>
-
-            <div
-              class="flex flex-col items-center bg-gray-50 dark:bg-zinc-800/50 rounded-xl p-2 backdrop-blur-sm border border-black/5 dark:border-white/5"
-            >
-              <span
-                class="text-[10px] font-semibold text-gray-500 dark:text-gray-400"
-              >
-                {{ t("vibe.checkins") }}
-              </span>
-              <span
-                class="text-sm font-black text-gray-900 dark:text-white mt-0.5"
-              >
-                {{ shop.checkins || 0 }}
-              </span>
-            </div>
-
-            <div
-              class="flex flex-col items-center bg-gray-50 dark:bg-zinc-800/50 rounded-xl p-2 backdrop-blur-sm border border-black/5 dark:border-white/5"
-            >
-              <span
-                class="text-[10px] font-semibold text-gray-500 dark:text-gray-400"
-              >
-                {{ t("vibe.photos") }}
-              </span>
-              <span
-                class="text-sm font-black text-gray-900 dark:text-white mt-0.5"
-              >
-                {{ processedImages.length }}
-              </span>
-            </div>
-          </div>
         </div>
 
-        <!-- Media Section (Hero + Particles) -->
+        <!-- ✅ Media Section with Lazy Loading -->
         <div
           id="media-container"
-          class="relative w-full aspect-[16/10] bg-gray-900 overflow-hidden group"
-          @pointerdown.stop="handlePointerTap"
+          class="relative w-full aspect-[16/10] bg-gray-100 dark:bg-zinc-800 overflow-hidden"
+          @touchstart.stop="handleDoubleTap"
         >
-          <!-- ✅ Cinematic Blooms (Hero Glow) -->
-          <div class="absolute inset-0 pointer-events-none z-[5]">
-            <div
-              class="absolute -top-24 -left-24 w-72 h-72 rounded-full blur-3xl opacity-40 bg-pink-500/40"
-            />
-            <div
-              class="absolute -bottom-28 -right-28 w-80 h-80 rounded-full blur-3xl opacity-40 bg-cyan-400/40"
-            />
-          </div>
-
-          <!-- Cinematic Gradients -->
-          <div
-            class="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-black/60 to-transparent pointer-events-none z-10"
-          />
-          <div
-            class="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-t from-black/80 to-transparent pointer-events-none z-10"
-          />
-          <div
-            class="absolute inset-0 shadow-[inset_0_0_100px_rgba(0,0,0,0.5)] pointer-events-none z-10"
-          />
-
-          <!-- Floating Particles -->
-          <div
-            class="absolute inset-0 overflow-hidden pointer-events-none z-10"
-          >
-            <div
-              v-for="i in 12"
-              :key="`particle-${i}`"
-              class="particle"
-              :style="getParticleStyle(i)"
-            />
-          </div>
-
           <!-- Loading Skeleton -->
           <div
             v-if="!isMediaVisible"
             class="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-zinc-700 dark:to-zinc-800 animate-pulse"
-          />
+          ></div>
 
           <!-- Heart Animation -->
           <transition name="heart">
@@ -965,9 +599,9 @@ onUnmounted(() => {
 
           <!-- Double Tap Hint -->
           <div
-            class="absolute top-3 left-3 px-3 py-1.5 rounded-full bg-black/30 backdrop-blur-md text-white text-[10px] font-semibold opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20"
+            class="absolute top-3 left-3 px-3 py-1.5 rounded-full bg-black/30 backdrop-blur-md text-white text-[10px] font-semibold opacity-0 group-hover:opacity-100 transition-opacity"
           >
-            {{ t("vibe.double_tap") }}
+            Double tap to like ❤️
           </div>
 
           <!-- Promotion Badge -->
@@ -980,7 +614,7 @@ onUnmounted(() => {
                 <span
                   class="text-[9px] font-bold text-white/80 uppercase tracking-widest"
                 >
-                  {{ t("vibe.limited_deal") }}
+                  Limited Deal
                 </span>
                 <h3 class="text-sm font-black text-white mt-0.5 leading-tight">
                   {{ shop.promotionInfo }}
@@ -1000,40 +634,40 @@ onUnmounted(() => {
           <!-- Media Content -->
           <template v-if="isMediaVisible">
             <video
-              v-if="media.type === 'video'"
               ref="videoPlayer"
+              v-if="media.type === 'video'"
               :src="media.url"
               autoplay
               loop
               muted
               playsinline
               class="w-full h-full object-cover"
-            />
+              loading="lazy"
+            ></video>
             <iframe
               v-else-if="media.type === 'youtube'"
               :src="media.url"
               class="w-full h-full"
-              title="Venue Video"
+              frameborder="0"
               allow="autoplay; encrypted-media; picture-in-picture"
               allowfullscreen
               loading="lazy"
-            />
+            ></iframe>
             <img
               v-else
               :src="media.url || FALLBACK_IMAGE"
-              :alt="shop.name || 'Venue photo'"
               class="w-full h-full object-cover"
               loading="lazy"
             />
           </template>
         </div>
 
-        <!-- Image Gallery Carousel -->
-        <div v-if="hasGallery" class="relative px-5 py-4">
+        <!-- ✅ Image Gallery Carousel (iOS-style) -->
+        <div v-if="processedImages.length > 0" class="relative px-5 py-4">
           <h4
             class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3"
           >
-            {{ t("vibe.gallery") }} ({{ processedImages.length }})
+            Gallery ({{ processedImages.length }})
           </h4>
 
           <div class="relative">
@@ -1044,15 +678,8 @@ onUnmounted(() => {
             >
               <div
                 v-for="(img, idx) in processedImages"
-                :key="`gallery-${idx}`"
-                class="flex-shrink-0 w-32 h-32 rounded-2xl overflow-hidden bg-gray-100 dark:bg-zinc-800 snap-start cursor-pointer active:scale-95 transition-transform"
-                @click="
-                  () => {
-                    currentImageIndex = idx;
-                    scrollToImage(idx);
-                    impactFeedback('light');
-                  }
-                "
+                :key="idx"
+                class="flex-shrink-0 w-32 h-32 rounded-2xl overflow-hidden bg-gray-100 dark:bg-zinc-800 snap-start"
               >
                 <img
                   :src="img"
@@ -1063,34 +690,12 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <!-- ✅ Dots Indicator -->
-            <div class="mt-3 flex items-center justify-center gap-1.5">
-              <button
-                v-for="(_, i) in processedImages"
-                :key="`dot-${i}`"
-                class="h-1.5 rounded-full transition-[width,background-color] duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
-                :class="
-                  i === currentImageIndex
-                    ? 'w-5 bg-black/80 dark:bg-white/90 shadow'
-                    : 'w-1.5 bg-gray-300 dark:bg-white/20'
-                "
-                :aria-label="`Go to image ${i + 1}`"
-                @click="
-                  () => {
-                    currentImageIndex = i;
-                    scrollToImage(i);
-                    impactFeedback('light');
-                  }
-                "
-              />
-            </div>
-
             <!-- Navigation Buttons -->
             <button
               v-if="currentImageIndex > 0"
               @click="prevImage"
               aria-label="Previous image"
-              class="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 dark:bg-black/50 backdrop-blur-md shadow-lg active:scale-90 transition-colors transition-transform z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+              class="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 dark:bg-black/50 backdrop-blur-md shadow-lg active:scale-90 transition-all"
             >
               <ChevronLeft class="w-5 h-5 text-gray-700 dark:text-white" />
             </button>
@@ -1099,14 +704,14 @@ onUnmounted(() => {
               v-if="currentImageIndex < processedImages.length - 1"
               @click="nextImage"
               aria-label="Next image"
-              class="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 dark:bg-black/50 backdrop-blur-md shadow-lg active:scale-90 transition-colors transition-transform z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+              class="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 dark:bg-black/50 backdrop-blur-md shadow-lg active:scale-90 transition-all"
             >
               <ChevronRight class="w-5 h-5 text-gray-700 dark:text-white" />
             </button>
           </div>
         </div>
 
-        <!-- Info Cards -->
+        <!-- ✅ Info Cards (iOS-style) -->
         <div class="px-5 py-4 space-y-3">
           <!-- Crowd Info -->
           <div
@@ -1122,12 +727,12 @@ onUnmounted(() => {
                 <h5
                   class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1"
                 >
-                  {{ t("vibe.crowd_vibe") }}
+                  Crowd Vibe
                 </h5>
                 <p
                   class="text-sm font-medium text-gray-900 dark:text-white leading-relaxed"
                 >
-                  {{ shop.crowdInfo || t("vibe.crowd_default") }}
+                  {{ shop.crowdInfo || "Mixed crowd, all ages welcome" }}
                 </p>
               </div>
             </div>
@@ -1149,33 +754,35 @@ onUnmounted(() => {
                 <h5
                   class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1"
                 >
-                  {{ t("vibe.atmosphere") }}
+                  Atmosphere
                 </h5>
                 <p
                   class="text-sm font-medium text-gray-900 dark:text-white leading-relaxed"
                 >
-                  {{ shop.vibeTag || t("vibe.atmosphere_default") }}
+                  {{ shop.vibeTag || "Chill and relaxed atmosphere" }}
                 </p>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Social Links -->
-        <div v-if="hasSocialLinks" class="px-5 py-4">
+        <!-- ✅ Social Links (iOS-style) -->
+        <div
+          v-if="shop.IG_URL || shop.FB_URL || shop.TikTok_URL"
+          class="px-5 py-4"
+        >
           <h4
             class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3"
           >
-            {{ t("vibe.explore_atmosphere") }}
+            Explore Atmosphere
           </h4>
           <div class="grid grid-cols-3 gap-2">
             <a
               v-if="shop.IG_URL"
               :href="shop.IG_URL"
               target="_blank"
-              rel="noopener noreferrer"
               @click="impactFeedback('medium')"
-              class="h-12 rounded-2xl bg-gradient-to-tr from-[#f9ce34] via-[#ee2a7b] to-[#6228d7] flex items-center justify-center gap-2 active:scale-95 transition-transform shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70"
+              class="h-12 rounded-2xl bg-gradient-to-tr from-[#f9ce34] via-[#ee2a7b] to-[#6228d7] flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg"
             >
               <Instagram class="w-5 h-5 text-white" />
               <span class="text-xs font-bold text-white">IG</span>
@@ -1185,9 +792,8 @@ onUnmounted(() => {
               v-if="shop.FB_URL"
               :href="shop.FB_URL"
               target="_blank"
-              rel="noopener noreferrer"
               @click="impactFeedback('medium')"
-              class="h-12 rounded-2xl bg-[#1877F2] flex items-center justify-center gap-2 active:scale-95 transition-transform shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+              class="h-12 rounded-2xl bg-[#1877F2] flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg"
             >
               <Facebook class="w-5 h-5 text-white" />
               <span class="text-xs font-bold text-white">FB</span>
@@ -1197,9 +803,8 @@ onUnmounted(() => {
               v-if="shop.TikTok_URL"
               :href="shop.TikTok_URL"
               target="_blank"
-              rel="noopener noreferrer"
               @click="impactFeedback('medium')"
-              class="h-12 rounded-2xl bg-black flex items-center justify-center gap-2 active:scale-95 transition-transform shadow-lg border border-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+              class="h-12 rounded-2xl bg-black flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg border border-white/10"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -1209,14 +814,14 @@ onUnmounted(() => {
                 stroke="currentColor"
                 stroke-width="2.5"
               >
-                <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" />
+                <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"></path>
               </svg>
               <span class="text-xs font-bold text-white">TT</span>
             </a>
           </div>
         </div>
 
-        <!-- Reviews Section -->
+        <!-- ✅ Reviews Section (Lazy Loaded) -->
         <div id="reviews-container" class="px-5 py-4">
           <ReviewSystem
             v-if="isReviewsVisible"
@@ -1226,10 +831,10 @@ onUnmounted(() => {
         </div>
 
         <!-- Bottom Safe Area -->
-        <div class="h-[calc(var(--safe-area-bottom)+20px)]" />
+        <div class="h-[calc(var(--safe-area-bottom)+20px)]"></div>
       </div>
 
-      <!-- iOS-Style Action Bar (Sticky Bottom) -->
+      <!-- ✅ iOS-Style Action Bar (Sticky Bottom) -->
       <div
         class="border-t border-gray-200 dark:border-zinc-700 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl"
       >
@@ -1237,27 +842,25 @@ onUnmounted(() => {
           <!-- Share -->
           <button
             @click="handleShare"
-            class="h-14 rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+            class="h-14 rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 flex flex-col items-center justify-center gap-1 active:scale-95 transition-all shadow-lg"
           >
             <Share2 class="w-5 h-5 text-white" />
             <span
               class="text-[10px] font-bold text-white uppercase tracking-wide"
+              >Share</span
             >
-              {{ t("vibe.share") }}
-            </span>
           </button>
 
           <!-- Navigate -->
           <button
             @click="openGoogleMaps"
-            class="h-14 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50"
+            class="h-14 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 flex flex-col items-center justify-center gap-1 active:scale-95 transition-all shadow-lg"
           >
             <Navigation class="w-5 h-5 text-white" />
             <span
               class="text-[10px] font-bold text-white uppercase tracking-wide"
+              >Navigate</span
             >
-              {{ t("vibe.navigate") }}
-            </span>
           </button>
 
           <!-- Ride -->
@@ -1266,23 +869,22 @@ onUnmounted(() => {
               showRidePopup = true;
               impactFeedback('medium');
             "
-            class="h-14 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/50"
+            class="h-14 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 flex flex-col items-center justify-center gap-1 active:scale-95 transition-all shadow-lg"
           >
             <Car class="w-5 h-5 text-white" />
             <span
               class="text-[10px] font-bold text-white uppercase tracking-wide"
+              >Ride</span
             >
-              {{ t("vibe.ride") }}
-            </span>
           </button>
         </div>
 
         <!-- Safe Area Bottom Padding -->
-        <div class="h-[var(--safe-area-bottom)]" />
+        <div class="h-[var(--safe-area-bottom)]"></div>
       </div>
     </div>
 
-    <!-- Ride Selection Bottom Sheet -->
+    <!-- ✅ Ride Selection Bottom Sheet -->
     <transition name="sheet">
       <div
         v-if="showRidePopup"
@@ -1295,7 +897,9 @@ onUnmounted(() => {
         >
           <!-- Drag Handle -->
           <div class="flex justify-center pt-3 pb-1">
-            <div class="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full" />
+            <div
+              class="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full"
+            ></div>
           </div>
 
           <div class="px-5 py-4">
@@ -1307,7 +911,7 @@ onUnmounted(() => {
                 <Car class="w-8 h-8 text-white" />
               </div>
               <h3 class="text-xl font-black text-gray-900 dark:text-white">
-                {{ t("vibe.book_ride") }}
+                Book a Ride
               </h3>
               <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 {{ shop.name }}
@@ -1320,8 +924,8 @@ onUnmounted(() => {
               <button
                 @click="openRide('grab')"
                 :disabled="rideLoading === 'grab'"
-                :aria-label="t('vibe.open_grab')"
-                class="w-full h-16 bg-gradient-to-r from-[#00B14F] to-[#00A84D] rounded-2xl flex items-center px-4 gap-3 active:scale-98 transition-transform shadow-lg disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300/80"
+                aria-label="Open Grab"
+                class="w-full h-16 bg-gradient-to-r from-[#00B14F] to-[#00A84D] rounded-2xl flex items-center px-4 gap-3 active:scale-98 transition-all shadow-lg"
               >
                 <div
                   class="w-10 h-10 bg-white rounded-full flex items-center justify-center"
@@ -1329,7 +933,7 @@ onUnmounted(() => {
                   <span class="text-lg font-black text-[#00B14F]">G</span>
                 </div>
                 <span class="flex-1 text-left font-bold text-white text-lg">
-                  {{ rideLoading === "grab" ? t("vibe.opening") : t("vibe.grab") }}
+                  {{ rideLoading === "grab" ? "Opening..." : "Grab" }}
                 </span>
                 <ChevronRight class="w-5 h-5 text-white/70" />
               </button>
@@ -1338,8 +942,8 @@ onUnmounted(() => {
               <button
                 @click="openRide('bolt')"
                 :disabled="rideLoading === 'bolt'"
-                :aria-label="t('vibe.open_bolt')"
-                class="w-full h-16 bg-gradient-to-r from-[#34D186] to-[#2EC477] rounded-2xl flex items-center px-4 gap-3 active:scale-98 transition-transform shadow-lg disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300/80"
+                aria-label="Open Bolt"
+                class="w-full h-16 bg-gradient-to-r from-[#34D186] to-[#2EC477] rounded-2xl flex items-center px-4 gap-3 active:scale-98 transition-all shadow-lg"
               >
                 <div
                   class="w-10 h-10 bg-white rounded-full flex items-center justify-center"
@@ -1347,7 +951,7 @@ onUnmounted(() => {
                   <span class="text-lg font-black text-[#34D186]">B</span>
                 </div>
                 <span class="flex-1 text-left font-bold text-white text-lg">
-                  {{ rideLoading === "bolt" ? t("vibe.opening") : t("vibe.bolt") }}
+                  {{ rideLoading === "bolt" ? "Opening..." : "Bolt" }}
                 </span>
                 <ChevronRight class="w-5 h-5 text-white/70" />
               </button>
@@ -1356,8 +960,8 @@ onUnmounted(() => {
               <button
                 @click="openRide('lineman')"
                 :disabled="rideLoading === 'lineman'"
-                :aria-label="t('vibe.open_lineman')"
-                class="w-full h-16 bg-gradient-to-r from-[#00B14F] to-[#009440] rounded-2xl flex items-center px-4 gap-3 active:scale-98 transition-transform shadow-lg disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300/80"
+                aria-label="Open Lineman"
+                class="w-full h-16 bg-gradient-to-r from-[#00B14F] to-[#009440] rounded-2xl flex items-center px-4 gap-3 active:scale-98 transition-all shadow-lg"
               >
                 <div
                   class="w-10 h-10 bg-white rounded-full flex items-center justify-center"
@@ -1365,7 +969,7 @@ onUnmounted(() => {
                   <span class="text-lg font-black text-[#00B14F]">L</span>
                 </div>
                 <span class="flex-1 text-left font-bold text-white text-lg">
-                  {{ rideLoading === "lineman" ? t("vibe.opening") : t("vibe.lineman") }}
+                  {{ rideLoading === "lineman" ? "Opening..." : "Lineman" }}
                 </span>
                 <ChevronRight class="w-5 h-5 text-white/70" />
               </button>
@@ -1375,8 +979,6 @@ onUnmounted(() => {
             <transition name="fade">
               <div
                 v-if="copyStatus"
-                role="status"
-                aria-live="polite"
                 class="text-center py-2 px-4 bg-green-100 dark:bg-green-900/30 rounded-xl"
               >
                 <p class="text-sm font-bold text-green-600 dark:text-green-400">
@@ -1387,22 +989,18 @@ onUnmounted(() => {
 
             <!-- Helper Text -->
             <p
-              v-if="isMobile"
               class="text-center text-xs text-gray-400 dark:text-gray-500 mt-4"
+              v-if="isMobile"
             >
-              {{ t("vibe.app_manual") }}
+              If app doesn't open, please launch manually
             </p>
           </div>
 
           <!-- Safe Area Bottom -->
-          <div class="h-[calc(var(--safe-area-bottom)+16px)]" />
+          <div class="h-[calc(var(--safe-area-bottom)+16px)]"></div>
         </div>
       </div>
     </transition>
-
-    <div class="sr-only" role="status" aria-live="polite">
-      {{ copyStatus || (rideLoading ? `Opening ${rideLoading}…` : "") }}
-    </div>
   </div>
 </template>
 
@@ -1416,7 +1014,6 @@ onUnmounted(() => {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
-
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -1427,7 +1024,6 @@ onUnmounted(() => {
 .fade-leave-active {
   transition: opacity 0.25s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
-
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
@@ -1435,11 +1031,8 @@ onUnmounted(() => {
 
 .scale-enter-active,
 .scale-leave-active {
-  transition:
-    opacity 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
-    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-
 .scale-enter-from,
 .scale-leave-to {
   opacity: 0;
@@ -1450,7 +1043,6 @@ onUnmounted(() => {
 .sheet-leave-active {
   transition: transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
-
 .sheet-enter-from,
 .sheet-leave-to {
   transform: translateY(100%);
@@ -1458,11 +1050,8 @@ onUnmounted(() => {
 
 .slide-up-enter-active,
 .slide-up-leave-active {
-  transition:
-    opacity 0.3s cubic-bezier(0.25, 0.1, 0.25, 1),
-    transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+  transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
-
 .slide-up-enter-from,
 .slide-up-leave-to {
   opacity: 0;
@@ -1472,11 +1061,9 @@ onUnmounted(() => {
 .heart-enter-active {
   animation: heartBeat 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-
 .heart-leave-active {
   transition: opacity 0.3s ease;
 }
-
 .heart-leave-to {
   opacity: 0;
 }
@@ -1497,10 +1084,6 @@ onUnmounted(() => {
 }
 
 /* Active Scale */
-.active\:scale-90:active {
-  transform: scale(0.9);
-}
-
 .active\:scale-95:active {
   transform: scale(0.95);
 }
@@ -1509,69 +1092,9 @@ onUnmounted(() => {
   transform: scale(0.98);
 }
 
-/* Particle Animation */
-.particle {
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--particle-color, rgba(255, 255, 255, 0.5));
-  left: var(--particle-x, 50%);
-  bottom: -10px;
-  animation:
-    float-up var(--particle-duration, 4s) ease-out infinite,
-    twinkle 2s ease-in-out infinite alternate;
-  animation-delay: var(--particle-delay, 0s);
-  will-change: transform, opacity;
-}
-
-@keyframes float-up {
-  0% {
-    transform: translateY(0) scale(1);
-    opacity: 0;
-  }
-  10% {
-    opacity: 1;
-  }
-  90% {
-    opacity: 0.5;
-  }
-  100% {
-    transform: translateY(-45vh) scale(0.5);
-    opacity: 0;
-  }
-}
-
-@keyframes twinkle {
-  0% {
-    filter: brightness(1);
-  }
-  100% {
-    filter: brightness(1.5);
-  }
-}
-
-/* Performance Optimizations */
-.transition-opacity,
-.transition-transform {
-  will-change: transform, opacity;
-}
-
-/* Safe Area Support */
-@supports (padding: max(0px)) {
-  .h-\[var\(--safe-area-bottom\)\] {
-    height: max(var(--safe-area-bottom), 0px);
-  }
-}
-
-/* ✅ Reduced Motion Support */
-@media (prefers-reduced-motion: reduce) {
-  .particle {
-    animation: none !important;
-  }
-  * {
-    scroll-behavior: auto !important;
-    transition: none !important;
-  }
+/* Disable Button States */
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>
