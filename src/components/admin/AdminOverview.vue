@@ -71,7 +71,7 @@
               class="text-xs font-semibold text-slate-400 uppercase tracking-wider"
               >{{ kpi.label }}</span
             >
-            <span class="text-blue-400 opacity-80" v-html="kpi.icon"></span>
+            <SafeHtml class="text-blue-400 opacity-80" :content="kpi.icon" />
           </div>
           <div
             class="text-2xl font-bold text-white tabular-nums tracking-tight"
@@ -149,6 +149,7 @@ import {
 import { computed, onMounted, ref } from "vue";
 import { Bar, Doughnut } from "vue-chartjs";
 import { adminDataService } from "../../services/adminDataService";
+import SafeHtml from "../ui/SafeHtml.vue";
 
 ChartJS.register(
 	CategoryScale,

@@ -105,7 +105,7 @@ const fetchMissingMedia = async () => {
 		window.location.reload();
 	} catch (e) {
 		console.error("Fetch media error:", e);
-		alert("Failed to fetch media: " + e.message);
+		alert(`Failed to fetch media: ${e.message}`);
 	} finally {
 		isFetchingMedia.value = false;
 	}

@@ -1,6 +1,6 @@
-/* 
+/*
   src/style.css - Global styles (minimal, design tokens in tokens.css)
-  
+
   Legacy ViteJS template code has been removed.
   All colors, fonts, and theme settings are managed via:
   - src/design-system/tokens.css (CSS variables)
@@ -17,4 +17,8 @@
 	text-rendering: optimizeLegibility;
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
+}
+
+body {
+	overscroll-behavior-y: none; /* Disable native browser pull-to-refresh for custom physics */
 }

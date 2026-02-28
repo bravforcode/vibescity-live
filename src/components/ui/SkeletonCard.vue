@@ -16,46 +16,87 @@ defineProps({
 </script>
 
 <template>
-  <!-- Carousel Card Skeleton -->
+  <!-- Carousel Card Skeleton (Matches SwipeCard perfectly) -->
   <div
     v-if="variant === 'carousel'"
     :class="[
-      'flex-shrink-0 w-40 rounded-2xl overflow-hidden',
-      isDarkMode ? 'bg-zinc-800/50' : 'bg-gray-200',
+      'relative flex-shrink-0 rounded-[24px] overflow-hidden',
+      isDarkMode
+        ? 'bg-zinc-900 border border-white/10'
+        : 'bg-gray-200 border border-black/10',
     ]"
   >
-    <!-- Image placeholder -->
+    <!-- Full background shimmer mimicking media layer -->
     <div
       :class="[
-        'h-28 w-full skeleton-shimmer',
-        isDarkMode ? 'bg-zinc-700' : 'bg-gray-300',
+        'absolute inset-0 skeleton-shimmer',
+        isDarkMode ? 'bg-zinc-800' : 'bg-gray-300',
       ]"
     />
 
-    <!-- Content placeholder -->
-    <div class="p-3 space-y-2">
-      <!-- Title -->
+    <!-- Gradient overlay mimicking sc-gradient -->
+    <div
+      class="absolute inset-0 z-10 pointer-events-none"
+      style="
+        background: linear-gradient(
+          to top,
+          rgba(0, 0, 0, 0.94) 0%,
+          rgba(0, 0, 0, 0.35) 40%,
+          transparent 80%
+        );
+      "
+    />
+
+    <!-- Content placeholder mimicking sc-info -->
+    <div
+      class="absolute bottom-0 left-0 right-0 p-4 pb-10 z-20 flex flex-col justify-end"
+    >
+      <!-- Title (sc-venue-name) -->
       <div
         :class="[
-          'h-4 w-3/4 rounded skeleton-shimmer',
-          isDarkMode ? 'bg-zinc-700' : 'bg-gray-300',
+          'h-5 w-3/4 rounded skeleton-shimmer mb-2',
+          isDarkMode ? 'bg-white/20' : 'bg-black/20',
         ]"
       />
-      <!-- Subtitle -->
+
+      <!-- Meta Row -->
+      <div class="flex items-center gap-2 mb-3">
+        <!-- sc-chip -->
+        <div
+          :class="[
+            'h-4 w-12 rounded skeleton-shimmer',
+            isDarkMode ? 'bg-white/20' : 'bg-black/20',
+          ]"
+          style="animation-delay: 0.1s"
+        />
+        <!-- sc-meta-item -->
+        <div
+          :class="[
+            'h-4 w-16 rounded skeleton-shimmer',
+            isDarkMode ? 'bg-white/20' : 'bg-black/20',
+          ]"
+          style="animation-delay: 0.15s"
+        />
+      </div>
+
+      <!-- Stats Badge -->
+      <div class="flex items-center gap-2 mb-4">
+        <div
+          :class="[
+            'h-[22px] w-12 rounded-full skeleton-shimmer',
+            isDarkMode ? 'bg-white/20' : 'bg-black/20',
+          ]"
+          style="animation-delay: 0.2s"
+        />
+      </div>
+
+      <!-- CTA (sc-cta) -->
       <div
         :class="[
-          'h-3 w-1/2 rounded skeleton-shimmer',
-          isDarkMode ? 'bg-zinc-700' : 'bg-gray-300',
+          'h-[40px] w-full rounded-[14px] skeleton-shimmer',
+          isDarkMode ? 'bg-white/20' : 'bg-black/20',
         ]"
-        style="animation-delay: 0.1s"
-      />
-      <!-- Status badge -->
-      <div
-        :class="[
-          'h-5 w-16 rounded-full skeleton-shimmer',
-          isDarkMode ? 'bg-zinc-700' : 'bg-gray-300',
-        ]"
-        style="animation-delay: 0.2s"
+        style="animation-delay: 0.3s"
       />
     </div>
   </div>

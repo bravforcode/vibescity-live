@@ -1,5 +1,6 @@
 import mapboxgl from "mapbox-gl";
 import { markRaw, onUnmounted, ref, shallowRef } from "vue";
+import { useInteractionState } from "../useInteractionState";
 
 export function useMapCore(containerRef, _options = {}) {
 	const map = shallowRef(null);
@@ -220,6 +221,15 @@ export function useMapCore(containerRef, _options = {}) {
 
 		// Amplify scroll zoom speed (default rate is 1/450 — lower = faster)
 		map.value.scrollZoom.setWheelZoomRate(1 / 180);
+
+		// Interaction FSM Hooks
+		const { beginMapDrag, endMapDrag } = useInteractionState();
+		map.value.on("dragstart", beginMapDrag);
+		map.value.on("zoomstart", beginMapDrag);
+		map.value.on("pitchstart", beginMapDrag);
+		map.value.on("dragend", endMapDrag);
+		map.value.on("zoomend", endMapDrag);
+		map.value.on("pitchend", endMapDrag);
 
 		map.value.on("load", markMapReady);
 		map.value.on("style.load", markMapReady);

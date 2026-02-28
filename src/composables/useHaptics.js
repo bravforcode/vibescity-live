@@ -14,6 +14,12 @@ export const useHaptics = () => {
 		);
 	};
 
+	const microFeedback = () => {
+		if (isSupported()) {
+			navigator.vibrate([20]);
+		}
+	};
+
 	/**
 	 * Light tap feedback - for minor interactions
 	 */
@@ -77,6 +83,7 @@ export const useHaptics = () => {
 
 	return {
 		isSupported: isSupported(),
+		microFeedback,
 		tapFeedback,
 		selectFeedback,
 		successFeedback,

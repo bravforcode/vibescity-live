@@ -7,6 +7,7 @@ export function useScrollSync({
 	smoothFlyTo,
 	selectFeedback,
 	mobileCardScrollRef,
+	onScrollDecelerate, // ✅ Track intent on deceleration
 }) {
 	const normalizeId = (value) => {
 		if (value === null || value === undefined) return null;
@@ -141,6 +142,11 @@ export function useScrollSync({
 				selectFeedback();
 				lastHapticAt = Date.now();
 			}
+		}
+
+		// Fire intent signal for prefetching
+		if (onScrollDecelerate && centerId) {
+			onScrollDecelerate(centerId);
 		}
 	};
 

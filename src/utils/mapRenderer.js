@@ -246,12 +246,12 @@ export const createMarkerElement = ({
          ${isGiant ? `<div class="vibe-giant-badge">★</div>` : ""}
 
          ${
-           hasCoins
-              ? `<div class="marker-float" style="position:absolute;top:-10px;right:-10px;z-index:20;pointer-events:none;">
+						hasCoins
+							? `<div class="marker-float" style="position:absolute;top:-10px;right:-10px;z-index:20;pointer-events:none;">
                 ${COIN_FLIP_HTML}
               </div>`
-              : ""
-         }
+							: ""
+					}
        </div>
      </div>
    `;

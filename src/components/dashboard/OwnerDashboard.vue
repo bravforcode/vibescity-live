@@ -992,7 +992,7 @@ onMounted(() => {
   font-weight: 900;
   margin-left: auto;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
 .od-btn--exit:hover {
   background: rgba(239, 68, 68, 0.2);

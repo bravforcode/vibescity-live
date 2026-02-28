@@ -1,6 +1,6 @@
 <template>
   <div
-    class="relative overflow-hidden backdrop-blur-[20px] bg-surface-glass border border-white/10 shadow-elevation-1 transition-all duration-normal ease-emphasized"
+    class="relative overflow-hidden backdrop-blur-[20px] bg-surface-glass border border-white/10 shadow-elevation-1 transition-[transform,opacity,background-color,border-color,box-shadow] duration-normal ease-emphasized"
     :class="[
       roundedClass,
       interactive

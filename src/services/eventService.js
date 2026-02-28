@@ -341,7 +341,8 @@ async function fetchTicketmelonEvents() {
 	try {
 		// Note: This would need actual API access
 		// For now, return mock data structure
-		console.log("[EventService] Fetching from Ticketmelon...");
+		if (import.meta.env.DEV)
+			console.log("[EventService] Fetching from Ticketmelon...");
 
 		// In production, use:
 		// const response = await fetch('https://www.ticketmelon.com/api/events');
@@ -360,7 +361,8 @@ async function fetchTicketmelonEvents() {
 async function fetchFacebookEvents(accessToken, _locationIds = []) {
 	try {
 		if (!accessToken) {
-			console.log("[EventService] No Facebook access token provided");
+			if (import.meta.env.DEV)
+				console.log("[EventService] No Facebook access token provided");
 			return [];
 		}
 
@@ -381,7 +383,8 @@ async function fetchFacebookEvents(accessToken, _locationIds = []) {
  */
 async function fetchThaiTicketMajorEvents() {
 	try {
-		console.log("[EventService] Fetching from ThaiTicketMajor...");
+		if (import.meta.env.DEV)
+			console.log("[EventService] Fetching from ThaiTicketMajor...");
 
 		// This would need web scraping or API access
 		// For demonstration, return sample upcoming concerts
@@ -427,11 +430,13 @@ export async function getAllEvents(options = {}) {
 		eventCache.lastFetched &&
 		Date.now() - eventCache.lastFetched < CACHE_DURATION
 	) {
-		console.log("[EventService] Returning cached events");
+		if (import.meta.env.DEV)
+			console.log("[EventService] Returning cached events");
 		return filterEvents(eventCache.data, province, category);
 	}
 
-	console.log("[EventService] Fetching fresh events...");
+	if (import.meta.env.DEV)
+		console.log("[EventService] Fetching fresh events...");
 
 	// Fetch from all sources
 	const [recurringEvents, ticketmelonEvents, thaiTicketMajorEvents] =

@@ -5,6 +5,7 @@ import {
 	defineAsyncComponent,
 	nextTick,
 	onMounted,
+	provide,
 	ref,
 	watch,
 } from "vue";
@@ -20,6 +21,7 @@ import FilterMenuSync from "../components/ui/FilterMenu.vue";
 // FilterPills removed — FilterMenu modal handles category selection
 import MapErrorFallback from "../components/ui/MapErrorFallback.vue";
 import SidebarDrawer from "../components/ui/SidebarDrawer.vue";
+import { useMapPadding } from "../composables/map/useMapPadding";
 import { useAppLogic } from "../composables/useAppLogic";
 import { useLocalAds } from "../composables/useLocalAds";
 import { setClientCookie } from "../lib/cookies";
@@ -275,6 +277,16 @@ const {
 	handleExitGiantView,
 } = useAppLogic();
 
+// --- Cinematic Spatial Physics: Dynamic Map Padding ---
+const mapInstanceRef = computed(() => mapRef.value?.map);
+const mapPaddingApi = useMapPadding(mapInstanceRef, {
+	defaultTop: mapUiTopOffset,
+	defaultBottom: mapUiBottomOffset,
+	mobileBottom: 60,
+	isSidebarOpen: computed(() => isPanelOpen.value),
+});
+provide("mapPaddingApi", mapPaddingApi);
+
 // Auth removed — app uses anonymous visitor identity only
 
 watch(globalSearchQuery, (q) => {
@@ -306,6 +318,14 @@ const handleCardSelect = (shop) => {
 const handleMapReadyChange = (ready) => {
 	mapReadySignal.value = Boolean(ready);
 };
+
+watch(isImmersive, (immersive) => {
+	if (immersive) return;
+	nextTick(() => {
+		mapRef.value?.resize?.();
+		window.setTimeout(() => mapRef.value?.resize?.(), 120);
+	});
+});
 
 const isGiantPinView = ref(false);
 const onEnterGiantView = (shop) => {
@@ -393,8 +413,8 @@ const resolveVenueUrl = (shopOrId) => {
 
 const activeVenue = computed(() => {
 	const targetSlug = resolveVenueSlug(route.params.slug);
-	const targetId =
-		resolveVenueId(route.params.id) || resolveVenueId(activeShopId.value);
+	const routeIdParam = resolveVenueId(route.params.id);
+	const targetId = routeIdParam || resolveVenueId(activeShopId.value);
 
 	const candidates = [
 		...(filteredShops.value || []),
@@ -410,9 +430,16 @@ const activeVenue = computed(() => {
 	}
 
 	if (targetId) {
-		return (
-			candidates.find((shop) => resolveVenueId(shop?.id) === targetId) || null
-		);
+		const byId =
+			candidates.find((shop) => resolveVenueId(shop?.id) === targetId) || null;
+		if (byId) return byId;
+		if (routeIdParam) {
+			const asSlug = routeIdParam.toLowerCase();
+			return (
+				candidates.find((shop) => resolveVenueSlug(shop?.slug) === asSlug) ||
+				null
+			);
+		}
 	}
 
 	return null;
@@ -1163,7 +1190,9 @@ const hasFilteredResults = computed(() => {
           <div
             class="relative h-full overflow-y-auto no-scrollbar bg-gradient-to-b from-[#0b1020] via-zinc-950 to-zinc-900"
           >
-            <div class="p-3 pt-14 grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+            <div
+              class="p-3 pt-14 grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4"
+            >
               <SwipeCard
                 v-for="shop in filteredShops.slice(0, 10)"
                 :key="`land-${shop.id}`"
@@ -1416,7 +1445,9 @@ const hasFilteredResults = computed(() => {
   transform: translateY(-140%);
   opacity: 0;
   pointer-events: none;
-  transition: transform 160ms ease, opacity 160ms ease;
+  transition:
+    transform 160ms ease,
+    opacity 160ms ease;
 }
 
 .skip-link:focus-visible {

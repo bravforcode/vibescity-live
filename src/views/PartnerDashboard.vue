@@ -7,7 +7,7 @@ import {
 	PAYOUT_COUNTRY_OPTIONS,
 	PAYOUT_CURRENCY_OPTIONS,
 	THAI_BANK_OPTIONS,
-} from "@/constants/bankCatalog";
+} from "../constants/bankCatalog";
 import { partnerService } from "../services/partnerService";
 import { paymentService } from "../services/paymentService";
 import { getOrCreateVisitorId } from "../services/visitorIdentity";
@@ -55,9 +55,9 @@ const status = ref({
 	status: "inactive",
 	current_period_end: null,
 });
-const summary = ref(null);
-const profile = ref(null);
-const orders = ref([]);
+const summary = ref<any>(null);
+const profile = ref<any>(null);
+const orders = ref<any[]>([]);
 
 const profileForm = reactive({
 	displayName: "",
@@ -104,7 +104,7 @@ const referralLink = computed(() => {
 	return `${window.location.origin}/?ref=${encodeURIComponent(code)}`;
 });
 
-const formatMoney = (value) => {
+const formatMoney = (value: any) => {
 	const num = Number(value || 0);
 	return new Intl.NumberFormat("th-TH", {
 		style: "currency",
@@ -113,7 +113,7 @@ const formatMoney = (value) => {
 	}).format(Number.isFinite(num) ? num : 0);
 };
 
-const formatDate = (value) => {
+const formatDate = (value: any) => {
 	if (!value) return "-";
 	const date = new Date(value);
 	if (Number.isNaN(date.getTime())) return "-";
@@ -440,7 +440,13 @@ onMounted(() => {
                   :disabled="isStartingSubscription"
                   @click="startPartnerSubscription"
                 >
-                  {{ isStartingSubscription ? 'Opening checkout...' : hasAccess ? 'Manage Subscription' : 'Pay with Card / PromptPay' }}
+                  {{
+                    isStartingSubscription
+                      ? "Opening checkout..."
+                      : hasAccess
+                        ? "Manage Subscription"
+                        : "Pay with Card / PromptPay"
+                  }}
                 </button>
                 <button
                   v-if="!hasAccess"
@@ -448,7 +454,11 @@ onMounted(() => {
                   class="pd-cta pd-cta--manual"
                   @click="showManualPayment = !showManualPayment"
                 >
-                  {{ showManualPayment ? 'Hide Transfer Info' : 'Bank Transfer / QR' }}
+                  {{
+                    showManualPayment
+                      ? "Hide Transfer Info"
+                      : "Bank Transfer / QR"
+                  }}
                 </button>
               </div>
             </div>
@@ -457,13 +467,19 @@ onMounted(() => {
             <div v-if="showManualPayment && !hasAccess" class="pd-manual-pay">
               <div class="pd-manual-tabs">
                 <button
-                  :class="['pd-manual-tab', paymentTab === 'qr' && 'pd-manual-tab--active']"
+                  :class="[
+                    'pd-manual-tab',
+                    paymentTab === 'qr' && 'pd-manual-tab--active',
+                  ]"
                   @click="paymentTab = 'qr'"
                 >
                   Scan QR
                 </button>
                 <button
-                  :class="['pd-manual-tab', paymentTab === 'bank' && 'pd-manual-tab--active']"
+                  :class="[
+                    'pd-manual-tab',
+                    paymentTab === 'bank' && 'pd-manual-tab--active',
+                  ]"
                   @click="paymentTab = 'bank'"
                 >
                   Bank Transfer
@@ -473,9 +489,16 @@ onMounted(() => {
               <!-- QR Tab -->
               <div v-if="paymentTab === 'qr'" class="pd-qr-section">
                 <div class="pd-qr-box">
-                  <qrcode-vue v-if="qrPayload" :value="qrPayload" :size="180" level="H" />
+                  <qrcode-vue
+                    v-if="qrPayload"
+                    :value="qrPayload"
+                    :size="180"
+                    level="H"
+                  />
                 </div>
-                <p class="pd-qr-label">Scan PromptPay to pay {{ PARTNER_PRICE.toLocaleString() }} THB</p>
+                <p class="pd-qr-label">
+                  Scan PromptPay to pay {{ PARTNER_PRICE.toLocaleString() }} THB
+                </p>
                 <p class="pd-qr-sub">PromptPay ID: {{ PROMPTPAY_ID }}</p>
               </div>
 
@@ -498,7 +521,9 @@ onMounted(() => {
                 </div>
                 <div class="pd-bank-row">
                   <span class="pd-bank-label">Amount</span>
-                  <span class="pd-bank-value pd-bank-value--highlight">{{ PARTNER_PRICE.toLocaleString() }} THB</span>
+                  <span class="pd-bank-value pd-bank-value--highlight"
+                    >{{ PARTNER_PRICE.toLocaleString() }} THB</span
+                  >
                 </div>
               </div>
 
@@ -1445,7 +1470,9 @@ onMounted(() => {
   font-size: 0.78rem;
   font-weight: 800;
   color: rgba(255, 255, 255, 0.5);
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
   cursor: pointer;
 }
 .pd-manual-tab--active {

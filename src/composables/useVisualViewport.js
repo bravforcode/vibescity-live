@@ -7,17 +7,16 @@ import { onMounted, onUnmounted, ref } from "vue";
  */
 export function useVisualViewport() {
 	const isKeyboardOpen = ref(false);
+	let rafId = 0;
 
-	const handleViewportChange = () => {
+	const applyViewportChange = () => {
+		rafId = 0;
 		if (!window.visualViewport) return;
 
 		const vv = window.visualViewport;
 
-		// Set a CSS variable for the visual viewport inner height
 		document.documentElement.style.setProperty("--vv-height", `${vv.height}px`);
 
-		// If the visual height is significantly less than the window's inner height,
-		// it's very likely the virtual keyboard is open.
 		isKeyboardOpen.value = vv.height < window.innerHeight * 0.8;
 
 		if (isKeyboardOpen.value) {
@@ -27,18 +26,26 @@ export function useVisualViewport() {
 		}
 	};
 
+	const handleViewportChange = () => {
+		if (rafId) return;
+		rafId = requestAnimationFrame(applyViewportChange);
+	};
+
 	onMounted(() => {
 		if (typeof window === "undefined" || !window.visualViewport) return;
 
-		// Run once on mount
-		handleViewportChange();
+		applyViewportChange();
 
-		// Listen for screen resizes (keyboard toggles) or scrolling over the keyboard
-		window.visualViewport.addEventListener("resize", handleViewportChange);
-		window.visualViewport.addEventListener("scroll", handleViewportChange);
+		window.visualViewport.addEventListener("resize", handleViewportChange, {
+			passive: true,
+		});
+		window.visualViewport.addEventListener("scroll", handleViewportChange, {
+			passive: true,
+		});
 	});
 
 	onUnmounted(() => {
+		if (rafId) cancelAnimationFrame(rafId);
 		if (typeof window === "undefined" || !window.visualViewport) return;
 		window.visualViewport.removeEventListener("resize", handleViewportChange);
 		window.visualViewport.removeEventListener("scroll", handleViewportChange);

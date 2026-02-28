@@ -50,6 +50,8 @@ const CLUSTER_COUNT_LAYER_ID = "cluster-count";
 const DISTANCE_LINE_SOURCE_ID = "distance-line";
 const IS_E2E = import.meta.env.VITE_E2E === "true";
 const IS_STRICT_MAP_E2E = import.meta.env.VITE_E2E_MAP_REQUIRED === "true";
+const ENABLE_DOM_OVERLAY_MARKERS = IS_E2E || IS_STRICT_MAP_E2E;
+const ENABLE_DOM_COIN_MARKERS = false;
 const SHOULD_EXPOSE_MAP_DEBUG =
 	import.meta.env.DEV || IS_E2E || IS_STRICT_MAP_E2E;
 const TRAFFIC_RADIUS_KM = 1;
@@ -365,6 +367,8 @@ const teardownMap = () => {
 		map.value.off("move", handleMapMoveForEnhancements);
 		map.value.off("zoom", handleMapMoveForEnhancements);
 		map.value.off("moveend", handleMapMoveEndForWeather);
+		map.value.off("movestart", handleMoveStart3d);
+		map.value.off("moveend", handleMoveEnd3d);
 		map.value.off("style.load", handleMapStyleLoad);
 		map.value.off("click", PIN_LAYER_ID, handlePointClick);
 		map.value.off("mouseenter", PIN_LAYER_ID, setPointer);
@@ -1395,6 +1399,8 @@ watch(isMapReady, (ready) => {
 		map.value.off("move", handleMapMoveForEnhancements);
 		map.value.off("zoom", handleMapMoveForEnhancements);
 		map.value.off("moveend", handleMapMoveEndForWeather);
+		map.value.off("movestart", handleMoveStart3d);
+		map.value.off("moveend", handleMoveEnd3d);
 		map.value.off("style.load", handleMapStyleLoad);
 
 		map.value.on("moveend", scheduleMapRefresh);
@@ -1402,6 +1408,8 @@ watch(isMapReady, (ready) => {
 		map.value.on("move", handleMapMoveForEnhancements);
 		map.value.on("zoom", handleMapMoveForEnhancements);
 		map.value.on("moveend", handleMapMoveEndForWeather);
+		map.value.on("movestart", handleMoveStart3d);
+		map.value.on("moveend", handleMoveEnd3d);
 		map.value.on("style.load", handleMapStyleLoad);
 		currentMapZoom.value = map.value.getZoom();
 		scheduleMapRefresh({ force: true }); // Initial load
@@ -1566,6 +1574,7 @@ let lastMarkerUpdate = 0;
 const MARKER_UPDATE_THROTTLE = 200;
 
 const requestUpdateMarkers = () => {
+	if (!ENABLE_DOM_OVERLAY_MARKERS) return;
 	const timeSinceLastUpdate = Date.now() - lastMarkerUpdate;
 	if (timeSinceLastUpdate < MARKER_UPDATE_THROTTLE) {
 		// Throttle: wait remaining time
@@ -1649,10 +1658,12 @@ watch(
 		}
 
 		// Toggle DOM Markers
-		markersMap.value.forEach(({ marker }) => {
-			const el = marker.getElement();
-			if (el) el.style.opacity = shouldHide ? "0" : "1";
-		});
+		if (ENABLE_DOM_OVERLAY_MARKERS) {
+			markersMap.value.forEach(({ marker }) => {
+				const el = marker.getElement();
+				if (el) el.style.opacity = shouldHide ? "0" : "1";
+			});
+		}
 
 		eventMarkersMap.value.forEach((marker) => {
 			const el = marker.getElement();
@@ -1692,6 +1703,13 @@ watch(
 						map.value.setPaintProperty(layerId, "icon-opacity", opacity);
 					}
 				}
+			});
+		}
+
+		if (!shouldHide) {
+			nextTick(() => {
+				queueMapResize(true);
+				window.setTimeout(() => queueMapResize(true), 120);
 			});
 		}
 	},
@@ -1813,7 +1831,7 @@ const setupMapLayers = () => {
 		});
 	}
 
-	// Fix 1G: coin animation handled exclusively by DOM markers (useMapMarkers)
+	// Coin overlays are rendered by symbol layers (pin-coins / pin-coins-fallback).
 
 	if (!map.value.getLayer(PIN_HITBOX_LAYER_ID)) {
 		map.value.addLayer(
@@ -2230,13 +2248,14 @@ const showPopup = (item) => {
 };
 
 const updateMarkers = () => {
+	if (!ENABLE_DOM_OVERLAY_MARKERS) return;
 	if (!props.shops) return;
 	// Only giant pins get DOM markers; regular pins use GeoJSON symbol layer
 	updateMarkersCore(props.shops, props.highlightedShopId, {
 		pinsVisible: pinsVisible.value,
 		allowedIds: allowedIdsRef.value,
-		enableDomCoinMarkers: true,
-		renderRegularDomMarkers: IS_STRICT_MAP_E2E,
+		enableDomCoinMarkers: ENABLE_DOM_COIN_MARKERS,
+		renderRegularDomMarkers: ENABLE_DOM_OVERLAY_MARKERS,
 		onSelect: (shop) => handleMarkerClick(shop),
 		onOpenBuilding: (shop) => emit("open-building", shop),
 	});
@@ -2369,6 +2388,19 @@ const handleMapMoveForEnhancements = () => {
 		updateSoundVolumeFromZoom();
 	});
 };
+
+const BUILDING_3D_LAYERS = ["3d-buildings", "3d-buildings-cyber"];
+const set3dBuildingsVisible = (visible) => {
+	if (!map.value) return;
+	const vis = visible ? "visible" : "none";
+	BUILDING_3D_LAYERS.forEach((id) => {
+		if (map.value.getLayer(id)) {
+			map.value.setLayoutProperty(id, "visibility", vis);
+		}
+	});
+};
+const handleMoveStart3d = () => set3dBuildingsVisible(false);
+const handleMoveEnd3d = () => set3dBuildingsVisible(true);
 
 const handleMapMoveEndForWeather = () => {
 	void refreshTrafficSubset();
@@ -2610,6 +2642,42 @@ watch(
 		const shop =
 			shopStore.getShopById?.(newId) ||
 			props.shops?.find((s) => String(s.id) === String(newId));
+		// ── Pin Declutter: dim non-selected pins; restore all when deselected ──
+		if (map.value?.getLayer(PIN_LAYER_ID)) {
+			if (newId) {
+				const activeId = String(newId);
+				// icon-opacity: active=1.0, others=0.35 — GPU paint, no layout change
+				map.value.setPaintProperty(PIN_LAYER_ID, "icon-opacity", [
+					"match",
+					["to-string", ["get", "id"]],
+					activeId,
+					1,
+					0.35,
+				]);
+				// icon-size: active pin 1.3× — layout property, triggers pin "pop"
+				if (map.value.getLayer(PIN_LAYER_ID)) {
+					try {
+						map.value.setLayoutProperty(PIN_LAYER_ID, "icon-size", [
+							"match",
+							["to-string", ["get", "id"]],
+							activeId,
+							1.3,
+							1.0,
+						]);
+					} catch {
+						// Layer may not support data-driven icon-size; silently skip
+					}
+				}
+			} else {
+				map.value.setPaintProperty(PIN_LAYER_ID, "icon-opacity", 1);
+				try {
+					map.value.setLayoutProperty(PIN_LAYER_ID, "icon-size", 1.0);
+				} catch {
+					// ignore
+				}
+			}
+		}
+
 		if (shop) {
 			// Fix 1H: skip regular popup when giant pin modal is open
 			if (!props.isGiantPinView) showPopup(shop);

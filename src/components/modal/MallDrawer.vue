@@ -1,85 +1,100 @@
 // --- C:\vibecity.live\src\components\modal\MallDrawer.vue ---
 
 <script setup>
-import {
-	Building2,
-	Car,
-	Heart,
-	MapPin,
-	Search,
-	Share2,
-	X,
-} from "lucide-vue-next";
-import { computed, nextTick, onUnmounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
 import { useNotifications } from "@/composables/useNotifications";
+import { usePerformance } from "@/composables/usePerformance";
+import { useSpatialFeedback } from "@/composables/useSpatialFeedback";
+import { useSwipeToDismiss } from "@/composables/useSwipeToDismiss";
 import { resolveVenueMedia } from "@/domain/venue/viewModel";
+import {
+  Building2,
+  Car,
+  Heart,
+  MapPin,
+  Search,
+  Share2,
+  X,
+} from "lucide-vue-next";
+import {
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  onUnmounted,
+  ref,
+  watch,
+} from "vue";
+import { useI18n } from "vue-i18n";
 import { Z } from "../../constants/zIndex";
+
+const ImageLoader = defineAsyncComponent(() => import("../ui/ImageLoader.vue"));
 
 const { t } = useI18n();
 const { notifySuccess } = useNotifications();
+const { isDegraded } = usePerformance();
+const { playWoosh, playSnap, playDismiss, haptic } = useSpatialFeedback();
 
 const normalizeId = (value) => {
-	if (value === null || value === undefined) return "";
-	return String(value).trim();
+  if (value === null || value === undefined) return "";
+  return String(value).trim();
 };
 
 const isSelectedShop = (shopId) => {
-	const selected = normalizeId(props.selectedShopId);
-	if (!selected) return false;
-	return selected === normalizeId(shopId);
+  const selected = normalizeId(props.selectedShopId);
+  if (!selected) return false;
+  return selected === normalizeId(shopId);
 };
 
 const isFavorited = (shopId) => {
-	const id = normalizeId(shopId);
-	if (!id) return false;
-	return (props.favorites || []).some((fav) => normalizeId(fav) === id);
+  const id = normalizeId(shopId);
+  if (!id) return false;
+  return (props.favorites || []).some((fav) => normalizeId(fav) === id);
 };
 
 const getShopImage = (shop) => {
-	const media = resolveVenueMedia(shop || {});
-	return media.primaryImage || shop?.Image_URL1 || "";
+  const media = resolveVenueMedia(shop || {});
+  return media.primaryImage || shop?.Image_URL1 || "";
 };
 
 // import ShopCard from "../panel/ShopCard.vue"; // Optional: Reuse if needed, but custom list item is better for this view
 
 const props = defineProps({
-	isOpen: {
-		type: Boolean,
-		default: false,
-	},
-	building: {
-		type: Object,
-		default: null,
-	},
-	shops: {
-		type: Array,
-		default: () => [],
-	},
-	// If true, data is treated as an Event
-	isEventMode: {
-		type: Boolean,
-		default: true,
-	},
-	isDarkMode: {
-		type: Boolean,
-		default: true,
-	},
-	favorites: {
-		type: Array,
-		default: () => [],
-	},
-	selectedShopId: {
-		type: [String, Number],
-		default: null,
-	},
+  isOpen: {
+    type: Boolean,
+    default: false,
+  },
+  building: {
+    type: Object,
+    default: null,
+  },
+  shops: {
+    type: Array,
+    default: () => [],
+  },
+  // If true, data is treated as an Event
+  isEventMode: {
+    type: Boolean,
+    default: true,
+  },
+  isDarkMode: {
+    type: Boolean,
+    default: true,
+  },
+  favorites: {
+    type: Array,
+    default: () => [],
+  },
+  selectedShopId: {
+    type: [String, Number],
+    default: null,
+  },
 });
 
 const emit = defineEmits([
-	"close",
-	"select-shop",
-	"open-ride-modal",
-	"toggle-favorite",
+  "close",
+  "select-shop",
+  "open-ride-modal",
+  "prefetch-ride",
+  "toggle-favorite",
 ]);
 
 const activeTab = ref("ALL"); // ALL, Food, Fashion, Beauty, Tech, Cinema
@@ -87,259 +102,339 @@ const activeFloor = ref(null); // Selected floor for Mall mode
 const searchQuery = ref("");
 const isSearchExpanded = ref(false); // New state for compact search
 const searchInputRef = ref(null);
-const drawerRef = ref(null);
+const backdropRef = ref(null);
+const {
+  elementRef: drawerRef,
+  pullY,
+  isDragging,
+} = useSwipeToDismiss({
+  threshold: 120,
+  onClose: () => emit("close"),
+  onFrame: ({ y }) => {
+    if (!backdropRef.value) return;
+    const op = Math.max(0, 0.6 * (1 - Math.max(0, y) / 120));
+    backdropRef.value.style.backgroundColor = `rgba(0,0,0,${op})`;
+    if (!isDegraded.value) {
+      const blur = Math.max(0, 4 * (1 - Math.max(0, y) / 120));
+      backdropRef.value.style.backdropFilter = `blur(${blur}px)`;
+      backdropRef.value.style.webkitBackdropFilter = `blur(${blur}px)`;
+    } else {
+      backdropRef.value.style.backdropFilter = "none";
+      backdropRef.value.style.webkitBackdropFilter = "none";
+    }
+    // Pin-modal coupling: drive pin glow from drag progress
+    if (mapPaddingApi) {
+      const progress = 1 - Math.min(1, Math.max(0, y) / 120);
+      mapPaddingApi.setPinDragProgress(progress);
+    }
+  },
+  onPredictRestState: ({ state, velocityPxMs }) => {
+    if (state === "close") {
+      playDismiss();
+      haptic("dismiss");
+    } else {
+      playSnap();
+      haptic("snap");
+    }
+    if (Math.abs(velocityPxMs) > 0.3) {
+      playWoosh(Math.abs(velocityPxMs));
+    }
+  },
+});
+// Gesture-synced backdrop constants
+const MALL_DISMISS_THRESHOLD = 120;
+
 const closeButtonRef = ref(null);
 const drawerTitleId = "mall-drawer-title";
+
+// --- Cinematic Spatial Physics: Dynamic Map Padding ---
+const mapPaddingApi = inject("mapPaddingApi", null);
+if (mapPaddingApi) {
+  mapPaddingApi.bindDrawer(drawerRef);
+
+  watch(
+    () => props.isOpen,
+    (val) => mapPaddingApi.setDrawerOpen(val),
+    { immediate: true },
+  );
+
+  watch(
+    [() => props.selectedShopId, () => props.shops, () => props.building],
+    ([id, shops, building]) => {
+      if (id && shops?.length) {
+        const shop = shops.find((s) => String(s.id) === String(id));
+        if (shop && shop.lat && shop.lng) {
+          mapPaddingApi.setActivePin([Number(shop.lng), Number(shop.lat)]);
+          mapPaddingApi.setActivePinId(id);
+          return;
+        }
+      }
+      if (building && building.lat && building.lng) {
+        mapPaddingApi.setActivePin([
+          Number(building.lng),
+          Number(building.lat),
+        ]);
+        return;
+      }
+      mapPaddingApi.setActivePin(null);
+      mapPaddingApi.setActivePinId(null);
+    },
+    { immediate: true },
+  );
+}
+
+// Backdrop opacity/blur tracks pullY in real-time (no CSS class flicker)
+// Removed reactive backdropOpacity/backdropBlurPx to prevent 60FPS Vue render thrashing
 
 const scrollContainerRef = ref(null);
 const shopRefs = ref({});
 const focusableSelector =
-	'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
+  'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
 let previousFocusedElement = null;
 
 // ✅ Check if building is currently open
 const isBuildingOpen = computed(() => {
-	if (!props.building?.openTime || !props.building?.closeTime) return true;
-	const now = new Date();
-	const time = now.getHours() * 100 + now.getMinutes();
-	const open = parseInt(props.building.openTime.replace(":", ""));
-	const close = parseInt(props.building.closeTime.replace(":", ""));
-	return time >= open && time <= close;
+  if (!props.building?.openTime || !props.building?.closeTime) return true;
+  const now = new Date();
+  const time = now.getHours() * 100 + now.getMinutes();
+  const open = parseInt(props.building.openTime.replace(":", ""));
+  const close = parseInt(props.building.closeTime.replace(":", ""));
+  return time >= open && time <= close;
 });
 
 // Reset state when building changes or drawer opens
 const resetDrawerState = () => {
-	activeTab.value = "ALL";
-	searchQuery.value = "";
-	isSearchExpanded.value = false;
+  activeTab.value = "ALL";
+  searchQuery.value = "";
+  isSearchExpanded.value = false;
 
-	// Initialize floor for Mall mode
-	if (props.building?.floors?.length) {
-		// Default to first floor if none selected
-		if (!activeFloor.value) {
-			activeFloor.value = props.building.floors[0];
-		}
-	} else {
-		activeFloor.value = null;
-	}
+  // Initialize floor for Mall mode
+  if (props.building?.floors?.length) {
+    // Default to first floor if none selected
+    if (!activeFloor.value) {
+      activeFloor.value = props.building.floors[0];
+    }
+  } else {
+    activeFloor.value = null;
+  }
 
-	// Auto-scroll to selected shop if provided
-	if (props.selectedShopId) {
-		// Find shop info to auto-select its floor
-		const shop = props.shops.find(
-			(s) => normalizeId(s.id) === normalizeId(props.selectedShopId),
-		);
-		if (shop?.Floor) {
-			activeFloor.value = shop.Floor;
-		}
+  // Auto-scroll to selected shop if provided
+  if (props.selectedShopId) {
+    // Find shop info to auto-select its floor
+    const shop = props.shops.find(
+      (s) => normalizeId(s.id) === normalizeId(props.selectedShopId),
+    );
+    if (shop?.Floor) {
+      activeFloor.value = shop.Floor;
+    }
 
-		nextTick(() => {
-			setTimeout(() => {
-				const el = shopRefs.value[props.selectedShopId];
-				if (el) {
-					el.scrollIntoView({ behavior: "smooth", block: "center" });
-				}
-			}, 300); // Wait for transition
-		});
-	}
+    nextTick(() => {
+      setTimeout(() => {
+        const el = shopRefs.value[props.selectedShopId];
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 300); // Wait for transition
+    });
+  }
 };
 
 watch(
-	() => props.isOpen,
-	(val) => {
-		if (val) {
-			resetDrawerState();
-			previousFocusedElement = document.activeElement;
-			lockBodyScroll(true);
-			document.addEventListener("keydown", handleDocumentKeydown);
-			nextTick(() => closeButtonRef.value?.focus?.());
-		} else {
-			lockBodyScroll(false);
-			document.removeEventListener("keydown", handleDocumentKeydown);
-			if (previousFocusedElement?.focus) {
-				nextTick(() => previousFocusedElement.focus());
-			}
-		}
-	},
-	{ immediate: true },
+  () => props.isOpen,
+  (val) => {
+    if (val) {
+      resetDrawerState();
+      previousFocusedElement = document.activeElement;
+      lockBodyScroll(true);
+      document.addEventListener("keydown", handleDocumentKeydown);
+      nextTick(() => closeButtonRef.value?.focus?.());
+    } else {
+      lockBodyScroll(false);
+      document.removeEventListener("keydown", handleDocumentKeydown);
+      if (previousFocusedElement?.focus) {
+        nextTick(() => previousFocusedElement.focus());
+      }
+    }
+  },
+  { immediate: true },
 );
 
 watch(
-	() => props.building?.id,
-	() => {
-		if (props.isOpen) resetDrawerState();
-	},
+  () => props.building?.id,
+  () => {
+    if (props.isOpen) resetDrawerState();
+  },
 );
 
 const handleExpandSearch = () => {
-	isSearchExpanded.value = true;
-	nextTick(() => {
-		searchInputRef.value?.focus();
-	});
+  isSearchExpanded.value = true;
+  nextTick(() => {
+    searchInputRef.value?.focus();
+  });
 };
 
 const handleClearSearch = () => {
-	searchQuery.value = "";
-	isSearchExpanded.value = false;
+  searchQuery.value = "";
+  isSearchExpanded.value = false;
 };
 
 function lockBodyScroll(locked) {
-	document.documentElement.style.overflow = locked ? "hidden" : "";
-	document.body.style.overflow = locked ? "hidden" : "";
+  document.documentElement.style.overflow = locked ? "hidden" : "";
+  document.body.style.overflow = locked ? "hidden" : "";
 }
 
 function trapFocus(e) {
-	if (e.key !== "Tab" || !drawerRef.value) return;
-	const focusables = drawerRef.value.querySelectorAll(focusableSelector);
-	if (!focusables.length) return;
+  if (e.key !== "Tab" || !drawerRef.value) return;
+  const focusables = drawerRef.value.querySelectorAll(focusableSelector);
+  if (!focusables.length) return;
 
-	const first = focusables[0];
-	const last = focusables[focusables.length - 1];
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
 
-	if (e.shiftKey && document.activeElement === first) {
-		e.preventDefault();
-		last.focus();
-	} else if (!e.shiftKey && document.activeElement === last) {
-		e.preventDefault();
-		first.focus();
-	}
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
 }
 
 function handleDocumentKeydown(e) {
-	if (!props.isOpen) return;
-	if (e.key === "Escape") {
-		e.preventDefault();
-		emit("close");
-		return;
-	}
-	trapFocus(e);
+  if (!props.isOpen) return;
+  if (e.key === "Escape") {
+    e.preventDefault();
+    emit("close");
+    return;
+  }
+  trapFocus(e);
 }
 
 // Derived Categories based on data or static list
 const categories = [
-	{ id: "ALL", label: t("categories.all") },
-	{ id: "Food", label: t("categories.food") },
-	{ id: "Fashion", label: t("categories.fashion") },
-	{ id: "Beauty", label: t("categories.beauty") },
-	{ id: "Tech", label: t("categories.tech") },
-	{ id: "Cinema", label: t("categories.cinema") },
+  { id: "ALL", label: t("categories.all") },
+  { id: "Food", label: t("categories.food") },
+  { id: "Fashion", label: t("categories.fashion") },
+  { id: "Beauty", label: t("categories.beauty") },
+  { id: "Tech", label: t("categories.tech") },
+  { id: "Cinema", label: t("categories.cinema") },
 ];
 
 // Computed Filtered Shops
 const filteredShops = computed(() => {
-	let result = props.shops;
-	// 1. Filter by Floor if in Mall mode (Priority)
-	if (activeFloor.value) {
-		result = result.filter((s) => {
-			if (!s.Floor) return true; // Show shops with no floor? Or maybe hide? Let's show for now to be safe
-			return (
-				String(s.Floor).trim().toUpperCase() ===
-				String(activeFloor.value).trim().toUpperCase()
-			);
-		});
-	}
+  let result = props.shops;
+  // 1. Filter by Floor if in Mall mode (Priority)
+  if (activeFloor.value) {
+    result = result.filter((s) => {
+      if (!s.Floor) return true; // Show shops with no floor? Or maybe hide? Let's show for now to be safe
+      return (
+        String(s.Floor).trim().toUpperCase() ===
+        String(activeFloor.value).trim().toUpperCase()
+      );
+    });
+  }
 
-	// 2. Filter by Tab
-	if (activeTab.value !== "ALL") {
-		const tab = activeTab.value;
-		result = result.filter((s) => {
-			const cat = (s.category || "").toLowerCase();
-			if (tab === "Food")
-				return (
-					cat.includes("food") ||
-					cat.includes("restaurant") ||
-					cat.includes("cafe") ||
-					cat.includes("bar") ||
-					cat.includes("กิน")
-				);
-			if (tab === "Fashion")
-				return (
-					cat.includes("fashion") ||
-					cat.includes("clothing") ||
-					cat.includes("bag") ||
-					cat.includes("แต่งตัว")
-				);
-			if (tab === "Beauty")
-				return (
-					cat.includes("beauty") ||
-					cat.includes("jewelry") ||
-					cat.includes("cosmetic") ||
-					cat.includes("ความงาม")
-				);
-			if (tab === "Tech")
-				return (
-					cat.includes("tech") ||
-					cat.includes("gadget") ||
-					cat.includes("mobile") ||
-					cat.includes("ไอที")
-				);
-			if (tab === "Cinema")
-				return (
-					cat.includes("cinema") ||
-					cat.includes("movie") ||
-					cat.includes("game") ||
-					cat.includes("บันเทิง")
-				);
-			return true;
-		});
-	}
+  // 2. Filter by Tab
+  if (activeTab.value !== "ALL") {
+    const tab = activeTab.value;
+    result = result.filter((s) => {
+      const cat = (s.category || "").toLowerCase();
+      if (tab === "Food")
+        return (
+          cat.includes("food") ||
+          cat.includes("restaurant") ||
+          cat.includes("cafe") ||
+          cat.includes("bar") ||
+          cat.includes("กิน")
+        );
+      if (tab === "Fashion")
+        return (
+          cat.includes("fashion") ||
+          cat.includes("clothing") ||
+          cat.includes("bag") ||
+          cat.includes("แต่งตัว")
+        );
+      if (tab === "Beauty")
+        return (
+          cat.includes("beauty") ||
+          cat.includes("jewelry") ||
+          cat.includes("cosmetic") ||
+          cat.includes("ความงาม")
+        );
+      if (tab === "Tech")
+        return (
+          cat.includes("tech") ||
+          cat.includes("gadget") ||
+          cat.includes("mobile") ||
+          cat.includes("ไอที")
+        );
+      if (tab === "Cinema")
+        return (
+          cat.includes("cinema") ||
+          cat.includes("movie") ||
+          cat.includes("game") ||
+          cat.includes("บันเทิง")
+        );
+      return true;
+    });
+  }
 
-	// 2. Filter by Search
-	if (searchQuery.value) {
-		const q = searchQuery.value.toLowerCase();
-		result = result.filter(
-			(s) =>
-				(s.name || "").toLowerCase().includes(q) ||
-				(s.category || "").toLowerCase().includes(q),
-		);
-		return result; // ถ้า search ให้โชว์ผลลัพธ์เลย (ไม่ Random)
-	}
+  // 2. Filter by Search
+  if (searchQuery.value) {
+    const q = searchQuery.value.toLowerCase();
+    result = result.filter(
+      (s) =>
+        (s.name || "").toLowerCase().includes(q) ||
+        (s.category || "").toLowerCase().includes(q),
+    );
+    return result; // ถ้า search ให้โชว์ผลลัพธ์เลย (ไม่ Random)
+  }
 
-	// 3. Highlight/Random View (When Tab is ALL and No Search)
-	if (activeTab.value === "ALL" && !searchQuery.value) {
-		// Logic: Pick LIVE shops first, then Randomly pick some others to look "Full" but not overwhelming
-		const liveShops = result.filter((s) => s.status === "LIVE");
-		const otherShops = result.filter((s) => s.status !== "LIVE");
+  // 3. Highlight/Random View (When Tab is ALL and No Search)
+  if (activeTab.value === "ALL" && !searchQuery.value) {
+    // Logic: Pick LIVE shops first, then Randomly pick some others to look "Full" but not overwhelming
+    const liveShops = result.filter((s) => s.status === "LIVE");
+    const otherShops = result.filter((s) => s.status !== "LIVE");
 
-		// Shuffle others (Simple randomize for "Discovery" feel)
-		const shuffled = otherShops.sort(() => 0.5 - Math.random());
+    // Shuffle others (Simple randomize for "Discovery" feel)
+    const shuffled = otherShops.sort(() => 0.5 - Math.random());
 
-		return [...liveShops, ...shuffled];
-	}
+    return [...liveShops, ...shuffled];
+  }
 
-	// 4. Sort: Live first, then by Floor (For Tab Views)
-	return result.sort((a, b) => {
-		// Live priority
-		const aLive = a.status === "LIVE" ? 1 : 0;
-		const bLive = b.status === "LIVE" ? 1 : 0;
-		if (aLive !== bLive) return bLive - aLive;
+  // 4. Sort: Live first, then by Floor (For Tab Views)
+  return result.sort((a, b) => {
+    // Live priority
+    const aLive = a.status === "LIVE" ? 1 : 0;
+    const bLive = b.status === "LIVE" ? 1 : 0;
+    if (aLive !== bLive) return bLive - aLive;
 
-		// Then Floor
-		return (a.Floor || "").localeCompare(b.Floor || "");
-	});
+    // Then Floor
+    return (a.Floor || "").localeCompare(b.Floor || "");
+  });
 });
 
 const handleShare = (item) => {
-	const name = item.name || item.EventName || "Amazing Vibe";
-	const url = `${window.location.href}?shop=${item.id}`;
+  const name = item.name || item.EventName || "Amazing Vibe";
+  const url = `${window.location.href}?shop=${item.id}`;
 
-	if (navigator.share) {
-		navigator
-			.share({
-				title: `Check out ${name} on VibeCity!`,
-				text: `Hey! found this cool place on VibeCity.live`,
-				url: url,
-			})
-			.catch(console.error);
-	} else {
-		navigator.clipboard.writeText(url);
-		notifySuccess("Link copied to clipboard!");
-	}
+  if (navigator.share) {
+    navigator
+      .share({
+        title: `Check out ${name} on VibeCity!`,
+        text: `Hey! found this cool place on VibeCity.live`,
+        url: url,
+      })
+      .catch(console.error);
+  } else {
+    navigator.clipboard.writeText(url);
+    notifySuccess("Link copied to clipboard!");
+  }
 };
 
 onUnmounted(() => {
-	lockBodyScroll(false);
-	document.removeEventListener("keydown", handleDocumentKeydown);
+  lockBodyScroll(false);
+  document.removeEventListener("keydown", handleDocumentKeydown);
 });
 </script>
 
@@ -348,7 +443,7 @@ onUnmounted(() => {
     <div
       v-if="isOpen"
       ref="drawerRef"
-      class="fixed inset-x-0 bottom-0 h-[85%] flex flex-col rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)] overflow-hidden"
+      class="fixed inset-x-0 bottom-0 h-[85%] flex flex-col rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)] overflow-hidden touch-pan-x"
       :style="{ zIndex: Z.DRAWER }"
       :class="isDarkMode ? 'bg-zinc-900' : 'bg-white'"
       role="dialog"
@@ -359,10 +454,9 @@ onUnmounted(() => {
       <!-- Header Image Area -->
       <div class="relative h-40 sm:h-48 flex-shrink-0">
         <div class="absolute inset-0">
-          <img
+          <ImageLoader
             v-if="building?.Image_URL || building?.image"
             :src="building?.Image_URL || building?.image"
-            class="w-full h-full object-cover"
           />
           <div
             v-else
@@ -377,7 +471,7 @@ onUnmounted(() => {
           ref="closeButtonRef"
           @click="emit('close')"
           aria-label="Close mall drawer"
-          class="absolute top-4 right-4 w-12 h-12 rounded-full bg-black/40 text-white flex items-center justify-center backdrop-blur-md hover:bg-black/60 transition-colors transition-transform z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+          class="absolute top-4 right-4 w-12 h-12 rounded-full bg-black/40 text-white flex items-center justify-center backdrop-blur-md hover:bg-black/60 transition z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
         >
           <X class="w-5 h-5" />
         </button>
@@ -412,7 +506,7 @@ onUnmounted(() => {
             building && emit('toggle-favorite', building.id || building.key)
           "
           aria-label="Toggle mall favorite"
-          class="w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md transition-colors transition-transform active:scale-90 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70"
+          class="w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md transition active:scale-90 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70"
           :class="[
             building && favorites.includes(Number(building.id || building.key))
               ? 'bg-pink-500 border-pink-400 text-white'
@@ -442,7 +536,7 @@ onUnmounted(() => {
         <button
           @click.stop="handleShare(building)"
           aria-label="Share mall"
-          class="w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-colors transition-transform active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+          class="w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md bg-white/10 border border-white/20 text-white hover:bg-white/20 transition active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
         >
           <Share2 class="w-5 h-5 text-white" />
         </button>
@@ -487,13 +581,15 @@ onUnmounted(() => {
             class="flex-1 flex items-center justify-between min-w-0"
           >
             <!-- Horizontal Scrollable Tabs -->
-            <div class="flex overflow-x-auto no-scrollbar gap-2 pb-1 pr-2">
+            <div
+              class="flex overflow-x-auto no-scrollbar gap-2 pb-1 pr-2 snap-x snap-mandatory overscroll-x-contain"
+            >
               <button
                 v-for="cat in categories"
                 :key="cat.id"
                 @click="activeTab = cat.id"
                 :class="[
-                  'px-4 py-2 rounded-xl text-xs font-black transition-colors transition-transform whitespace-nowrap active:scale-95 border-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70',
+                  'snap-center px-4 py-2 rounded-xl text-xs font-black transition whitespace-nowrap active:scale-95 border-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70',
                   activeTab === cat.id
                     ? 'bg-blue-600 text-white border-blue-400 shadow-lg shadow-blue-500/20'
                     : isDarkMode
@@ -509,7 +605,7 @@ onUnmounted(() => {
             <button
               @click="handleExpandSearch"
               aria-label="Expand search"
-              class="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full transition-colors transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+              class="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
               :class="
                 isDarkMode
                   ? 'bg-white/10 text-white hover:bg-white/20'
@@ -574,7 +670,7 @@ onUnmounted(() => {
                   v-for="fl in building.floors"
                   :key="fl"
                   @click="activeFloor = fl"
-                  class="px-4 py-2 rounded-xl text-sm font-black transition-colors transition-transform active:scale-90 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+                  class="px-4 py-2 rounded-xl text-sm font-black transition active:scale-90 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
                   :class="[
                     activeFloor === fl
                       ? 'bg-blue-600 border-blue-500 text-white shadow-lg'
@@ -611,6 +707,8 @@ onUnmounted(() => {
               <img
                 :src="building.floorPlanUrls[activeFloor]"
                 class="w-full aspect-video object-contain p-4 transition-transform duration-700 group-hover:scale-110"
+                loading="lazy"
+                decoding="async"
               />
               <div
                 class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent pointer-events-none"
@@ -638,13 +736,20 @@ onUnmounted(() => {
               >
                 {{ t("mall.highlights") }}
               </h3>
-              <div class="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+              <div
+                class="flex gap-3 overflow-x-auto no-scrollbar pb-2 snap-x snap-mandatory overscroll-x-contain"
+              >
                 <div
                   v-for="(hl, idx) in building.highlights || []"
                   :key="idx"
-                  class="flex-shrink-0 w-64 h-36 rounded-xl overflow-hidden relative shadow-md bg-gray-800"
+                  class="snap-center flex-shrink-0 w-64 h-36 rounded-xl overflow-hidden relative shadow-md bg-gray-800"
                 >
-                  <img :src="hl.src" class="w-full h-full object-cover" />
+                  <img
+                    :src="hl.src"
+                    class="w-full h-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </div>
               </div>
               <p
@@ -658,14 +763,18 @@ onUnmounted(() => {
             <!-- CTA Buttons -->
             <div class="flex flex-col gap-3">
               <button
-                class="w-full py-4 rounded-2xl bg-blue-600 text-white font-black uppercase shadow-lg shadow-blue-600/30 active:scale-95 transition-colors transition-transform flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+                class="w-full py-4 rounded-2xl bg-blue-600 text-white font-black uppercase shadow-lg shadow-blue-600/30 active:scale-95 transition flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
               >
                 <span><MapPin class="w-4 h-4 inline-block" /></span>
                 {{ t("mall.navigate") }}
               </button>
               <button
                 @click="emit('open-ride-modal', building)"
-                class="w-full py-4 rounded-2xl bg-white/10 text-white font-black uppercase border border-white/10 hover:bg-white/20 active:scale-95 transition-colors transition-transform flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-400/70"
+                @mouseenter="building && emit('prefetch-ride', building)"
+                @touchstart.passive="
+                  building && emit('prefetch-ride', building)
+                "
+                class="w-full py-4 rounded-2xl bg-white/10 text-white font-black uppercase border border-white/10 hover:bg-white/20 active:scale-95 transition flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-400/70"
               >
                 <span><Car class="w-4 h-4 inline-block" /></span>
                 {{ t("mall.taxi") }}
@@ -690,6 +799,12 @@ onUnmounted(() => {
             <div
               v-for="shop in filteredShops"
               :key="shop.id"
+              v-memo="[
+                shop.id,
+                shop.status,
+                isSelectedShop(shop.id),
+                isDarkMode,
+              ]"
               :ref="
                 (el) => {
                   if (el) shopRefs[shop.id] = el;
@@ -698,7 +813,7 @@ onUnmounted(() => {
               @click="emit('select-shop', shop)"
               @keydown.enter.prevent="emit('select-shop', shop)"
               @keydown.space.prevent="emit('select-shop', shop)"
-              class="flex items-center gap-3 p-3 rounded-2xl transition-colors transition-transform cursor-pointer group active:scale-[0.98] border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+              class="flex items-center gap-3 p-3 rounded-2xl transition cursor-pointer group active:scale-[0.98] border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
               role="button"
               tabindex="0"
               :aria-label="`Open ${shop.name || 'venue'} details`"
@@ -715,11 +830,10 @@ onUnmounted(() => {
               <div
                 class="w-16 h-16 rounded-xl overflow-hidden relative flex-shrink-0 bg-gray-500"
               >
-                <img
+                <ImageLoader
                   v-if="getShopImage(shop)"
                   :src="getShopImage(shop)"
-                  class="w-full h-full object-cover"
-                  loading="lazy"
+                  :alt="shop.name"
                 />
                 <!-- Live Badge on Thumb -->
                 <div
@@ -770,25 +884,23 @@ onUnmounted(() => {
                 <button
                   @click.stop="emit('toggle-favorite', shop.id)"
                   :aria-label="`Toggle favorite for ${shop.name || 'venue'}`"
-                   class="w-8 h-8 flex items-center justify-center rounded-lg transition-colors transition-transform active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70"
-                   :class="[
-                     isFavorited(shop.id)
-                       ? 'text-pink-500 bg-pink-500/10'
-                       : 'text-gray-400 hover:text-pink-400 hover:bg-pink-400/5',
-                   ]"
-                 >
-                   <Heart
-                     class="w-4 h-4"
-                     :class="
-                       isFavorited(shop.id) ? 'fill-current' : ''
-                     "
-                   />
-                 </button>
+                  class="w-8 h-8 flex items-center justify-center rounded-lg transition active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70"
+                  :class="[
+                    isFavorited(shop.id)
+                      ? 'text-pink-500 bg-pink-500/10'
+                      : 'text-gray-400 hover:text-pink-400 hover:bg-pink-400/5',
+                  ]"
+                >
+                  <Heart
+                    class="w-4 h-4"
+                    :class="isFavorited(shop.id) ? 'fill-current' : ''"
+                  />
+                </button>
                 <!-- Share -->
                 <button
                   @click.stop="handleShare(shop)"
                   :aria-label="`Share ${shop.name || 'venue'}`"
-                  class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-blue-400 hover:bg-blue-400/5 transition-colors transition-transform active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+                  class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-blue-400 hover:bg-blue-400/5 transition active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
                 >
                   <Share2 class="w-4 h-4" />
                 </button>
@@ -806,13 +918,22 @@ onUnmounted(() => {
     </div>
   </transition>
 
-  <!-- Backgroun Overlay -->
+  <!-- Backdrop — opacity + blur tied to swipe gesture in real-time -->
   <transition name="fade">
     <div
       v-if="isOpen"
-      class="fixed inset-0 bg-black/60 backdrop-blur-sm"
-      :style="{ zIndex: Z.DRAWER_BACKDROP }"
+      ref="backdropRef"
+      class="fixed inset-0 will-change-[backdrop-filter,opacity]"
+      :style="{
+        zIndex: Z.DRAWER_BACKDROP,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        backdropFilter: isDegraded ? 'none' : 'blur(4px)',
+        transition: isDragging
+          ? 'none'
+          : 'background-color 0.3s ease, backdrop-filter 0.3s ease',
+      }"
       @click="emit('close')"
+      aria-hidden="true"
     ></div>
   </transition>
 </template>

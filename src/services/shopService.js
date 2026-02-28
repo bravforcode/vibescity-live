@@ -1,5 +1,25 @@
 import { isSupabaseSchemaCacheError, supabase } from "../lib/supabase";
 
+const VENUE_LIST_COLUMNS =
+	"id,name,slug,category,description,status,province,district,zone,building,floor,category_color,latitude,longitude,location,image_urls,image_url_1,image_url_2,video_url,social_links,is_promoted,rating,review_count,is_verified,pin_type,pin_metadata,visibility_score,open_time,close_time,golden_time,end_golden_time,vibe_info,crowd_info,promotion_info,promotion_endtime";
+
+const fetchVenuesWithFallback = async (mutateQuery) => {
+	const buildQuery = (select) => {
+		let query = supabase.from("venues").select(select);
+		if (typeof mutateQuery === "function") {
+			query = mutateQuery(query);
+		}
+		return query;
+	};
+
+	let { data, error } = await buildQuery(VENUE_LIST_COLUMNS);
+	if (error && isSupabaseSchemaCacheError(error)) {
+		({ data, error } = await buildQuery("*"));
+	}
+	if (error) throw error;
+	return data || [];
+};
+
 /**
  * Maps Supabase Postgres data to the internal shop object format.
  * This ensures the UI doesn't break even if DB column names differ from CSV headers.
@@ -72,17 +92,13 @@ const mapShopData = (item, index) => {
 
 export const getShops = async (province = "ทุกจังหวัด") => {
 	try {
-		let query = supabase.from("venues").select("*");
-
-		if (province && province !== "ทุกจังหวัด") {
-			query = query.eq("province", province);
-		}
-
-		const { data, error } = await query;
-
-		if (error) throw error;
-
-		return (data || []).map((item, index) => mapShopData(item, index));
+		const data = await fetchVenuesWithFallback((query) => {
+			if (province && province !== "ทุกจังหวัด") {
+				return query.eq("province", province);
+			}
+			return query;
+		});
+		return data.map((item, index) => mapShopData(item, index));
 	} catch (error) {
 		console.error("Error fetching shops from Supabase:", error);
 		throw new Error("Unable to load data from Supabase");
@@ -94,13 +110,10 @@ export const getShops = async (province = "ทุกจังหวัด") => {
  */
 export const getLiveEverywhere = async () => {
 	try {
-		const { data, error } = await supabase
-			.from("venues")
-			.select("*")
-			.eq("status", "active");
-
-		if (error) throw error;
-		return (data || []).map((item, index) => mapShopData(item, index));
+		const data = await fetchVenuesWithFallback((query) =>
+			query.eq("status", "active"),
+		);
+		return data.map((item, index) => mapShopData(item, index));
 	} catch (err) {
 		console.error("Error fetching live everywhere:", err);
 		return [];

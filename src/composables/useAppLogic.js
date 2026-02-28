@@ -17,9 +17,9 @@ import { useUserStore } from "../store/userStore";
 import { openExternal } from "../utils/browserUtils";
 import { calculateDistance } from "../utils/shopUtils";
 import {
-	loadFavoritesWithTTL,
-	removeFavoriteItem,
-	saveFavoriteItem,
+    loadFavoritesWithTTL,
+    removeFavoriteItem,
+    saveFavoriteItem,
 } from "../utils/storageHelper";
 import { useAudioSystem } from "./useAudioSystem";
 // ✅ Modular Composables
@@ -224,7 +224,10 @@ export function useAppLogic() {
 		return !isIdle.value;
 	});
 
-	// --- 6. Init Scroll Sync ---
+	// --- 5.5. Spatial Intent Predictor & Prefetch ---
+	const intentPredictor = useIntentPredictor();
+	const prefetchEngine = usePrefetchEngine();
+
 	const scrollSync = useScrollSync({
 		activeShopId,
 		shops: computed(() => shopStore.visibleShops),
@@ -232,6 +235,7 @@ export function useAppLogic() {
 		smoothFlyTo,
 		selectFeedback,
 		mobileCardScrollRef,
+		onScrollDecelerate: intentPredictor.recordCarouselDeceleration,
 	});
 	const {
 		handleHorizontalScroll,
@@ -632,6 +636,47 @@ export function useAppLogic() {
 		}
 	});
 
+	// Map Breathe Settle Animation
+	const triggerMapBreathe = () => {
+		if (!mapRef.value || !mapRef.value.isZooming || !mapRef.value.isMoving)
+			return;
+		// Safe check: no active map drag, no cinematic fly
+		if (mapRef.value.isZooming() || mapRef.value.isMoving()) return;
+
+		const prefersReducedMotion =
+			typeof window !== "undefined"
+				? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+				: false;
+		if (prefersReducedMotion) return;
+
+		const currentZoom = mapRef.value.getZoom();
+
+		mapRef.value.easeTo({
+			zoom: currentZoom - 0.1,
+			duration: 400,
+			easing: (t) => t * (2 - t),
+		});
+		setTimeout(() => {
+			if (mapRef.value && !mapRef.value.isMoving()) {
+				mapRef.value.easeTo({
+					zoom: currentZoom,
+					duration: 400,
+					easing: (t) => t * (2 - t),
+				});
+			}
+		}, 400);
+	};
+
+	watch(
+		[() => uiLogic.showProfileDrawer?.value, showMallDrawer],
+		([newProf, newMall], [oldProf, oldMall]) => {
+			if ((oldProf && !newProf) || (oldMall && !newMall)) {
+				// Wait slightly for drawer to clear viewport visually
+				setTimeout(() => triggerMapBreathe(), 100);
+			}
+		},
+	);
+
 	// Gestures (Must be called in setup, not inside onMounted)
 	useEdgeSwipe(() => {
 		showSidebar.value = true;
@@ -644,6 +689,8 @@ export function useAppLogic() {
 	let timeInterval = null;
 	let popStateHandler = null;
 	let deepLinkTimer = null;
+	let cardClickTimer = null;
+	let searchBlurTimer = null;
 	let initRunSeq = 0;
 
 	// --- Initialization Logic ---
@@ -898,6 +945,9 @@ export function useAppLogic() {
 
 	onMounted(() => {
 		initApp();
+		intentPredictor.observeCards();
+		prefetchEngine.startEngine();
+
 		if (typeof window !== "undefined") {
 			popStateHandler = () => {
 				const venueRef = getVenueRefFromPath(window.location.pathname);
@@ -910,6 +960,7 @@ export function useAppLogic() {
 	});
 
 	onUnmounted(() => {
+		prefetchEngine.stopEngine();
 		if (timeInterval) {
 			clearInterval(timeInterval);
 			timeInterval = null;

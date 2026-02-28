@@ -220,12 +220,12 @@ export const useShopStore = defineStore(
 		// 📦 State
 		// ═══════════════════════════════════════════
 		const rawShops = shallowRef([]); // shallowRef for performance
-		const shopMap = ref(new Map()); // Quick lookup by ID
-		const slugMap = ref(new Map()); // Quick lookup by slug (lowercased)
+		const shopMap = shallowRef(new Map()); // shallowRef: no proxy traversal
+		const slugMap = shallowRef(new Map()); // shallowRef: no proxy traversal
 		const reviews = ref({});
 		const reviewsUnavailable = ref(false);
 		const reviewsApiDisabled = ref(false);
-		const collectedCoins = ref(new Set());
+		const collectedCoins = shallowRef(new Set());
 		const currentTime = ref(new Date()); // ✅ Current time for status calculations
 
 		// UI State

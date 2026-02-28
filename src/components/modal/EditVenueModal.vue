@@ -1,15 +1,21 @@
-<script setup>
+<script setup lang="ts">
 import { Loader2, Save, X } from "lucide-vue-next";
 import { ref } from "vue";
-import { useNotifications } from "@/composables/useNotifications";
-import { supabase } from "@/lib/supabase";
+import { useNotifications } from "../../composables/useNotifications";
+import { useThrottledAction } from "../../composables/useThrottledAction";
+import { supabase } from "../../lib/supabase";
 
-const props = defineProps({
-	venue: {
-		type: Object,
-		required: true,
-	},
-});
+interface VenueInput {
+	id: string | number;
+	shop_name?: string;
+	name?: string;
+	category?: string;
+	description?: string;
+}
+
+const props = defineProps<{
+	venue: VenueInput;
+}>();
 
 const emit = defineEmits(["close"]);
 
@@ -21,8 +27,10 @@ const form = ref({
 
 const isSaving = ref(false);
 const { notifySuccess, notifyError } = useNotifications();
+const { createThrottledAction } = useThrottledAction({ delayMs: 1000 });
 
 const saveChanges = async () => {
+	if (isSaving.value) return;
 	isSaving.value = true;
 	try {
 		const visitorId = localStorage.getItem("vibe_visitor_id");
@@ -38,12 +46,18 @@ const saveChanges = async () => {
 
 		notifySuccess("Venue updated successfully!");
 		emit("close", true); // Refresh parent
-	} catch (e) {
-		notifyError(`Error updating: ${e.message}`);
+	} catch (error) {
+		const message =
+			error instanceof Error ? error.message : "Unable to save venue updates.";
+		notifyError(`Error updating: ${message}`);
 	} finally {
 		isSaving.value = false;
 	}
 };
+
+const saveChangesThrottled = createThrottledAction(() => {
+	void saveChanges();
+});
 </script>
 
 <template>
@@ -68,13 +82,20 @@ const saveChanges = async () => {
         </button>
       </div>
 
-      <div class="space-y-4">
+      <form
+        class="space-y-4 transition-opacity"
+        :class="{ 'pointer-events-none opacity-50': isSaving }"
+        @submit.prevent="saveChangesThrottled"
+      >
         <div>
           <label class="block text-xs font-bold text-white/50 uppercase mb-1"
             >Venue Name</label
           >
           <input
             v-model="form.name"
+            type="text"
+            autocomplete="organization"
+            aria-label="Venue name"
             class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none"
           />
         </div>
@@ -85,6 +106,7 @@ const saveChanges = async () => {
           >
           <select
             v-model="form.category"
+            aria-label="Venue category"
             class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none"
           >
             <option value="Cafe">Cafe</option>
@@ -103,20 +125,22 @@ const saveChanges = async () => {
           <textarea
             v-model="form.description"
             rows="3"
+            aria-label="Venue description"
             class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none resize-none"
           ></textarea>
         </div>
 
         <button
-          @click="saveChanges"
+          type="submit"
           :disabled="isSaving"
+          aria-label="Save venue changes"
           class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition mt-4"
         >
           <Loader2 v-if="isSaving" class="w-4 h-4 animate-spin" />
           <Save v-else class="w-4 h-4" />
           {{ isSaving ? "Saving…" : "Save Changes" }}
         </button>
-      </div>
+      </form>
     </div>
   </div>
 </template>

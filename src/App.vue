@@ -2,12 +2,17 @@
 import { onMounted, watch } from "vue";
 import ReloadPrompt from "@/components/pwa/ReloadPrompt.vue";
 import ConsentBanner from "@/components/ui/ConsentBanner.vue";
+import StickyOfflineBanner from "@/components/ui/StickyOfflineBanner.vue";
 import VibeNotification from "@/components/ui/VibeNotification.vue";
 import { useHomeBase } from "@/composables/useHomeBase";
+import { useNetworkResilience } from "@/composables/useNetworkResilience";
+import { useVisualViewport } from "@/composables/useVisualViewport";
 import { useLocationStore } from "@/store/locationStore";
 
 const locationStore = useLocationStore();
 const { setHomeBase, hasHomeBase } = useHomeBase();
+useNetworkResilience();
+useVisualViewport();
 
 const parseEnvBool = (value) => {
 	const raw = String(value ?? "")
@@ -68,6 +73,7 @@ watch(
 <template>
   <!-- Skip Link for Keyboard Accessibility -->
   <a href="#main-content" class="skip-link">Skip to main content</a>
+  <StickyOfflineBanner />
   <ReloadPrompt />
   <ConsentBanner />
   <router-view v-slot="{ Component }">
@@ -89,6 +95,33 @@ watch(
 ::-webkit-scrollbar-thumb {
   background-color: rgba(255, 255, 255, 0.2);
   border-radius: 4px;
+}
+
+:root {
+  --vv-height: 100dvh;
+}
+
+.keyboard-open #main-content {
+  height: var(--vv-height);
+  min-height: var(--vv-height);
+}
+
+/* ✅ App-Like Page Transitions */
+.page-enter-active,
+.page-leave-active {
+  transition:
+    opacity 0.35s cubic-bezier(0.25, 1, 0.5, 1),
+    transform 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: scale(0.98) translateY(10px);
+}
+
+.page-leave-to {
+  opacity: 0;
+  transform: scale(1.02) translateY(-10px);
 }
 
 /* ✅ UI Transitions */

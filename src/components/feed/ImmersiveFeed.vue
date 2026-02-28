@@ -2,6 +2,7 @@
 import { ArrowLeft, Heart, Share2, User } from "lucide-vue-next";
 import { computed, defineAsyncComponent, ref } from "vue";
 import { useHaptics } from "../../composables/useHaptics";
+import { useThrottledAction } from "../../composables/useThrottledAction";
 import { useCoinStore } from "../../store/coinStore";
 import { useShopStore } from "../../store/shopStore";
 
@@ -35,6 +36,7 @@ const emit = defineEmits([
 
 const shopStore = useShopStore();
 const { selectFeedback } = useHaptics();
+const { createThrottledAction } = useThrottledAction({ delayMs: 1000 });
 
 // Current Active Shop Logic
 const activeShopIndex = ref(0);
@@ -71,11 +73,26 @@ const isFavorited = (shopId) => {
 	return (props.favorites || []).some((fav) => normalizeId(fav) === id);
 };
 
-const handleFavorite = (shopId) => {
+const runHandleFavorite = (shopId) => {
+	if (!shopId) return;
 	selectFeedback();
-	shopStore.toggleFavorite(shopId);
-	coinStore.awardCoins(1);
+	try {
+		shopStore.toggleFavorite(shopId);
+		if (typeof coinStore.awardCoins === "function") {
+			coinStore.awardCoins(1);
+		} else if (typeof coinStore.awardBonus === "function") {
+			void coinStore.awardBonus(1, "favorite");
+		}
+	} catch (error) {
+		if (import.meta.env.DEV) {
+			console.error("[ImmersiveFeed] Favorite action failed", error);
+		}
+	}
 };
+
+const handleFavorite = createThrottledAction((shopId) => {
+	runHandleFavorite(shopId);
+});
 
 const handleShare = async (shop) => {
 	selectFeedback();
@@ -91,7 +108,7 @@ const handleShare = async (shop) => {
 			console.error(err);
 		}
 	} else {
-		console.log("Web Share API not supported");
+		if (import.meta.env.DEV) console.log("Web Share API not supported");
 	}
 };
 

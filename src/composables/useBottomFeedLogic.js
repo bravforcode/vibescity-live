@@ -215,29 +215,9 @@ export function useBottomFeedLogic(props, emit) {
 		}
 
 		// 2. Normal Carousel (Horizontal)
-		const cardWidth = 220;
-		const gap = 12;
-		const cardStride = cardWidth + gap;
-
-		const center = container.scrollLeft + container.clientWidth / 2;
-		const index = Math.round((center - cardStride / 2) / cardStride);
-
-		if (index >= 0 && index < props.carouselShops.length) {
-			const shop = props.carouselShops[index];
-			if (shop && normalizeId(shop.id) !== normalizeId(props.activeShopId)) {
-				emit("click-shop", shop);
-				// Auto-open modal with debounce — only once per shop per session
-				const shopKey = normalizeId(shop.id);
-				if (shopKey && !autoOpenedShops.has(shopKey)) {
-					if (autoOpenTimer) clearTimeout(autoOpenTimer);
-					autoOpenTimer = setTimeout(() => {
-						autoOpenedShops.add(shopKey);
-						emit("open-detail", shop);
-						autoOpenTimer = null;
-					}, 350);
-				}
-			}
-		}
+		// Parent scroll engine (useAppLogic.handleHorizontalScroll) is the single
+		// source of truth for horizontal active-card sync.
+		return;
 	};
 
 	const handleScroll = (e) => {
@@ -256,7 +236,9 @@ export function useBottomFeedLogic(props, emit) {
 			emit("load-more");
 		}
 
-		// Optimized active detection — runs in BOTH carousel and immersive mode
+		// Optimized active detection — immersive mode only.
+		// Horizontal mode is handled by the parent scroll engine.
+		if (!props.isImmersive) return;
 		if (scrollFrame) cancelAnimationFrame(scrollFrame);
 		scrollFrame = requestAnimationFrame(() => {
 			detectActiveCard(container);

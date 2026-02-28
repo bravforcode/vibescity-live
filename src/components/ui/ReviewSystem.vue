@@ -1,9 +1,11 @@
 <script setup>
 import { MessageSquare, ShieldCheck } from "lucide-vue-next";
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useHaptics } from "../../composables/useHaptics";
 import { useMotionPreference } from "../../composables/useMotionPreference";
+import { useNotifications } from "../../composables/useNotifications";
+import { useThrottledAction } from "../../composables/useThrottledAction";
 import { useShopStore } from "../../store/shopStore";
 import { useUserStore } from "../../store/userStore";
 
@@ -21,7 +23,9 @@ const props = defineProps({
 const { t } = useI18n();
 const shopStore = useShopStore();
 const userStore = useUserStore();
-const { tapFeedback, successFeedback } = useHaptics();
+const { tapFeedback, successFeedback, microFeedback } = useHaptics();
+const { notifyError } = useNotifications();
+const { createThrottledAction } = useThrottledAction({ delayMs: 1000 });
 const { shouldReduceMotion, getAnimationDuration } = useMotionPreference();
 
 // Emoji reaction definitions
@@ -38,6 +42,8 @@ const selectedReaction = ref(null);
 const isSubmitting = ref(false);
 const showSuccess = ref(false);
 const animatingEmoji = ref(null);
+const successTimer = ref(null);
+const resetTimer = ref(null);
 
 const shopReviews = computed(() => shopStore.getShopReviews(props.shopId));
 
@@ -90,13 +96,12 @@ onMounted(() => {
 	shopStore.fetchShopReviews(props.shopId);
 });
 
-const selectReaction = async (reaction) => {
+const runSelectReaction = async (reaction) => {
 	if (isSubmitting.value) return;
 
 	tapFeedback();
 	animatingEmoji.value = reaction.key;
 
-	// Toggle if same reaction
 	if (selectedReaction.value === reaction.key) {
 		selectedReaction.value = null;
 		animatingEmoji.value = null;
@@ -104,37 +109,56 @@ const selectReaction = async (reaction) => {
 	}
 
 	selectedReaction.value = reaction.key;
-
 	isSubmitting.value = true;
 
 	try {
-		// Save reaction to DB (encoded as a review comment; counts derived server-side)
 		await shopStore.addReview(props.shopId, {
 			rating: null,
 			comment: `Reaction: ${reaction.emoji} ${reaction.key}`,
 			userName: userStore.userProfile?.name || "Vibe Explorer",
 		});
-
-		// Re-fetch to keep counts consistent with DB
 		await shopStore.fetchShopReviews(props.shopId);
-
 		successFeedback();
+		microFeedback();
 		showSuccess.value = true;
 
-		setTimeout(
+		if (successTimer.value) clearTimeout(successTimer.value);
+		successTimer.value = setTimeout(
 			() => {
 				showSuccess.value = false;
 			},
 			shouldReduceMotion.value ? 1000 : 2000,
 		);
-	} catch {
+	} catch (error) {
+		if (import.meta.env.DEV) {
+			console.error("[ReviewSystem] Failed to submit reaction", error);
+		}
+		notifyError(
+			t("reviews.submit_failed") || "Unable to save reaction right now",
+		);
 	} finally {
 		isSubmitting.value = false;
-		setTimeout(() => {
+		if (resetTimer.value) clearTimeout(resetTimer.value);
+		resetTimer.value = setTimeout(() => {
 			animatingEmoji.value = null;
 		}, getAnimationDuration(600));
 	}
 };
+
+const selectReaction = createThrottledAction((reaction) => {
+	void runSelectReaction(reaction);
+});
+
+onUnmounted(() => {
+	if (successTimer.value) {
+		clearTimeout(successTimer.value);
+		successTimer.value = null;
+	}
+	if (resetTimer.value) {
+		clearTimeout(resetTimer.value);
+		resetTimer.value = null;
+	}
+});
 </script>
 
 <template>

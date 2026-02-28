@@ -2,11 +2,11 @@
 import { Heart, MapPin, Navigation, Share2, Sparkles } from "lucide-vue-next";
 import { defineAsyncComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { DynamicScroller, DynamicScrollerItem } from "vue-virtual-scroller";
 import "vue-virtual-scroller/dist/vue-virtual-scroller.css";
 import { useBottomFeedLogic } from "../../composables/useBottomFeedLogic";
 import { useDragScroll } from "../../composables/useDragScroll";
 import { useHaptics } from "../../composables/useHaptics";
+import { useThrottledAction } from "../../composables/useThrottledAction";
 import ShopCard from "../panel/ShopCard.vue";
 import PullToRefresh from "../ui/PullToRefresh.vue";
 import SwipeCard from "../ui/SwipeCard.vue";
@@ -85,6 +85,7 @@ const emit = defineEmits([
 
 // ✅ Haptic Feedback
 const { tapFeedback, selectFeedback, impactFeedback } = useHaptics();
+const { createThrottledAction } = useThrottledAction({ delayMs: 1000 });
 
 // ✅ Bottom Feed Logic (extracted to composable)
 const {
@@ -128,11 +129,15 @@ const toggleView = () => {
 	selectFeedback();
 };
 
+const emitToggleFavorite = createThrottledAction((shopId) => {
+	emit("toggle-favorite", shopId);
+});
+
 // ✅ Virtual scroller item size (dynamic)
 const getItemSize = (index) => {
 	// Active card is larger due to scale effect
 	const isActive = props.carouselShops[index]?.id === props.activeShopId;
-	return props.isImmersive ? window.innerHeight : isActive ? 220 : 200;
+	return props.isImmersive ? window.innerHeight : isActive ? 160 : 140;
 };
 </script>
 
@@ -192,25 +197,26 @@ const getItemSize = (index) => {
     </div>
 
     <!-- Grid View -->
-      <div
-        v-if="isGridView"
-        @scroll="handleScroll"
-        class="px-4 py-2 pb-24 h-[60vh] overflow-y-auto no-scrollbar grid grid-cols-2 md:grid-cols-3 gap-3 animate-fade-in pointer-events-auto"
+    <div
+      v-if="isGridView"
+      @scroll="handleScroll"
+      class="px-4 py-2 pb-24 h-[60vh] overflow-y-auto no-scrollbar grid grid-cols-2 md:grid-cols-3 gap-3 animate-fade-in pointer-events-auto"
+    >
+      <button
+        v-for="shop in carouselShops"
+        :key="shop.id"
+        @click="emit('open-detail', shop)"
+        :aria-label="`Open details for ${shop.name}`"
+        type="button"
+        class="relative aspect-[3/4] rounded-2xl overflow-hidden bg-zinc-900 border border-white/10 shadow-xl active:scale-95 transition-[transform,opacity,box-shadow,border-color,background-color] hover:shadow-2xl hover:shadow-purple-500/20 text-left"
       >
-        <button
-          v-for="shop in carouselShops"
-          :key="shop.id"
-          @click="emit('open-detail', shop)"
-          :aria-label="`Open details for ${shop.name}`"
-          type="button"
-          class="relative aspect-[3/4] rounded-2xl overflow-hidden bg-zinc-900 border border-white/10 shadow-xl active:scale-95 transition-[transform,opacity,box-shadow,border-color,background-color] hover:shadow-2xl hover:shadow-purple-500/20 text-left"
-        >
         <img
           v-if="shop.Image_URL1"
           :src="shop.Image_URL1"
           :alt="shop.name"
           class="absolute inset-0 w-full h-full object-cover"
           loading="lazy"
+          decoding="async"
         />
         <div
           class="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent"
@@ -419,7 +425,7 @@ const getItemSize = (index) => {
                 @swipe-left="emit('swipe-left', shop)"
                 @swipe-right="emit('swipe-right', shop)"
                 @expand="emit('open-detail', shop)"
-                @toggle-favorite="emit('toggle-favorite', shop.id)"
+                @toggle-favorite="emitToggleFavorite(shop.id)"
                 @share="emit('share-shop', shop)"
                 @open-ride="emit('open-ride', shop)"
                 :data-shop-id="shop.id"
@@ -429,12 +435,12 @@ const getItemSize = (index) => {
                 :class="[
                   isImmersive
                     ? 'w-full h-[100dvh] rounded-none scale-100 opacity-100'
-                    : 'w-[220px] h-[196px]',
+                    : 'w-[160px] h-[220px]',
                   !isImmersive && activeShopId === shop.id
                     ? 'scale-100 z-20'
                     : '',
                   !isImmersive && activeShopId !== shop.id
-                    ? 'scale-90 opacity-100'
+                    ? 'scale-95 opacity-100'
                     : '',
                 ]"
               >
@@ -478,7 +484,7 @@ const getItemSize = (index) => {
                   class="absolute right-4 bottom-32 flex flex-col gap-4 z-40"
                 >
                   <button
-                    @click="emit('toggle-favorite', shop.id)"
+                    @click="emitToggleFavorite(shop.id)"
                     aria-label="Like this venue"
                     class="w-14 h-14 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center text-white border border-white/20 shadow-xl hover:scale-110 active:scale-95 transition-[transform,opacity,box-shadow,border-color,background-color]"
                     :class="

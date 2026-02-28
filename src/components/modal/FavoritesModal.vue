@@ -12,10 +12,12 @@ import {
 	Trash2,
 	X,
 } from "lucide-vue-next";
-import { computed, ref } from "vue";
+import { computed, defineAsyncComponent, ref } from "vue";
 import { useHaptics } from "../../composables/useHaptics";
 import { useFavoritesStore } from "../../store/favoritesStore";
 import { useShopStore } from "../../store/shopStore";
+
+const ImageLoader = defineAsyncComponent(() => import("../ui/ImageLoader.vue"));
 
 defineProps({
 	isOpen: {
@@ -102,7 +104,11 @@ const close = () => {
               <p class="fm-subtitle">{{ favoritesStore.count }} places</p>
             </div>
           </div>
-          <button class="fm-close-btn" aria-label="Close favorites" @click="close">
+          <button
+            class="fm-close-btn"
+            aria-label="Close favorites"
+            @click="close"
+          >
             <X class="w-5 h-5" />
           </button>
         </header>
@@ -115,7 +121,7 @@ const close = () => {
             placeholder="Search saved places..."
             class="fm-search"
             aria-label="Search favorites"
-          >
+          />
         </div>
 
         <div class="fm-list">
@@ -124,7 +130,9 @@ const close = () => {
               <Heart class="w-10 h-10 text-rose-500/40" />
             </div>
             <p class="fm-empty-title">No saved places yet</p>
-            <p class="fm-empty-hint">Double-tap any venue card to save it here</p>
+            <p class="fm-empty-hint">
+              Double-tap any venue card to save it here
+            </p>
           </div>
 
           <div v-else-if="favoriteShops.length === 0" class="fm-empty">
@@ -132,12 +140,14 @@ const close = () => {
             <p class="fm-empty-hint">Try a different search term</p>
           </div>
 
-          <TransitionGroup v-else tag="ul" name="fm-list-item" class="fm-cards" role="list">
-            <li
-              v-for="shop in favoriteShops"
-              :key="shop.id"
-              class="fm-card"
-            >
+          <TransitionGroup
+            v-else
+            tag="ul"
+            name="fm-list-item"
+            class="fm-cards"
+            role="list"
+          >
+            <li v-for="shop in favoriteShops" :key="shop.id" class="fm-card">
               <button
                 class="fm-card-main"
                 data-testid="favorites-open-item"
@@ -145,15 +155,11 @@ const close = () => {
                 @click="selectShop(shop)"
               >
                 <div class="fm-thumb">
-                  <img
+                  <ImageLoader
                     v-if="shop.Image_URL1 || shop.media?.primaryImage"
                     :src="shop.Image_URL1 || shop.media?.primaryImage"
                     :alt="shop.name || 'Venue image'"
-                    class="fm-thumb-img"
-                    loading="lazy"
-                    decoding="async"
-                    draggable="false"
-                  >
+                  />
                   <div v-else class="fm-thumb-placeholder" aria-hidden="true">
                     {{ (shop.name || "?").charAt(0).toUpperCase() }}
                   </div>
@@ -170,8 +176,14 @@ const close = () => {
                   <p class="fm-card-category">{{ shop.category || "-" }}</p>
                   <div class="fm-card-meta">
                     <MapPin class="w-3 h-3 flex-shrink-0" aria-hidden="true" />
-                    <span>{{ shop.distance != null ? `${Number(shop.distance).toFixed(1)} km` : "Nearby" }}</span>
-                    <span v-if="shop.rating" class="fm-card-rating">★ {{ Number(shop.rating).toFixed(1) }}</span>
+                    <span>{{
+                      shop.distance != null
+                        ? `${Number(shop.distance).toFixed(1)} km`
+                        : "Nearby"
+                    }}</span>
+                    <span v-if="shop.rating" class="fm-card-rating"
+                      >★ {{ Number(shop.rating).toFixed(1) }}</span
+                    >
                   </div>
                 </div>
 
@@ -215,9 +227,15 @@ const close = () => {
   flex-direction: column;
   border-radius: 24px 24px 0 0;
   overflow: hidden;
-  background: linear-gradient(170deg, rgba(18 24 52 / 0.98) 0%, rgba(8 12 24 / 0.99) 100%);
+  background: linear-gradient(
+    170deg,
+    rgba(18 24 52 / 0.98) 0%,
+    rgba(8 12 24 / 0.99) 100%
+  );
   border-top: 1px solid rgba(255 255 255 / 0.1);
-  box-shadow: 0 -8px 40px rgba(0 0 0 / 0.5), 0 -1px 0 rgba(255 255 255 / 0.06) inset;
+  box-shadow:
+    0 -8px 40px rgba(0 0 0 / 0.5),
+    0 -1px 0 rgba(255 255 255 / 0.06) inset;
   padding-bottom: env(safe-area-inset-bottom, 0px);
   contain: layout paint style;
 }
@@ -285,7 +303,10 @@ const close = () => {
   color: rgba(255 255 255 / 0.55);
   background: rgba(255 255 255 / 0.06);
   border: 1px solid rgba(255 255 255 / 0.08);
-  transition: background 0.15s, color 0.15s, transform 0.1s;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    transform 0.1s;
 }
 
 .fm-close-btn:hover {
@@ -328,7 +349,9 @@ const close = () => {
   font-size: 0.875rem;
   color: #fff;
   outline: none;
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
 }
 
 .fm-search::placeholder {
@@ -416,7 +439,9 @@ const close = () => {
   gap: 12px;
   padding: 12px;
   cursor: pointer;
-  transition: background 0.15s, transform 0.12s;
+  transition:
+    background 0.15s,
+    transform 0.12s;
   touch-action: manipulation;
 }
 
@@ -460,7 +485,11 @@ const close = () => {
   font-size: 1.25rem;
   font-weight: 900;
   color: rgba(255 255 255 / 0.4);
-  background: linear-gradient(135deg, rgba(99 102 241 / 0.2), rgba(236 72 153 / 0.2));
+  background: linear-gradient(
+    135deg,
+    rgba(99 102 241 / 0.2),
+    rgba(236 72 153 / 0.2)
+  );
 }
 
 .fm-live-dot {
@@ -528,7 +557,9 @@ const close = () => {
   width: 18px;
   height: 18px;
   color: rgba(255 255 255 / 0.2);
-  transition: transform 0.15s, color 0.15s;
+  transition:
+    transform 0.15s,
+    color 0.15s;
 }
 
 .fm-card-main:hover .fm-card-chevron {
@@ -547,7 +578,9 @@ const close = () => {
   font-weight: 700;
   color: rgba(248 113 113 / 0.7);
   border-top: 1px solid rgba(255 255 255 / 0.05);
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
 .fm-remove-btn:hover {
@@ -587,11 +620,15 @@ const close = () => {
 }
 
 .fm-list-item-enter-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 
 .fm-list-item-leave-active {
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
 }
 
 .fm-list-item-enter-from {

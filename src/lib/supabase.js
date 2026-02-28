@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { getNetworkOnlineState } from "../services/networkState";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -10,6 +11,9 @@ const SCHEMA_CACHE_BROWNOUT_MS = 8_000;
 const SCHEMA_CACHE_RETRY_MAX_ATTEMPTS = 3;
 const SCHEMA_CACHE_RETRY_BASE_DELAY_MS = 220;
 const SCHEMA_CACHE_RETRY_MAX_DELAY_MS = 1_200;
+const OFFLINE_STATUS_CODE =
+	Number(import.meta.env.VITE_OFFLINE_HTTP_STATUS) || 503;
+const OFFLINE_ERROR_CODE = "VIBECITY_OFFLINE";
 const RETRYABLE_HTTP_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const RETRYABLE_READONLY_RPCS = new Set([
 	"get_map_pins",
@@ -90,6 +94,44 @@ const getRequestMeta = (input, init = {}) => {
 	};
 };
 
+const getSupabaseOrigin = () => {
+	try {
+		return new URL(String(supabaseUrl || "")).origin;
+	} catch {
+		return "";
+	}
+};
+
+const isSupabaseRequest = (requestUrl) => {
+	const normalizedUrl = String(requestUrl || "");
+	if (!normalizedUrl) return false;
+	const supabaseOrigin = getSupabaseOrigin();
+	if (supabaseOrigin && normalizedUrl.startsWith(supabaseOrigin)) return true;
+	return normalizedUrl.includes("supabase.co");
+};
+
+const isOffline = () => {
+	if (typeof navigator !== "undefined" && navigator.onLine === false) {
+		return true;
+	}
+	return !getNetworkOnlineState();
+};
+
+const buildOfflineResponse = (meta) => {
+	const body = JSON.stringify({
+		code: OFFLINE_ERROR_CODE,
+		message: "Network offline. Request queued or deferred.",
+		method: meta?.method || "GET",
+		url: meta?.url || "",
+	});
+	return new Response(body, {
+		status: OFFLINE_STATUS_CODE,
+		headers: {
+			"Content-Type": "application/json",
+		},
+	});
+};
+
 const isSchemaCacheRetryableRequest = ({ method, rpcName }) => {
 	if (RETRYABLE_HTTP_METHODS.has(method)) return true;
 	if (method === "POST" && rpcName) {
@@ -135,6 +177,10 @@ const createSupabaseFetch = () => {
 		let attempt = 0;
 
 		while (attempt < maxAttempts) {
+			if (isSupabaseRequest(meta.url) && isOffline()) {
+				return buildOfflineResponse(meta);
+			}
+
 			if (canRetry && schemaCacheBrownoutUntil > Date.now()) {
 				const waitMs = Math.min(300, schemaCacheBrownoutUntil - Date.now());
 				if (waitMs > 0) {
@@ -142,7 +188,18 @@ const createSupabaseFetch = () => {
 				}
 			}
 
-			const response = await nativeFetch(input, init);
+			let response;
+			try {
+				response = await nativeFetch(input, init);
+			} catch (fetchError) {
+				if (isSupabaseRequest(meta.url)) {
+					if (import.meta.env.DEV) {
+						console.error("[supabase] Network request failed:", fetchError);
+					}
+					return buildOfflineResponse(meta);
+				}
+				throw fetchError;
+			}
 			if (response.ok || !canRetry) return response;
 
 			const payload = await extractSchemaCachePayload(response);

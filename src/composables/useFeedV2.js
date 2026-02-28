@@ -16,7 +16,7 @@ const PAGE_SIZE = 20;
 /**
  * Fetch a single page of feed data from the Supabase RPC.
  */
-async function fetchFeedPage({ lat, lng, pageParam }) {
+async function fetchFeedPage({ lat, lng }) {
 	const { data, error } = await supabase.rpc("get_feed_cards", {
 		p_lat: lat,
 		p_lng: lng,

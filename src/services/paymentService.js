@@ -5,7 +5,7 @@ import { analyticsService } from "./analyticsService";
 export const paymentService = {
 	/**
 	 * Create Checkout Session
-	 * @param {number} shopId
+	 * @param {string|number} shopId
 	 * @param {Array<{sku: string, quantity: number}>} items
 	 */
 	async createCheckoutSession(shopId, items, options = {}) {

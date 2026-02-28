@@ -494,6 +494,7 @@ onUnmounted(() => {
               <div
                 v-for="shop in enrichedShops"
                 :key="shop.id"
+                v-memo="[shop.id, shop.status, shop._badgeType, shop._isFlash, shop.isGolden, selectedShopId === shop.id]"
                 @click="handleShopClick(shop)"
                 role="listitem"
                 tabindex="0"

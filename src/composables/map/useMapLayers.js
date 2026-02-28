@@ -1,5 +1,5 @@
-import coinAnimation from "@/assets/animations/coin.json";
 import { onUnmounted } from "vue";
+import coinAnimation from "@/assets/animations/coin.json";
 
 const pendingMapImages = new Set();
 const TRAFFIC_SOURCE_ID = "traffic-roads-local";
@@ -592,7 +592,11 @@ export function useMapLayers(map, options = {}) {
 			stopCoinAnimation();
 			if (map.value.getLayer("unclustered-coins")) {
 				try {
-					map.value.removeLayer("unclustered-coins");
+					map.value.setLayoutProperty(
+						"unclustered-coins",
+						"visibility",
+						"none",
+					);
 				} catch {
 					// Ignore style/layer race during rapid mode toggles.
 				}
@@ -611,16 +615,70 @@ export function useMapLayers(map, options = {}) {
 				map.value.addSource(sourceId, {
 					type: "geojson",
 					data: sourceData,
-					cluster: false,
+					cluster: true,
+					clusterMaxZoom: 14,
+					clusterRadius: 50,
 				});
 			}
 
-			// Pins (Base Layer) — no clustering
+			// Cluster circles
+			if (!map.value.getLayer("clusters")) {
+				map.value.addLayer({
+					id: "clusters",
+					type: "circle",
+					source: sourceId,
+					filter: ["has", "point_count"],
+					paint: {
+						"circle-color": [
+							"step",
+							["get", "point_count"],
+							"rgba(99,102,241,0.85)",
+							20,
+							"rgba(168,85,247,0.85)",
+							50,
+							"rgba(236,72,153,0.85)",
+						],
+						"circle-radius": [
+							"step",
+							["get", "point_count"],
+							18,
+							20,
+							24,
+							50,
+							30,
+						],
+						"circle-stroke-width": 2,
+						"circle-stroke-color": "rgba(255,255,255,0.3)",
+					},
+				});
+			}
+
+			// Cluster count labels
+			if (!map.value.getLayer("cluster-count")) {
+				map.value.addLayer({
+					id: "cluster-count",
+					type: "symbol",
+					source: sourceId,
+					filter: ["has", "point_count"],
+					layout: {
+						"text-field": ["get", "point_count_abbreviated"],
+						"text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
+						"text-size": 13,
+						"text-allow-overlap": true,
+					},
+					paint: {
+						"text-color": "#ffffff",
+					},
+				});
+			}
+
+			// Pins (Base Layer) — individual unclustered points
 			if (!map.value.getLayer("unclustered-point")) {
 				map.value.addLayer({
 					id: "unclustered-point",
 					type: "symbol",
 					source: sourceId,
+					filter: ["!", ["has", "point_count"]],
 					layout: {
 						"icon-image": [
 							"case",
@@ -663,7 +721,14 @@ export function useMapLayers(map, options = {}) {
 			}
 
 			// 4. Coins (Animation Layer) - Floats above pins
-			if (canRunEffects() && !map.value.getLayer("unclustered-coins")) {
+			if (canRunEffects() && map.value.getLayer("unclustered-coins")) {
+				// Re-show if hidden by effects-off toggle
+				map.value.setLayoutProperty(
+					"unclustered-coins",
+					"visibility",
+					"visible",
+				);
+			} else if (canRunEffects() && !map.value.getLayer("unclustered-coins")) {
 				// Double-check fallback coin image exists
 				if (!map.value.hasImage?.(COIN_IMAGE_ID)) {
 					ensureFallbackCoinImage();

@@ -40,9 +40,8 @@ const onTouchMove = (e) => {
 
 	// Only pull down
 	if (diff > 0) {
-		// Apply resistance
-		const resistance = diff * 0.4;
-		pullDistance.value = Math.min(resistance, 150); // Cap visual pull
+		// Apply strong physical rubber-band resistance curve
+		pullDistance.value = 150 * (1 - Math.exp(-diff / 250));
 
 		// Haptic snap logic
 		if (pullDistance.value > THRESHOLD && !isReadyToRefresh.value) {
@@ -111,7 +110,7 @@ onBeforeUnmount(() => {
         opacity: pullDistance / THRESHOLD,
         transition: isDragging
           ? 'none'
-          : 'all 0.3s cubic-bezier(0.25, 1, 0.5, 1)',
+          : 'all 0.4s cubic-bezier(0.19, 1, 0.22, 1)',
       }"
     >
       <div class="transform translate-y-2">
@@ -131,10 +130,10 @@ onBeforeUnmount(() => {
     <div
       class="relative transition-transform duration-300 ease-out will-change-transform"
       :style="{
-        transform: `translateY(${pullDistance}px)`,
+        transform: `translate3d(0, ${pullDistance}px, 0)`,
         transition: isDragging
           ? 'none'
-          : 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)',
+          : 'transform 0.4s cubic-bezier(0.19, 1, 0.22, 1)',
       }"
     >
       <slot />

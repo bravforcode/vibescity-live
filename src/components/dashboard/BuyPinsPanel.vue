@@ -34,7 +34,7 @@
           class="bg-black/40 hover:bg-black/60 text-white px-3 py-1.5 rounded-lg text-xs font-bold border border-white/10 transition flex items-center gap-2"
         >
           <span>{{
-            currencyStore.currentCurrency === "THB" ? "🇹🇭 THB" : "🇺🇸 USD"
+            currencyStore.currentCurrency.value === "THB" ? "🇹🇭 THB" : "🇺🇸 USD"
           }}</span>
           <span class="opacity-50">⇄</span>
         </button>
@@ -62,8 +62,13 @@
       </div>
     </div>
 
-    <div class="relative z-10 mb-6 rounded-xl border border-white/10 bg-black/30 p-3">
-      <label for="partner-ref-code" class="mb-1 block text-[11px] font-bold uppercase tracking-wide text-white/70">
+    <div
+      class="relative z-10 mb-6 rounded-xl border border-white/10 bg-black/30 p-3"
+    >
+      <label
+        for="partner-ref-code"
+        class="mb-1 block text-[11px] font-bold uppercase tracking-wide text-white/70"
+      >
         Referral Code (Optional)
       </label>
       <input
@@ -114,7 +119,7 @@
       <div
         v-for="(pkg, idx) in filteredPackages"
         :key="pkg.sku"
-        class="bg-white/5 rounded-2xl p-1 border border-white/10 hover:border-white/30 transition group relative min-w-[280px] md:min-w-0 snap-center flex flex-col h-full"
+        class="@container/card bg-white/5 rounded-2xl p-1 border border-white/10 hover:border-white/30 transition group relative min-w-[17.5rem] md:min-w-0 snap-center flex flex-col h-full"
         :class="{ 'hover:-translate-y-1 shadow-2xl': true }"
         :style="{ animationDelay: `${idx * 50}ms` }"
       >
@@ -129,7 +134,7 @@
         </div>
 
         <div
-          class="bg-gray-900/80 rounded-xl p-5 h-full flex flex-col relative z-10 backdrop-blur-sm"
+          class="bg-gray-900/80 rounded-xl p-5 h-full flex flex-col relative z-10 backdrop-blur-sm @md/card:p-6"
         >
           <!-- Badge -->
           <div
@@ -141,13 +146,13 @@
           </div>
 
           <div
-            class="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-3xl mb-4 group-hover:scale-110 group-hover:rotate-6 transition duration-300 shadow-inner"
+            class="w-12 h-12 @md/card:w-14 @md/card:h-14 rounded-full bg-white/5 flex items-center justify-center text-3xl mb-4 group-hover:scale-110 group-hover:rotate-6 transition duration-300 shadow-inner"
           >
             {{ pkg.icon }}
           </div>
 
-          <h3 class="text-base font-bold text-white mb-1">{{ pkg.name }}</h3>
-          <p class="text-gray-400 text-xs mb-4 min-h-[32px]">{{ pkg.desc }}</p>
+          <h3 class="text-fluid-base @md/card:text-fluid-lg font-bold text-white mb-1">{{ pkg.name }}</h3>
+          <p class="text-gray-400 text-fluid-xs mb-4 min-h-[2rem] @md/card:min-h-[2.25rem]">{{ pkg.desc }}</p>
 
           <!-- Options -->
           <div v-if="pkg.options" class="mb-4">
@@ -162,8 +167,13 @@
           </div>
 
           <div class="mt-auto pt-4 border-t border-white/5">
-            <div v-if="pkg.isRecurring" class="mb-3 rounded-lg border border-white/10 bg-black/30 p-2">
-              <div class="mb-1 text-[10px] font-bold uppercase tracking-wide text-white/70">
+            <div
+              v-if="pkg.isRecurring"
+              class="mb-3 rounded-lg border border-white/10 bg-black/30 p-2"
+            >
+              <div
+                class="mb-1 text-[10px] font-bold uppercase tracking-wide text-white/70"
+              >
                 Billing
               </div>
               <div class="flex gap-2">
@@ -201,14 +211,18 @@
             </div>
 
             <div class="flex items-end gap-1 mb-3">
-              <div class="text-2xl font-black text-white tracking-tight">
+              <div class="text-fluid-xl font-black text-white tracking-tight">
                 {{
                   currencyStore.formatPrice(
                     pkg.selectedOption ? pkg.selectedOption.price : pkg.price,
                   )
                 }}
               </div>
-              <span v-if="pkg.isRecurring && getPurchaseMode(pkg) === 'subscription'" class="text-xs text-gray-500 mb-1"
+              <span
+                v-if="
+                  pkg.isRecurring && getPurchaseMode(pkg) === 'subscription'
+                "
+                class="text-xs text-gray-500 mb-1"
                 >/mo</span
               >
             </div>
@@ -222,9 +236,10 @@
 
             <button
               v-else
-              @click="handleBuy(pkg)"
+              @click="handleBuyThrottled(pkg)"
               :disabled="loading"
-              class="w-full font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-2 text-xs uppercase tracking-wide shadow-lg active:scale-95"
+              :aria-label="`Buy ${pkg.name}`"
+              class="w-full font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-2 text-fluid-xs uppercase tracking-wide shadow-lg active:scale-95"
               :class="
                 pkg.btnClass ||
                 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white'
@@ -249,16 +264,23 @@
         class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 backdrop-blur-md p-4"
       >
         <div
+          ref="manualModalRef"
           class="bg-gray-900 border border-white/10 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-fade-in-up"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="manual-transfer-title"
         >
           <div
             class="bg-white/5 p-4 border-b border-white/5 flex justify-between items-center"
           >
-            <h3 class="font-bold text-white flex items-center gap-2">
+            <h3 id="manual-transfer-title" class="font-bold text-white flex items-center gap-2">
               🏦 Bank Transfer
             </h3>
             <button
+              ref="manualCloseBtnRef"
+              type="button"
               @click="closeManualModal"
+              aria-label="Close transfer panel"
               class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition"
             >
               ✕
@@ -317,7 +339,8 @@
                 />
               </div>
               <p class="text-gray-400 text-xs mt-3">
-                Scan with Thai banking apps (PromptPay) or use account/wire tab for international transfer
+                Scan with Thai banking apps (PromptPay) or use account/wire tab
+                for international transfer
               </p>
             </div>
 
@@ -350,7 +373,10 @@
                 <div>
                   <p class="text-gray-400 text-xs">Receiving Bank</p>
                   <p class="text-white font-bold">
-                    {{ selectedTransferProfile.bankName || selectedTransferProfile.label }}
+                    {{
+                      selectedTransferProfile.bankName ||
+                      selectedTransferProfile.label
+                    }}
                   </p>
                   <p class="text-[11px] text-white/60">
                     {{
@@ -362,48 +388,80 @@
                 </div>
               </div>
 
-              <div
+              <button
                 v-if="selectedTransferProfile.accountNumber"
+                type="button"
                 @click="copyToClipboard(selectedTransferProfile.accountNumber)"
-                class="bg-white/5 p-4 rounded-xl border border-white/5 cursor-pointer hover:bg-white/10 transition group"
+                :aria-label="`Copy account number ending ${maskedAccountNumber.slice(-4)}`"
+                class="w-full text-left bg-white/5 p-4 rounded-xl border border-white/5 cursor-pointer hover:bg-white/10 transition group"
               >
                 <p class="text-gray-400 text-xs mb-1">Account Number</p>
                 <div class="flex items-center justify-between">
                   <span
                     class="text-white font-mono text-lg font-bold tracking-wider"
-                  >{{ selectedTransferProfile.accountNumber }}</span>
+                    >{{ maskedAccountNumber }}</span
+                  >
                   <span
                     class="text-[10px] bg-white/10 px-2 py-1 rounded text-gray-300 group-hover:bg-green-500 group-hover:text-white transition-colors"
-                  >COPY</span>
+                    >COPY</span
+                  >
                 </div>
-              </div>
+              </button>
 
               <div
                 v-if="selectedTransferProfile.accountName"
                 class="bg-white/5 p-4 rounded-xl border border-white/5"
               >
                 <p class="text-gray-400 text-xs">Account Name</p>
-                <p class="text-white font-bold">{{ selectedTransferProfile.accountName }}</p>
+                <p class="text-white font-bold">
+                  {{ selectedTransferProfile.accountName }}
+                </p>
               </div>
 
               <div
-                v-if="selectedTransferProfile.swiftCode || selectedTransferProfile.iban || selectedTransferProfile.routingNumber"
+                v-if="
+                  selectedTransferProfile.swiftCode ||
+                  selectedTransferProfile.iban ||
+                  selectedTransferProfile.routingNumber
+                "
                 class="bg-white/5 p-4 rounded-xl border border-white/5 space-y-2"
               >
                 <p class="text-gray-400 text-xs">International Wire Details</p>
-                <p v-if="selectedTransferProfile.swiftCode" class="text-white text-sm">
-                  SWIFT: <span class="font-bold">{{ selectedTransferProfile.swiftCode }}</span>
+                <p
+                  v-if="selectedTransferProfile.swiftCode"
+                  class="text-white text-sm"
+                >
+                  SWIFT:
+                  <span class="font-bold">{{
+                    selectedTransferProfile.swiftCode
+                  }}</span>
                 </p>
-                <p v-if="selectedTransferProfile.iban" class="text-white text-sm">
-                  IBAN: <span class="font-bold">{{ selectedTransferProfile.iban }}</span>
+                <p
+                  v-if="selectedTransferProfile.iban"
+                  class="text-white text-sm"
+                >
+                  IBAN:
+                  <span class="font-bold">{{
+                    selectedTransferProfile.iban
+                  }}</span>
                 </p>
-                <p v-if="selectedTransferProfile.routingNumber" class="text-white text-sm">
-                  Routing: <span class="font-bold">{{ selectedTransferProfile.routingNumber }}</span>
+                <p
+                  v-if="selectedTransferProfile.routingNumber"
+                  class="text-white text-sm"
+                >
+                  Routing:
+                  <span class="font-bold">{{
+                    selectedTransferProfile.routingNumber
+                  }}</span>
                 </p>
               </div>
 
-              <div class="bg-cyan-500/10 p-4 rounded-xl border border-cyan-400/25">
-                <p class="text-cyan-200 text-xs font-bold uppercase tracking-wide mb-2">
+              <div
+                class="bg-cyan-500/10 p-4 rounded-xl border border-cyan-400/25"
+              >
+                <p
+                  class="text-cyan-200 text-xs font-bold uppercase tracking-wide mb-2"
+                >
                   Supported Thai Banks
                 </p>
                 <div class="flex flex-wrap gap-2">
@@ -415,66 +473,112 @@
                     {{ bank.code }} · {{ bank.name }}
                   </span>
                 </div>
-                <p v-if="selectedTransferProfile.notes" class="mt-2 text-[11px] text-cyan-100/90">
+                <p
+                  v-if="selectedTransferProfile.notes"
+                  class="mt-2 text-[11px] text-cyan-100/90"
+                >
                   {{ selectedTransferProfile.notes }}
                 </p>
               </div>
             </div>
 
             <!-- Buyer Details & Upload -->
-            <div class="mt-8 space-y-4 border-t border-white/10 pt-6">
+            <form
+              class="mt-8 space-y-4 border-t border-white/10 pt-6 transition-opacity"
+              :class="{ 'pointer-events-none opacity-50': uploading }"
+              :aria-busy="uploading"
+              @submit.prevent="confirmManualPaymentThrottled"
+            >
               <h4 class="text-white font-bold text-sm">Verify Payment</h4>
 
               <div class="grid grid-cols-2 gap-3">
                 <input
                   v-model="buyerProfile.full_name"
                   type="text"
+                  autocomplete="name"
+                  aria-label="Full name"
                   placeholder="Full Name"
                   class="input-dark"
+                  @blur="markFieldTouched('full_name')"
                 />
                 <input
                   v-model="buyerProfile.phone"
-                  type="text"
-                  placeholder="Phone"
+                  type="tel"
+                  inputmode="numeric"
+                  autocomplete="tel"
+                  aria-label="Phone number"
+                  placeholder="081-xxx-xxxx"
                   class="input-dark"
+                  @input="formatPhoneInput"
+                  @blur="markFieldTouched('phone')"
                 />
                 <input
                   v-model="buyerProfile.email"
                   type="email"
+                  autocomplete="email"
+                  aria-label="Email"
                   placeholder="Email"
                   class="input-dark"
+                  @blur="markFieldTouched('email')"
                 />
                 <input
                   v-model="buyerProfile.address_line1"
                   type="text"
+                  autocomplete="address-line1"
+                  aria-label="Address line 1"
                   placeholder="Address Line 1"
                   class="input-dark"
+                  @blur="markFieldTouched('address_line1')"
                 />
                 <input
                   v-model="buyerProfile.country"
                   type="text"
+                  autocomplete="country-name"
+                  aria-label="Country"
                   placeholder="Country"
                   class="input-dark"
+                  @blur="markFieldTouched('country')"
                 />
                 <input
                   v-model="buyerProfile.province"
                   type="text"
+                  autocomplete="address-level1"
+                  aria-label="Province"
                   placeholder="Province"
                   class="input-dark"
+                  @blur="markFieldTouched('province')"
                 />
                 <input
                   v-model="buyerProfile.district"
                   type="text"
+                  autocomplete="address-level2"
+                  aria-label="District"
                   placeholder="District"
                   class="input-dark"
+                  @blur="markFieldTouched('district')"
                 />
                 <input
                   v-model="buyerProfile.postal_code"
                   type="text"
+                  inputmode="numeric"
+                  autocomplete="postal-code"
+                  aria-label="Postal code"
                   placeholder="Postal Code"
                   class="input-dark"
+                  @blur="markFieldTouched('postal_code')"
                 />
               </div>
+
+              <p
+                v-if="firstValidationError"
+                class="text-xs text-rose-300 bg-rose-500/10 border border-rose-400/30 rounded-lg px-3 py-2"
+                role="alert"
+              >
+                {{ firstValidationError }}
+              </p>
+              <p v-if="maskedPhonePreview" class="text-[11px] text-white/60">
+                Phone preview: {{ maskedPhonePreview }}
+              </p>
 
               <div class="relative">
                 <input
@@ -487,6 +591,7 @@
                 />
                 <label
                   for="slip-upload"
+                  aria-label="Upload payment slip"
                   class="flex items-center justify-center w-full h-32 border-2 border-dashed border-white/20 rounded-xl cursor-pointer hover:border-green-500/50 hover:bg-green-500/5 transition text-gray-400 flex-col gap-2"
                 >
                   <div v-if="previewUrl" class="w-full h-full p-2">
@@ -496,21 +601,32 @@
                     />
                   </div>
                   <span v-else class="text-2xl">📸</span>
-                  <span v-if="!previewUrl" class="text-xs"
-                    >Tap to upload slip</span
-                  >
+                  <span v-if="!previewUrl" class="text-xs">Tap to upload slip</span>
                 </label>
+                <p v-if="maskedSlipUrl" class="mt-2 text-[11px] text-white/60">
+                  Slip URL: {{ maskedSlipUrl }}
+                </p>
               </div>
 
               <button
-                @click="confirmManualPayment"
-                :disabled="uploading || !slipUrl"
+                type="submit"
+                :disabled="uploading || !hasUploadedSlip"
+                :aria-label="uploading ? 'Verifying payment' : 'Confirm transfer'"
                 class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-green-900/20 active:scale-95 transition disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2"
               >
-                <span v-if="uploading" class="animate-spin">⏳</span>
+                <svg
+                  v-if="uploading"
+                  class="h-4 w-4 animate-spin"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-opacity="0.2" stroke-width="3" />
+                  <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" stroke-width="3" />
+                </svg>
                 {{ uploading ? "Verifying..." : "Confirm Transfer" }}
               </button>
-            </div>
+            </form>
           </div>
         </div>
       </div>
@@ -518,27 +634,137 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import confetti from "canvas-confetti";
 import generatePayload from "promptpay-qr";
 import QrcodeVue from "qrcode.vue";
-import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
-import { useCurrency } from "@/composables/useCurrency";
-import { useNotifications } from "@/composables/useNotifications";
-import { usePayPal } from "@/composables/usePayPal";
-import { featureFlags } from "@/config/featureFlags";
-import { THAI_BANK_OPTIONS } from "@/constants/bankCatalog";
+import {
+	computed,
+	nextTick,
+	onMounted,
+	onUnmounted,
+	reactive,
+	ref,
+	watch,
+} from "vue";
+import { z } from "zod";
+import { useCurrency } from "../../composables/useCurrency";
+import { useDialogA11y } from "../../composables/useDialogA11y";
+import { useHaptics } from "../../composables/useHaptics";
+import { useNotifications } from "../../composables/useNotifications";
+import { usePayPal } from "../../composables/usePayPal";
+import { useThrottledAction } from "../../composables/useThrottledAction";
+import { featureFlags } from "../../config/featureFlags";
+import { THAI_BANK_OPTIONS } from "../../constants/bankCatalog";
 import { supabase } from "../../lib/supabase";
 import { paymentService } from "../../services/paymentService";
+import {
+	maskPaymentSlipUrl,
+	maskPhoneNumber,
+	maskUserId,
+} from "../../utils/privacyMask";
 
 // Import CSS animations from main.postcss implicitly since it's global
 
-const props = defineProps({
-	shopId: { type: [String, Number], required: true },
+const props = defineProps<{
+	shopId: string | number;
+}>();
+
+interface TransferProfile {
+	id: string;
+	type: "thai_bank" | "international_wire";
+	label: string;
+	bankCode?: string;
+	accountName?: string;
+	accountNumber?: string;
+	currency?: string;
+	promptpayId?: string;
+	bankCountry?: string;
+	bankName?: string;
+	swiftCode?: string;
+	iban?: string;
+	routingNumber?: string;
+	notes?: string;
+}
+
+interface PinOption {
+	label: string;
+	price: number;
+	sku: string;
+}
+
+interface PinPackage {
+	name: string;
+	desc: string;
+	tier: string;
+	icon: string;
+	price: number;
+	sku: string;
+	options?: PinOption[];
+	selectedOption?: PinOption;
+	cta: string;
+	btnClass: string;
+	isRecurring?: boolean;
+	isPremium?: boolean;
+	badge?: string;
+	badgeColor?: string;
+}
+
+interface BuyerProfile {
+	full_name: string;
+	phone: string;
+	email: string;
+	address_line1: string;
+	country: string;
+	province: string;
+	district: string;
+	postal_code: string;
+}
+
+type BuyerProfileKey = keyof BuyerProfile;
+
+const buyerProfileFieldLabels: Record<BuyerProfileKey, string> = {
+	full_name: "Full name",
+	phone: "Phone",
+	email: "Email",
+	address_line1: "Address",
+	country: "Country",
+	province: "Province",
+	district: "District",
+	postal_code: "Postal code",
+};
+
+const buyerProfileRequiredFields: BuyerProfileKey[] = [
+	"full_name",
+	"phone",
+	"email",
+	"address_line1",
+	"country",
+	"province",
+	"district",
+	"postal_code",
+];
+
+const buyerProfileSchema = z.object({
+	full_name: z.string().trim().min(1, "Please enter your full name."),
+	phone: z
+		.string()
+		.trim()
+		.refine((value) => value.replace(/\D/g, "").length >= 9, {
+			message: "Please enter a valid phone number.",
+		}),
+	email: z.string().trim().email("Please enter a valid email address."),
+	address_line1: z.string().trim().min(1, "Address is required."),
+	country: z.string().trim().min(1, "Country is required."),
+	province: z.string().trim().min(1, "Province is required."),
+	district: z.string().trim().min(1, "District is required."),
+	postal_code: z.string().trim().min(1, "Postal code is required."),
 });
 
 // Composables
 const { notifySuccess, notifyError } = useNotifications();
+const { microFeedback } = useHaptics();
+const { createThrottledAction } = useThrottledAction({ delayMs: 1000 });
 const currencyStore = useCurrency();
 const paypal = usePayPal();
 
@@ -555,16 +781,19 @@ const paymentMethods = computed(() => {
 	return methods;
 });
 const activeTier = ref("all");
-const selectedPkg = ref(null);
-const successMessage = ref(null);
+const selectedPkg = ref<PinPackage | null>(null);
+const successMessage = ref<string | null>(null);
 const showManualModal = ref(false);
 const manualTab = ref("qr");
 const selectedTransferProfileId = ref("th-kbank");
 const qrPayload = ref("");
-const slipUrl = ref(null);
-const previewUrl = ref(null);
-const fileInput = ref(null);
-const buyerProfile = reactive({
+const hasUploadedSlip = ref(false);
+const maskedSlipUrl = ref("");
+const previewUrl = ref<string | null>(null);
+const fileInput = ref<HTMLInputElement | null>(null);
+const manualModalRef = ref<HTMLElement | null>(null);
+const manualCloseBtnRef = ref<HTMLButtonElement | null>(null);
+const buyerProfile = reactive<BuyerProfile>({
 	full_name: "",
 	phone: "",
 	email: "",
@@ -574,13 +803,24 @@ const buyerProfile = reactive({
 	district: "",
 	postal_code: "",
 });
-const activeSku = ref(null);
-const purchaseModeBySku = reactive({});
+const touchedFields = reactive<Record<BuyerProfileKey, boolean>>({
+	full_name: false,
+	phone: false,
+	email: false,
+	address_line1: false,
+	country: false,
+	province: false,
+	district: false,
+	postal_code: false,
+});
+const activeSku = ref<string | null>(null);
+const purchaseModeBySku = reactive<Record<string, string>>({});
 const partnerReferralCode = ref("");
+let slipUrlSecret = "";
 
 // Config
 const PROMPTPAY_ID = "0113222743";
-const DEFAULT_TRANSFER_PROFILES = [
+const DEFAULT_TRANSFER_PROFILES: TransferProfile[] = [
 	{
 		id: "th-kbank",
 		type: "thai_bank",
@@ -616,21 +856,55 @@ const DEFAULT_TRANSFER_PROFILES = [
 	},
 ];
 
-const parseTransferProfiles = () => {
+const parseTransferProfiles = (): TransferProfile[] => {
 	const raw = String(
 		import.meta.env.VITE_MANUAL_TRANSFER_PROFILES || "",
 	).trim();
 	if (!raw) return DEFAULT_TRANSFER_PROFILES;
 	try {
 		const parsed = JSON.parse(raw);
-		if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+		if (!Array.isArray(parsed) || parsed.length === 0) {
+			return DEFAULT_TRANSFER_PROFILES;
+		}
+		return parsed
+			.map((profile) => ({
+				id: String(profile?.id || ""),
+				type:
+					String(profile?.type || "") === "international_wire"
+						? "international_wire"
+						: "thai_bank",
+				label: String(profile?.label || ""),
+				bankCode: profile?.bankCode ? String(profile.bankCode) : undefined,
+				accountName: profile?.accountName
+					? String(profile.accountName)
+					: undefined,
+				accountNumber: profile?.accountNumber
+					? String(profile.accountNumber)
+					: undefined,
+				currency: profile?.currency ? String(profile.currency) : undefined,
+				promptpayId: profile?.promptpayId
+					? String(profile.promptpayId)
+					: undefined,
+				bankCountry: profile?.bankCountry
+					? String(profile.bankCountry)
+					: undefined,
+				bankName: profile?.bankName ? String(profile.bankName) : undefined,
+				swiftCode: profile?.swiftCode ? String(profile.swiftCode) : undefined,
+				iban: profile?.iban ? String(profile.iban) : undefined,
+				routingNumber: profile?.routingNumber
+					? String(profile.routingNumber)
+					: undefined,
+				notes: profile?.notes ? String(profile.notes) : undefined,
+			}))
+			.filter((profile) => profile.id && profile.label);
 	} catch {
-		// ignore malformed env value
+		return DEFAULT_TRANSFER_PROFILES;
 	}
-	return DEFAULT_TRANSFER_PROFILES;
 };
 
-const manualTransferProfiles = computed(() => parseTransferProfiles());
+const manualTransferProfiles = computed<TransferProfile[]>(() =>
+	parseTransferProfiles(),
+);
 const selectedTransferProfile = computed(
 	() =>
 		manualTransferProfiles.value.find(
@@ -641,6 +915,71 @@ const qrPromptPayId = computed(
 	() => selectedTransferProfile.value?.promptpayId || PROMPTPAY_ID,
 );
 const supportedThaiBanks = computed(() => THAI_BANK_OPTIONS);
+const maskedAccountNumber = computed(() =>
+	maskUserId(selectedTransferProfile.value?.accountNumber || ""),
+);
+
+const buyerProfileErrors = computed<Record<BuyerProfileKey, string>>(() => {
+	const errors: Record<BuyerProfileKey, string> = {
+		full_name: "",
+		phone: "",
+		email: "",
+		address_line1: "",
+		country: "",
+		province: "",
+		district: "",
+		postal_code: "",
+	};
+
+	const validationResult = buyerProfileSchema.safeParse({ ...buyerProfile });
+	if (validationResult.success) {
+		return errors;
+	}
+
+	for (const issue of validationResult.error.issues) {
+		const field = String(issue.path[0] || "") as BuyerProfileKey;
+		if (field in errors && !errors[field]) {
+			errors[field] = issue.message;
+		}
+	}
+	return errors;
+});
+
+const firstValidationError = computed(() => {
+	for (const key of buyerProfileRequiredFields) {
+		if (!touchedFields[key]) continue;
+		const message = buyerProfileErrors.value[key];
+		if (message) {
+			return `${buyerProfileFieldLabels[key]}: ${message}`;
+		}
+	}
+	return "";
+});
+
+const maskedPhonePreview = computed(() => maskPhoneNumber(buyerProfile.phone));
+
+const markFieldTouched = (field: BuyerProfileKey) => {
+	touchedFields[field] = true;
+};
+
+const markAllFieldsTouched = () => {
+	for (const field of buyerProfileRequiredFields) {
+		touchedFields[field] = true;
+	}
+};
+
+const formatPhoneInput = () => {
+	const digits = buyerProfile.phone.replace(/\D/g, "").slice(0, 10);
+	if (digits.length <= 3) {
+		buyerProfile.phone = digits;
+		return;
+	}
+	if (digits.length <= 6) {
+		buyerProfile.phone = `${digits.slice(0, 3)}-${digits.slice(3)}`;
+		return;
+	}
+	buyerProfile.phone = `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+};
 
 // 💎 Package Tiers Configuration
 const tiers = [
@@ -666,7 +1005,7 @@ const tiers = [
 	{ id: "vip", name: "VIP", icon: "💎", grad: "from-purple-600 to-indigo-600" },
 ];
 
-const packages = reactive([
+const packages = reactive<PinPackage[]>([
 	// 🟢 STARTER
 	{
 		name: "Basic Pin",
@@ -810,17 +1149,17 @@ watch(
 	{ immediate: true },
 );
 
-const getPrice = (pkg) => {
+const getPrice = (pkg: PinPackage | null) => {
 	if (!pkg) return 0;
 	return pkg.selectedOption ? pkg.selectedOption.price : pkg.price;
 };
 
-const getSku = (pkg) => {
+const getSku = (pkg: PinPackage | null) => {
 	if (!pkg) return "";
 	return pkg.selectedOption ? pkg.selectedOption.sku : pkg.sku;
 };
 
-const getPurchaseMode = (pkg) => {
+const getPurchaseMode = (pkg: PinPackage | null) => {
 	if (!pkg?.sku) return "one_time";
 	return (
 		purchaseModeBySku[pkg.sku] ||
@@ -828,7 +1167,10 @@ const getPurchaseMode = (pkg) => {
 	);
 };
 
-const setPurchaseMode = (pkg, mode) => {
+const setPurchaseMode = (
+	pkg: PinPackage | null,
+	mode: "subscription" | "one_time",
+) => {
 	if (!pkg?.sku) return;
 	purchaseModeBySku[pkg.sku] =
 		mode === "subscription" ? "subscription" : "one_time";
@@ -902,7 +1244,7 @@ const persistPartnerCode = () => {
 };
 
 // Actions
-const handleBuy = (pkg) => {
+const runHandleBuy = async (pkg: PinPackage) => {
 	selectedPkg.value = pkg;
 	const sku = getSku(pkg);
 
@@ -914,12 +1256,17 @@ const handleBuy = (pkg) => {
 		showManualModal.value = true;
 		const amount = getPrice(pkg);
 		qrPayload.value = generatePayload(qrPromptPayId.value, { amount });
-	} else {
-		// Stripe
-		loading.value = true;
-		activeSku.value = sku;
-		paymentService
-			.createCheckoutSession(props.shopId, [{ sku, quantity: 1 }], {
+		microFeedback();
+		return;
+	}
+
+	loading.value = true;
+	activeSku.value = sku;
+	try {
+		const { url } = await paymentService.createCheckoutSession(
+			Number(props.shopId),
+			[{ sku, quantity: 1 }],
+			{
 				purchaseMode: getPurchaseMode(pkg),
 				partnerCode: partnerReferralCode.value,
 				paymentPreferences: {
@@ -927,23 +1274,39 @@ const handleBuy = (pkg) => {
 					allowInternational: true,
 					preferPromptPay: true,
 					bankCountry: String(buyerProfile.country || "TH").toUpperCase(),
-					currency: currencyStore.currentCurrency === "USD" ? "USD" : "THB",
+					currency:
+						currencyStore.currentCurrency.value === "USD" ? "USD" : "THB",
 				},
-			})
-			.then(({ url }) => {
-				if (url) globalThis.location.href = url;
-			})
-			.catch((err) => notifyError(`Payment Error: ${err.message}`))
-			.finally(() => {
-				loading.value = false;
-			});
+			},
+		);
+		if (url) {
+			microFeedback();
+			globalThis.location.href = url;
+		}
+	} catch (error) {
+		if (import.meta.env.DEV) {
+			console.error("[BuyPinsPanel] Checkout session failed", error);
+		}
+		const message =
+			error instanceof Error ? error.message : "Unable to start checkout.";
+		notifyError(`Payment Error: ${message}`);
+	} finally {
+		loading.value = false;
 	}
 };
 
-const handleFileUpload = async (event) => {
-	const file = event.target.files[0];
+const handleBuyThrottled = createThrottledAction((pkg: PinPackage) => {
+	void runHandleBuy(pkg);
+});
+
+const handleFileUpload = async (event: Event) => {
+	const input = event.target as HTMLInputElement | null;
+	const file = input?.files?.[0];
 	if (!file) return;
 	uploading.value = true;
+	if (previewUrl.value) {
+		URL.revokeObjectURL(previewUrl.value);
+	}
 	previewUrl.value = URL.createObjectURL(file);
 	try {
 		const fileName = `${Date.now()}-${file.name}`;
@@ -954,42 +1317,50 @@ const handleFileUpload = async (event) => {
 		const { data } = supabase.storage
 			.from("payment-slips")
 			.getPublicUrl(fileName);
-		slipUrl.value = data.publicUrl;
+		slipUrlSecret = data.publicUrl;
+		hasUploadedSlip.value = true;
+		maskedSlipUrl.value = maskPaymentSlipUrl(data.publicUrl);
 		notifySuccess("Slip uploaded!");
-	} catch (err) {
-		const message = err instanceof Error ? err.message : String(err);
+		microFeedback();
+	} catch (error) {
+		if (import.meta.env.DEV) {
+			console.error("[BuyPinsPanel] Slip upload failed", error);
+		}
+		const message = error instanceof Error ? error.message : String(error);
 		notifyError(`Upload failed: ${message}`);
+		slipUrlSecret = "";
+		hasUploadedSlip.value = false;
+		maskedSlipUrl.value = "";
 	} finally {
 		uploading.value = false;
 	}
 };
 
-const confirmManualPayment = async () => {
-	if (!slipUrl.value) return notifyError("Please upload a slip");
-	const required = [
-		"full_name",
-		"phone",
-		"email",
-		"address_line1",
-		"country",
-		"province",
-		"district",
-		"postal_code",
-	];
-	for (const field of required) {
-		if (!String(buyerProfile[field] || "").trim()) {
-			return notifyError(`Missing required field: ${field}`);
-		}
+const runConfirmManualPayment = async () => {
+	if (!hasUploadedSlip.value || !slipUrlSecret) {
+		notifyError("Please upload a payment slip before confirming.");
+		return;
+	}
+
+	markAllFieldsTouched();
+	const invalidField = buyerProfileRequiredFields.find((field) =>
+		Boolean(buyerProfileErrors.value[field]),
+	);
+	if (invalidField) {
+		notifyError(
+			`${buyerProfileFieldLabels[invalidField]}: ${buyerProfileErrors.value[invalidField]}`,
+		);
+		return;
 	}
 
 	uploading.value = true;
 	try {
-		const profile = selectedTransferProfile.value || {};
+		const profile = selectedTransferProfile.value || ({} as TransferProfile);
 		await paymentService.createManualOrder({
 			venue_id: props.shopId,
 			sku: getSku(selectedPkg.value),
 			amount: getPrice(selectedPkg.value),
-			slip_url: slipUrl.value,
+			slip_url: slipUrlSecret,
 			consent_personal_data: true,
 			buyer_profile: { ...buyerProfile },
 			metadata: {
@@ -1005,26 +1376,67 @@ const confirmManualPayment = async () => {
 			},
 		});
 		notifySuccess("Transfer submitted! Pending verification.");
-		showManualModal.value = false;
-	} catch (err) {
-		notifyError(err?.message || "Unable to submit transfer.");
+		microFeedback();
+		closeManualModal();
+	} catch (error) {
+		if (import.meta.env.DEV) {
+			console.error("[BuyPinsPanel] Manual order submission failed", error);
+		}
+		const message =
+			error instanceof Error
+				? error.message
+				: "Unable to submit transfer right now.";
+		notifyError(message);
 	} finally {
 		uploading.value = false;
 	}
 };
 
+const confirmManualPaymentThrottled = createThrottledAction(() => {
+	void runConfirmManualPayment();
+});
+
 const closeManualModal = () => {
 	showManualModal.value = false;
 	selectedPkg.value = null;
-	slipUrl.value = null;
+	slipUrlSecret = "";
+	hasUploadedSlip.value = false;
+	maskedSlipUrl.value = "";
+	if (previewUrl.value) {
+		URL.revokeObjectURL(previewUrl.value);
+	}
 	previewUrl.value = null;
 	qrPayload.value = "";
 };
 
-const copyToClipboard = (text) => {
-	navigator.clipboard.writeText(text);
-	notifySuccess("Copied!");
+useDialogA11y({
+	isOpen: showManualModal,
+	containerRef: manualModalRef,
+	initialFocusRef: manualCloseBtnRef,
+	onClose: closeManualModal,
+	lockScroll: true,
+});
+
+const copyToClipboard = async (text: string) => {
+	try {
+		await navigator.clipboard.writeText(text);
+		notifySuccess("Copied!");
+	} catch (error) {
+		if (import.meta.env.DEV) {
+			console.error("[BuyPinsPanel] Clipboard write failed", error);
+		}
+		notifyError("Unable to copy right now.");
+	}
 };
+
+onUnmounted(() => {
+	if (previewUrl.value) {
+		URL.revokeObjectURL(previewUrl.value);
+		previewUrl.value = null;
+	}
+	slipUrlSecret = "";
+	hasUploadedSlip.value = false;
+});
 </script>
 
 <style scoped>

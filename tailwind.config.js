@@ -27,7 +27,14 @@ export default {
           "monospace",
         ],
       },
+      fontSize: {
+        "fluid-xs": ["clamp(0.75rem, 0.7rem + 0.22vw, 0.875rem)", { lineHeight: "1.35" }],
+        "fluid-sm": ["clamp(0.875rem, 0.8rem + 0.28vw, 1rem)", { lineHeight: "1.45" }],
+        "fluid-base": ["clamp(1rem, 0.9rem + 0.38vw, 1.125rem)", { lineHeight: "1.5" }],
+        "fluid-lg": ["clamp(1.125rem, 1rem + 0.62vw, 1.375rem)", { lineHeight: "1.35" }],
+        "fluid-xl": ["clamp(1.25rem, 1.05rem + 0.9vw, 1.75rem)", { lineHeight: "1.2" }],
+      },
     },
   },
-  plugins: [],
+  plugins: [require("@tailwindcss/container-queries")],
 };

@@ -1,0 +1,22 @@
+commit b008d1cb1f13d6fa987a7f001f1eaee2bec4d629
+Author: bravforcode <nxme176@gmail.com>
+Date:   Sun Feb 15 21:05:52 2026 +0700
+
+    Fix .gitignore
+
+diff --git a/src/components/layout/SmartHeader.vue b/src/components/layout/SmartHeader.vue
+index cfb3828..7f8aebc 100644
+--- a/src/components/layout/SmartHeader.vue
++++ b/src/components/layout/SmartHeader.vue
+@@ -143,9 +143,9 @@ const displayCoins = computed(() => {
+ 	if (coins < 1000) {
+ 		return coins.toString();
+ 	} else if (coins < 1000000) {
+-		return (coins / 1000).toFixed(1).replace(/\.0$/, "") + "K";
++		return `${(coins / 1000).toFixed(1).replace(/\.0$/, "")}K`;
+ 	} else {
+-		return (coins / 1000000).toFixed(1).replace(/\.0$/, "") + "M";
++		return `${(coins / 1000000).toFixed(1).replace(/\.0$/, "")}M`;
+ 	}
+ });
+ 

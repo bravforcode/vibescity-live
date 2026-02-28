@@ -1,15 +1,26 @@
 <!-- src/components/system/AppModals.vue -->
 <script setup>
 import { AlertTriangle, X } from "lucide-vue-next";
-import { computed, defineAsyncComponent } from "vue";
+import { computed, defineAsyncComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import {
 	normalizeVenueCollection,
 	normalizeVenueViewModel,
 } from "@/domain/venue/viewModel";
+import InstallBanner from "../ui/InstallBanner.vue";
 import PortalLayer from "./PortalLayer.vue";
 
 const { t } = useI18n();
+
+const rideModalRef = ref(null);
+
+const handlePrefetchRide = (shop) => {
+	if (!shop || !props.userLocation) return;
+	const normalized = normalizeVenueViewModel(shop, {
+		userLocation: props.userLocation,
+	});
+	rideModalRef.value?.prefetch?.(normalized, props.userLocation);
+};
 
 const MallDrawer = defineAsyncComponent(
 	() => import("../modal/MallDrawer.vue"),
@@ -110,6 +121,7 @@ const normalizedMallShops = computed(() =>
     </transition>
 
     <RideComparisonModal
+      ref="rideModalRef"
       :isOpen="!!normalizedRideShop"
       :shop="normalizedRideShop"
       :userLocation="props.userLocation"
@@ -127,6 +139,7 @@ const normalizedMallShops = computed(() =>
       @close="emit('close-mall-drawer')"
       @select-shop="(shop) => emit('select-mall-shop', shop)"
       @open-ride-modal="(shop) => emit('open-ride-modal', shop)"
+      @prefetch-ride="handlePrefetchRide"
       @toggle-favorite="(id) => emit('toggle-favorite', id)"
       :favorites="props.favorites"
     />
@@ -181,7 +194,7 @@ const normalizedMallShops = computed(() =>
     <transition name="toast">
       <div
         v-if="props.errorMessage"
-        class="fixed top-20 left-1/2 -translate-x-1/2 z-[6100] w-[90%] max-w-md"
+        class="fixed top-20 left-1/2 -translate-x-1/2 z-[6100] w-[90%] max-w-md pt-safe"
       >
         <div class="toast-notification flex items-center gap-4">
           <div
@@ -210,6 +223,7 @@ const normalizedMallShops = computed(() =>
     </transition>
 
     <ConfettiEffect v-if="props.showConfetti" />
+    <InstallBanner />
   </PortalLayer>
 </template>
 

@@ -62,8 +62,22 @@
 
 	/* Shadows */
 	--vc-shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.37);
-	--vc-shadow-neon-blue: 0 0 10px rgba(0, 240, 255, 0.5);
-	--vc-shadow-neon-pink: 0 0 10px rgba(255, 0, 170, 0.5);
+	--vc-shadow-glow-cyan: 0 0 20px rgba(0, 240, 255, 0.4);
+	--vc-shadow-glow-purple: 0 0 30px rgba(188, 19, 254, 0.4);
+}
+
+/*
+  P3 Wide Color Gamut (Hardware Context)
+  Enhances colors for OLED / Modern Apple Devices
+*/
+@media (color-gamut: p3) {
+	:root {
+		--vc-color-brand-primary: color(display-p3 0 0.941 1);
+		--vc-color-accent-purple: color(display-p3 0.737 0.075 0.996);
+		--vc-color-accent-pink: color(display-p3 1 0 0.667);
+		--vc-color-accent-green: color(display-p3 0 1 0.616);
+		--vc-color-accent-yellow: color(display-p3 0.988 0.933 0.039);
+	}
 }
 
 :root[data-theme="night"] {

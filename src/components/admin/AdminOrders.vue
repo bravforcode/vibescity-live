@@ -257,6 +257,7 @@ import {
 import { computed, onMounted, ref } from "vue";
 import { Line as LineChart } from "vue-chartjs";
 import { adminDataService } from "../../services/adminDataService";
+import { maskPaymentSlipUrl } from "../../utils/privacyMask";
 import DataTable from "./DataTable.vue";
 
 ChartJS.register(
@@ -274,6 +275,28 @@ const activeFilters = ref({});
 const statusCounts = ref({});
 const trendData = ref([]);
 const loadingChart = ref(false);
+
+const escapeHtml = (value) =>
+	String(value || "").replace(/[&<>"']/g, (char) => {
+		const map = {
+			"&": "&amp;",
+			"<": "&lt;",
+			">": "&gt;",
+			'"': "&quot;",
+			"'": "&#39;",
+		};
+		return map[char] || char;
+	});
+
+const toSafeExternalHref = (value) => {
+	try {
+		const parsed = new URL(String(value || ""));
+		if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
+		return parsed.href;
+	} catch {
+		return "";
+	}
+};
 
 const updateFilters = () => {
 	activeFilters.value = statusFilter.value
@@ -359,7 +382,7 @@ const chartOptions = {
 			grid: { color: "#334155", tickColor: "transparent" },
 			ticks: {
 				color: "#94a3b8",
-				callback: (value) => `฿${value >= 1000 ? value / 1000 + "k" : value}`,
+				callback: (value) => `฿${value >= 1000 ? `${value / 1000}k` : value}`,
 			},
 			border: { display: false },
 		},
@@ -402,10 +425,12 @@ const columns = [
 		key: "slip_url",
 		label: "Slip",
 		width: "80px",
-		render: (v) =>
-			v
-				? `<a href="${v}" target="_blank" class="text-blue-400 hover:text-blue-300 hover:underline flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>View</a>`
-				: `<span class="text-slate-500">—</span>`,
+		render: (v) => {
+			const href = toSafeExternalHref(v);
+			if (!href) return `<span class="text-slate-500">—</span>`;
+			const masked = escapeHtml(maskPaymentSlipUrl(v));
+			return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 hover:underline flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>${masked}</a>`;
+		},
 	},
 	{ key: "metadata", label: "Metadata", type: "json", width: "100px" },
 	{ key: "created_at", label: "Created", type: "date", width: "140px" },

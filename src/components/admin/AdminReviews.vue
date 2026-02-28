@@ -38,7 +38,7 @@
             class="flex-1 h-3 bg-slate-900 rounded-full overflow-hidden border border-slate-700/50"
           >
             <div
-              class="h-full bg-amber-400 rounded-full transition-all duration-500 ease-out"
+              class="h-full bg-amber-400 rounded-full transition-[width] duration-500 ease-out"
               :style="{ width: ratingWidth(star) }"
             />
           </div>

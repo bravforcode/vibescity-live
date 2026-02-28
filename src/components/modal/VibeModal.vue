@@ -882,7 +882,7 @@ onUnmounted(() => {
       <button
         @click="handleClose"
         aria-label="Close details"
-        class="absolute right-4 z-50 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/10 backdrop-blur-xl transition-colors transition-transform active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 dark:bg-white/10"
+        class="absolute right-4 z-50 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/10 backdrop-blur-xl transition active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 dark:bg-white/10"
         :style="{ top: safeTopOffset }"
       >
         <X class="w-5 h-5 text-gray-700 dark:text-white" />
@@ -1183,6 +1183,7 @@ onUnmounted(() => {
                   :alt="`${shop.name} gallery image ${idx + 1}`"
                   class="w-full h-full object-cover"
                   loading="lazy"
+                  decoding="async"
                 />
               </button>
             </div>
@@ -1208,7 +1209,7 @@ onUnmounted(() => {
               v-if="currentImageIndex > 0"
               @click="prevImage"
               aria-label="Previous image"
-              class="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 dark:bg-black/50 backdrop-blur-md shadow-lg active:scale-90 transition-colors transition-transform z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+              class="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 dark:bg-black/50 backdrop-blur-md shadow-lg active:scale-90 transition z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
             >
               <ChevronLeft class="w-5 h-5 text-gray-700 dark:text-white" />
             </button>
@@ -1217,7 +1218,7 @@ onUnmounted(() => {
               v-if="currentImageIndex < processedImages.length - 1"
               @click="nextImage"
               aria-label="Next image"
-              class="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 dark:bg-black/50 backdrop-blur-md shadow-lg active:scale-90 transition-colors transition-transform z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+              class="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 dark:bg-black/50 backdrop-blur-md shadow-lg active:scale-90 transition z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
             >
               <ChevronRight class="w-5 h-5 text-gray-700 dark:text-white" />
             </button>

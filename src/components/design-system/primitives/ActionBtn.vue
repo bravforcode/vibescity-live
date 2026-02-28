@@ -1,6 +1,6 @@
 <template>
   <button
-    class="relative flex items-center justify-center font-bold text-white transition-all duration-normal ease-emphasized active:scale-[0.96] active:animate-press-spring hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:brightness-100 group"
+    class="relative flex items-center justify-center font-bold text-white transition-[transform,opacity,filter] duration-normal ease-emphasized active:scale-[0.96] active:animate-press-spring hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:brightness-100 group"
     :aria-label="label || $slots.default?.[0]?.children || 'Button'"
     :class="[
       variantClasses,

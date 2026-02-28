@@ -11,91 +11,104 @@
  * - Zero layout-triggering properties during animation
  */
 
-import {
-	Car,
-	ChevronUp,
-	Clock,
-	Flame,
-	Heart,
-	ImageOff,
-	MapPin,
-	Share2,
-	Star,
-	Volume2,
-	VolumeX,
-	Zap,
-} from "lucide-vue-next";
-import { computed, nextTick, onUnmounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
 import { useHaptics } from "@/composables/useHaptics";
+import { useHardwareInfo } from "@/composables/useHardwareInfo";
+import {
+  Car,
+  ChevronUp,
+  Clock,
+  Flame,
+  Heart,
+  ImageOff,
+  MapPin,
+  Share2,
+  Star,
+  Volume2,
+  VolumeX,
+  Zap,
+} from "lucide-vue-next";
+import {
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  onUnmounted,
+  ref,
+  watch,
+} from "vue";
+import { useI18n } from "vue-i18n";
 import { useFavoritesStore } from "../../store/favoritesStore";
 import { useShopStore } from "../../store/shopStore";
+
+const ImageLoader = defineAsyncComponent(() => import("./ImageLoader.vue"));
 
 const { t } = useI18n();
 
 const props = defineProps({
-	threshold: { type: Number, default: 100 },
-	showExpand: { type: Boolean, default: true },
-	isSelected: { type: Boolean, default: false },
-	isImmersive: { type: Boolean, default: false },
-	isActive: { type: Boolean, default: false },
-	shop: { type: Object, default: null },
+  threshold: { type: Number, default: 100 },
+  showExpand: { type: Boolean, default: true },
+  isSelected: { type: Boolean, default: false },
+  isImmersive: { type: Boolean, default: false },
+  isActive: { type: Boolean, default: false },
+  shop: { type: Object, default: null },
 });
 
 const emit = defineEmits([
-	"swipe-left",
-	"swipe-right",
-	"expand",
-	"toggle-favorite",
-	"share",
-	"open-ride",
+  "swipe-left",
+  "swipe-right",
+  "expand",
+  "toggle-favorite",
+  "share",
+  "open-ride",
 ]);
 
 const { selectFeedback, successFeedback, impactFeedback } = useHaptics();
 const shopStore = useShopStore();
 const favoritesStore = useFavoritesStore();
 
+// Hardware context
+const { isSlowNetwork, isLowPowerMode } = useHardwareInfo();
+
 // ─────────────────────────────────────────────────────────────
 // DERIVED DATA
 // ─────────────────────────────────────────────────────────────
 
 const displayName = computed(
-	() => props.shop?.name || props.shop?.Name || "Venue",
+  () => props.shop?.name || props.shop?.Name || "Venue",
 );
 const displayCategory = computed(
-	() =>
-		props.shop?.category ||
-		props.shop?.Category ||
-		props.shop?.type ||
-		"General",
+  () =>
+    props.shop?.category ||
+    props.shop?.Category ||
+    props.shop?.type ||
+    "General",
 );
 const displayDistance = computed(() => {
-	const d = props.shop?.distance ?? props.shop?.Distance;
-	return d == null ? "Nearby" : `${Number(d).toFixed(1)} km`;
+  const d = props.shop?.distance ?? props.shop?.Distance;
+  return d == null ? "Nearby" : `${Number(d).toFixed(1)} km`;
 });
 const displayRating = computed(() => props.shop?.rating ?? "—");
 const displayTime = computed(() => {
-	const o = props.shop?.openTime || props.shop?.OpenTime || "10:00";
-	const c = props.shop?.closeTime || props.shop?.CloseTime || "22:00";
-	return `${o} – ${c}`;
+  const o = props.shop?.openTime || props.shop?.OpenTime || "10:00";
+  const c = props.shop?.closeTime || props.shop?.CloseTime || "22:00";
+  return `${o} – ${c}`;
 });
 
 const isGiantPin = computed(
-	() =>
-		String(props.shop?.pin_type || "").toLowerCase() === "giant" ||
-		props.shop?.is_giant_active === true ||
-		props.shop?.isGiantPin === true ||
-		props.shop?.giantActive === true,
+  () =>
+    String(props.shop?.pin_type || "").toLowerCase() === "giant" ||
+    props.shop?.is_giant_active === true ||
+    props.shop?.isGiantPin === true ||
+    props.shop?.giantActive === true,
 );
 const isPromoted = computed(
-	() =>
-		props.shop?.isPromoted === true ||
-		props.shop?.boostActive === true ||
-		Number(props.shop?.visibilityScore || 0) > 0,
+  () =>
+    props.shop?.isPromoted === true ||
+    props.shop?.boostActive === true ||
+    Number(props.shop?.visibilityScore || 0) > 0,
 );
 const isLive = computed(() => props.shop?.status === "LIVE");
 const isFavorite = computed(() =>
-	props.shop?.id ? favoritesStore.isFavorite(props.shop.id) : false,
+  props.shop?.id ? favoritesStore.isFavorite(props.shop.id) : false,
 );
 
 // ─────────────────────────────────────────────────────────────
@@ -104,20 +117,27 @@ const isFavorite = computed(() =>
 
 const showHeartAnim = ref(false);
 
+watch(
+  () => favoritesStore.animatingFavoriteId,
+  (id) => {
+    if (id && props.shop?.id && String(id) === String(props.shop.id)) {
+      // Trigger local burst animation when global signal fires for this shop
+      showHeartAnim.value = false;
+      nextTick(() => {
+        showHeartAnim.value = true;
+        setTimeout(() => {
+          showHeartAnim.value = false;
+        }, 600); // 600ms is enough for the burst
+      });
+    }
+  },
+);
+
 const toggleFavorite = () => {
-	if (!props.shop?.id) return;
-	const added = favoritesStore.toggleFavorite(props.shop.id);
-	successFeedback();
-	if (added) {
-		showHeartAnim.value = false;
-		nextTick(() => {
-			showHeartAnim.value = true;
-			setTimeout(() => {
-				showHeartAnim.value = false;
-			}, 900);
-		});
-	}
-	emit("toggle-favorite", { shopId: props.shop.id, isFavorite: added });
+  if (!props.shop?.id) return;
+  // Store handles the optimistic update, haptic pulse, and global animation signal
+  const added = favoritesStore.toggleFavorite(props.shop.id);
+  emit("toggle-favorite", { shopId: props.shop.id, isFavorite: added });
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -128,15 +148,15 @@ const lastTapTime = ref(0);
 const DOUBLE_TAP_MS = 280;
 
 const handlePointerUp = (e) => {
-	// Only primary button / tap
-	if (e.button !== 0 && e.button !== undefined) return;
-	const now = Date.now();
-	if (now - lastTapTime.value < DOUBLE_TAP_MS) {
-		toggleFavorite();
-		lastTapTime.value = 0;
-	} else {
-		lastTapTime.value = now;
-	}
+  // Only primary button / tap
+  if (e.button !== 0 && e.button !== undefined) return;
+  const now = Date.now();
+  if (now - lastTapTime.value < DOUBLE_TAP_MS) {
+    toggleFavorite();
+    lastTapTime.value = 0;
+  } else {
+    lastTapTime.value = now;
+  }
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -144,23 +164,23 @@ const handlePointerUp = (e) => {
 // ─────────────────────────────────────────────────────────────
 
 const shareShop = async () => {
-	selectFeedback();
-	if (!props.shop) return;
-	const url = `${window.location.origin}/venue/${props.shop.id}`;
-	try {
-		if (navigator.share) {
-			await navigator.share({
-				title: props.shop.name,
-				text: `Check out ${props.shop.name}!`,
-				url,
-			});
-		} else {
-			await navigator.clipboard.writeText(url);
-		}
-		emit("share", { shop: props.shop, url });
-	} catch {
-		/* cancelled */
-	}
+  selectFeedback();
+  if (!props.shop) return;
+  const url = `${window.location.origin}/venue/${props.shop.id}`;
+  try {
+    if (navigator.share) {
+      await navigator.share({
+        title: props.shop.name,
+        text: `Check out ${props.shop.name}!`,
+        url,
+      });
+    } else {
+      await navigator.clipboard.writeText(url);
+    }
+    emit("share", { shop: props.shop, url });
+  } catch {
+    /* cancelled */
+  }
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -173,39 +193,39 @@ const videoError = ref(false);
 const isMuted = ref(true);
 
 const toggleMute = () => {
-	if (!videoEl.value) return;
-	isMuted.value = !isMuted.value;
-	videoEl.value.muted = isMuted.value;
-	selectFeedback();
+  if (!videoEl.value) return;
+  isMuted.value = !isMuted.value;
+  videoEl.value.muted = isMuted.value;
+  selectFeedback();
 };
 
 watch(
-	() => props.isActive,
-	async (active) => {
-		if (active) {
-			if (props.shop?.id) shopStore.incrementView(props.shop.id);
-			if (videoEl.value && videoLoaded.value) {
-				try {
-					await videoEl.value.play();
-				} catch {
-					isMuted.value = true;
-					videoEl.value.muted = true;
-					videoEl.value.play().catch(() => {});
-				}
-			}
-		} else {
-			videoEl.value?.pause();
-		}
-	},
-	{ immediate: true },
+  () => props.isActive,
+  async (active) => {
+    if (active) {
+      if (props.shop?.id) shopStore.incrementView(props.shop.id);
+      if (videoEl.value && videoLoaded.value) {
+        try {
+          await videoEl.value.play();
+        } catch {
+          isMuted.value = true;
+          videoEl.value.muted = true;
+          videoEl.value.play().catch(() => {});
+        }
+      }
+    } else {
+      videoEl.value?.pause();
+    }
+  },
+  { immediate: true },
 );
 
 onUnmounted(() => {
-	if (videoEl.value) {
-		videoEl.value.pause();
-		videoEl.value.src = "";
-		videoEl.value.load();
-	}
+  if (videoEl.value) {
+    videoEl.value.pause();
+    videoEl.value.src = "";
+    videoEl.value.load();
+  }
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -233,74 +253,74 @@ const easePull = (raw) => PULL_MAX * (1 - Math.exp(-Math.abs(raw) / 250));
 // ── Pointer capture approach for bulletproof tracking ──
 
 const onPointerDown = (e) => {
-	if (props.isImmersive) return;
-	if (e.button !== 0) return; // primary only
-	// Don't capture here — we track on the document in onPointerMove
-	// to avoid losing tracking to child elements
-	gestureActive = true;
-	axisLocked = false;
-	snapTriggered = false;
-	startX = e.clientX;
-	startY = e.clientY;
-	isDragging.value = false; // only set true once axis locked vertical
-	attachGlobal();
+  if (props.isImmersive) return;
+  if (e.button !== 0) return; // primary only
+  // Don't capture here — we track on the document in onPointerMove
+  // to avoid losing tracking to child elements
+  gestureActive = true;
+  axisLocked = false;
+  snapTriggered = false;
+  startX = e.clientX;
+  startY = e.clientY;
+  isDragging.value = false; // only set true once axis locked vertical
+  attachGlobal();
 };
 
 const onPointerMove = (e) => {
-	if (!gestureActive) return;
+  if (!gestureActive) return;
 
-	const dx = e.clientX - startX;
-	const dy = e.clientY - startY; // negative = pulling up
+  const dx = e.clientX - startX;
+  const dy = e.clientY - startY; // negative = pulling up
 
-	if (!axisLocked) {
-		const totalMove = Math.sqrt(dx * dx + dy * dy);
-		if (totalMove < 15) return; // dead-zone: wait for intent (increased from 6 to 15 to prevent accidental swipes)
-		axisLocked = Math.abs(dy) > Math.abs(dx) ? "vertical" : "horizontal";
-	}
+  if (!axisLocked) {
+    const totalMove = Math.sqrt(dx * dx + dy * dy);
+    if (totalMove < 15) return; // dead-zone: wait for intent (increased from 6 to 15 to prevent accidental swipes)
+    axisLocked = Math.abs(dy) > Math.abs(dx) ? "vertical" : "horizontal";
+  }
 
-	if (axisLocked !== "vertical") {
-		// Horizontal swipe — reset any pull and let parent handle
-		if (pullY.value !== 0) pullY.value = 0;
-		isDragging.value = false;
-		return;
-	}
+  if (axisLocked !== "vertical") {
+    // Horizontal swipe — reset any pull and let parent handle
+    if (pullY.value !== 0) pullY.value = 0;
+    isDragging.value = false;
+    return;
+  }
 
-	// Vertical — prevent page scroll
-	e.preventDefault();
-	isDragging.value = true;
+  // Vertical — prevent page scroll
+  e.preventDefault();
+  isDragging.value = true;
 
-	if (dy < 0) {
-		pullY.value = easePull(-dy); // positive value = pulled up
+  if (dy < 0) {
+    pullY.value = easePull(-dy); // positive value = pulled up
 
-		if (!snapTriggered && pullY.value > props.threshold * 0.75) {
-			impactFeedback("light");
-			snapTriggered = true;
-		} else if (snapTriggered && pullY.value < props.threshold * 0.6) {
-			snapTriggered = false;
-		}
-	} else {
-		pullY.value = 0; // pulled down — ignore / resist
-	}
+    if (!snapTriggered && pullY.value > props.threshold * 0.75) {
+      impactFeedback("light");
+      snapTriggered = true;
+    } else if (snapTriggered && pullY.value < props.threshold * 0.6) {
+      snapTriggered = false;
+    }
+  } else {
+    pullY.value = 0; // pulled down — ignore / resist
+  }
 };
 
 const onPointerUp = () => {
-	if (!gestureActive) {
-		detachGlobal();
-		return;
-	}
-	gestureActive = false;
-	isDragging.value = false;
+  if (!gestureActive) {
+    detachGlobal();
+    return;
+  }
+  gestureActive = false;
+  isDragging.value = false;
 
-	if (pullY.value > props.threshold * 0.38) {
-		impactFeedback("medium");
-		emit("expand");
-		requestAnimationFrame(() => {
-			pullY.value = 0;
-		});
-	} else {
-		pullY.value = 0;
-	}
-	detachGlobal();
+  if (pullY.value > props.threshold * 0.38) {
+    impactFeedback("medium");
+    emit("expand");
+    requestAnimationFrame(() => {
+      pullY.value = 0;
+    });
+  } else {
+    pullY.value = 0;
+  }
+  detachGlobal();
 };
 
 // Attach move/up on window to keep tracking outside element bounds
@@ -310,18 +330,18 @@ const onPointerUp = () => {
 let globalListenersAttached = false;
 
 const attachGlobal = () => {
-	if (globalListenersAttached) return;
-	globalListenersAttached = true;
-	window.addEventListener("pointermove", onPointerMove, { passive: false });
-	window.addEventListener("pointerup", onPointerUp, { passive: true });
-	window.addEventListener("pointercancel", onPointerUp, { passive: true });
+  if (globalListenersAttached) return;
+  globalListenersAttached = true;
+  window.addEventListener("pointermove", onPointerMove, { passive: false });
+  window.addEventListener("pointerup", onPointerUp, { passive: true });
+  window.addEventListener("pointercancel", onPointerUp, { passive: true });
 };
 const detachGlobal = () => {
-	if (!globalListenersAttached) return;
-	globalListenersAttached = false;
-	window.removeEventListener("pointermove", onPointerMove);
-	window.removeEventListener("pointerup", onPointerUp);
-	window.removeEventListener("pointercancel", onPointerUp);
+  if (!globalListenersAttached) return;
+  globalListenersAttached = false;
+  window.removeEventListener("pointermove", onPointerMove);
+  window.removeEventListener("pointerup", onPointerUp);
+  window.removeEventListener("pointercancel", onPointerUp);
 };
 
 onUnmounted(detachGlobal);
@@ -333,40 +353,40 @@ onUnmounted(detachGlobal);
 const progress = computed(() => Math.min(pullY.value / props.threshold, 1));
 
 const cardStyle = computed(() => ({
-	"--pull": `${pullY.value}px`,
-	"--scale": `${1 - progress.value * 0.04}`,
-	"--radius": `${32 + progress.value * 8}px`,
-	transform: isDragging.value
-		? `translate3d(0, calc(-1 * var(--pull)), 0) scale(var(--scale))`
-		: `translate3d(0, calc(-1 * var(--pull)), 0) scale(var(--scale))`,
-	borderRadius: "var(--radius)",
-	transition: isDragging.value
-		? "none"
-		: "transform 0.55s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.35s ease",
-	willChange: "transform, border-radius",
+  "--pull": `${pullY.value}px`,
+  "--scale": `${1 - progress.value * 0.04}`,
+  "--radius": `${24 + progress.value * 8}px`,
+  transform: isDragging.value
+    ? `translate3d(0, calc(-1 * var(--pull)), 0) scale(var(--scale))`
+    : `translate3d(0, calc(-1 * var(--pull)), 0) scale(var(--scale))`,
+  borderRadius: "var(--radius)",
+  transition: isDragging.value
+    ? "none"
+    : "transform 0.55s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.35s ease",
+  willChange: "transform, border-radius",
 }));
 
 const infoOpacity = computed(() =>
-	Math.max(0, 1 - pullY.value / (props.threshold * 0.55)),
+  Math.max(0, 1 - pullY.value / (props.threshold * 0.55)),
 );
 const handleOpacity = computed(() =>
-	Math.max(0, 1 - pullY.value / (props.threshold * 0.4)),
+  Math.max(0, 1 - pullY.value / (props.threshold * 0.4)),
 );
 
 // Release pill visibility (only show after meaningful pull)
 const pillOpacity = computed(() =>
-	pullY.value > 36
-		? Math.min(1, (pullY.value - 36) / (props.threshold - 36))
-		: 0,
+  pullY.value > 36
+    ? Math.min(1, (pullY.value - 36) / (props.threshold - 36))
+    : 0,
 );
 const pillTransform = computed(
-	() =>
-		`translateY(${Math.min(0, -pullY.value * 0.12)}px) scale(${0.88 + progress.value * 0.14})`,
+  () =>
+    `translateY(${Math.min(0, -pullY.value * 0.12)}px) scale(${0.88 + progress.value * 0.14})`,
 );
 
 const handleManualExpand = () => {
-	impactFeedback("medium");
-	emit("expand");
+  impactFeedback("medium");
+  emit("expand");
 };
 </script>
 
@@ -390,7 +410,11 @@ const handleManualExpand = () => {
       <!-- ── Media Layer ─────────────────────────── -->
       <div class="sc-media">
         <video
-          v-if="shop?.Video_URL || shop?.video_url"
+          v-if="
+            (shop?.Video_URL || shop?.video_url) &&
+            !isSlowNetwork &&
+            !isLowPowerMode
+          "
           ref="videoEl"
           :src="shop?.Video_URL || shop?.video_url"
           :poster="shop.Image_URL1"
@@ -403,16 +427,18 @@ const handleManualExpand = () => {
           @loadeddata="videoLoaded = true"
           @error="videoError = true"
         />
-        <img
+        <ImageLoader
           v-if="
-            !(shop?.Video_URL || shop?.video_url) || !videoLoaded || videoError
+            !(shop?.Video_URL || shop?.video_url) ||
+            !videoLoaded ||
+            videoError ||
+            isSlowNetwork ||
+            isLowPowerMode
           "
           :src="shop?.Image_URL1"
           :alt="displayName"
-          class="sc-media-fill object-cover transition-transform duration-700 will-change-transform group-hover:scale-105"
+          img-class="sc-media-fill transition-transform duration-700 will-change-transform group-hover:scale-105"
           :class="!videoLoaded ? 'z-10' : ''"
-          loading="lazy"
-          draggable="false"
         />
         <!-- No media placeholder -->
         <div
@@ -501,7 +527,7 @@ const handleManualExpand = () => {
           @click.stop="toggleFavorite"
         >
           <Heart
-            class="w-[18px] h-[18px] transition-all duration-200"
+            class="w-[18px] h-[18px] transition-transform duration-200"
             :class="isFavorite ? 'fill-current scale-110' : 'scale-100'"
             aria-hidden="true"
           />
@@ -627,6 +653,7 @@ const handleManualExpand = () => {
   height: 100%;
   display: flex;
   flex-direction: column;
+  container-type: inline-size;
 
   /*
    * touch-action: pan-x  →  browser handles horizontal (parent carousel)
@@ -647,7 +674,7 @@ const handleManualExpand = () => {
   position: relative;
   width: 100%;
   height: 100%;
-  border-radius: 32px;
+  border-radius: 24px;
   overflow: hidden;
   background: #0f0f12;
   border: 1px solid rgba(255 255 255 / 0.06);
@@ -856,7 +883,7 @@ const handleManualExpand = () => {
 }
 
 .sc-venue-name {
-  font-size: 1.25rem;
+  font-size: clamp(1rem, 0.78rem + 1cqi, 1.35rem);
   font-weight: 900;
   color: #fff;
   line-height: 1.2;
@@ -877,7 +904,7 @@ const handleManualExpand = () => {
   background: rgba(255 255 255 / 0.16);
   backdrop-filter: blur(6px);
   border: 1px solid rgba(255 255 255 / 0.08);
-  font-size: 9px;
+  font-size: clamp(0.58rem, 0.5rem + 0.4cqi, 0.65rem);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -889,7 +916,7 @@ const handleManualExpand = () => {
   display: flex;
   align-items: center;
   gap: 3px;
-  font-size: 10px;
+  font-size: clamp(0.6rem, 0.55rem + 0.36cqi, 0.72rem);
   color: rgba(255 255 255 / 0.65);
   white-space: nowrap;
   overflow: hidden;
@@ -929,7 +956,7 @@ const handleManualExpand = () => {
   gap: 8px;
   padding: 11px 16px;
   border-radius: 14px;
-  font-size: 0.875rem;
+  font-size: clamp(0.72rem, 0.62rem + 0.58cqi, 0.92rem);
   font-weight: 700;
   color: #fff;
   background: linear-gradient(100deg, #4f46e5 0%, #0ea5e9 100%);
@@ -1057,6 +1084,16 @@ const handleManualExpand = () => {
   }
   50% {
     opacity: 0.4;
+  }
+}
+
+@container (max-width: 14rem) {
+  .sc-info {
+    padding: 0.8rem 0.8rem 2rem;
+  }
+
+  .sc-cta {
+    padding: 0.6rem 0.8rem;
   }
 }
 </style>

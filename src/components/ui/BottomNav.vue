@@ -50,7 +50,7 @@ const getBadgeCount = (tabId) => {
 <template>
   <nav
     :class="[
-      'fixed bottom-0 left-0 right-0 z-[1000] safe-area-bottom',
+      'fixed bottom-0 left-0 right-0 z-[1000] pb-safe',
       'backdrop-blur-xl border-t',
       isDarkMode
         ? 'bg-zinc-950/90 border-white/10'
@@ -115,10 +115,6 @@ const getBadgeCount = (tabId) => {
 </template>
 
 <style scoped>
-.safe-area-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-
 @keyframes bounce-once {
   0%,
   100% {

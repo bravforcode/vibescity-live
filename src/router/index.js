@@ -285,4 +285,29 @@ router.beforeEach(async (to, _from, next) => {
 	next();
 });
 
+const focusRouteLandmark = () => {
+	if (typeof window === "undefined" || typeof document === "undefined") return;
+
+	window.requestAnimationFrame(() => {
+		const h1 = document.querySelector("#main-content h1, main h1");
+		const mainContent = document.getElementById("main-content");
+		const target = h1 || mainContent;
+		if (!(target instanceof HTMLElement)) return;
+
+		const hadTabIndex = target.hasAttribute("tabindex");
+		if (!hadTabIndex) {
+			target.setAttribute("tabindex", "-1");
+		}
+
+		target.focus({ preventScroll: true });
+		if (!hadTabIndex) {
+			target.removeAttribute("tabindex");
+		}
+	});
+};
+
+router.afterEach(() => {
+	focusRouteLandmark();
+});
+
 export default router;
