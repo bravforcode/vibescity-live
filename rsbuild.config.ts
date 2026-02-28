@@ -1,6 +1,7 @@
-import { readFileSync } from "node:fs";
 import { defineConfig, loadEnv } from "@rsbuild/core";
 import { pluginVue } from "@rsbuild/plugin-vue";
+import { readFileSync } from "node:fs";
+import { injectManifest } from "workbox-build";
 
 const { publicVars } = loadEnv({ prefixes: ["VITE_"] });
 const { version } = JSON.parse(readFileSync("./package.json", "utf8")) as {
@@ -8,7 +9,34 @@ const { version } = JSON.parse(readFileSync("./package.json", "utf8")) as {
 };
 
 export default defineConfig({
-  plugins: [pluginVue()],
+  plugins: [
+    pluginVue(),
+    {
+      name: "vite-plugin-pwa-compat",
+      setup(api) {
+        api.onAfterBuild(async () => {
+          if (process.env.NODE_ENV === "development") return;
+          console.log(
+            "[PWA] Injecting precache manifest into service worker...",
+          );
+          try {
+            const { count, size } = await injectManifest({
+              swSrc: "./public/sw.js",
+              swDest: "./dist/sw.js",
+              globDirectory: "./dist",
+              globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+              maximumFileSizeToCacheInBytes: 2 * 1024 * 1024,
+            });
+            console.log(
+              `[PWA] Successfully injected ${count} files (${(size / 1024 / 1024).toFixed(2)} MB).`,
+            );
+          } catch (e) {
+            console.error("[PWA] Workbox error:", e);
+          }
+        });
+      },
+    },
+  ],
   source: {
     entry: {
       index: "./src/main.js",
@@ -34,6 +62,15 @@ export default defineConfig({
     },
     // Target modern browsers for smaller bundles
     target: "web",
+    // Modern browser targets — eliminates legacy polyfills (~5-10% bundle reduction)
+    overrideBrowserslist: [
+      "chrome >= 87",
+      "firefox >= 78",
+      "safari >= 14",
+      "edge >= 88",
+    ],
+    // Strip license comment files from dist
+    legalComments: "none",
   },
   performance: {
     // Chunk splitting for better caching
