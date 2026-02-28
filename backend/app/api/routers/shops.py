@@ -1,5 +1,6 @@
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from app.core.rate_limit import limiter
@@ -35,7 +36,11 @@ async def read_shops(request: Request):
     """
     Retrieve all shops.
     """
-    return shop_service.get_all_shops()
+    data = shop_service.get_all_shops()
+    return JSONResponse(
+        content=data,
+        headers={"Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=60"},
+    )
 
 @router.get("/{shop_id}", response_model=dict)
 @limiter.limit("120/minute")
@@ -71,7 +76,10 @@ async def read_shop_reviews(
             .execute()
         )
         rows = response.data or []
-        return [_normalize_review_row(row) for row in rows]
+        return JSONResponse(
+            content=[_normalize_review_row(row) for row in rows],
+            headers={"Cache-Control": "public, max-age=30, s-maxage=120, stale-while-revalidate=30"},
+        )
     except Exception:
         # Fail-open for UI smoothness.
         return []

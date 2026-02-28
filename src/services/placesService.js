@@ -131,7 +131,8 @@ const OSM_CATEGORY_MAP = {
 export async function fetchFromOpenStreetMap(province, radius = 10000) {
 	const center = PROVINCE_CENTERS[province];
 	if (!center) {
-		console.log(`[PlacesService] No center coordinates for ${province}`);
+		if (import.meta.env.DEV)
+			console.log(`[PlacesService] No center coordinates for ${province}`);
 		return [];
 	}
 
@@ -226,7 +227,8 @@ export async function fetchFromGooglePlaces(
 	types = ["restaurant", "bar", "cafe", "tourist_attraction"],
 ) {
 	if (!apiKey) {
-		console.log("[PlacesService] No Google API key provided");
+		if (import.meta.env.DEV)
+			console.log("[PlacesService] No Google API key provided");
 		return [];
 	}
 
@@ -240,22 +242,18 @@ export async function fetchFromGooglePlaces(
 	}
 
 	try {
-		const allPlaces = [];
+		const results = await Promise.allSettled(
+			types.map(async (type) => {
+				const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${center.lat},${center.lng}&radius=10000&type=${type}&language=th&key=${apiKey}`;
+				const response = await fetch(url);
+				const data = await response.json();
+				return data.results ? data.results.map(transformGooglePlace) : [];
+			}),
+		);
 
-		for (const type of types) {
-			const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${center.lat},${center.lng}&radius=10000&type=${type}&language=th&key=${apiKey}`;
-
-			const response = await fetch(url);
-			const data = await response.json();
-
-			if (data.results) {
-				const places = data.results.map(transformGooglePlace);
-				allPlaces.push(...places);
-			}
-
-			// Respect rate limits
-			await new Promise((r) => setTimeout(r, 200));
-		}
+		const allPlaces = results.flatMap((r) =>
+			r.status === "fulfilled" ? r.value : [],
+		);
 
 		placesCache.set(cacheKey, { data: allPlaces, timestamp: Date.now() });
 
@@ -370,7 +368,7 @@ export async function searchPlaces(query, province = null) {
  */
 export function clearPlacesCache() {
 	placesCache.clear();
-	console.log("[PlacesService] Cache cleared");
+	if (import.meta.env.DEV) console.log("[PlacesService] Cache cleared");
 }
 
 /**
