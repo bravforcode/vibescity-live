@@ -162,4 +162,10 @@ defineProps({
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shimmer {
+    animation: none;
+  }
+}
 </style>

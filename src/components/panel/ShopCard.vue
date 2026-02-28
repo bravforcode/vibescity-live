@@ -231,6 +231,7 @@ const cardAriaLabel = computed(
         class="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-[transform,filter] duration-700"
         :style="blurStyle"
         loading="lazy"
+        decoding="async"
       />
       <div
         v-else

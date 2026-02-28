@@ -65,6 +65,13 @@ defineProps({
   animation: pulse-neon 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .animate-shimmer,
+  .animate-pulse-neon {
+    animation: none;
+  }
+}
+
 .vibe-skeleton {
   background: rgba(20, 20, 25, 0.6);
   backdrop-filter: blur(8px);
