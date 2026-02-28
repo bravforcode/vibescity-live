@@ -1,134 +1,158 @@
 /**
  * 📁 src/store/favoritesStore.js
- * ✅ Favorites Store with Backend Sync
- * Features: Optimistic updates, Offline support, Collections
+ * ✅ Favorites Store with Backend Sync + Offline Queue (IndexedDB)
  */
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 import { supabase } from "../lib/supabase";
+import { getNetworkOnlineState } from "../services/networkState";
+import {
+	appendOfflineAction,
+	clearOfflineActionQueue,
+	loadOfflineActionQueue,
+	saveOfflineActionQueue,
+} from "../services/offlineActionQueue";
 import { useUserStore } from "./userStore";
+
+const hapticPulse = () => {
+	if (
+		typeof navigator === "undefined" ||
+		typeof navigator.vibrate !== "function"
+	) {
+		return;
+	}
+	navigator.vibrate([20]);
+};
 
 export const useFavoritesStore = defineStore(
 	"favorites",
 	() => {
 		const userStore = useUserStore();
 
-		// ═══════════════════════════════════════════
-		// 📦 State
-		// ═══════════════════════════════════════════
-		const favoriteIds = ref([]); // Array for better serialization
-		const collections = ref([]); // Named collections/lists
-		const syncStatus = ref("idle"); // idle | syncing | error
+		const favoriteIds = ref([]);
+		const collections = ref([]);
+		const syncStatus = ref("idle");
 		const lastSyncTime = ref(null);
-		const pendingSync = ref([]); // Offline queue
+		const pendingSync = ref([]);
 
-		// ═══════════════════════════════════════════
-		// 📊 Computed
-		// ═══════════════════════════════════════════
 		const count = computed(() => favoriteIds.value.length);
 		const favoriteSet = computed(() => new Set(favoriteIds.value));
 		const isFavorite = (shopId) => favoriteSet.value.has(shopId);
 		const hasFavorites = computed(() => count.value > 0);
 
-		// ═══════════════════════════════════════════
-		// 🎯 Actions
-		// ═══════════════════════════════════════════
+		const hydrateOfflineQueue = async () => {
+			try {
+				pendingSync.value = await loadOfflineActionQueue();
+			} catch (error) {
+				if (import.meta.env.DEV) {
+					console.error("[favorites] Failed to load offline queue:", error);
+				}
+			}
+		};
 
-		/**
-		 * Toggle favorite status
-		 */
-		const toggleFavorite = async (shopId, shopData = null) => {
+		const queueOfflineFavorite = async (shopId, action) => {
+			const queuedAction = {
+				type: "favorite",
+				shopId: String(shopId),
+				action,
+				timestamp: Date.now(),
+			};
+			pendingSync.value = await appendOfflineAction(queuedAction);
+		};
+
+		const syncFavoriteAction = async (
+			shopId,
+			isAdding,
+			shopData,
+			options = {},
+		) => {
+			const queueOnFailure = options.queueOnFailure !== false;
+			if (!userStore.isAuthenticated || !userStore.userId) return;
+
+			const isOnline = getNetworkOnlineState();
+			if (!isOnline) {
+				await queueOfflineFavorite(shopId, isAdding ? "add" : "remove");
+				return;
+			}
+
+			try {
+				if (isAdding) {
+					const { error } = await supabase.from("user_favorites").upsert({
+						user_id: userStore.userId,
+						venue_id: shopId,
+						venue_name: shopData?.name,
+						created_at: new Date().toISOString(),
+					});
+					if (error) throw error;
+				} else {
+					const { error } = await supabase
+						.from("user_favorites")
+						.delete()
+						.eq("user_id", userStore.userId)
+						.eq("venue_id", shopId);
+					if (error) throw error;
+				}
+			} catch (error) {
+				if (import.meta.env.DEV) {
+					console.error("[favorites] Sync failed, queued for retry:", error);
+				}
+				if (queueOnFailure) {
+					await queueOfflineFavorite(shopId, isAdding ? "add" : "remove");
+					return;
+				}
+				throw error;
+			}
+		};
+
+		const toggleFavorite = (shopId, shopData = null) => {
 			const wasAdded = !isFavorite(shopId);
 
-			// Optimistic update
 			if (wasAdded) {
 				favoriteIds.value = [...favoriteIds.value, shopId];
 			} else {
 				favoriteIds.value = favoriteIds.value.filter((id) => id !== shopId);
 			}
 
-			// Haptic feedback on mobile
-			if (navigator.vibrate) navigator.vibrate(wasAdded ? [20, 10, 20] : 10);
+			hapticPulse();
 
-			// Sync to backend if authenticated
 			if (userStore.isAuthenticated) {
-				await syncFavoriteAction(shopId, wasAdded, shopData);
+				void syncFavoriteAction(shopId, wasAdded, shopData);
 			}
 
 			return wasAdded;
 		};
 
-		/**
-		 * Add to favorites
-		 */
-		const addFavorite = async (shopId, shopData = null) => {
+		const addFavorite = (shopId, shopData = null) => {
 			if (isFavorite(shopId)) return false;
 			return toggleFavorite(shopId, shopData);
 		};
 
-		/**
-		 * Remove from favorites
-		 */
-		const removeFavorite = async (shopId) => {
+		const removeFavorite = (shopId) => {
 			if (!isFavorite(shopId)) return false;
 			return toggleFavorite(shopId);
 		};
 
-		/**
-		 * Clear all favorites
-		 */
 		const clearAll = async () => {
 			const oldFavorites = [...favoriteIds.value];
 			favoriteIds.value = [];
 
-			if (userStore.isAuthenticated) {
-				try {
-					await supabase
-						.from("user_favorites")
-						.delete()
-						.eq("user_id", userStore.userId);
-				} catch (e) {
-					favoriteIds.value = oldFavorites; // Rollback
-					console.error("❌ Failed to clear favorites:", e);
-				}
-			}
-		};
-
-		/**
-		 * Sync single favorite action to backend
-		 */
-		const syncFavoriteAction = async (shopId, isAdding, shopData) => {
+			if (!userStore.isAuthenticated || !userStore.userId) return;
 			try {
-				if (isAdding) {
-					await supabase.from("user_favorites").upsert({
-						user_id: userStore.userId,
-						venue_id: shopId,
-						venue_name: shopData?.name,
-						created_at: new Date().toISOString(),
-					});
-				} else {
-					await supabase
-						.from("user_favorites")
-						.delete()
-						.eq("user_id", userStore.userId)
-						.eq("venue_id", shopId);
+				const { error } = await supabase
+					.from("user_favorites")
+					.delete()
+					.eq("user_id", userStore.userId);
+				if (error) throw error;
+			} catch (error) {
+				favoriteIds.value = oldFavorites;
+				if (import.meta.env.DEV) {
+					console.error("[favorites] Failed to clear favorites:", error);
 				}
-			} catch (e) {
-				console.error("❌ Favorite sync failed:", e);
-				// Queue for retry
-				pendingSync.value.push({
-					shopId,
-					action: isAdding ? "add" : "remove",
-					timestamp: Date.now(),
-				});
 			}
 		};
 
-		/**
-		 * Fetch favorites from backend
-		 */
 		const fetchFavorites = async () => {
-			if (!userStore.isAuthenticated) return;
+			if (!userStore.isAuthenticated || !userStore.userId) return;
 
 			syncStatus.value = "syncing";
 			try {
@@ -138,32 +162,58 @@ export const useFavoritesStore = defineStore(
 					.eq("user_id", userStore.userId);
 
 				if (error) throw error;
-				favoriteIds.value = data?.map((f) => f.venue_id) || [];
+				favoriteIds.value = data?.map((item) => item.venue_id) || [];
 				lastSyncTime.value = Date.now();
 				syncStatus.value = "idle";
-			} catch (e) {
-				console.error("❌ Failed to fetch favorites:", e);
+			} catch (error) {
 				syncStatus.value = "error";
+				if (import.meta.env.DEV) {
+					console.error("[favorites] Failed to fetch favorites:", error);
+				}
 			}
 		};
 
-		/**
-		 * Process pending sync queue
-		 */
-		const processPendingSync = async () => {
-			if (pendingSync.value.length === 0 || !userStore.isAuthenticated) return;
+		const flushOfflineFavorites = async () => {
+			if (!userStore.isAuthenticated || !userStore.userId) return;
+			if (!getNetworkOnlineState()) return;
 
-			const queue = [...pendingSync.value];
-			pendingSync.value = [];
+			const queue = await loadOfflineActionQueue();
+			if (queue.length === 0) {
+				pendingSync.value = [];
+				return;
+			}
 
+			const latestByShop = new Map();
 			for (const item of queue) {
-				await syncFavoriteAction(item.shopId, item.action === "add", null);
+				if (item.type !== "favorite") continue;
+				latestByShop.set(String(item.shopId), item);
 			}
+
+			const failures = [];
+			for (const item of latestByShop.values()) {
+				try {
+					await syncFavoriteAction(item.shopId, item.action === "add", null, {
+						queueOnFailure: false,
+					});
+				} catch {
+					failures.push(item);
+				}
+			}
+
+			if (failures.length > 0) {
+				await saveOfflineActionQueue(failures);
+				pendingSync.value = failures;
+				return;
+			}
+
+			await clearOfflineActionQueue();
+			pendingSync.value = [];
 		};
 
-		// ═══════════════════════════════════════════
-		// 📂 Collections Management
-		// ═══════════════════════════════════════════
+		const processPendingSync = async () => {
+			await flushOfflineFavorites();
+		};
+
 		const createCollection = (name, icon = "❤️") => {
 			const id = `col_${Date.now()}`;
 			collections.value.push({
@@ -177,18 +227,22 @@ export const useFavoritesStore = defineStore(
 		};
 
 		const addToCollection = (collectionId, shopId) => {
-			const col = collections.value.find((c) => c.id === collectionId);
-			if (col && !col.items.includes(shopId)) {
-				col.items.push(shopId);
+			const collection = collections.value.find(
+				(item) => item.id === collectionId,
+			);
+			if (collection && !collection.items.includes(shopId)) {
+				collection.items.push(shopId);
 				return true;
 			}
 			return false;
 		};
 
 		const removeFromCollection = (collectionId, shopId) => {
-			const col = collections.value.find((c) => c.id === collectionId);
-			if (col) {
-				col.items = col.items.filter((id) => id !== shopId);
+			const collection = collections.value.find(
+				(item) => item.id === collectionId,
+			);
+			if (collection) {
+				collection.items = collection.items.filter((id) => id !== shopId);
 				return true;
 			}
 			return false;
@@ -196,42 +250,39 @@ export const useFavoritesStore = defineStore(
 
 		const deleteCollection = (collectionId) => {
 			collections.value = collections.value.filter(
-				(c) => c.id !== collectionId,
+				(item) => item.id !== collectionId,
 			);
 		};
 
-		// Auto-sync when auth state changes
 		watch(
 			() => userStore.isAuthenticated,
 			(isAuth) => {
-				if (isAuth) {
-					fetchFavorites();
-					processPendingSync();
-				}
+				if (!isAuth) return;
+				void fetchFavorites();
+				void flushOfflineFavorites();
 			},
 			{ immediate: true },
 		);
 
+		void hydrateOfflineQueue();
+
 		return {
-			// State
 			favoriteIds,
 			collections,
 			syncStatus,
 			lastSyncTime,
 			pendingSync,
-			// Computed
 			count,
 			favoriteSet,
 			hasFavorites,
 			isFavorite,
-			// Actions
 			toggleFavorite,
 			addFavorite,
 			removeFavorite,
 			clearAll,
 			fetchFavorites,
 			processPendingSync,
-			// Collections
+			flushOfflineFavorites,
 			createCollection,
 			addToCollection,
 			removeFromCollection,
@@ -240,7 +291,7 @@ export const useFavoritesStore = defineStore(
 	},
 	{
 		persist: {
-			paths: ["favoriteIds", "collections", "pendingSync"],
+			paths: ["favoriteIds", "collections"],
 			key: "vibe-favorites",
 		},
 	},

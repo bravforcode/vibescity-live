@@ -4,7 +4,7 @@
  * Features: XP System, Achievements, Streaks, Leaderboard
  */
 import { defineStore } from "pinia";
-import { computed, ref, watch } from "vue";
+import { computed, onScopeDispose, ref, shallowRef, watch } from "vue";
 import { isSupabaseSchemaCacheError, supabase } from "../lib/supabase";
 import { gamificationService } from "../services/gamificationService";
 import { bootstrapVisitor } from "../services/visitorIdentity";
@@ -95,7 +95,7 @@ export const useCoinStore = defineStore(
 		// ═══════════════════════════════════════════
 		const coins = ref(0);
 		const totalEarned = ref(0);
-		const collectedVenues = ref([]); // Array of venue IDs checked in
+		const collectedVenues = shallowRef([]); // shallowRef: IDs only, no deep proxy needed
 		const achievements = ref([]); // Array of achievement IDs unlocked
 		const dailyStreak = ref(0);
 		const lastCheckInDate = ref(null);
@@ -346,6 +346,10 @@ export const useCoinStore = defineStore(
 			window.addEventListener("focus", syncOnReturn, { passive: true });
 			document.addEventListener("visibilitychange", syncOnReturn, {
 				passive: true,
+			});
+			onScopeDispose(() => {
+				window.removeEventListener("focus", syncOnReturn);
+				document.removeEventListener("visibilitychange", syncOnReturn);
 			});
 		}
 

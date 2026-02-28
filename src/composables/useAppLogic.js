@@ -17,9 +17,9 @@ import { useUserStore } from "../store/userStore";
 import { openExternal } from "../utils/browserUtils";
 import { calculateDistance } from "../utils/shopUtils";
 import {
-    loadFavoritesWithTTL,
-    removeFavoriteItem,
-    saveFavoriteItem,
+	loadFavoritesWithTTL,
+	removeFavoriteItem,
+	saveFavoriteItem,
 } from "../utils/storageHelper";
 import { useAudioSystem } from "./useAudioSystem";
 // ✅ Modular Composables
@@ -33,6 +33,7 @@ import { useNotifications } from "./useNotifications";
 import { usePerformance } from "./usePerformance";
 import { useScrollSync } from "./useScrollSync";
 import { useShopFilters } from "./useShopFilters";
+import { useThrottledAction } from "./useThrottledAction";
 import { useUILogic } from "./useUILogic";
 
 const IS_STRICT_MAP_E2E = import.meta.env.VITE_E2E_MAP_REQUIRED === "true";
@@ -183,7 +184,9 @@ export function useAppLogic() {
 	} = eventLogic;
 
 	// --- 5. Init Utils (Audio, Haptics, Perf) ---
-	const { tapFeedback, selectFeedback, successFeedback } = useHaptics();
+	const { tapFeedback, selectFeedback, successFeedback, microFeedback } =
+		useHaptics();
+	const { createThrottledAction } = useThrottledAction({ delayMs: 1000 });
 	const { isIdle, kick: wakeUi } = useIdle(300000);
 	const { isMuted, toggleMute, setZone } = useAudioSystem();
 	const { initPerformanceMonitoring, isLowPowerMode } = usePerformance();
@@ -458,6 +461,7 @@ export function useAppLogic() {
 			return;
 		}
 		selectFeedback();
+		microFeedback();
 		socketService.joinRoom(shop.id);
 		handleOpenDetail(shop, {
 			trackEvent: true,
@@ -481,14 +485,15 @@ export function useAppLogic() {
 
 		// When opening detail sheet, the modal covers ~85-90vh of the screen on mobile,
 		// so we need a much larger offsetY (e.g. 40%) to ensure the pin flies into the visible top 10%.
-		const viewportHeight = typeof window !== "undefined" ? window.innerHeight : 800;
+		const viewportHeight =
+			typeof window !== "undefined" ? window.innerHeight : 800;
 
 		applyShopSelection(shop.id, false, {
 			syncRoute: true,
 			syncRouteMode: routeMode,
 			trackEvent,
 			trackEventType,
-			flyOffsetY: Math.round(viewportHeight * 0.48)
+			flyOffsetY: Math.round(viewportHeight * 0.48),
 		});
 
 		// Stagger the heavy Vue modal mount slightly to let Mapbox lock into WebGL animation first
@@ -533,7 +538,7 @@ export function useAppLogic() {
 
 		if (shouldSettleCardFirst) {
 			scrollToCard(shop.id);
-			window.setTimeout(() => {
+			cardClickTimer = window.setTimeout(() => {
 				applyShopSelection(shop.id, false, {
 					trackEvent: true,
 					trackEventType: "view_venue",
@@ -913,6 +918,14 @@ export function useAppLogic() {
 			clearTimeout(deepLinkTimer);
 			deepLinkTimer = null;
 		}
+		if (cardClickTimer) {
+			clearTimeout(cardClickTimer);
+			cardClickTimer = null;
+		}
+		if (searchBlurTimer) {
+			clearTimeout(searchBlurTimer);
+			searchBlurTimer = null;
+		}
 		socketService.removeListener(handleSocketEvent);
 		socketService.disconnect?.();
 		if (typeof window !== "undefined" && popStateHandler) {
@@ -922,7 +935,7 @@ export function useAppLogic() {
 	});
 
 	// Wrapper for favorites
-	const toggleFavorite = (shopId) => {
+	const runToggleFavorite = (shopId) => {
 		const id = normalizeVenueId(shopId);
 		if (!id) return;
 		const index = favorites.value.findIndex((x) => String(x) === id);
@@ -930,12 +943,17 @@ export function useAppLogic() {
 			favorites.value.push(id);
 			saveFavoriteItem(id);
 			successFeedback();
-		} else {
-			favorites.value.splice(index, 1);
-			removeFavoriteItem(id);
-			selectFeedback();
+			microFeedback();
+			return;
 		}
+		favorites.value.splice(index, 1);
+		removeFavoriteItem(id);
+		selectFeedback();
+		microFeedback();
 	};
+	const toggleFavorite = createThrottledAction((shopId) => {
+		runToggleFavorite(shopId);
+	});
 	const isFavorited = (id) => {
 		const normalized = normalizeVenueId(id);
 		if (!normalized) return false;
@@ -1183,10 +1201,11 @@ export function useAppLogic() {
 			globalSearchQuery.value = "";
 			uiLogic.showSearchResults.value = false;
 		},
-		handleSearchBlur: () =>
-			setTimeout(() => {
+		handleSearchBlur: () => {
+			searchBlurTimer = setTimeout(() => {
 				uiLogic.showSearchResults.value = false;
-			}, 200),
+			}, 200);
+		},
 
 		// Misc
 		carouselShops: computed(() => shopStore.visibleShops),

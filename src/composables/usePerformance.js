@@ -5,23 +5,31 @@ const hardwareConcurrency = ref(navigator.hardwareConcurrency || 4);
 const deviceMemory = ref(navigator.deviceMemory || 8);
 const isReducedMotion = ref(false);
 
+// Module-level guard: register the mediaQuery listener only once.
+let _mediaQuery = null;
+let _mediaQueryHandler = null;
+
 export function usePerformance() {
 	const initPerformanceMonitoring = () => {
 		// 1. Check Reduced Motion User Preference
-		const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-		isReducedMotion.value = mediaQuery.matches;
-
-		// Listen for changes
-		mediaQuery.addEventListener("change", (e) => {
-			isReducedMotion.value = e.matches;
-		});
+		if (!_mediaQuery) {
+			_mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+			_mediaQueryHandler = (e) => {
+				isReducedMotion.value = e.matches;
+			};
+			_mediaQuery.addEventListener("change", _mediaQueryHandler);
+		}
+		isReducedMotion.value = _mediaQuery.matches;
 
 		// 2. Hardware Heuristics
 		// If <= 4 CPU cores or <= 4GB RAM, assume "Low Power"
 		// Also check for specific low-end UA strings if needed (omitted for now)
 		if (hardwareConcurrency.value <= 4 || deviceMemory.value <= 4) {
 			isLowPowerMode.value = true;
-			console.log("⚡️ VibeCity: Low Power Mode Activated (Hardware Heuristic)");
+			if (import.meta.env.DEV)
+				console.log(
+					"⚡️ VibeCity: Low Power Mode Activated (Hardware Heuristic)",
+				);
 		}
 
 		// 3. Optional: GPU Tier detection or FPS monitoring could go here

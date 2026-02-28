@@ -176,10 +176,10 @@
               v-for="col in columns"
               :key="col.key"
               :class="['px-4 py-3 text-slate-300 max-w-xs truncate', col.class]"
-              :title="String(row[col.key] ?? '')"
+              :title="String(formatCellValue(col.key, row[col.key]))"
             >
               <template v-if="col.render">
-                <span v-html="col.render(row[col.key], row)" />
+                <SafeHtml :content="String(col.render(row[col.key], row) || '')" />
               </template>
               <template v-else-if="col.type === 'date'">
                 <span class="tabular-nums text-slate-400">{{
@@ -226,7 +226,7 @@
                 </details>
               </template>
               <template v-else>
-                {{ row[col.key] ?? "—" }}
+                {{ formatCellValue(col.key, row[col.key]) }}
               </template>
             </td>
           </tr>
@@ -350,6 +350,8 @@
 
 <script setup>
 import { onMounted, ref, watch } from "vue";
+import { maskSensitiveField } from "../../utils/privacyMask";
+import SafeHtml from "../ui/SafeHtml.vue";
 
 const props = defineProps({
 	columns: { type: Array, required: true },
@@ -444,6 +446,11 @@ const formatDate = (val) => {
 const formatNumber = (val) => {
 	const n = Number(val);
 	return Number.isNaN(n) ? (val ?? "—") : n.toLocaleString("en-US");
+};
+
+const formatCellValue = (key, val) => {
+	if (val === null || val === undefined || val === "") return "—";
+	return maskSensitiveField(String(key || ""), val);
 };
 
 const exportCSV = () => {

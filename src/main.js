@@ -15,6 +15,7 @@ import i18n from "./i18n.js";
 import { vueQueryOptions } from "./plugins/queryClient";
 import router from "./router"; // ✅ Import Router
 import { useFeatureFlagStore } from "./store/featureFlagStore";
+import { cleanupStores } from "./store/index";
 
 const app = createApp(App);
 const head = createHead();
@@ -236,6 +237,13 @@ import Vue3Lottie from "vue3-lottie";
 app.use(Vue3Lottie);
 
 app.mount("#app");
+
+// ✅ Cleanup Supabase Realtime channels and store subscriptions on page unload
+if (typeof window !== "undefined") {
+	window.addEventListener("beforeunload", () => {
+		cleanupStores().catch(() => {});
+	});
+}
 
 // ✅ Global unhandled promise rejection logger (dev + prod safe)
 if (typeof window !== "undefined") {
