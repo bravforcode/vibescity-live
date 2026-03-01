@@ -207,7 +207,11 @@
 	"app": {
 		"brand": "VIBECITY",
 		"syncing": "Synchronizing Vibe Engine…",
-		"system_alert": "System Alert"
+		"system_alert": "System Alert",
+		"you_are_offline": "Offline mode enabled",
+		"limited_functionality": "Actions will sync when online",
+		"connection_restored": "Connection restored",
+		"syncing_data": "Syncing queued actions"
 	},
 	"feed": {
 		"no_items": "No items to display",

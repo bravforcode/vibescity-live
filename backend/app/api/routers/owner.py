@@ -155,8 +155,8 @@ async def get_shop_stats(
     client = supabase_admin or supabase
     venue_data = {}
     try:
-        response = (
-            client.table("venues")
+        response = await asyncio.to_thread(
+            lambda: client.table("venues")
             .select("rating,total_views,view_count,pin_type")
             .eq("id", shop_id)
             .single()
@@ -165,8 +165,8 @@ async def get_shop_stats(
         venue_data = response.data or {}
     except Exception:
         try:
-            response = (
-                client.table("shops")
+            response = await asyncio.to_thread(
+                lambda: client.table("shops")
                 .select("rating,total_views,view_count,pin_type")
                 .eq("id", shop_id)
                 .single()

@@ -5,28 +5,28 @@
  */
 
 import {
-  ChevronLeft,
-  ChevronRight,
-  HelpCircle,
-  History,
-  LogOut,
-  Settings,
-  Share2,
-  ShoppingBag,
-  Trophy,
-  User,
-  X,
-  Zap,
+	ChevronLeft,
+	ChevronRight,
+	HelpCircle,
+	History,
+	LogOut,
+	Settings,
+	Share2,
+	ShoppingBag,
+	Trophy,
+	User,
+	X,
+	Zap,
 } from "lucide-vue-next";
 import { storeToRefs } from "pinia";
 import {
-  computed,
-  defineAsyncComponent,
-  inject,
-  nextTick,
-  onUnmounted,
-  ref,
-  watch,
+	computed,
+	defineAsyncComponent,
+	inject,
+	nextTick,
+	onUnmounted,
+	ref,
+	watch,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useHaptics } from "../../composables/useHaptics";
@@ -40,13 +40,13 @@ import { useUserStore } from "../../store/userStore";
 
 // Async Components
 const AchievementBadges = defineAsyncComponent(
-  () => import("../ui/AchievementBadges.vue"),
+	() => import("../ui/AchievementBadges.vue"),
 );
 const ImageLoader = defineAsyncComponent(() => import("../ui/ImageLoader.vue"));
 
 const props = defineProps({
-  isOpen: Boolean,
-  isDarkMode: Boolean,
+	isOpen: Boolean,
+	isDarkMode: Boolean,
 });
 
 const emit = defineEmits(["close", "toggle-language"]);
@@ -62,7 +62,7 @@ const userStore = useUserStore();
 
 // Destructure reactive state
 const { coins, currentLevel, levelProgress, xpToNextLevel } =
-  storeToRefs(coinStore);
+	storeToRefs(coinStore);
 const { profile } = storeToRefs(userStore);
 
 // Computed Display
@@ -71,15 +71,15 @@ const levelTitle = computed(() => currentLevel.value.title);
 const totalCoins = computed(() => coins.value);
 const progressPercent = computed(() => Math.floor(levelProgress.value * 100));
 const displayName = computed(() => {
-  const name = String(profile.value?.displayName || "").trim();
-  return name || "Vibe Explorer";
+	const name = String(profile.value?.displayName || "").trim();
+	return name || "Vibe Explorer";
 });
 
 // Status map for order statuses
 const statusMap = {
-  pending_review: "status.pendingReview",
-  paid: "status.completed",
-  rejected: "status.rejected",
+	pending_review: "status.pendingReview",
+	paid: "status.completed",
+	rejected: "status.rejected",
 };
 
 // View State
@@ -94,55 +94,55 @@ const backdropRef = ref(null);
 let assetsWarmed = false;
 
 const warmDrawerAssets = () => {
-  if (assetsWarmed) return;
-  assetsWarmed = true;
-  void import("../ui/AchievementBadges.vue");
-  void import("../ui/ImageLoader.vue");
+	if (assetsWarmed) return;
+	assetsWarmed = true;
+	void import("../ui/AchievementBadges.vue");
+	void import("../ui/ImageLoader.vue");
 };
 
 const applyBackdropFrame = (offsetY, dragging) => {
-  if (!backdropRef.value) return;
+	if (!backdropRef.value) return;
 
-  const normalized = Math.max(0, offsetY) / PROFILE_DISMISS_THRESHOLD;
-  const progress = Math.min(1, normalized);
-  const opacity = Math.max(0, BACKDROP_MAX_OPACITY * (1 - progress));
+	const normalized = Math.max(0, offsetY) / PROFILE_DISMISS_THRESHOLD;
+	const progress = Math.min(1, normalized);
+	const opacity = Math.max(0, BACKDROP_MAX_OPACITY * (1 - progress));
 
-  backdropRef.value.style.backgroundColor = `rgba(0,0,0,${opacity})`;
-  backdropRef.value.style.transition = dragging
-    ? "none"
-    : "background-color 0.25s ease, backdrop-filter 0.25s ease";
+	backdropRef.value.style.backgroundColor = `rgba(0,0,0,${opacity})`;
+	backdropRef.value.style.transition = dragging
+		? "none"
+		: "background-color 0.25s ease, backdrop-filter 0.25s ease";
 
-  if (isDegraded.value) {
-    backdropRef.value.style.backdropFilter = "none";
-    backdropRef.value.style.webkitBackdropFilter = "none";
-    return;
-  }
+	if (isDegraded.value) {
+		backdropRef.value.style.backdropFilter = "none";
+		backdropRef.value.style.webkitBackdropFilter = "none";
+		return;
+	}
 
-  const blur = Math.max(0, BACKDROP_MAX_BLUR * (1 - progress));
-  backdropRef.value.style.backdropFilter = `blur(${blur}px)`;
-  backdropRef.value.style.webkitBackdropFilter = `blur(${blur}px)`;
+	const blur = Math.max(0, BACKDROP_MAX_BLUR * (1 - progress));
+	backdropRef.value.style.backdropFilter = `blur(${blur}px)`;
+	backdropRef.value.style.webkitBackdropFilter = `blur(${blur}px)`;
 };
 
 const { elementRef: drawerRef } = useSwipeToDismiss({
-  threshold: PROFILE_DISMISS_THRESHOLD,
-  compositorOnly: true,
-  onClose: () => handleClose(),
-  onFrame: ({ y, dragging }) => {
-    applyBackdropFrame(y, dragging);
-  },
-  onPredictRestState: ({ state, velocityPxMs }) => {
-    if (state === "open") warmDrawerAssets();
-    if (state === "close") {
-      playDismiss();
-      haptic("dismiss");
-    } else {
-      playSnap();
-      haptic("snap");
-    }
-    if (Math.abs(velocityPxMs) > 0.3) {
-      playWoosh(Math.abs(velocityPxMs));
-    }
-  },
+	threshold: PROFILE_DISMISS_THRESHOLD,
+	compositorOnly: true,
+	onClose: () => handleClose(),
+	onFrame: ({ y, dragging }) => {
+		applyBackdropFrame(y, dragging);
+	},
+	onPredictRestState: ({ state, velocityPxMs }) => {
+		if (state === "open") warmDrawerAssets();
+		if (state === "close") {
+			playDismiss();
+			haptic("dismiss");
+		} else {
+			playSnap();
+			haptic("snap");
+		}
+		if (Math.abs(velocityPxMs) > 0.3) {
+			playWoosh(Math.abs(velocityPxMs));
+		}
+	},
 });
 const closeButtonRef = ref(null);
 
@@ -153,239 +153,239 @@ const appVersion = import.meta.env.VITE_APP_VERSION || "dev";
 
 const drawerTitleId = "profile-drawer-title";
 const focusableSelector =
-  'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
+	'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
 let previousFocusedElement = null;
 
 // --- Cinematic Spatial Physics: Dynamic Map Padding ---
 const mapPaddingApi = inject("mapPaddingApi", null);
 if (mapPaddingApi) {
-  mapPaddingApi.bindDrawer(drawerRef);
-  watch(
-    () => props.isOpen,
-    (val) => mapPaddingApi.setDrawerOpen(val),
-    { immediate: true },
-  );
+	mapPaddingApi.bindDrawer(drawerRef);
+	watch(
+		() => props.isOpen,
+		(val) => mapPaddingApi.setDrawerOpen(val),
+		{ immediate: true },
+	);
 }
 
 const handleClose = () => {
-  selectFeedback();
-  activeView.value = "menu"; // Reset
-  emit("close");
+	selectFeedback();
+	activeView.value = "menu"; // Reset
+	emit("close");
 };
 
 const handleLogout = async () => {
-  selectFeedback();
-  await userStore.logout();
-  emit("close");
+	selectFeedback();
+	await userStore.logout();
+	emit("close");
 };
 
 const handleInviteFriend = async () => {
-  selectFeedback();
-  const shareData = {
-    title: "VibeCity - Your Nightlife Guide",
-    text: "Check out VibeCity for the best nightlife spots! 🌃",
-    url: window.location.origin,
-  };
+	selectFeedback();
+	const shareData = {
+		title: "VibeCity - Your Nightlife Guide",
+		text: "Check out VibeCity for the best nightlife spots! 🌃",
+		url: window.location.origin,
+	};
 
-  try {
-    // 1. True Native Contact Picker API (Deep OS Integration)
-    if ("contacts" in navigator && "ContactsManager" in window) {
-      const props = ["name", "tel"];
-      const opts = { multiple: true };
-      const contacts = await navigator.contacts.select(props, opts);
-      if (contacts && contacts.length > 0) {
-        // Fast-path to Native SMS composer
-        const numbers = contacts.flatMap((c) => c.tel).join(",");
-        window.location.href = `sms:${numbers}?body=${encodeURIComponent(shareData.url + " 🌃")}`;
-        return;
-      }
-    }
+	try {
+		// 1. True Native Contact Picker API (Deep OS Integration)
+		if ("contacts" in navigator && "ContactsManager" in window) {
+			const props = ["name", "tel"];
+			const opts = { multiple: true };
+			const contacts = await navigator.contacts.select(props, opts);
+			if (contacts && contacts.length > 0) {
+				// Fast-path to Native SMS composer
+				const numbers = contacts.flatMap((c) => c.tel).join(",");
+				window.location.href = `sms:${numbers}?body=${encodeURIComponent(`${shareData.url} 🌃`)}`;
+				return;
+			}
+		}
 
-    // 2. Web Share API Fallback
-    if (
-      navigator.share &&
-      navigator.canShare &&
-      navigator.canShare(shareData)
-    ) {
-      await navigator.share(shareData);
-    } else {
-      // 3. Last resort clipboard
-      navigator.clipboard.writeText(shareData.url);
-      showComingSoon(); // Optionally replace with a "Copied" toast
-    }
-  } catch (err) {
-    console.error("Share failed", err);
-    // Ignore DOMExceptions from user cancellation
-  }
+		// 2. Web Share API Fallback
+		if (
+			navigator.share &&
+			navigator.canShare &&
+			navigator.canShare(shareData)
+		) {
+			await navigator.share(shareData);
+		} else {
+			// 3. Last resort clipboard
+			navigator.clipboard.writeText(shareData.url);
+			showComingSoon(); // Optionally replace with a "Copied" toast
+		}
+	} catch (err) {
+		console.error("Share failed", err);
+		// Ignore DOMExceptions from user cancellation
+	}
 };
 
 const fetchOrders = async () => {
-  if (!userStore.isAuthenticated) {
-    myOrders.value = [];
-    return;
-  }
-  loadingOrders.value = true;
-  try {
-    myOrders.value = await paymentService.getMyOrders();
-  } catch (error) {
-    console.error("Error fetching orders:", error);
-    myOrders.value = [];
-  } finally {
-    loadingOrders.value = false;
-  }
+	if (!userStore.isAuthenticated) {
+		myOrders.value = [];
+		return;
+	}
+	loadingOrders.value = true;
+	try {
+		myOrders.value = await paymentService.getMyOrders();
+	} catch (error) {
+		console.error("Error fetching orders:", error);
+		myOrders.value = [];
+	} finally {
+		loadingOrders.value = false;
+	}
 };
 
 const showComingSoon = () => {
-  comingSoonToast.value = true;
-  clearTimeout(comingSoonTimer);
-  comingSoonTimer = setTimeout(() => {
-    comingSoonToast.value = false;
-  }, 2000);
+	comingSoonToast.value = true;
+	clearTimeout(comingSoonTimer);
+	comingSoonTimer = setTimeout(() => {
+		comingSoonToast.value = false;
+	}, 2000);
 };
 
 const handleMenuItemClick = (item) => {
-  selectFeedback();
-  if (item.id === "orders") {
-    if (!userStore.isAuthenticated) {
-      showComingSoon();
-      return;
-    }
-    activeView.value = "orders";
-    fetchOrders();
-  } else if (item.id === "invite") {
-    handleInviteFriend();
-  } else {
-    showComingSoon();
-  }
+	selectFeedback();
+	if (item.id === "orders") {
+		if (!userStore.isAuthenticated) {
+			showComingSoon();
+			return;
+		}
+		activeView.value = "orders";
+		fetchOrders();
+	} else if (item.id === "invite") {
+		handleInviteFriend();
+	} else {
+		showComingSoon();
+	}
 };
 
 const lockBodyScroll = (locked) => {
-  document.documentElement.style.overflow = locked ? "hidden" : "";
-  document.body.style.overflow = locked ? "hidden" : "";
+	document.documentElement.style.overflow = locked ? "hidden" : "";
+	document.body.style.overflow = locked ? "hidden" : "";
 };
 
 const trapFocus = (e) => {
-  if (e.key !== "Tab" || !drawerRef.value) return;
-  const focusables = drawerRef.value.querySelectorAll(focusableSelector);
-  if (!focusables.length) return;
+	if (e.key !== "Tab" || !drawerRef.value) return;
+	const focusables = drawerRef.value.querySelectorAll(focusableSelector);
+	if (!focusables.length) return;
 
-  const first = focusables[0];
-  const last = focusables[focusables.length - 1];
+	const first = focusables[0];
+	const last = focusables[focusables.length - 1];
 
-  if (e.shiftKey && document.activeElement === first) {
-    e.preventDefault();
-    last.focus();
-  } else if (!e.shiftKey && document.activeElement === last) {
-    e.preventDefault();
-    first.focus();
-  }
+	if (e.shiftKey && document.activeElement === first) {
+		e.preventDefault();
+		last.focus();
+	} else if (!e.shiftKey && document.activeElement === last) {
+		e.preventDefault();
+		first.focus();
+	}
 };
 
 const handleDocumentKeydown = (e) => {
-  if (!props.isOpen) return;
-  if (e.key === "Escape") {
-    e.preventDefault();
-    handleClose();
-    return;
-  }
-  trapFocus(e);
+	if (!props.isOpen) return;
+	if (e.key === "Escape") {
+		e.preventDefault();
+		handleClose();
+		return;
+	}
+	trapFocus(e);
 };
 
 watch(
-  () => props.isOpen,
-  (isOpen) => {
-    if (isOpen) {
-      previousFocusedElement = document.activeElement;
-      lockBodyScroll(true);
-      document.addEventListener("keydown", handleDocumentKeydown);
-      warmDrawerAssets();
-      nextTick(() => {
-        closeButtonRef.value?.focus?.();
-        applyBackdropFrame(0, false);
-      });
-    } else {
-      lockBodyScroll(false);
-      document.removeEventListener("keydown", handleDocumentKeydown);
-      if (previousFocusedElement?.focus) {
-        nextTick(() => previousFocusedElement.focus());
-      }
-    }
-  },
-  { immediate: true },
+	() => props.isOpen,
+	(isOpen) => {
+		if (isOpen) {
+			previousFocusedElement = document.activeElement;
+			lockBodyScroll(true);
+			document.addEventListener("keydown", handleDocumentKeydown);
+			warmDrawerAssets();
+			nextTick(() => {
+				closeButtonRef.value?.focus?.();
+				applyBackdropFrame(0, false);
+			});
+		} else {
+			lockBodyScroll(false);
+			document.removeEventListener("keydown", handleDocumentKeydown);
+			if (previousFocusedElement?.focus) {
+				nextTick(() => previousFocusedElement.focus());
+			}
+		}
+	},
+	{ immediate: true },
 );
 
 onUnmounted(() => {
-  lockBodyScroll(false);
-  document.removeEventListener("keydown", handleDocumentKeydown);
-  clearTimeout(comingSoonTimer);
+	lockBodyScroll(false);
+	document.removeEventListener("keydown", handleDocumentKeydown);
+	clearTimeout(comingSoonTimer);
 });
 
 const menuSections = computed(() => {
-  const accountItems = [];
-  if (userStore.isAuthenticated) {
-    accountItems.push({
-      id: "orders",
-      label: t("profile.my_orders"),
-      icon: ShoppingBag,
-      color: "text-green-400",
-    });
-  }
-  accountItems.push(
-    {
-      id: "invite",
-      label: t("profile.invite_friend") || "Invite Friend",
-      icon: Share2,
-      color: "text-emerald-400",
-    },
-    {
-      id: "profile",
-      label: t("profile.edit_profile"),
-      icon: User,
-      color: "text-zinc-400",
-    },
-    {
-      id: "settings",
-      label: t("profile.preferences"),
-      icon: Settings,
-      color: "text-zinc-400",
-    },
-    {
-      id: "support",
-      label: t("profile.help_support"),
-      icon: HelpCircle,
-      color: "text-zinc-400",
-    },
-  );
+	const accountItems = [];
+	if (userStore.isAuthenticated) {
+		accountItems.push({
+			id: "orders",
+			label: t("profile.my_orders"),
+			icon: ShoppingBag,
+			color: "text-green-400",
+		});
+	}
+	accountItems.push(
+		{
+			id: "invite",
+			label: t("profile.invite_friend") || "Invite Friend",
+			icon: Share2,
+			color: "text-emerald-400",
+		},
+		{
+			id: "profile",
+			label: t("profile.edit_profile"),
+			icon: User,
+			color: "text-zinc-400",
+		},
+		{
+			id: "settings",
+			label: t("profile.preferences"),
+			icon: Settings,
+			color: "text-zinc-400",
+		},
+		{
+			id: "support",
+			label: t("profile.help_support"),
+			icon: HelpCircle,
+			color: "text-zinc-400",
+		},
+	);
 
-  return [
-    {
-      title: t("profile.vibe_discovery"),
-      items: [
-        {
-          id: "events",
-          label: t("profile.nearby_events"),
-          icon: Zap,
-          color: "text-amber-400",
-        },
-        {
-          id: "quests",
-          label: t("profile.vibe_quests"),
-          icon: Trophy,
-          color: "text-purple-400",
-        },
-        {
-          id: "history",
-          label: t("profile.visit_history"),
-          icon: History,
-          color: "text-blue-400",
-        },
-      ],
-    },
-    {
-      title: t("profile.account"),
-      items: accountItems,
-    },
-  ];
+	return [
+		{
+			title: t("profile.vibe_discovery"),
+			items: [
+				{
+					id: "events",
+					label: t("profile.nearby_events"),
+					icon: Zap,
+					color: "text-amber-400",
+				},
+				{
+					id: "quests",
+					label: t("profile.vibe_quests"),
+					icon: Trophy,
+					color: "text-purple-400",
+				},
+				{
+					id: "history",
+					label: t("profile.visit_history"),
+					icon: History,
+					color: "text-blue-400",
+				},
+			],
+		},
+		{
+			title: t("profile.account"),
+			items: accountItems,
+		},
+	];
 });
 </script>
 

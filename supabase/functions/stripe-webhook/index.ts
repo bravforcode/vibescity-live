@@ -134,24 +134,20 @@ serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
   );
 
-  const { error: idempotencyError } = await supabase
+  // SELECT-first idempotency: allows Stripe retries when processing previously failed.
+  // INSERT-first pattern blocks retries on partial failure (processed_at stays NULL).
+  const { data: existingEvent } = await supabase
     .from("stripe_webhook_events")
-    .insert({
-      stripe_event_id: event.id,
-      event_type: event.type,
-      payload: event,
-      processed_at: null,
+    .select("stripe_event_id, processed_at")
+    .eq("stripe_event_id", event.id)
+    .maybeSingle();
+
+  if (existingEvent?.processed_at) {
+    return new Response(JSON.stringify({ received: true, duplicate: true }), {
+      headers: { "Content-Type": "application/json" },
     });
-  if (idempotencyError) {
-    if (idempotencyError.code === "23505") {
-      return new Response("Idempotent", { status: 200 });
-    }
-    console.error(
-      "[stripe-webhook] idempotency insert error",
-      idempotencyError,
-    );
-    return new Response("Database error", { status: 500 });
   }
+  // If existingEvent but processed_at is null: previous attempt failed → allow retry
 
   try {
     if (event.type === "checkout.session.completed") {
@@ -383,10 +379,18 @@ serve(async (req) => {
       }
     }
 
+    // Upsert after successful processing (handles both new events and retried failed events)
     await supabase
       .from("stripe_webhook_events")
-      .update({ processed_at: new Date().toISOString() })
-      .eq("stripe_event_id", event.id);
+      .upsert(
+        {
+          stripe_event_id: event.id,
+          event_type: event.type,
+          payload: event,
+          processed_at: new Date().toISOString(),
+        },
+        { onConflict: "stripe_event_id" },
+      );
 
     return new Response(JSON.stringify({ received: true }), {
       headers: { "Content-Type": "application/json" },

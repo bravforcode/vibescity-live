@@ -8,6 +8,8 @@ from app.core.supabase import supabase, supabase_admin
 from app.services.shop_service import shop_service
 
 router = APIRouter()
+REVIEW_SELECT_PRIMARY = "id,venue_id,rating,comment,user_name,created_at"
+REVIEW_SELECT_FALLBACK = "id,venue_id,rating,content,user_id,status,created_at"
 
 
 class ReviewCreatePayload(BaseModel):
@@ -21,7 +23,7 @@ def _normalize_review_row(row: dict) -> dict:
         "id": row.get("id"),
         "venue_id": row.get("venue_id"),
         "rating": row.get("rating"),
-        "comment": row.get("comment") or "",
+        "comment": row.get("comment") or row.get("content") or "",
         "userName": row.get("user_name") or row.get("userName") or "Vibe Explorer",
         "created_at": row.get("created_at"),
     }
@@ -29,6 +31,68 @@ def _normalize_review_row(row: dict) -> dict:
 
 def _reviews_db():
     return supabase_admin or supabase
+
+
+def _fetch_review_rows(db, shop_id: str, limit: int) -> list[dict]:
+    last_error = None
+    for select_columns in (REVIEW_SELECT_PRIMARY, REVIEW_SELECT_FALLBACK):
+        try:
+            response = (
+                db.table("reviews")
+                .select(select_columns)
+                .eq("venue_id", shop_id)
+                .order("created_at", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            return response.data or []
+        except Exception as exc:  # pragma: no cover - defensive fallback
+            last_error = exc
+    if last_error:
+        raise last_error
+    return []
+
+
+def _insert_review_row(
+    db,
+    shop_id: str,
+    rating: float | None,
+    comment: str,
+    user_name: str,
+) -> dict:
+    primary_insert = {
+        "venue_id": shop_id,
+        "rating": rating,
+        "comment": comment,
+        "user_name": user_name,
+    }
+    fallback_insert = {
+        "venue_id": shop_id,
+        "rating": rating,
+        "content": comment,
+    }
+    attempts = (
+        (primary_insert, REVIEW_SELECT_PRIMARY),
+        (fallback_insert, REVIEW_SELECT_FALLBACK),
+    )
+
+    last_error = None
+    for payload, select_columns in attempts:
+        try:
+            response = (
+                db.table("reviews")
+                .insert(payload)
+                .select(select_columns)
+                .limit(1)
+                .execute()
+            )
+            rows = response.data or []
+            return rows[0] if rows else payload
+        except Exception as exc:  # pragma: no cover - defensive fallback
+            last_error = exc
+    if last_error:
+        raise last_error
+    return primary_insert
 
 @router.get("/", response_model=list[dict])
 @limiter.limit("60/minute")
@@ -67,15 +131,7 @@ async def read_shop_reviews(
     """
     db = _reviews_db()
     try:
-        response = (
-            db.table("reviews")
-            .select("id,venue_id,rating,comment,user_name,created_at")
-            .eq("venue_id", shop_id)
-            .order("created_at", desc=True)
-            .limit(limit)
-            .execute()
-        )
-        rows = response.data or []
+        rows = _fetch_review_rows(db, shop_id, limit)
         return JSONResponse(
             content=[_normalize_review_row(row) for row in rows],
             headers={"Cache-Control": "public, max-age=30, s-maxage=120, stale-while-revalidate=30"},
@@ -101,22 +157,16 @@ async def create_shop_review(
         raise HTTPException(status_code=400, detail="Review payload is empty")
 
     db = _reviews_db()
-    insert_row = {
-        "venue_id": shop_id,
-        "rating": payload.rating if has_rating else None,
-        "comment": comment,
-        "user_name": str(payload.userName or "Vibe Explorer").strip() or "Vibe Explorer",
-    }
+    normalized_user = str(payload.userName or "Vibe Explorer").strip() or "Vibe Explorer"
 
     try:
-        response = (
-            db.table("reviews")
-            .insert(insert_row)
-            .select("id,venue_id,rating,comment,user_name,created_at")
-            .limit(1)
-            .execute()
+        created = _insert_review_row(
+            db=db,
+            shop_id=shop_id,
+            rating=payload.rating if has_rating else None,
+            comment=comment,
+            user_name=normalized_user,
         )
-        created = (response.data or [insert_row])[0]
         return _normalize_review_row(created)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to create review: {exc}") from exc

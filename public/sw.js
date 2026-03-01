@@ -12,8 +12,14 @@ if (workbox) {
 	workbox.precaching.cleanupOutdatedCaches();
 	workbox.precaching.precacheAndRoute(self.__WB_MANIFEST || []);
 
+	// Only cache genuine 200 OK responses — never opaque (status 0) ones.
 	const cacheable200 = new workbox.cacheableResponse.CacheableResponsePlugin({
-		statuses: [0, 200],
+		statuses: [200],
+	});
+
+	// Separate plugin for Supabase images: must be a proper 200, no opaque.
+	const cacheableImg = new workbox.cacheableResponse.CacheableResponsePlugin({
+		statuses: [200],
 	});
 
 	const expShort = new workbox.expiration.ExpirationPlugin({
@@ -76,14 +82,17 @@ if (workbox) {
 	);
 
 	// 5) Non-video public images from Supabase storage: stale-while-revalidate.
+	// IMPORTANT: fetchOptions.mode = 'cors' prevents opaque responses (status 0)
+	// that would otherwise cause 'ERR_FAILED / opaque response' browser errors.
 	workbox.routing.registerRoute(
 		({ url }) =>
 			url.origin.includes("supabase.co") &&
 			url.pathname.includes("/storage/v1/object/public/") &&
 			!/\.(mp4|webm|mov|avi|mkv|m4v)$/i.test(url.pathname),
 		new workbox.strategies.StaleWhileRevalidate({
-			cacheName: `${CACHE_PREFIX}-supabase-images-v1`,
-			plugins: [cacheable200, expLong],
+			cacheName: `${CACHE_PREFIX}-supabase-images-v2`,
+			fetchOptions: { mode: "cors", credentials: "omit" },
+			plugins: [cacheableImg, expLong],
 		}),
 	);
 

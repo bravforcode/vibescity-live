@@ -15,72 +15,72 @@ const { t } = useI18n();
 
 // ✅ Lazy load heavy components
 const VisitorCount = defineAsyncComponent(
-	() => import("../ui/VisitorCount.vue"),
+  () => import("../ui/VisitorCount.vue"),
 );
 
 const SkeletonCard = defineAsyncComponent(
-	() => import("../ui/SkeletonCard.vue"),
+  () => import("../ui/SkeletonCard.vue"),
 );
 
 const VideoExpandedView = defineAsyncComponent(
-	() => import("./VideoExpandedView.vue"),
+  () => import("./VideoExpandedView.vue"),
 );
 
 const GiantPinDialog = defineAsyncComponent(
-	() => import("./GiantPinDialog.vue"),
+  () => import("./GiantPinDialog.vue"),
 );
 
 const props = defineProps({
-	isDataLoading: Boolean,
-	isRefreshing: Boolean,
-	isImmersive: Boolean, // Feature: Immersive Mode
-	isDarkMode: Boolean,
-	isIndoorView: Boolean,
-	activeFloor: String,
-	liveCount: Number,
-	carouselShops: {
-		type: Array,
-		default: () => [],
-	},
-	suggestedShops: {
-		type: Array,
-		default: () => [],
-	},
-	favorites: {
-		type: Array,
-		default: () => [],
-	},
-	activeShopId: [Number, String],
-	mallShops: {
-		type: Array,
-		default: () => [],
-	},
-	setBottomUiRef: Function,
-	setMobileCardScrollRef: Function,
-	enableCinemaExplorer: {
-		type: Boolean,
-		default: false,
-	},
+  isDataLoading: Boolean,
+  isRefreshing: Boolean,
+  isImmersive: Boolean, // Feature: Immersive Mode
+  isDarkMode: Boolean,
+  isIndoorView: Boolean,
+  activeFloor: String,
+  liveCount: Number,
+  carouselShops: {
+    type: Array,
+    default: () => [],
+  },
+  suggestedShops: {
+    type: Array,
+    default: () => [],
+  },
+  favorites: {
+    type: Array,
+    default: () => [],
+  },
+  activeShopId: [Number, String],
+  mallShops: {
+    type: Array,
+    default: () => [],
+  },
+  setBottomUiRef: Function,
+  setMobileCardScrollRef: Function,
+  enableCinemaExplorer: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits([
-	"click-shop",
-	"open-detail",
-	"open-ride",
-	"swipe-left",
-	"swipe-right",
-	"toggle-favorite",
-	"toggle-immersive",
-	"refresh",
-	"set-active-floor",
-	"reset-filters",
-	"scroll",
-	"scroll-start",
-	"scroll-end",
-	"load-more",
-	"enter-giant-view",
-	"exit-giant-view",
-	"share-shop", // ✅ Added share event
+  "click-shop",
+  "open-detail",
+  "open-ride",
+  "swipe-left",
+  "swipe-right",
+  "toggle-favorite",
+  "toggle-immersive",
+  "refresh",
+  "set-active-floor",
+  "reset-filters",
+  "scroll",
+  "scroll-start",
+  "scroll-end",
+  "load-more",
+  "enter-giant-view",
+  "exit-giant-view",
+  "share-shop", // ✅ Added share event
 ]);
 
 // ✅ Haptic Feedback
@@ -89,55 +89,55 @@ const { createThrottledAction } = useThrottledAction({ delayMs: 1000 });
 
 // ✅ Bottom Feed Logic (extracted to composable)
 const {
-	isGiantPinView,
-	activeGiantPin,
-	giantPinShops,
-	selectedGiantShop,
-	selectedGiantVideoUrl,
-	selectedGiantImage,
-	isVideoExpanded,
-	expandedShop,
-	videoRef,
-	normalizeId,
-	getShopPreviewImage,
-	exitGiantView,
-	selectGiantShop,
-	closeExpandedVideo,
-	selectShop,
-	handleScroll,
+  isGiantPinView,
+  activeGiantPin,
+  giantPinShops,
+  selectedGiantShop,
+  selectedGiantVideoUrl,
+  selectedGiantImage,
+  isVideoExpanded,
+  expandedShop,
+  videoRef,
+  normalizeId,
+  getShopPreviewImage,
+  exitGiantView,
+  selectGiantShop,
+  closeExpandedVideo,
+  selectShop,
+  handleScroll,
 } = useBottomFeedLogic(props, emit);
 
 // ✅ Drag-to-Scroll for Desktop Users
 const carouselRef = ref(null);
 const { isDragging } = useDragScroll(carouselRef, {
-	momentum: true,
-	snapSelector: ".vibe-card-item",
-	sensitivity: 1.2,
-	onScrollStart: () => emit("scroll-start"),
-	onScrollEnd: () => emit("scroll-end"),
+  momentum: true,
+  snapSelector: ".vibe-card-item",
+  sensitivity: 1.2,
+  onScrollStart: () => emit("scroll-start"),
+  onScrollEnd: () => emit("scroll-end"),
 });
 
 const isFavorited = (shopId) => {
-	const id = normalizeId(shopId);
-	if (!id) return false;
-	return (props.favorites || []).some((fav) => normalizeId(fav) === id);
+  const id = normalizeId(shopId);
+  if (!id) return false;
+  return (props.favorites || []).some((fav) => normalizeId(fav) === id);
 };
 
 const isGridView = ref(false);
 const toggleView = () => {
-	isGridView.value = !isGridView.value;
-	selectFeedback();
+  isGridView.value = !isGridView.value;
+  selectFeedback();
 };
 
 const emitToggleFavorite = createThrottledAction((shopId) => {
-	emit("toggle-favorite", shopId);
+  emit("toggle-favorite", shopId);
 });
 
 // ✅ Virtual scroller item size (dynamic)
 const getItemSize = (index) => {
-	// Active card is larger due to scale effect
-	const isActive = props.carouselShops[index]?.id === props.activeShopId;
-	return props.isImmersive ? window.innerHeight : isActive ? 160 : 140;
+  // Active card is larger due to scale effect
+  const isActive = props.carouselShops[index]?.id === props.activeShopId;
+  return props.isImmersive ? window.innerHeight : isActive ? 160 : 140;
 };
 </script>
 
@@ -291,7 +291,7 @@ const getItemSize = (index) => {
           variant="carousel"
           :isDarkMode="isDarkMode"
           class="pointer-events-auto"
-          style="width: 200px; height: 280px"
+          style="width: 210px; height: 260px"
         />
       </div>
 
@@ -431,11 +431,11 @@ const getItemSize = (index) => {
                 :data-shop-id="shop.id"
                 data-testid="shop-card"
                 :is-immersive="isImmersive"
-                class="vibe-card-item flex-shrink-0 transition-[transform,opacity,box-shadow,border-color,background-color] duration-500 ease-out snap-center"
+                class="vibe-card-item flex-shrink-0 snap-center"
                 :class="[
                   isImmersive
                     ? 'w-full h-[100dvh] rounded-none scale-100 opacity-100'
-                    : 'w-[160px] h-[220px]',
+                    : 'w-[250px] h-[310px]',
                   !isImmersive && activeShopId === shop.id
                     ? 'scale-100 z-20'
                     : '',
@@ -572,10 +572,11 @@ const getItemSize = (index) => {
   transform: translateZ(0);
   backface-visibility: hidden;
   touch-action: manipulation;
+  contain: layout style;
   transition:
-    transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
-    opacity 0.3s ease-out,
-    box-shadow 0.3s ease-out;
+    transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    opacity 0.25s ease-out,
+    box-shadow 0.25s ease-out;
 }
 
 .vibe-card-item:hover {

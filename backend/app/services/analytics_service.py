@@ -57,7 +57,10 @@ class AnalyticsBuffer:
             from app.core.supabase import supabase
 
             if supabase:
-                supabase.table("analytics_events").insert(events).execute()
+                # Run blocking supabase-py call in thread — event loop must not be blocked
+                await asyncio.to_thread(
+                    lambda: supabase.table("analytics_events").insert(events).execute()
+                )
                 logger.debug("Flushed %d analytics events", len(events))
             else:
                 logger.warning("Supabase not configured — dropping %d analytics events", len(events))

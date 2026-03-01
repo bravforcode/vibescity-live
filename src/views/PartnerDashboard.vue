@@ -270,8 +270,16 @@ const startPartnerSubscription = async () => {
 		);
 		if (url) window.location.href = url;
 	} catch (error) {
-		errorMessage.value =
-			error?.message || "Unable to start partner subscription.";
+		const rawMessage = String(error?.message || "");
+		if (/missing stripe server config/i.test(rawMessage)) {
+			showManualPayment.value = true;
+			paymentTab.value = "qr";
+			errorMessage.value =
+				"Online card checkout is temporarily unavailable. Please use Bank Transfer / QR below.";
+		} else {
+			errorMessage.value =
+				error?.message || "Unable to start partner subscription.";
+		}
 	} finally {
 		isStartingSubscription.value = false;
 	}

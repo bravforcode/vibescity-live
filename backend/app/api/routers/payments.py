@@ -208,17 +208,6 @@ async def create_checkout_session(
 
         # 2. metadata for Webhook
         user_id = user.get("id") if isinstance(user, dict) else getattr(user, "id", None)
-        metadata = {
-            "user_id": user_id,
-            "item_type": body.itemType,
-            "item_id": body.itemId,
-        }
-
-        # specific metadata for webhook handler expectations
-        if body.itemType in ["verified", "glow", "boost", "giant"]:
-            # The existing webhook expects 'venue_id' and 'sku'
-            metadata["venue_id"] = body.itemId
-            metadata["sku"] = f"{body.itemType}_feature"
 
         # C3: Deterministic idempotency key — prevents duplicate charges on retry
         ts_bucket = str(int(time.time()) // 3600)
@@ -228,6 +217,19 @@ async def create_checkout_session(
                 f"{user_id}:{body.itemType}:{body.itemId}:{ts_bucket}",
             )
         )
+
+        metadata = {
+            "user_id": user_id,
+            "item_type": body.itemType,
+            "item_id": body.itemId,
+            "idempotency_key": idempotency_key,  # Passed to webhook for order-level dedup
+        }
+
+        # specific metadata for webhook handler expectations
+        if body.itemType in ["verified", "glow", "boost", "giant"]:
+            # The existing webhook expects 'venue_id' and 'sku'
+            metadata["venue_id"] = body.itemId
+            metadata["sku"] = f"{body.itemType}_feature"
 
         session = stripe.checkout.Session.create(
             payment_method_types=["card", "promptpay"],
@@ -616,9 +618,11 @@ async def _handle_checkout_completed(session: dict) -> None:
     Important: Never mutate order state based only on metadata without additional
     validation. This handler must remain strict because `/webhook` is a public endpoint.
     """
-    order_id = (session.get("metadata") or {}).get("order_id")
+    metadata = session.get("metadata") or {}
+    order_id = metadata.get("order_id")
     session_id = session.get("id")
     payment_status = session.get("payment_status")
+    idempotency_key = metadata.get("idempotency_key")
 
     if not order_id or not session_id or not supabase_admin:
         return
@@ -630,6 +634,29 @@ async def _handle_checkout_completed(session: dict) -> None:
             extra={"order_id": order_id, "session_id": session_id, "payment_status": payment_status},
         )
         return
+
+    # Transaction-level idempotency: guard against double-click checkout edge cases.
+    # Stripe-level dedup (event_id) already prevents duplicate events; this guards
+    # the fulfillment state in case the same intent produces multiple sessions.
+    if idempotency_key:
+        try:
+            already_fulfilled = (
+                supabase_admin.table("orders")
+                .select("id, status")
+                .eq("idempotency_key", idempotency_key)
+                .not_.in_("status", ["pending", "pending_review"])
+                .limit(1)
+                .execute()
+            )
+            if already_fulfilled.data:
+                logger.info(
+                    "checkout_already_fulfilled",
+                    extra={"idempotency_key": idempotency_key, "order_id": order_id},
+                )
+                return
+        except Exception as e:
+            # Non-fatal: log and proceed (idempotency_key column may not exist yet)
+            logger.warning("idempotency_check_failed", extra={"err": str(e)})
 
     try:
         # Only transition from pending-ish states to avoid replay/late events reopening flows.

@@ -33,7 +33,12 @@ const prefetchImage = (url) => {
 const prefetchVenueData = async (id, signal) => {
 	if (!id) return;
 	try {
-		await supabase.from("shops").select("*").eq("id", id).single().abortSignal(signal);
+		await supabase
+			.from("shops")
+			.select("*")
+			.eq("id", id)
+			.single()
+			.abortSignal(signal);
 		// Note: Supabase JS client handles caching in some versions,
 		// but even just making the fetch Warms the browser's disk/network cache.
 		// For true local-first, you would insert into IndexedDB here if needed.
@@ -71,7 +76,9 @@ const executePrefetch = async (id) => {
 		});
 	} finally {
 		// Decrement even if async work is queued, slightly inaccurate but prevents deadlocks
-		setTimeout(() => { activePrefetches--; }, 2000);
+		setTimeout(() => {
+			activePrefetches--;
+		}, 2000);
 	}
 };
 
@@ -94,7 +101,8 @@ export function usePrefetchEngine() {
 
 		// If browser supports navigator.connection.saveData, respect it!
 		if (navigator.connection && navigator.connection.saveData) {
-			if (import.meta.env.DEV) console.log("[Prefetch] Disabled: Save-Data header is on.");
+			if (import.meta.env.DEV)
+				console.log("[Prefetch] Disabled: Save-Data header is on.");
 			return;
 		}
 
@@ -119,6 +127,6 @@ export function usePrefetchEngine() {
 		stopEngine,
 		cancelAll,
 		prefetchImage,
-		isEnabled
+		isEnabled,
 	};
 }

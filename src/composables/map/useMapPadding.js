@@ -186,7 +186,9 @@ export function useMapPadding(mapRef, options = {}) {
 						{ source: PIN_SOURCE_ID, id: oldFid },
 						{ drawerProgress: 0 },
 					);
-				} catch { /* source may not exist yet */ }
+				} catch {
+					/* source may not exist yet */
+				}
 			}
 		}
 		activePinId.value = pinId;
@@ -208,7 +210,9 @@ export function useMapPadding(mapRef, options = {}) {
 				{ source: PIN_SOURCE_ID, id: fid },
 				{ drawerProgress: clamped },
 			);
-		} catch { /* source may not exist during init */ }
+		} catch {
+			/* source may not exist during init */
+		}
 	};
 
 	// Init

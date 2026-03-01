@@ -1,4 +1,5 @@
 import { computed, ref } from "vue";
+import { calculateDistance } from "../utils/shopUtils";
 
 const DESKTOP_MIN_WIDTH = 1280;
 
@@ -10,6 +11,88 @@ export function useMapLogic({
 	userLocation,
 }) {
 	const mapRef = ref(null);
+
+	// ── Nearby Pin Filtering ─────────────────────────────────────────
+	// Shows max 30 venues within 20km, shuffled every 30 minutes.
+	// Shuffle is deterministic per 30-min bucket so it doesn't cause
+	// excessive re-renders but still provides variety over time.
+	const NEARBY_MAX_COUNT = 30;
+	const NEARBY_RADIUS_KM = 20;
+	const SHUFFLE_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+
+	// Seeded shuffle using Durstenfeld (Fisher-Yates) algorithm.
+	const seededShuffle = (arr, seed) => {
+		const result = [...arr];
+		let s = seed;
+		for (let i = result.length - 1; i > 0; i--) {
+			// LCG pseudo-random number
+			s = (s * 1664525 + 1013904223) & 0xffffffff;
+			const j = Math.abs(s) % (i + 1);
+			[result[i], result[j]] = [result[j], result[i]];
+		}
+		return result;
+	};
+
+	/**
+	 * Filter and shuffle shops to nearby 30 within 20km,
+	 * refreshing the shuffle bucket every 30 minutes.
+	 * @param {Array} allShops - full list of processed shops
+	 * @returns {Array} up to 30 nearby shops
+	 */
+	const getNearbyPins = (allShops) => {
+		const userLoc = userLocation?.value;
+		const hasUserLoc =
+			Array.isArray(userLoc) &&
+			userLoc.length >= 2 &&
+			Number.isFinite(Number(userLoc[0])) &&
+			Number.isFinite(Number(userLoc[1]));
+
+		if (!hasUserLoc || !allShops?.length) {
+			// No user location — return first 30 with valid coords
+			return (
+				allShops
+					?.filter(
+						(s) =>
+							Number.isFinite(Number(s?.lat)) &&
+							Number.isFinite(Number(s?.lng)),
+					)
+					.slice(0, NEARBY_MAX_COUNT) ?? []
+			);
+		}
+
+		const userLat = Number(userLoc[0]);
+		const userLng = Number(userLoc[1]);
+
+		// Filter to shops within radius and with valid coords
+		const nearby = allShops
+			.filter((s) => {
+				const lat = Number(s?.lat);
+				const lng = Number(s?.lng);
+				if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+				const dist = calculateDistance(userLat, userLng, lat, lng);
+				return dist <= NEARBY_RADIUS_KM;
+			})
+			.map((s) => {
+				const dist = calculateDistance(
+					userLat,
+					userLng,
+					Number(s.lat),
+					Number(s.lng),
+				);
+				return { ...s, distance: dist };
+			})
+			.sort((a, b) => a.distance - b.distance);
+
+		// Use time-bucket seed (changes every 30 minutes)
+		const timeBucket = Math.floor(Date.now() / SHUFFLE_INTERVAL_MS);
+		// Mix in user position so different users see different orders
+		const seed =
+			timeBucket ^ Math.round(userLat * 1000) ^ Math.round(userLng * 1000);
+
+		const shuffled = seededShuffle(nearby, seed);
+		return shuffled.slice(0, NEARBY_MAX_COUNT);
+	};
+
 	const getViewportWidth = () => {
 		if (typeof window === "undefined") return 0;
 		return Math.round(
@@ -164,5 +247,6 @@ export function useMapLogic({
 		handleExitGiantView,
 		mapUiTopOffset,
 		mapUiBottomOffset,
+		getNearbyPins,
 	};
 }

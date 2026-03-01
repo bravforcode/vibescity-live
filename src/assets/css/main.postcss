@@ -1023,3 +1023,10 @@ html {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
+
+/* ── Glass CSS fallback (when WebGL chromatic glass unavailable) ── */
+.glass-css-fallback {
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  background: rgba(15, 15, 20, 0.75);
+}

@@ -17,9 +17,9 @@ import { useUserStore } from "../store/userStore";
 import { openExternal } from "../utils/browserUtils";
 import { calculateDistance } from "../utils/shopUtils";
 import {
-    loadFavoritesWithTTL,
-    removeFavoriteItem,
-    saveFavoriteItem,
+	loadFavoritesWithTTL,
+	removeFavoriteItem,
+	saveFavoriteItem,
 } from "../utils/storageHelper";
 import { useAudioSystem } from "./useAudioSystem";
 // ✅ Modular Composables
@@ -28,9 +28,11 @@ import { useEdgeSwipe } from "./useGestures";
 import { useHaptics } from "./useHaptics";
 import { useHomeBase } from "./useHomeBase"; // ✅ Correct Import Placement
 import { useIdle } from "./useIdle";
+import { useIntentPredictor } from "./useIntentPredictor";
 import { useMapLogic } from "./useMapLogic";
 import { useNotifications } from "./useNotifications";
 import { usePerformance } from "./usePerformance";
+import { usePrefetchEngine } from "./usePrefetchEngine";
 import { useScrollSync } from "./useScrollSync";
 import { useShopFilters } from "./useShopFilters";
 import { useThrottledAction } from "./useThrottledAction";
@@ -171,7 +173,7 @@ export function useAppLogic() {
 		bottomUiHeight,
 		userLocation, // Now reactive from locationStore
 	});
-	const { mapRef, smoothFlyTo, handleLocateMe } = mapLogic;
+	const { mapRef, smoothFlyTo, handleLocateMe, getNearbyPins } = mapLogic;
 
 	// --- 4. Init Event Logic ---
 	const eventLogic = useEventLogic();
@@ -251,51 +253,203 @@ export function useAppLogic() {
 
 	// Search Logic (Kept here as it spans multiple domains)
 	const globalSearchQuery = ref("");
-
-	const globalSearchResults = computed(() => {
-		if (!globalSearchQuery.value || globalSearchQuery.value.length < 2)
-			return [];
-
-		const emojiMap = {
-			"☕": "cafe",
-			"🍽️": "restaurant",
-			"🍜": "food",
-			"🍺": "bar",
-			"🍷": "wine",
-			"💃": "club",
-			"🎵": "live music",
-			"🎨": "art",
-			"🛍️": "fashion",
-			"🏢": "mall",
-		};
-
-		let searchQuery = globalSearchQuery.value.toLowerCase();
-		for (const [emoji, term] of Object.entries(emojiMap)) {
-			if (searchQuery.includes(emoji)) {
-				searchQuery = searchQuery.replace(emoji, term);
+	const normalizeSearchText = (value) =>
+		String(value || "")
+			.normalize("NFKC")
+			.toLowerCase()
+			.replace(/[\u200B-\u200D\uFEFF]/g, "")
+			.replace(/[^a-z0-9\u0E00-\u0E7F\s]/gi, " ")
+			.replace(/\s+/g, " ")
+			.trim();
+	const emojiAliasMap = {
+		"☕": "cafe coffee",
+		"🍽️": "restaurant dining",
+		"🍜": "food noodle",
+		"🍺": "bar beer",
+		"🍷": "wine cocktail",
+		"💃": "club nightlife dance",
+		"🎵": "live music",
+		"🎨": "art gallery",
+		"🛍️": "fashion shopping",
+		"🏢": "mall shopping center",
+		"🏨": "hotel accommodation",
+		"🛏️": "hostel accommodation",
+		"🕌": "temple",
+	};
+	const expandEmojiAliases = (value) => {
+		let next = String(value || "");
+		for (const [emoji, alias] of Object.entries(emojiAliasMap)) {
+			if (next.includes(emoji)) {
+				next = next.split(emoji).join(` ${alias} `);
 			}
 		}
-
-		const matches = processedShops.value.filter(
-			(s) =>
-				(s.name || "").toLowerCase().includes(searchQuery) ||
-				(s.category || "").toLowerCase().includes(searchQuery),
-		);
-
-		if (userLocation.value) {
-			const [uLat, uLng] = userLocation.value;
-			return matches
-				.map((s) => ({
-					...s,
-					distance:
-						s.lat && s.lng
-							? calculateDistance(uLat, uLng, s.lat, s.lng)
-							: Infinity,
-				}))
-				.sort((a, b) => a.distance - b.distance)
-				.slice(0, 10);
+		return next;
+	};
+	const tokenizeSearchText = (value) =>
+		normalizeSearchText(value).split(" ").filter(Boolean);
+	const editDistanceWithin = (a, b, maxDistance = 2) => {
+		const left = String(a || "");
+		const right = String(b || "");
+		if (!left || !right) return Number.POSITIVE_INFINITY;
+		if (Math.abs(left.length - right.length) > maxDistance) {
+			return Number.POSITIVE_INFINITY;
 		}
-		return matches.slice(0, 10);
+
+		const rows = left.length + 1;
+		const cols = right.length + 1;
+		const dp = Array.from({ length: rows }, () => Array(cols).fill(0));
+		for (let i = 0; i < rows; i += 1) dp[i][0] = i;
+		for (let j = 0; j < cols; j += 1) dp[0][j] = j;
+
+		for (let i = 1; i < rows; i += 1) {
+			let rowMin = Number.POSITIVE_INFINITY;
+			for (let j = 1; j < cols; j += 1) {
+				const cost = left[i - 1] === right[j - 1] ? 0 : 1;
+				dp[i][j] = Math.min(
+					dp[i - 1][j] + 1,
+					dp[i][j - 1] + 1,
+					dp[i - 1][j - 1] + cost,
+				);
+				rowMin = Math.min(rowMin, dp[i][j]);
+			}
+			if (rowMin > maxDistance) return Number.POSITIVE_INFINITY;
+		}
+		return dp[rows - 1][cols - 1];
+	};
+	const tokenMatchesWord = (token, word) => {
+		if (!token || !word) return false;
+		if (word.startsWith(token) || word.includes(token)) return true;
+		if (token.length < 4) return false;
+		const maxDistance = token.length >= 7 ? 2 : 1;
+		return editDistanceWithin(token, word, maxDistance) <= maxDistance;
+	};
+	const scoreSearchMatch = (shop, normalizedQuery, queryTokens) => {
+		const name = normalizeSearchText(shop?.name || "");
+		const category = normalizeSearchText(shop?.category || "");
+		const description = normalizeSearchText(
+			shop?.description || shop?.vibeTag || shop?.crowdInfo || "",
+		);
+		const locationMeta = normalizeSearchText(
+			[
+				shop?.zone || shop?.Zone,
+				shop?.district || shop?.District,
+				shop?.province || shop?.Province,
+				shop?.building || shop?.Building,
+				shop?.floor || shop?.Floor,
+				shop?.slug,
+			]
+				.filter(Boolean)
+				.join(" "),
+		);
+		const corpus = normalizeSearchText(
+			[name, category, description, locationMeta].filter(Boolean).join(" "),
+		);
+		if (!corpus) return null;
+
+		let score = 0;
+		let matchedTokens = 0;
+		let unmatchedTokens = 0;
+		const corpusWords = corpus.split(" ").filter(Boolean);
+
+		if (name.includes(normalizedQuery)) score += 220;
+		else if (corpus.includes(normalizedQuery)) score += 120;
+
+		for (const token of queryTokens) {
+			if (!token) continue;
+			let matched = false;
+
+			if (name.includes(token)) {
+				score += name.startsWith(token) ? 100 : 88;
+				matched = true;
+			} else if (category.includes(token)) {
+				score += 70;
+				matched = true;
+			} else if (description.includes(token)) {
+				score += 48;
+				matched = true;
+			} else if (locationMeta.includes(token)) {
+				score += 52;
+				matched = true;
+			} else if (corpusWords.some((word) => tokenMatchesWord(token, word))) {
+				score += 30;
+				matched = true;
+			}
+
+			if (matched) matchedTokens += 1;
+			else if (token.length > 1) unmatchedTokens += 1;
+		}
+
+		const mismatchThreshold = Math.ceil(queryTokens.length * 0.5);
+		if (matchedTokens === 0 || unmatchedTokens > mismatchThreshold) return null;
+		if (String(shop?.status || "").toUpperCase() === "LIVE") score += 12;
+		if (shop?.is_verified || shop?.verifiedActive) score += 8;
+
+		return {
+			score,
+			matchedTokens,
+		};
+	};
+
+	const globalSearchResults = computed(() => {
+		const expandedQuery = expandEmojiAliases(globalSearchQuery.value);
+		const normalizedQuery = normalizeSearchText(expandedQuery);
+		if (!normalizedQuery) return [];
+
+		const queryTokens = tokenizeSearchText(normalizedQuery);
+		if (!queryTokens.length) return [];
+
+		let userLat = null;
+		let userLng = null;
+		if (
+			Array.isArray(userLocation.value) &&
+			Number.isFinite(Number(userLocation.value[0])) &&
+			Number.isFinite(Number(userLocation.value[1]))
+		) {
+			userLat = Number(userLocation.value[0]);
+			userLng = Number(userLocation.value[1]);
+		}
+
+		const scored = processedShops.value
+			.map((shop) => {
+				const match = scoreSearchMatch(shop, normalizedQuery, queryTokens);
+				if (!match) return null;
+
+				let distance = Number.POSITIVE_INFINITY;
+				if (
+					userLat !== null &&
+					userLng !== null &&
+					Number.isFinite(Number(shop?.lat)) &&
+					Number.isFinite(Number(shop?.lng))
+				) {
+					distance = calculateDistance(
+						userLat,
+						userLng,
+						Number(shop.lat),
+						Number(shop.lng),
+					);
+				}
+				const proximityBoost = Number.isFinite(distance)
+					? Math.max(0, 24 - Math.min(distance, 24))
+					: 0;
+
+				return {
+					...shop,
+					distance,
+					searchScore: match.score + proximityBoost,
+					searchMatchedTokens: match.matchedTokens,
+				};
+			})
+			.filter(Boolean);
+
+		return scored
+			.sort((a, b) => {
+				if (b.searchScore !== a.searchScore) {
+					return b.searchScore - a.searchScore;
+				}
+				if (a.distance !== b.distance) return a.distance - b.distance;
+				return (a.name || "").localeCompare(b.name || "");
+			})
+			.slice(0, 30);
 	});
 
 	// --- 8. Core Coordinator Functions ---
@@ -1261,6 +1415,7 @@ export function useAppLogic() {
 		// Misc
 		carouselShops: computed(() => shopStore.visibleShops),
 		carouselShopIds: computed(() => shopStore.visibleShops.map((s) => s.id)),
+		nearbyPins: computed(() => getNearbyPins(filteredShops.value)),
 		loadMoreVibes: () => {}, // Infinite scroll placeholder
 		retryLoad: () => globalThis.location.reload(),
 

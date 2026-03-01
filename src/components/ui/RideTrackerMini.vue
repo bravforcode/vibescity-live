@@ -8,14 +8,14 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
  */
 
 const props = defineProps({
-  etaMinutes: { type: Number, default: 5 },
-  driverName: { type: String, default: "Sompong" },
-  driverAvatar: {
-    type: String,
-    default: "https://api.dicebear.com/7.x/notionists/svg?seed=Sompong",
-  },
-  licensePlate: { type: String, default: "กท 5555" },
-  status: { type: String, default: "arriving" }, // arriving, arrived
+	etaMinutes: { type: Number, default: 5 },
+	driverName: { type: String, default: "Sompong" },
+	driverAvatar: {
+		type: String,
+		default: "https://api.dicebear.com/7.x/notionists/svg?seed=Sompong",
+	},
+	licensePlate: { type: String, default: "กท 5555" },
+	status: { type: String, default: "arriving" }, // arriving, arrived
 });
 
 // Auto ETAs tick down realistically
@@ -23,30 +23,30 @@ const currentEta = ref(props.etaMinutes);
 let ticker = null;
 
 onMounted(() => {
-  // Fake ticking for demo
-  ticker = setInterval(() => {
-    if (currentEta.value > 1) {
-      currentEta.value -= 1;
-    } else {
-      currentEta.value = "Now";
-    }
-  }, 60000);
+	// Fake ticking for demo
+	ticker = setInterval(() => {
+		if (currentEta.value > 1) {
+			currentEta.value -= 1;
+		} else {
+			currentEta.value = "Now";
+		}
+	}, 60000);
 });
 
 onUnmounted(() => {
-  if (ticker) clearInterval(ticker);
+	if (ticker) clearInterval(ticker);
 });
 
 watch(
-  () => props.etaMinutes,
-  (newVal) => {
-    currentEta.value = newVal;
-  },
+	() => props.etaMinutes,
+	(newVal) => {
+		currentEta.value = newVal;
+	},
 );
 
 const isArrivingSoon = computed(() => {
-  if (currentEta.value === "Now") return true;
-  return currentEta.value <= 2;
+	if (currentEta.value === "Now") return true;
+	return currentEta.value <= 2;
 });
 
 // PiP windows don't inherit Tailwind classes easily without injecting <style> tags.

@@ -152,9 +152,9 @@ export const createPopupHTML = ({
         <div class="absolute inset-0 bg-gradient-to-br from-purple-700 via-pink-600 to-red-600"></div>
         ${
 					hasRenderableVideo
-						? `<video src="${safeVideoUrl}" poster="${safeImageUrl}" class="absolute inset-0 w-full h-full object-cover" autoplay muted loop playsinline></video>`
+						? `<video src="${safeVideoUrl}" poster="${safeImageUrl}" class="absolute inset-0 w-full h-full object-cover" autoplay muted loop playsinline crossorigin="anonymous"></video>`
 						: safeImageUrl
-							? `<img src="${safeImageUrl}" alt="${safeName}" class="absolute inset-0 w-full h-full object-cover" />`
+							? `<img src="${safeImageUrl}" alt="${safeName}" class="absolute inset-0 w-full h-full object-cover" crossorigin="anonymous" />`
 							: ""
 				}
         <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>

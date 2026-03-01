@@ -116,6 +116,16 @@ const isOffline = () => {
 	}
 	return !getNetworkOnlineState();
 };
+const isAbortLikeError = (errorLike) => {
+	const name = String(errorLike?.name || "");
+	if (name === "AbortError") return true;
+	const message = toErrorMessage(errorLike?.message || errorLike);
+	return (
+		message.includes("aborterror") ||
+		message.includes("signal is aborted") ||
+		message.includes("the operation was aborted")
+	);
+};
 
 const buildOfflineResponse = (meta) => {
 	const body = JSON.stringify({
@@ -192,6 +202,9 @@ const createSupabaseFetch = () => {
 			try {
 				response = await nativeFetch(input, init);
 			} catch (fetchError) {
+				if (isAbortLikeError(fetchError)) {
+					throw fetchError;
+				}
 				if (isSupabaseRequest(meta.url)) {
 					if (import.meta.env.DEV) {
 						console.error("[supabase] Network request failed:", fetchError);

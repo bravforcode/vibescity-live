@@ -207,7 +207,11 @@
 	"app": {
 		"brand": "VIBECITY",
 		"syncing": "กำลังซิงค์ระบบ…",
-		"system_alert": "แจ้งเตือนระบบ"
+		"system_alert": "แจ้งเตือนระบบ",
+		"you_are_offline": "โหมดออฟไลน์ถูกเปิดใช้งาน",
+		"limited_functionality": "ระบบจะซิงก์คำสั่งเมื่อกลับมาออนไลน์",
+		"connection_restored": "เชื่อมต่อกลับมาแล้ว",
+		"syncing_data": "กำลังซิงก์งานที่ค้างอยู่"
 	},
 	"feed": {
 		"no_items": "ไม่มีรายการให้แสดง",

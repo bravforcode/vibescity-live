@@ -282,16 +282,16 @@ export const useUserPreferencesStore = defineStore(
 		const isHapticsEnabled = ref(true);
 		const isLowPowerMode = ref(false);
 		// Map Performance / Visual FX
-		const isAmbientFxEnabled = ref(false);
-		const isNeonPulseEnabled = ref(false);
+		const isAmbientFxEnabled = ref(true);
+		const isNeonPulseEnabled = ref(true);
 		const isWeatherFxEnabled = ref(true);
 		const isSoundEnabled = ref(false);
 		const isHeatmapEnabled = ref(true);
 		const is3dBuildingsEnabled = ref(true);
 		const isMapFogEnabled = ref(true);
-		// Map Visual Presets / Budget (Performance-first default)
-		const mapVisualPreset = ref("smooth"); // smooth | colorful | cinematic
-		const motionBudget = ref("micro"); // micro | balanced | full
+		// Map Visual Presets / Budget (Colorful default to showcase FX)
+		const mapVisualPreset = ref("colorful"); // smooth | colorful | cinematic
+		const motionBudget = ref("balanced"); // micro | balanced | full
 		const isMapHapticsEnabled = ref(true);
 		const isLiveChipsEnabled = ref(true);
 		const isViewportGlowEnabled = ref(true);

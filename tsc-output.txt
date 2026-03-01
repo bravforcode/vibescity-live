@@ -1,0 +1,8 @@
+node_modules/@types/mdx/types.d.ts(23,38): error TS2503: Cannot find namespace 'JSX'.
+node_modules/@types/mdx/types.d.ts(28,23): error TS2503: Cannot find namespace 'JSX'.
+node_modules/@types/mdx/types.d.ts(47,28): error TS2503: Cannot find namespace 'JSX'.
+node_modules/@types/mdx/types.d.ts(73,46): error TS2503: Cannot find namespace 'JSX'.
+src/components/dashboard/BuyPinsPanel.vue(163,60): error TS2339: Property 'sku' does not exist on type 'never'.
+src/components/dashboard/BuyPinsPanel.vue(164,24): error TS2339: Property 'label' does not exist on type 'never'.
+src/components/dashboard/BuyPinsPanel.vue(217,61): error TS2339: Property 'price' does not exist on type 'unknown'.
+src/components/dashboard/BuyPinsPanel.vue(673,6): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', 'node18', 'node20', or 'nodenext'.

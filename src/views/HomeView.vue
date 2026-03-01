@@ -218,6 +218,7 @@ const {
 	filteredShops,
 	carouselShops,
 	carouselShopIds,
+	nearbyPins,
 	suggestedShops,
 	mallShops,
 	activeEvents,
@@ -290,9 +291,7 @@ provide("mapPaddingApi", mapPaddingApi);
 // Auth removed — app uses anonymous visitor identity only
 
 watch(globalSearchQuery, (q) => {
-	if (IS_STRICT_MAP_E2E) {
-		showSearchResults.value = Boolean(q && q.length >= 2);
-	}
+	showSearchResults.value = Boolean(q && q.length >= 1);
 });
 
 const setBottomUiRef = (el) => {
@@ -1162,7 +1161,7 @@ const hasFilteredResults = computed(() => {
                 ref="mapRef"
                 :uiTopOffset="mapUiTopOffset"
                 :uiBottomOffset="0"
-                :shops="filteredShops"
+                :shops="nearbyPins"
                 :userLocation="userLocation"
                 :highlightedShopId="activeShopId"
                 :is-low-power-mode="isLowPowerMode"

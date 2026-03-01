@@ -3,6 +3,7 @@ import { useMotion } from "@vueuse/motion";
 import {
 	computed,
 	defineAsyncComponent,
+	inject,
 	nextTick,
 	onMounted,
 	onUnmounted,
@@ -10,6 +11,8 @@ import {
 	watch,
 	watchEffect,
 } from "vue";
+import { useChromaticGlass } from "../../composables/engine/useChromaticGlass.js";
+import { useGranularAudio } from "../../composables/engine/useGranularAudio.js";
 import { useHaptics } from "../../composables/useHaptics";
 import { Z } from "../../constants/zIndex";
 import { resolveVenueMedia } from "../../domain/venue/viewModel";
@@ -86,7 +89,11 @@ const DISMISS_THRESHOLD = {
 // ==========================================
 const { t } = useI18n();
 const { selectFeedback, successFeedback, impactFeedback } = useHaptics();
-
+const {
+	onSwipe: audioSwipe,
+	onSnap: audioSnap,
+	onDismiss: audioDismiss,
+} = useGranularAudio();
 const props = defineProps({
 	shop: {
 		type: Object,
@@ -115,6 +122,12 @@ const emit = defineEmits(["close", "toggle-favorite"]);
 
 // UI State
 const modalCard = ref(null);
+// Refractive glass panel — placed after modalCard so ref is captured
+const { enabled: glassEnabled, fallbackClass } = useChromaticGlass({
+	panelId: "vibe-modal",
+	panelRef: modalCard,
+	aberration: 0.006,
+});
 const scrollContentRef = ref(null);
 const imageCarouselRef = ref(null);
 const videoPlayer = ref(null);
@@ -138,6 +151,9 @@ const copyStatus = ref("");
 const rideLoading = ref("");
 const isMobile = ref(false);
 const modalTitleId = "vibe-modal-title";
+
+// --- Cinematic Spatial Physics: Dynamic Map Padding ---
+const mapPaddingApi = inject("mapPaddingApi", null);
 
 // Promotion State
 const timeLeft = ref("");
@@ -312,6 +328,11 @@ const handleTouchMove = (e) => {
 			scale: 1 - deltaY / 3000,
 			opacity: 1,
 		});
+
+		const _dt = Date.now() - touchStart.value.t;
+		if (_dt > 0) {
+			audioSwipe(Math.abs(deltaY) / _dt);
+		}
 	}
 };
 
@@ -342,6 +363,7 @@ const handleTouchEnd = (e) => {
 	// Snap back
 	if (deltaY > 0) {
 		apply("enter");
+		audioSnap();
 	}
 
 	dragProgress.value = 0;
@@ -354,6 +376,7 @@ const handleTouchEnd = (e) => {
 const handleClose = () => {
 	try {
 		impactFeedback("medium");
+		audioDismiss();
 		apply("leave");
 		setTimeout(() => emit("close"), 300);
 	} catch (error) {
@@ -535,6 +558,26 @@ const openRide = async (appName) => {
 	impactFeedback("medium");
 
 	try {
+		// Cinematic Route Unveiling: Fly to destination before switching apps
+		if (hasCoords && mapPaddingApi?.map) {
+			try {
+				const mapInstance = mapPaddingApi.map.value || mapPaddingApi.map;
+				if (typeof mapInstance.flyTo === "function") {
+					mapInstance.flyTo({
+						center: [lngNum, latNum],
+						zoom: 16,
+						duration: 800, // Longer duration for smooth cinematic effect
+						essential: true,
+					});
+				}
+			} catch (err) {
+				console.warn("Cinematic flyTo failed:", err);
+			}
+		}
+
+		// Wait 400ms for the animation to be visible before thread blocks / app switches
+		await new Promise((resolve) => setTimeout(resolve, 400));
+
 		// Copy shop name to clipboard
 		await copyToClipboard(props.shop.name);
 		copyStatus.value = hasCoords
@@ -855,10 +898,12 @@ onUnmounted(() => {
       @touchmove.stop="handleTouchMove"
       @touchend.stop="handleTouchEnd"
       class="relative w-full md:max-w-5xl bg-white dark:bg-zinc-900 md:rounded-[2rem] rounded-t-[2rem] flex flex-col shadow-[0_-10px_80px_rgba(0,0,0,0.3)] max-h-[94vh] md:max-h-[90vh] pointer-events-auto overflow-hidden"
+      :class="fallbackClass"
       :style="{
         zIndex: Z.MODAL,
         '--safe-area-top': 'env(safe-area-inset-top)',
         '--safe-area-bottom': 'env(safe-area-inset-bottom)',
+        background: glassEnabled ? 'rgba(10,10,18,0.55)' : undefined,
       }"
       role="dialog"
       aria-modal="true"

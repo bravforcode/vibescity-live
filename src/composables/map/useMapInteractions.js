@@ -79,6 +79,11 @@ export function useMapInteractions(
 		const resolvedShop = resolveFeatureItem
 			? resolveFeatureItem(shopData, feature)
 			: shopData;
+		// Signal manual pin tap to sentient map
+		if (typeof options.onPinTap === "function") {
+			options.onPinTap();
+		}
+
 		emit("select-shop", resolvedShop || shopData);
 	};
 

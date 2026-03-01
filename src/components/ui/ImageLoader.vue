@@ -38,6 +38,7 @@ const load = () => {
 	if (!props.src || hasError.value || isLoaded.value) return;
 
 	const img = new Image();
+	img.crossOrigin = "anonymous";
 	img.onload = () => {
 		currentSrc.value = props.src;
 		isLoaded.value = true;
@@ -113,6 +114,7 @@ onUnmounted(() => {
         :class="['absolute inset-0 w-full h-full object-cover z-10', imgClass]"
         loading="lazy"
         draggable="false"
+        crossorigin="anonymous"
       />
     </transition>
   </div>

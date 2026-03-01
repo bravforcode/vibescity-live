@@ -41,13 +41,15 @@ registerRoute(
 	}),
 );
 
-// Cache Supabase Storage Images (StaleWhileRevalidate)
+// Cache Supabase Storage Images (StaleWhileRevalidate, CORS only)
+// IMPORTANT: mode:'cors' prevents opaque (status 0) responses that cause ERR_FAILED.
 registerRoute(
 	({ url }) =>
 		url.origin.includes("supabase.co") &&
 		url.pathname.includes("/storage/v1/object/public/"),
 	new StaleWhileRevalidate({
-		cacheName: "supabase-images",
+		cacheName: "supabase-images-v2",
+		fetchOptions: { mode: "cors", credentials: "omit" },
 		plugins: [
 			new ExpirationPlugin({
 				maxEntries: 100,

@@ -35,6 +35,19 @@ export function useMapAtmosphere(
 	const weatherLayer = new WeatherLayer();
 	const currentMapZoom = ref(15);
 
+	watch(
+		() => map.value,
+		(m) => {
+			if (!m) return;
+			const updateZoom = () => {
+				currentMapZoom.value = m.getZoom();
+			};
+			m.on("zoom", updateZoom);
+			updateZoom();
+		},
+		{ immediate: true },
+	);
+
 	// --- Fireflies Logic ---
 	const initFireflies = () => {
 		const center = map.value

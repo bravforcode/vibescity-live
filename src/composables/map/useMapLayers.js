@@ -143,7 +143,10 @@ export function useMapLayers(map, options = {}) {
 
 	const addNeonRoads = () => {
 		if (!map.value) return;
-		if (!map.value.isStyleLoaded?.()) return;
+		if (!map.value.isStyleLoaded?.()) {
+			map.value.once("style.load", addNeonRoads);
+			return;
+		}
 		if (map.value.getSource("neon-roads")) return;
 
 		try {
@@ -1122,15 +1125,18 @@ export function useMapLayers(map, options = {}) {
 			activeCarSourceKey = sourceConfig.key;
 		}
 		if (m.getLayer("road-cars")) {
-			resetCarRetry();
-			updateTrafficDebug({
-				stage: "skip:already-mounted",
-				sourceId: sourceConfig.sourceId,
-				sourceLayer: sourceConfig.sourceLayer || null,
-			});
-			return;
+			if (!carAnimFrame && !prefersReduceMotion) {
+				removeCarLayers();
+			} else {
+				resetCarRetry();
+				updateTrafficDebug({
+					stage: "skip:already-mounted",
+					sourceId: sourceConfig.sourceId,
+					sourceLayer: sourceConfig.sourceLayer || null,
+				});
+				return;
+			}
 		}
-
 		try {
 			const iconsReady = ensureCarIcons(m);
 			if (!iconsReady) {
@@ -1231,6 +1237,8 @@ export function useMapLayers(map, options = {}) {
 			let lastTs = performance.now();
 			let dashFrameIndex = 0;
 			let lastDashUpdateAt = 0;
+			let carOffset = 0;
+
 			const animate = (ts = performance.now()) => {
 				if (!m || !m.getLayer("road-cars")) {
 					carAnimFrame = null;
@@ -1242,12 +1250,18 @@ export function useMapLayers(map, options = {}) {
 				}
 				const dt = Math.max(0, ts - lastTs);
 				lastTs = ts;
-				phase = (phase + dt * 0.0032) % (Math.PI * 2);
-				const shift = Math.sin(phase) * 6.5;
+				phase = (phase + dt * 0.0048) % (Math.PI * 2);
+
+				// Continuous flowing cars based on their symbol-spacing (220, 320, 430)
+				carOffset += dt * 0.04;
+				const offset1 = carOffset % 220;
+				const offset2 = (carOffset * 0.8) % 320;
+				const offset3 = (carOffset * 1.15) % 430;
+
 				try {
-					m.setLayoutProperty("road-cars", "icon-offset", [shift, 0]);
-					m.setLayoutProperty("road-cars-w", "icon-offset", [-shift * 0.8, 0]);
-					m.setLayoutProperty("road-cars-r", "icon-offset", [shift * 1.15, 0]);
+					m.setLayoutProperty("road-cars", "icon-offset", [-offset1, 0]);
+					m.setLayoutProperty("road-cars-w", "icon-offset", [offset2, 0]);
+					m.setLayoutProperty("road-cars-r", "icon-offset", [-offset3, 0]);
 					if (ts - lastDashUpdateAt >= 140) {
 						lastDashUpdateAt = ts;
 						dashFrameIndex = (dashFrameIndex + 1) % FLOW_DASH_FRAMES.length;

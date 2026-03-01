@@ -44,7 +44,9 @@ async def lifespan(_app: FastAPI):
     import asyncio
 
     from app.jobs import triad_reconcile
+    from app.services.analytics_service import analytics_buffer
 
+    await analytics_buffer.start_periodic_flush()
     await vibes.start_background_tasks()
     _reconcile_task = asyncio.create_task(triad_reconcile.run_forever())
     try:
@@ -52,6 +54,7 @@ async def lifespan(_app: FastAPI):
     finally:
         _reconcile_task.cancel()
         await vibes.stop_background_tasks()
+        await analytics_buffer.stop()
 
 
 app = FastAPI(

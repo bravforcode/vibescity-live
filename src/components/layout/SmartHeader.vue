@@ -115,6 +115,9 @@ const sortedSearchResults = computed(() => {
 	return deduped
 		.slice(0, 50) // Limit for performance
 		.sort((a, b) => {
+			const scoreA = Number((a as any)?.searchScore || 0);
+			const scoreB = Number((b as any)?.searchScore || 0);
+			if (scoreA !== scoreB) return scoreB - scoreA;
 			// Sort by open status first, then by name
 			if (a.isOpen !== b.isOpen) return a.isOpen ? -1 : 1;
 			return (a.name || "").localeCompare(b.name || "");

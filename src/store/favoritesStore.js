@@ -7,13 +7,13 @@ import { computed, ref, shallowRef, watch } from "vue";
 import { supabase } from "../lib/supabase";
 import { getNetworkOnlineState } from "../services/networkState";
 import {
-    appendOfflineAction,
-    clearOfflineActionQueue,
-    deduplicateQueue,
-    getBackoffDelay,
-    loadOfflineActionQueue,
-    MAX_RETRIES,
-    saveOfflineActionQueue,
+	appendOfflineAction,
+	clearOfflineActionQueue,
+	deduplicateQueue,
+	getBackoffDelay,
+	loadOfflineActionQueue,
+	MAX_RETRIES,
+	saveOfflineActionQueue,
 } from "../services/offlineActionQueue";
 import { useUserStore } from "./userStore";
 
@@ -230,9 +230,17 @@ export const useFavoritesStore = defineStore(
 						if (import.meta.env.DEV) {
 							console.warn(`[favorites] Dead letter: ${item.shopId}`);
 						}
-						failures.push({ ...item, retries: nextRetries, status: "dead_letter" });
+						failures.push({
+							...item,
+							retries: nextRetries,
+							status: "dead_letter",
+						});
 					} else {
-						failures.push({ ...item, retries: nextRetries, timestamp: Date.now() });
+						failures.push({
+							...item,
+							retries: nextRetries,
+							timestamp: Date.now(),
+						});
 					}
 				}
 			}
