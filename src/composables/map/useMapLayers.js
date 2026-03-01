@@ -1,9 +1,17 @@
-import { onUnmounted } from "vue";
 import coinAnimation from "@/assets/animations/coin.json";
+import { onUnmounted } from "vue";
 
 const pendingMapImages = new Set();
 const TRAFFIC_SOURCE_ID = "traffic-roads-local";
 const TRAFFIC_ROADS_DATA_URL = "/data/chiangmai-main-roads-lanes.geojson";
+
+// Flow dash arrays for animated roads
+const FLOW_DASH_FRAMES = [];
+for (let i = 0; i < 20; i++) {
+	const step = (i * 4) / 20;
+	// dash of 2, gap of 4 -> moving forward
+	FLOW_DASH_FRAMES.push([0, step, 2, 4 - step]);
+}
 
 export function useMapLayers(map, options = {}) {
 	const resolveEffectsMode = () =>
