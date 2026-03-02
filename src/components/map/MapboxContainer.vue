@@ -89,9 +89,9 @@ const styleUrlForTheme = (isDarkMode) => {
 	return isDarkMode ? DARK_STYLE : LIGHT_STYLE;
 };
 
-import { useDollyZoom } from "../../composables/engine/useDollyZoom.js";
-import { useFluidOverlay } from "../../composables/engine/useFluidOverlay.js";
-import { useSDFClusters } from "../../composables/engine/useSDFClusters.js";
+// useDollyZoom deferred — loaded after map idle (non-blocking) [Wave 3: Task 3.1]
+// useFluidOverlay deferred — dynamic import in onMounted (preserves Vue lifecycle) [Wave 3: Task 3.2]
+// useSDFClusters deferred — dynamic import in onMounted (preserves Vue lifecycle) [Wave 3: Task 3.3]
 // useVibeEffects deferred — loaded after map idle (non-blocking)
 import { logCaps } from "../../engine/capabilities.js";
 import { socketService } from "../../services/socketService";
@@ -2615,26 +2615,68 @@ const {
 let sentient = null;
 
 // ── God-Tier Engine Layers ────────────────────────────────────
+// Wave 3: Task 3.1 — useDollyZoom async-loaded via idle queue (no onUnmounted = safe)
+// Wave 3: Task 3.2 — useFluidOverlay dynamic import in onMounted (onUnmounted = must be onMounted ctx)
+// Wave 3: Task 3.3 — useSDFClusters dynamic import in onMounted (onUnmounted = must be onMounted ctx)
 logCaps();
 let _sdfClusters = null;
 let _fluidOverlay = null;
-const { zoomTo: dollyZoomTo, flipPinToModal } = useDollyZoom(map.value);
+
+// Dolly zoom deferred instance (set after idle queue fires)
+let _dollyZoomInstance = null;
 
 let _godTierInit = false;
-const initGodTierLayers = () => {
+const initGodTierLayers = async () => {
 	if (_godTierInit) return; // only init once
 	_godTierInit = true;
 	const m = map.value;
 	if (!m) return;
-	_sdfClusters = useSDFClusters(m);
-	_fluidOverlay = useFluidOverlay(m);
+	// Dynamic imports — removes these modules from the main map chunk parse budget.
+	// useSDFClusters + useFluidOverlay call onUnmounted internally → must be called
+	// from onMounted context (guaranteed: initGodTierLayers is called from onMounted).
+	try {
+		const [sdfMod, fluidMod] = await Promise.all([
+			import("../../composables/engine/useSDFClusters.js"),
+			import("../../composables/engine/useFluidOverlay.js"),
+		]);
+		_sdfClusters = sdfMod.useSDFClusters(m);
+		_fluidOverlay = fluidMod.useFluidOverlay(m);
+	} catch (err) {
+		if (import.meta.env.DEV) {
+			console.warn(
+				"[MapboxContainer] God-tier engine layers failed to load:",
+				err,
+			);
+		}
+	}
 };
 
-// Wire dolly zoom into pin-click: expose via composable interface
-const godTierZoomTo = (lngLat, modalEl) => {
-	dollyZoomTo(lngLat);
-	if (modalEl) flipPinToModal(lngLat, modalEl);
+// Wave 3: Task 3.1 — dolly zoom async init via idle queue (queued at setup time)
+const initDollyZoom = async () => {
+	if (_dollyZoomInstance) return;
+	try {
+		const mod = await import("../../composables/engine/useDollyZoom.js");
+		_dollyZoomInstance = mod.useDollyZoom(map.value);
+		if (import.meta.env.DEV) {
+			console.log("[MapboxContainer] Dolly zoom initialized after idle");
+		}
+	} catch (err) {
+		if (import.meta.env.DEV) {
+			console.warn("[MapboxContainer] Dolly zoom failed to load:", err);
+		}
+	}
 };
+
+// Wire dolly zoom into pin-click: expose via deferred composable interface
+// Falls back to no-op if not yet loaded (dolly effect is non-critical on first tap)
+const godTierZoomTo = (lngLat, modalEl) => {
+	_dollyZoomInstance?.zoomTo?.(lngLat);
+	if (modalEl) _dollyZoomInstance?.flipPinToModal?.(lngLat, modalEl);
+};
+
+// Wave 3: Task 3.1 — Queue dolly zoom for async load after first map idle
+// useDollyZoom has no onUnmounted → safe to load from idle callback context
+scheduleIdleTask(initDollyZoom, { timeout: 4000 });
 
 const prefetchVenueDetails = async (venueId, signal) => {
 	// Try to use Vue Query if available, otherwise skip
@@ -2786,7 +2828,9 @@ watch(isMapReady, (ready) => {
 					"mapbox-interactive",
 				);
 				if (import.meta.env.DEV) {
-					console.log(`Map interactive time: ${perfEntry.duration.toFixed(0)}ms`);
+					console.log(
+						`Map interactive time: ${perfEntry.duration.toFixed(0)}ms`,
+					);
 				}
 				reportMapLifecycle("map_load_performance", {
 					duration: Math.round(perfEntry.duration),
