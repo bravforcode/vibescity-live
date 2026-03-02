@@ -2,6 +2,50 @@ import mapboxgl from "mapbox-gl";
 import { markRaw, onUnmounted, ref, shallowRef } from "vue";
 import { useInteractionState } from "../useInteractionState";
 
+const MAPBOX_FEATURESET_WARN_SNIPPETS = [
+	"featureNamespace",
+	"featureset",
+	"place-labels",
+	"selector is not associated to the same source",
+	"Couldn't find terrain source", // Suppress spurious terrain warnings during style transitions
+];
+
+let mapboxWarnFilterRefs = 0;
+let mapboxWarnOriginal = null;
+let mapboxWarnPatched = null;
+
+const shouldSuppressMapboxFeaturesetWarn = (args) => {
+	const message = args
+		.map((part) => (typeof part === "string" ? part : String(part ?? "")))
+		.join(" ");
+	return MAPBOX_FEATURESET_WARN_SNIPPETS.every((snippet) =>
+		message.includes(snippet),
+	);
+};
+
+const installMapboxWarnFilter = () => {
+	if (typeof console === "undefined") return;
+	mapboxWarnFilterRefs += 1;
+	if (mapboxWarnPatched) return;
+	mapboxWarnOriginal = console.warn?.bind(console) ?? null;
+	mapboxWarnPatched = (...args) => {
+		if (shouldSuppressMapboxFeaturesetWarn(args)) return;
+		mapboxWarnOriginal?.(...args);
+	};
+	console.warn = mapboxWarnPatched;
+};
+
+const uninstallMapboxWarnFilter = () => {
+	if (typeof console === "undefined") return;
+	mapboxWarnFilterRefs = Math.max(0, mapboxWarnFilterRefs - 1);
+	if (mapboxWarnFilterRefs > 0) return;
+	if (mapboxWarnPatched && console.warn === mapboxWarnPatched) {
+		console.warn = mapboxWarnOriginal ?? console.warn;
+	}
+	mapboxWarnPatched = null;
+	mapboxWarnOriginal = null;
+};
+
 export function useMapCore(containerRef, _options = {}) {
 	const map = shallowRef(null);
 	const isMapReady = ref(false);
@@ -10,7 +54,8 @@ export function useMapCore(containerRef, _options = {}) {
 	const HARDCODED_MAPBOX_TOKEN =
 		"pk.eyJ1IjoicGhpcnJyIiwiYSI6ImNta21tbzNobDBndXMzZHB2N3V3cXdtMXQifQ.HlJvxxRdjzhbOLw5WgRPQA";
 	const PRIMARY_STYLE_URL = "mapbox://styles/phirrr/cmlktq68u002601se295iazmm";
-	const FALLBACK_STYLE_URL = PRIMARY_STYLE_URL;
+	// Distinct fallback: Mapbox light-v11 (public, no custom token required for basic access)
+	const FALLBACK_STYLE_URL = "mapbox://styles/mapbox/light-v11";
 	const STYLE_ENDPOINT_PATH = "/styles/v1/";
 	const EMPTY_VECTOR_TILE_DATA_URI = "data:application/x-protobuf;base64,";
 	let lastRequestedStyleUrl = "";
@@ -161,6 +206,7 @@ export function useMapCore(containerRef, _options = {}) {
 		style = PRIMARY_STYLE_URL,
 	) => {
 		if (!containerRef.value) return;
+		installMapboxWarnFilter();
 
 		// ✅ Clear container to prevent "should be empty" warnings and duplicate canvases on hot reload
 		containerRef.value.innerHTML = "";
@@ -238,6 +284,7 @@ export function useMapCore(containerRef, _options = {}) {
 		map.value.on("style.load", clearReadyFallbackTimer);
 		map.value.on("idle", clearReadyFallbackTimer);
 		map.value.on("remove", clearReadyFallbackTimer);
+		map.value.on("remove", uninstallMapboxWarnFilter);
 
 		// Track last requested style even when callers use map.value.setStyle directly.
 		const baseSetStyle = map.value.setStyle.bind(map.value);
@@ -246,10 +293,17 @@ export function useMapCore(containerRef, _options = {}) {
 			return baseSetStyle(nextStyle, options);
 		};
 
-		map.value.on("load", ensurePinImagesLoaded);
-		map.value.on("style.load", ensurePinImagesLoaded);
-		map.value.on("load", ensureTerrainSourceConsistency);
-		map.value.on("style.load", ensureTerrainSourceConsistency);
+		// CRITICAL: Pin images and terrain consistency are non-blocking.
+		// Defer to idle + requestAnimationFrame so they don't block map ready.
+		const scheduleNonCriticalInit = () => {
+			requestAnimationFrame(() => {
+				ensurePinImagesLoaded();
+				ensureTerrainSourceConsistency();
+			});
+		};
+		map.value.on("idle", scheduleNonCriticalInit);
+		// styleimagemissing handler (below) already covers image re-adds during style transitions.
+		// Keep styledata for terrain only (lightweight check, no image loading).
 		map.value.on("styledata", ensureTerrainSourceConsistency);
 		// Error handling — suppress expected tile 404s during style transitions
 		map.value.on("error", (e) => {
@@ -320,6 +374,7 @@ export function useMapCore(containerRef, _options = {}) {
 			map.value.remove();
 			map.value = null;
 		}
+		uninstallMapboxWarnFilter();
 	});
 
 	return {
