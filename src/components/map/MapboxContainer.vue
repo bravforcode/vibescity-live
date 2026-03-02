@@ -17,7 +17,7 @@ import { useI18n } from "vue-i18n";
 import "../../assets/map-atmosphere.css";
 import { useMapAtmosphere } from "../../composables/map/useMapAtmosphere";
 import { useMapCore } from "../../composables/map/useMapCore";
-import { useMapHeatmap } from "../../composables/map/useMapHeatmap";
+// useMapHeatmap deferred — loaded after map idle (non-blocking)
 import { useMapImagePrefetch } from "../../composables/map/useMapImagePrefetch";
 import { useMapInteractions } from "../../composables/map/useMapInteractions";
 import { useMapLayers } from "../../composables/map/useMapLayers";
@@ -28,7 +28,7 @@ import { useMapRenderScheduler } from "../../composables/map/useMapRenderSchedul
 // useSentientMap deferred — loaded after map idle (non-blocking)
 import { useAudioSystem } from "../../composables/useAudioSystem";
 import { useHaptics } from "../../composables/useHaptics";
-import { useWeather } from "../../composables/useWeather";
+// useWeather deferred — loaded after map idle (non-blocking)
 import { apiFetch } from "../../services/apiClient";
 import { frontendObservabilityService } from "../../services/frontendObservabilityService";
 import { useFeatureFlagStore } from "../../store/featureFlagStore";
@@ -91,11 +91,16 @@ const styleUrlForTheme = (isDarkMode) => {
 import { useDollyZoom } from "../../composables/engine/useDollyZoom.js";
 import { useFluidOverlay } from "../../composables/engine/useFluidOverlay.js";
 import { useSDFClusters } from "../../composables/engine/useSDFClusters.js";
-import { useVibeEffects } from "../../composables/useVibeEffects";
+// useVibeEffects deferred — loaded after map idle (non-blocking)
 import { logCaps } from "../../engine/capabilities.js";
 import { socketService } from "../../services/socketService";
 
-const { activeVibeEffects, triggerVibeEffect } = useVibeEffects();
+// Deferred useVibeEffects — initialized after map idle
+const activeVibeEffects = ref([]);
+let _vibeEffectsInstance = null;
+const triggerVibeEffect = (shop, content) => {
+	_vibeEffectsInstance?.triggerVibeEffect?.(shop, content);
+};
 const { impactFeedback } = useHaptics();
 const handleMotionChange = (e) => {
 	prefersReducedMotion.value = e.matches;
@@ -651,8 +656,17 @@ const clearVibeEffectMarkers = () => {
 	vibeMarkersMap.clear();
 };
 
-const { updateHeatmapData, addHeatmapLayer, removeHeatmapLayer } =
-	useMapHeatmap(map, allowHeatmap, shopsByIdRef);
+// Deferred useMapHeatmap — initialized after map idle
+let _heatmapInstance = null;
+const updateHeatmapData = (data) => {
+	_heatmapInstance?.updateHeatmapData?.(data);
+};
+const addHeatmapLayer = () => {
+	_heatmapInstance?.addHeatmapLayer?.();
+};
+const removeHeatmapLayer = () => {
+	_heatmapInstance?.removeHeatmapLayer?.();
+};
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const getWeatherCenter = () => {
@@ -665,13 +679,13 @@ const getWeatherCenter = () => {
 	}
 	return null;
 };
-const {
-	weatherCondition,
-	isNight: isWeatherNight,
-	refresh: refreshWeather,
-} = useWeather({
-	getMapCenter: getWeatherCenter,
-});
+// Deferred useWeather — initialized after map idle
+let _weatherInstance = null;
+const weatherCondition = ref(null);
+const isWeatherNight = ref(false);
+const refreshWeather = () => {
+	_weatherInstance?.refresh?.();
+};
 
 // Audio Sync Watcher (Restored)
 watch(weatherCondition, (newVal) => {
@@ -2668,6 +2682,66 @@ const initSentientMap = async () => {
 	}
 };
 
+// Deferred feature init — loads heatmap, weather, vibe effects after map idle
+let _deferredFeaturesInitialized = false;
+const initDeferredFeatures = async () => {
+	if (_deferredFeaturesInitialized) return;
+	_deferredFeaturesInitialized = true;
+
+	if (featureFlagStore.isEnabled("enable_map_heatmap")) {
+		try {
+			const mod = await import("../../composables/map/useMapHeatmap");
+			_heatmapInstance = mod.useMapHeatmap(map, allowHeatmap, shopsByIdRef);
+		} catch (err) {
+			console.warn("Heatmap failed:", err);
+		}
+	}
+
+	if (
+		featureFlagStore.isEnabled("enable_map_weather") ||
+		allowWeatherFx.value
+	) {
+		try {
+			const mod = await import("../../composables/useWeather");
+			_weatherInstance = mod.useWeather({ getMapCenter: getWeatherCenter });
+			// Sync reactive refs from deferred instance
+			watch(
+				() => _weatherInstance?.weatherCondition?.value,
+				(val) => {
+					if (val !== undefined) weatherCondition.value = val;
+				},
+				{ immediate: true },
+			);
+			watch(
+				() => _weatherInstance?.isNight?.value,
+				(val) => {
+					if (val !== undefined) isWeatherNight.value = val;
+				},
+				{ immediate: true },
+			);
+		} catch (err) {
+			console.warn("Weather failed:", err);
+		}
+	}
+
+	if (featureFlagStore.isEnabled("enable_vibe_effects") || !IS_E2E) {
+		try {
+			const mod = await import("../../composables/useVibeEffects");
+			_vibeEffectsInstance = mod.useVibeEffects();
+			// Sync activeVibeEffects ref from deferred instance
+			watch(
+				() => _vibeEffectsInstance?.activeVibeEffects?.value,
+				(val) => {
+					if (Array.isArray(val)) activeVibeEffects.value = val;
+				},
+				{ immediate: true },
+			);
+		} catch (err) {
+			console.warn("Vibe effects failed:", err);
+		}
+	}
+};
+
 const setupMapInteractions = () => {
 	setupInteractionsCore();
 };
@@ -2692,9 +2766,10 @@ watch(isMapReady, (ready) => {
 	queueMapResize(true);
 	setupMapInteractions();
 	refreshSmartPulseTargets();
-	// Deferred: load sentient map after first idle (non-blocking)
+	// Deferred: load sentient map + heavy features after first idle (non-blocking)
 	map.value.once("idle", () => {
 		requestIdleCallback(initSentientMap, { timeout: 3000 });
+		requestIdleCallback(initDeferredFeatures, { timeout: 5000 });
 	});
 });
 
