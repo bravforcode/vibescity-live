@@ -555,6 +555,9 @@ const {
 	upsertCoinLayer,
 	removeCoinLayer,
 	stopCoinAnimation,
+	// Wave 2: Task 2.3 — split layer API
+	addCriticalLayers,
+	addDeferredLayers,
 } = useMapLayers(map, {
 	effectsMode: () => "full",
 	scheduler: (sourceId, data) => applySourceData(sourceId, data),
@@ -838,6 +841,8 @@ const {
 	removeFirefliesLayer,
 	remove3dBuildingLayers,
 	resetTrafficDashState,
+	// Wave 2: Task 2.3 — deferred terrain application
+	applyTerrainAndAtmosphere,
 } = useMapAtmosphere(map, isMapReady, {
 	allowAmbientFx,
 	allowNeonPulse,
@@ -2789,6 +2794,29 @@ watch(isMapReady, (ready) => {
 		// Deferred: load sentient map + heavy features after first idle (non-blocking)
 		requestIdleCallback(initSentientMap, { timeout: 3000 });
 		requestIdleCallback(initDeferredFeatures, { timeout: 5000 });
+		// Wave 2: Task 2.3 — deferred visual layers after map idle
+		requestIdleCallback(
+			() => {
+				try {
+					addDeferredLayers({ mapInstance: map.value });
+				} catch (err) {
+					if (import.meta.env.DEV)
+						console.warn("Deferred layer setup failed:", err);
+				}
+			},
+			{ timeout: 2000 },
+		);
+		requestIdleCallback(
+			async () => {
+				try {
+					await applyTerrainAndAtmosphere();
+				} catch (err) {
+					if (import.meta.env.DEV)
+						console.warn("Deferred terrain setup failed:", err);
+				}
+			},
+			{ timeout: 3000 },
+		);
 	});
 });
 
