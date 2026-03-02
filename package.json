@@ -7,7 +7,7 @@
     "dev": "rsbuild dev --port 5173",
     "build": "rsbuild build && node scripts/prerender-venues.mjs",
     "preview": "rsbuild preview",
-    "check": "biome check --write src",
+    "check": "biome check --write src && node scripts/ci/check-source-i18n-hardcoded.mjs",
     "check:bundle": "node scripts/check-bundle-sizes.mjs",
     "format": "biome format --write src",
     "lint": "biome lint src",
@@ -37,6 +37,9 @@
     "ci:route-slo": "node scripts/ci/evaluate-route-slo.mjs",
     "ci:seo-lint": "node scripts/ci/seo-lint.mjs",
     "ci:db-migration-safety": "node scripts/ci/validate-migrations-safety.mjs",
+    "ci:sw-contract": "node scripts/ci/check-sw-contract.mjs",
+    "ci:source-console-budget": "node scripts/ci/check-source-console-budget.mjs",
+    "ci:source-i18n": "node scripts/ci/check-source-i18n-hardcoded.mjs",
     "ci:prod-ready": "node scripts/ci/prod-ready-gate.mjs",
     "ci:cache-warm-seo": "node scripts/ci/cache-warm-seo.mjs",
     "ci:secret-scan:gitleaks": "node scripts/ci/secret-scan-gitleaks.mjs",
@@ -53,7 +56,10 @@
     "knip": "knip -c knip.json --no-progress",
     "knip:deps": "knip -c knip.json --include dependencies,unlisted,binaries,unresolved --no-progress",
     "knip:files": "knip -c knip.json --include files --no-progress",
-    "knip:exports": "knip -c knip.json --include exports,types,duplicates --no-progress"
+    "knip:exports": "knip -c knip.json --include exports,types,duplicates --no-progress",
+    "perf:baseline": "lighthouse http://localhost:5173 --throttling-method=simulate --cpu-slowdown-multiplier=4 --output=json --output-path=baseline-lh.json",
+    "perf:compare": "node scripts/compare-perf.mjs",
+    "perf:monitor": "node scripts/monitor-perf-db.mjs"
   },
   "dependencies": {
     "@iconify-json/flat-color-icons": "^1.2.3",

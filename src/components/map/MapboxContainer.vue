@@ -2947,6 +2947,29 @@ watch(isMapReady, (ready) => {
 		// addDeferredLayers, applyTerrainAndAtmosphere, initDollyZoom.
 		// Single call to flush them all via requestIdleCallback in priority order.
 		executeIdleTasksOnce(map.value);
+		// Wave 4: Task 4.6 — Report map performance metrics to observability service.
+		// Uses requestIdleCallback so it doesn't compete with deferred feature init.
+		const _reportPerfMetrics = () => {
+			try {
+				const fcpEntry = performance.getEntriesByName("first-contentful-paint")[0];
+				const lcpEntries = performance.getEntriesByType("largest-contentful-paint");
+				frontendObservabilityService.trackMapPerformance({
+					fcp: fcpEntry?.startTime,
+					lcp: lcpEntries.length ? lcpEntries[lcpEntries.length - 1].renderTime : undefined,
+					mapInteractive: window.__mapMetrics?.interactiveAt,
+					parseOverhead: window.__mapMetrics?.parseOverhead,
+					sentientLoadTime: window.__mapMetrics?.sentientLoadTime,
+					heatmapLoadTime: window.__mapMetrics?.heatmapLoadTime,
+				});
+			} catch {
+				// fail-open: never block map for observability
+			}
+		};
+		if (typeof requestIdleCallback !== "undefined") {
+			requestIdleCallback(_reportPerfMetrics, { timeout: 5000 });
+		} else {
+			setTimeout(_reportPerfMetrics, 2000);
+		}
 	});
 });
 
