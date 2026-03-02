@@ -1,6 +1,15 @@
 // --- C:\vibecity.live\src\components\map\MapboxContainer.vue ---
 
 <script setup>
+// Wave 3: Task 3.6 — Parse/eval instrumentation.
+// Mark the moment this component's script starts evaluating (before imports settle).
+// This captures the time from first script byte to Vue setup() entry.
+const _setupStartTime =
+	typeof performance !== "undefined" ? performance.now() : 0;
+if (typeof performance !== "undefined" && performance.mark) {
+	performance.mark("mapbox-container-setup-start");
+}
+
 import mapboxgl from "mapbox-gl";
 import { DEFAULT_CITY } from "@/config/cityConfig";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -91,6 +100,26 @@ const styleUrlForTheme = (isDarkMode) => {
 	if (IS_STRICT_MAP_E2E) return STRICT_E2E_STYLE;
 	return isDarkMode ? DARK_STYLE : LIGHT_STYLE;
 };
+
+// Wave 3: Task 3.6 — Record parse + setup overhead after stores and composables resolve.
+// This measures the time from script-start to when Vue setup() has executed core init.
+{
+	const _setupEndTime =
+		typeof performance !== "undefined" ? performance.now() : 0;
+	const _parseOverhead =
+		_setupStartTime > 0 ? _setupEndTime - _setupStartTime : 0;
+	if (typeof window !== "undefined") {
+		window.__mapMetrics = window.__mapMetrics || {};
+		window.__mapMetrics.parseOverhead = _parseOverhead;
+		window.__mapMetrics.setupStart = _setupStartTime;
+		window.__mapMetrics.setupEnd = _setupEndTime;
+	}
+	if (import.meta.env.DEV && _parseOverhead > 0) {
+		console.log(
+			`[MapboxContainer] Parse + setup: ${_parseOverhead.toFixed(1)}ms`,
+		);
+	}
+}
 
 // useDollyZoom deferred — loaded after map idle (non-blocking) [Wave 3: Task 3.1]
 // useFluidOverlay deferred — dynamic import in onMounted (preserves Vue lifecycle) [Wave 3: Task 3.2]
@@ -2904,6 +2933,11 @@ watch(isMapReady, (ready) => {
 				reportMapLifecycle("map_load_performance", {
 					duration: Math.round(perfEntry.duration),
 				});
+				// Wave 3: Task 3.6 — persist interactive time to window.__mapMetrics
+				if (typeof window !== "undefined") {
+					window.__mapMetrics = window.__mapMetrics || {};
+					window.__mapMetrics.interactiveAt = Math.round(perfEntry.duration);
+				}
 			} catch {
 				// Ignore if navigationStart mark missing (some browsers)
 			}
