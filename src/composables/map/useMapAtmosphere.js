@@ -360,6 +360,42 @@ export function useMapAtmosphere(
 	watch([allowMapFog, fogDensityProfile, isWeatherNight], applyFogSettings);
 	watch([weatherCondition, isMapReady], updateWeatherVisuals);
 
+	// Wave 2: Task 2.2 — Deferred terrain + atmosphere application.
+	// Called from idle queue after map has fully settled; safe to call multiple times.
+	const applyTerrainAndAtmosphere = async () => {
+		if (!map.value) return;
+		try {
+			const style = map.value.getStyle();
+			const terrainSourceId = style?.terrain?.source;
+
+			if (!terrainSourceId) return;
+
+			// Only re-enable terrain when source is loaded
+			if (!map.value.getSource(terrainSourceId)) {
+				if (import.meta.env.DEV) {
+					console.warn(
+						`[useMapAtmosphere] Terrain source "${terrainSourceId}" not found, skipping.`,
+					);
+				}
+				return;
+			}
+
+			// Re-enable terrain with exaggeration
+			try {
+				map.value.setTerrain({
+					source: terrainSourceId,
+					exaggeration: 1.5,
+				});
+			} catch {
+				// Ignore if style changed between idle and execution
+			}
+		} catch (err) {
+			if (import.meta.env.DEV) {
+				console.warn("[useMapAtmosphere] Failed to apply terrain:", err);
+			}
+		}
+	};
+
 	return {
 		startAtmosphereLoop,
 		stopAtmosphereLoop,
@@ -369,6 +405,8 @@ export function useMapAtmosphere(
 		removeFirefliesLayer,
 		remove3dBuildingLayers,
 		resetTrafficDashState,
+		// Wave 2: deferred terrain application
+		applyTerrainAndAtmosphere,
 		// Expose for debugging if needed, or internal usage
 		weatherLayer,
 	};
