@@ -2709,10 +2709,6 @@ const godTierZoomTo = (lngLat, modalEl) => {
 	if (modalEl) _dollyZoomInstance?.flipPinToModal?.(lngLat, modalEl);
 };
 
-// Wave 3: Task 3.1 — Queue dolly zoom for async load after first map idle
-// useDollyZoom has no onUnmounted → safe to load from idle callback context
-scheduleIdleTask(initDollyZoom, { timeout: 4000 });
-
 const prefetchVenueDetails = async (venueId, signal) => {
 	// Try to use Vue Query if available, otherwise skip
 	try {
@@ -2828,6 +2824,37 @@ const initDeferredFeatures = async () => {
 	}
 };
 
+// Wave 3: Task 3.4 — Consolidate ALL idle tasks into the scheduleIdleTask queue.
+// Previously: 4 raw requestIdleCallback() calls in the first-idle handler + executeIdleTasksOnce.
+// Now: all tasks pre-registered here; first-idle handler calls only executeIdleTasksOnce.
+// Priority order (lower timeout = higher priority, runs first in queue):
+scheduleIdleTask(initSentientMap, { timeout: 3000 }); // HIGH: interaction prediction
+scheduleIdleTask(initDeferredFeatures, { timeout: 5000 }); // HIGH: heatmap/weather/vibe
+scheduleIdleTask(
+	() => {
+		try {
+			addDeferredLayers({ mapInstance: map.value });
+		} catch (err) {
+			if (import.meta.env.DEV)
+				console.warn("Deferred layer setup failed:", err);
+		}
+	},
+	{ timeout: 2000 }, // MEDIUM: visual layers
+);
+scheduleIdleTask(
+	async () => {
+		try {
+			await applyTerrainAndAtmosphere();
+		} catch (err) {
+			if (import.meta.env.DEV)
+				console.warn("Deferred terrain setup failed:", err);
+		}
+	},
+	{ timeout: 3000 }, // MEDIUM: terrain re-enable
+);
+// Task 3.1 — dolly zoom: low priority (visual polish, non-critical on first tap)
+scheduleIdleTask(initDollyZoom, { timeout: 4000 });
+
 const setupMapInteractions = () => {
 	setupInteractionsCore();
 };
@@ -2874,33 +2901,10 @@ watch(isMapReady, (ready) => {
 				// Ignore if navigationStart mark missing (some browsers)
 			}
 		}
-		// Deferred: load sentient map + heavy features after first idle (non-blocking)
-		requestIdleCallback(initSentientMap, { timeout: 3000 });
-		requestIdleCallback(initDeferredFeatures, { timeout: 5000 });
-		// Wave 2: Task 2.3 — deferred visual layers after map idle
-		requestIdleCallback(
-			() => {
-				try {
-					addDeferredLayers({ mapInstance: map.value });
-				} catch (err) {
-					if (import.meta.env.DEV)
-						console.warn("Deferred layer setup failed:", err);
-				}
-			},
-			{ timeout: 2000 },
-		);
-		requestIdleCallback(
-			async () => {
-				try {
-					await applyTerrainAndAtmosphere();
-				} catch (err) {
-					if (import.meta.env.DEV)
-						console.warn("Deferred terrain setup failed:", err);
-				}
-			},
-			{ timeout: 3000 },
-		);
-		// Wave 2: Task 2.5 — flush the idle task queue (all tasks scheduled via scheduleIdleTask)
+		// Wave 3: Task 3.4 — All deferred tasks now flow through scheduleIdleTask queue.
+		// Tasks pre-registered above: initSentientMap, initDeferredFeatures,
+		// addDeferredLayers, applyTerrainAndAtmosphere, initDollyZoom.
+		// Single call to flush them all via requestIdleCallback in priority order.
 		executeIdleTasksOnce(map.value);
 	});
 });
