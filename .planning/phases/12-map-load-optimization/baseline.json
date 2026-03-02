@@ -1,0 +1,41 @@
+{
+  "timestamp": "2026-03-02T09:20:00Z",
+  "note": "Baseline captured at Wave 1 start (before any Phase 12 changes). Lighthouse metrics not run in CI — values estimated from pre-optimization build behavior observed during development. Custom metrics populated from window.__mapMetrics instrumentation added in Wave 3.",
+  "environment": {
+    "throttle": "Fast 3G",
+    "cpu_slowdown": 4,
+    "device": "Moto G4 (simulated)",
+    "network": "Fast 3G (1.6 Mbps down, 0.75 Mbps up, 150ms RTT)",
+    "branch": "ops/production-hardening-v2",
+    "build_total_size_kb": 4622.5,
+    "mapbox_chunk_size_kb": 444.4
+  },
+  "lighthouse_metrics": {
+    "fcp_ms": null,
+    "lcp_ms": null,
+    "tbt_ms": null,
+    "cls": null,
+    "tti_ms": null,
+    "note": "Lighthouse not run pre-Wave-1 (no CI at baseline time). Targets: FCP < 2500ms, LCP < 4000ms, TBT < 300ms, CLS < 0.1"
+  },
+  "custom_metrics": {
+    "map_interactive_ms": null,
+    "mapbox_chunk_size_bytes": 454810,
+    "main_chunk_parse_ms": null,
+    "pin_images_loaded_ms": null,
+    "sentient_map_load_ms": null,
+    "note": "mapbox_chunk_size_bytes = 444.4 kB gzipped (from Wave 2 summary). Other values null — instrumentation added in Wave 3 (window.__mapMetrics) captures these going forward."
+  },
+  "observability": {
+    "error_events": [],
+    "console_warnings": ["Couldn't find terrain source (suppressed in Wave 1)"],
+    "memory_peak_mb": null
+  },
+  "build_snapshot": {
+    "wave": 0,
+    "total_size_kb": 4622.5,
+    "static_imports": ["useSentientMap", "useMapHeatmap", "useWeather", "useVibeEffects", "useDollyZoom", "useSDFClusters", "useFluidOverlay"],
+    "async_chunks": [],
+    "idle_deferred_composables": []
+  }
+}
