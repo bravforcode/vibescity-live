@@ -72,7 +72,7 @@ def _get_supabase():
 
 @router.get("/venues", response_model=VenuesResponse)
 async def get_venues(
-    bbox: str = Query(..., example="100.5,13.5,101.0,14.0", description="minLng,minLat,maxLng,maxLat"),
+    bbox: str = Query(..., examples=["100.5,13.5,101.0,14.0"], description="minLng,minLat,maxLng,maxLat"),
     zoom: float = Query(12.0, ge=3, le=22),
     limit: int = Query(200, ge=1, le=500),
 ):
