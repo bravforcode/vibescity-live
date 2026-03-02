@@ -1,5 +1,5 @@
-import coinAnimation from "@/assets/animations/coin.json";
 import { onUnmounted } from "vue";
+import coinAnimation from "@/assets/animations/coin.json";
 
 const pendingMapImages = new Set();
 const TRAFFIC_SOURCE_ID = "traffic-roads-local";
@@ -1430,6 +1430,164 @@ export function useMapLayers(map, options = {}) {
 		stopCarAnimation();
 	});
 
+	// Wave 2: Task 2.1 — Critical + Deferred layer split
+	// addCriticalLayers: Only pin interaction layers needed before first paint.
+	// Caller must pass the map instance and source/layer IDs so this composable
+	// remains decoupled from MapboxContainer constants.
+	const addCriticalLayers = ({
+		mapInstance,
+		pinSourceId,
+		pinLayerId,
+		pinHitboxLayerId,
+		selectedPinLayerId,
+		emptySelectedPinFilter,
+	} = {}) => {
+		const m = mapInstance ?? map.value;
+		if (!m) return;
+
+		// pin-hitbox: invisible touch target (added below symbol layer)
+		if (!m.getLayer(pinHitboxLayerId)) {
+			try {
+				m.addLayer(
+					{
+						id: pinHitboxLayerId,
+						type: "circle",
+						source: pinSourceId,
+						filter: ["all", ["!", ["has", "point_count"]]],
+						paint: {
+							"circle-radius": [
+								"case",
+								["==", ["get", "pin_type"], "giant"],
+								16,
+								["==", ["get", "boost"], true],
+								14,
+								12,
+							],
+							"circle-color": "#ffffff",
+							"circle-opacity": 0.01,
+							"circle-stroke-opacity": 0,
+						},
+					},
+					pinLayerId,
+				);
+			} catch {
+				// Layer may already exist during style transitions
+			}
+		}
+
+		// selected-pin-marker: highlighted pin overlay
+		if (selectedPinLayerId && !m.getLayer(selectedPinLayerId)) {
+			try {
+				m.addLayer({
+					id: selectedPinLayerId,
+					type: "symbol",
+					source: pinSourceId,
+					filter: emptySelectedPinFilter ?? ["==", ["get", "id"], "__none__"],
+					layout: {
+						"icon-image": [
+							"case",
+							["==", ["get", "pin_state"], "event"],
+							"pin-purple",
+							["==", ["get", "pin_state"], "live"],
+							"pin-red",
+							"pin-grey",
+						],
+						"icon-size": [
+							"case",
+							["==", ["get", "pin_type"], "giant"],
+							0.32,
+							0.24,
+						],
+						"icon-allow-overlap": true,
+						"icon-ignore-placement": true,
+						"icon-anchor": "bottom",
+						"symbol-sort-key": 9999,
+					},
+					paint: {
+						"icon-opacity": 1,
+					},
+				});
+			} catch {
+				// Ignore during style transitions
+			}
+		}
+	};
+
+	// addDeferredLayers: Visual-only enhancements added after map idle.
+	// Guards: only adds if corresponding source exists (graceful no-op).
+	const addDeferredLayers = ({ mapInstance } = {}) => {
+		const m = mapInstance ?? map.value;
+		if (!m) return;
+
+		// Heatmap layer (requires heatmap-data source)
+		if (m.getSource("heatmap-data") && !m.getLayer("heatmap-layer")) {
+			try {
+				m.addLayer({
+					id: "heatmap-layer",
+					type: "heatmap",
+					source: "heatmap-data",
+					paint: {
+						"heatmap-weight": [
+							"interpolate",
+							["linear"],
+							["get", "mag"],
+							0,
+							0,
+							6,
+							1,
+						],
+						"heatmap-intensity": [
+							"interpolate",
+							["linear"],
+							["zoom"],
+							0,
+							1,
+							9,
+							3,
+						],
+					},
+				});
+			} catch {
+				// Source may have been removed; silently skip
+			}
+		}
+
+		// Terrain visual line enhancement (requires terrain-source)
+		if (m.getSource("terrain-source") && !m.getLayer("terrain-visual")) {
+			try {
+				m.addLayer({
+					id: "terrain-visual",
+					type: "line",
+					source: "terrain-source",
+					paint: {
+						"line-color": "#999",
+						"line-width": 0.5,
+						"line-opacity": 0.3,
+					},
+				});
+			} catch {
+				// Source may be missing; silently skip
+			}
+		}
+
+		// 3D building extrusion (requires buildings source)
+		if (m.getSource("buildings") && !m.getLayer("building-extrusion")) {
+			try {
+				m.addLayer({
+					id: "building-extrusion",
+					type: "fill-extrusion",
+					source: "buildings",
+					paint: {
+						"fill-extrusion-color": "#aaa",
+						"fill-extrusion-height": ["get", "height"],
+					},
+				});
+			} catch {
+				// Source may be missing; silently skip
+			}
+		}
+	};
+
 	// Public API
 	return {
 		addNeonRoads,
@@ -1444,5 +1602,8 @@ export function useMapLayers(map, options = {}) {
 		upsertCoinLayer,
 		removeCoinLayer,
 		stopCoinAnimation,
+		// Wave 2: split layer API
+		addCriticalLayers,
+		addDeferredLayers,
 	};
 }
