@@ -91,7 +91,9 @@
 
     <!-- Preload critical assets -->
     <link rel="preconnect" href="https://api.mapbox.com" />
-    <link rel="preconnect" href="https://events.mapbox.com" />
+    <link rel="preconnect" href="https://events.mapbox.com" importance="low" />
+    <!-- Prefetch Mapbox async chunk so it's in cache when the map route loads -->
+    <link rel="prefetch" as="script" importance="low" href="/static/js/async/mapbox.js" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Non-blocking font load: preload trick eliminates render-blocking -->
