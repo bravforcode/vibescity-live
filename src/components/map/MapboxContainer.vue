@@ -19,7 +19,10 @@ import { useMapAtmosphere } from "../../composables/map/useMapAtmosphere";
 import { useMapCore } from "../../composables/map/useMapCore";
 // useMapHeatmap deferred — loaded after map idle (non-blocking)
 import { useMapIdleFeatures } from "../../composables/map/useMapIdleFeatures";
-import { useMapImagePrefetch } from "../../composables/map/useMapImagePrefetch";
+import {
+	prefetchCriticalPins,
+	useMapImagePrefetch,
+} from "../../composables/map/useMapImagePrefetch";
 import { useMapInteractions } from "../../composables/map/useMapInteractions";
 import { useMapLayers } from "../../composables/map/useMapLayers";
 import { useMapMarkers } from "../../composables/map/useMapMarkers";
@@ -300,6 +303,10 @@ const { warmShop } = useMapImagePrefetch(
 	map,
 	computed(() => props.shops ?? []),
 );
+// Wave 3: Task 3.5 — Pre-decode critical pin images in parallel with map initialization.
+// Start immediately (setup scope) so pin sprites are in browser decode cache before idle.
+// prefetchCriticalPins() is non-blocking: uses Image.decode() API, never stalls main thread.
+void prefetchCriticalPins();
 const { scheduleSourceUpdate, frameBudgetMissCount, longTaskCount } =
 	useMapRenderScheduler(map, {
 		trackLongTasks: true,
