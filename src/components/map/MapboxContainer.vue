@@ -18,6 +18,7 @@ import "../../assets/map-atmosphere.css";
 import { useMapAtmosphere } from "../../composables/map/useMapAtmosphere";
 import { useMapCore } from "../../composables/map/useMapCore";
 // useMapHeatmap deferred — loaded after map idle (non-blocking)
+import { useMapIdleFeatures } from "../../composables/map/useMapIdleFeatures";
 import { useMapImagePrefetch } from "../../composables/map/useMapImagePrefetch";
 import { useMapInteractions } from "../../composables/map/useMapInteractions";
 import { useMapLayers } from "../../composables/map/useMapLayers";
@@ -853,6 +854,9 @@ const {
 	isWeatherNight,
 	shouldRunAtmosphere,
 });
+
+// Wave 2: Task 2.5 — Idle task queue for deferred map work
+const { scheduleIdleTask, executeIdleTasksOnce } = useMapIdleFeatures();
 
 // Route neon trail state (Keep here or extract later)
 let routeTrailTimer = null;
@@ -2817,6 +2821,8 @@ watch(isMapReady, (ready) => {
 			},
 			{ timeout: 3000 },
 		);
+		// Wave 2: Task 2.5 — flush the idle task queue (all tasks scheduled via scheduleIdleTask)
+		executeIdleTasksOnce(map.value);
 	});
 });
 
