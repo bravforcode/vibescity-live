@@ -293,18 +293,37 @@ export function useMapCore(containerRef, _options = {}) {
 			return baseSetStyle(nextStyle, options);
 		};
 
+		// Wave 2: Task 2.4 — single-fire guards to prevent redundant style mutations.
+		// Pin images: load once after style stabilizes (styleimagemissing covers re-adds).
+		// Terrain: check once per idle; reset on style.load so new styles are handled.
+		let pinnedImagesEnsured = false;
+		let terrainChecked = false;
+
 		// CRITICAL: Pin images and terrain consistency are non-blocking.
 		// Defer to idle + requestAnimationFrame so they don't block map ready.
 		const scheduleNonCriticalInit = () => {
 			requestAnimationFrame(() => {
-				ensurePinImagesLoaded();
-				ensureTerrainSourceConsistency();
+				// Pin images: only on first idle after each style load
+				if (!pinnedImagesEnsured) {
+					pinnedImagesEnsured = true;
+					ensurePinImagesLoaded();
+				}
+				// Terrain: only once per style, re-checked when style reloads
+				if (!terrainChecked) {
+					terrainChecked = true;
+					ensureTerrainSourceConsistency();
+				}
 			});
 		};
 		map.value.on("idle", scheduleNonCriticalInit);
+
+		// Reset guards on style.load so fresh styles re-check images + terrain
+		map.value.on("style.load", () => {
+			pinnedImagesEnsured = false;
+			terrainChecked = false;
+		});
 		// styleimagemissing handler (below) already covers image re-adds during style transitions.
-		// Keep styledata for terrain only (lightweight check, no image loading).
-		map.value.on("styledata", ensureTerrainSourceConsistency);
+		// styledata terrain check removed — now handled by idle guard above.
 		// Error handling — suppress expected tile 404s during style transitions
 		map.value.on("error", (e) => {
 			const err = e?.error;
