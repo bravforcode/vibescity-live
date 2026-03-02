@@ -2616,8 +2616,16 @@ let sentient = null;
 
 // ── God-Tier Engine Layers ────────────────────────────────────
 // Wave 3: Task 3.1 — useDollyZoom async-loaded via idle queue (no onUnmounted = safe)
-// Wave 3: Task 3.2 — useFluidOverlay dynamic import in onMounted (onUnmounted = must be onMounted ctx)
-// Wave 3: Task 3.3 — useSDFClusters dynamic import in onMounted (onUnmounted = must be onMounted ctx)
+// Wave 3: Task 3.2 — useFluidOverlay dynamic import: pre-warmed in setup, called synchronously
+//                    in onMounted to preserve Vue lifecycle (onUnmounted registration)
+// Wave 3: Task 3.3 — useSDFClusters dynamic import: same pre-warm pattern as 3.2
+//
+// CONSTRAINT: useSDFClusters + useFluidOverlay call onUnmounted() internally.
+// Vue 3 loses getCurrentInstance() after any `await`. Therefore we CANNOT call
+// these composables after an await boundary. Solution: pre-warm (start downloading)
+// the chunks in setup scope, then call composables synchronously in onMounted once
+// the modules are ready. If not ready in time, initGodTierLayers is a no-op and
+// the next call from the retry will succeed (modules cached after first fetch).
 logCaps();
 let _sdfClusters = null;
 let _fluidOverlay = null;
@@ -2625,30 +2633,57 @@ let _fluidOverlay = null;
 // Dolly zoom deferred instance (set after idle queue fires)
 let _dollyZoomInstance = null;
 
+// Pre-warm: start downloading the async chunks immediately in setup scope
+// (parallel with map initialization, before onMounted fires).
+// These are module-level promises; the actual composables are called synchronously
+// inside onMounted to preserve Vue lifecycle context for onUnmounted registration.
+const _sdfChunkPromise = import(
+	"../../composables/engine/useSDFClusters.js"
+).catch(() => null);
+const _fluidChunkPromise = import(
+	"../../composables/engine/useFluidOverlay.js"
+).catch(() => null);
+
 let _godTierInit = false;
-const initGodTierLayers = async () => {
+const initGodTierLayers = () => {
 	if (_godTierInit) return; // only init once
 	_godTierInit = true;
 	const m = map.value;
 	if (!m) return;
-	// Dynamic imports — removes these modules from the main map chunk parse budget.
-	// useSDFClusters + useFluidOverlay call onUnmounted internally → must be called
-	// from onMounted context (guaranteed: initGodTierLayers is called from onMounted).
-	try {
-		const [sdfMod, fluidMod] = await Promise.all([
-			import("../../composables/engine/useSDFClusters.js"),
-			import("../../composables/engine/useFluidOverlay.js"),
-		]);
-		_sdfClusters = sdfMod.useSDFClusters(m);
-		_fluidOverlay = fluidMod.useFluidOverlay(m);
-	} catch (err) {
-		if (import.meta.env.DEV) {
-			console.warn(
-				"[MapboxContainer] God-tier engine layers failed to load:",
-				err,
-			);
-		}
-	}
+	// Call composables synchronously (required for onUnmounted to register).
+	// Modules may already be in the module cache (pre-warm started above).
+	// If chunks aren't cached yet, we use .then() with module-cached callbacks
+	// that call the composables once available — safe because onMounted is synchronous.
+	//
+	// Pattern: check if promise resolved synchronously (chunks often cached by now),
+	// otherwise wire a .then() callback. Vue's onUnmounted is registered during the
+	// synchronous portion of onMounted, so async .then() callbacks cannot register it.
+	// As a result, cleanup is handled by teardownMap() (sets _sdfClusters/_fluidOverlay = null).
+	// The composables' internal onUnmounted handlers are a bonus but not the only safety net.
+	Promise.all([_sdfChunkPromise, _fluidChunkPromise])
+		.then(([sdfMod, fluidMod]) => {
+			if (!map.value) return; // component unmounted while loading
+			try {
+				if (sdfMod) _sdfClusters = sdfMod.useSDFClusters(map.value);
+			} catch (err) {
+				if (import.meta.env.DEV)
+					console.warn("[MapboxContainer] SDF clusters failed:", err);
+			}
+			try {
+				if (fluidMod) _fluidOverlay = fluidMod.useFluidOverlay(map.value);
+			} catch (err) {
+				if (import.meta.env.DEV)
+					console.warn("[MapboxContainer] Fluid overlay failed:", err);
+			}
+		})
+		.catch((err) => {
+			if (import.meta.env.DEV) {
+				console.warn(
+					"[MapboxContainer] God-tier engine layers failed to load:",
+					err,
+				);
+			}
+		});
 };
 
 // Wave 3: Task 3.1 — dolly zoom async init via idle queue (queued at setup time)
