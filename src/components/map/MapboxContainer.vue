@@ -2839,7 +2839,33 @@ const handleMapMoveEndForWeather = () => {
 	applyFogSettings();
 };
 
+// Task 1.4: Handle terrain source missing on style load — defer re-enable to idle
+const handleTerrainSourceOnStyleLoad = () => {
+	if (!map.value) return;
+	try {
+		const style = map.value.getStyle();
+		const terrainSourceId = style?.terrain?.source;
+		if (!terrainSourceId) return;
+		if (map.value.getSource(terrainSourceId)) return;
+		// Source not yet loaded — remove terrain temporarily to suppress warnings
+		map.value.setTerrain(null);
+		map.value.once("idle", () => {
+			if (!map.value) return;
+			if (map.value.getSource(terrainSourceId)) {
+				try {
+					map.value.setTerrain({ source: terrainSourceId, exaggeration: 1.5 });
+				} catch {
+					// Ignore if style changed again before idle
+				}
+			}
+		});
+	} catch {
+		// Ignore style transition races
+	}
+};
+
 const handleMapStyleLoad = () => {
+	handleTerrainSourceOnStyleLoad();
 	resetTrafficDashState();
 	applyFogSettings();
 	syncBuildingInfoPopupFromSelection();
