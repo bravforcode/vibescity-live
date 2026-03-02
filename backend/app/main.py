@@ -14,6 +14,7 @@ from app.api.routers import (
     admin,
     analytics,
     emergency,
+    map_core,
     owner,
     partner,
     payments,
@@ -157,11 +158,10 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
 app.add_middleware(RequestIdMiddleware)
 
 
-@app.get("/health")
-async def health_check():
+def _run_readiness_checks() -> tuple[str, dict[str, str]]:
     from app.core.supabase import supabase_admin
 
-    checks: dict = {}
+    checks: dict[str, str] = {}
     strict_health = settings.ENV.lower() == "production"
     overall = "ok"
 
@@ -197,6 +197,23 @@ async def health_check():
     except Exception:
         checks["qdrant"] = "unknown"
 
+    return overall, checks
+
+
+@app.get("/health/liveness")
+async def health_liveness():
+    return {"status": "ok", "version": settings.VERSION, "checks": {"app": "ok"}}
+
+
+@app.get("/health/readiness")
+async def health_readiness():
+    overall, checks = _run_readiness_checks()
+    return {"status": overall, "version": settings.VERSION, "checks": checks}
+
+
+@app.get("/health")
+async def health_check():
+    overall, checks = _run_readiness_checks()
     return {"status": overall, "version": settings.VERSION, "checks": checks}
 
 @app.get("/")
@@ -219,3 +236,7 @@ app.include_router(partner.router, prefix=settings.API_V1_STR + "/partner", tags
 app.include_router(visitor.router, prefix=settings.API_V1_STR + "/visitor", tags=["visitor"])
 app.include_router(places.router, prefix=settings.API_V1_STR + "/places", tags=["places"])
 app.include_router(proxy.router, prefix=settings.API_V1_STR, tags=["proxy"])
+
+# Map core endpoints — dual-alias per roadmap lock decision
+app.include_router(map_core.router, prefix="/api/v1", tags=["map-core"])
+app.include_router(map_core.router, prefix="/v1", tags=["map-core"])  # alias
