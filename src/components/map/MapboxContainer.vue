@@ -2766,8 +2766,27 @@ watch(isMapReady, (ready) => {
 	queueMapResize(true);
 	setupMapInteractions();
 	refreshSmartPulseTargets();
-	// Deferred: load sentient map + heavy features after first idle (non-blocking)
+	// Task 1.6: Measure map interactive time on first idle
 	map.value.once("idle", () => {
+		if (window.performance?.mark) {
+			try {
+				performance.mark("mapbox-interactive");
+				const perfEntry = performance.measure(
+					"mapbox-load-time",
+					"navigationStart",
+					"mapbox-interactive",
+				);
+				if (import.meta.env.DEV) {
+					console.log(`Map interactive time: ${perfEntry.duration.toFixed(0)}ms`);
+				}
+				reportMapLifecycle("map_load_performance", {
+					duration: Math.round(perfEntry.duration),
+				});
+			} catch {
+				// Ignore if navigationStart mark missing (some browsers)
+			}
+		}
+		// Deferred: load sentient map + heavy features after first idle (non-blocking)
 		requestIdleCallback(initSentientMap, { timeout: 3000 });
 		requestIdleCallback(initDeferredFeatures, { timeout: 5000 });
 	});
