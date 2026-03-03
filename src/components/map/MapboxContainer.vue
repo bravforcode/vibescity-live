@@ -10,9 +10,9 @@ if (typeof performance !== "undefined" && performance.mark) {
 	performance.mark("mapbox-container-setup-start");
 }
 
-import mapboxgl from "mapbox-gl";
+import maplibregl from "maplibre-gl";
 import { DEFAULT_CITY } from "@/config/cityConfig";
-import "mapbox-gl/dist/mapbox-gl.css";
+import "maplibre-gl/dist/maplibre-gl.css";
 import {
 	computed,
 	nextTick,
@@ -51,14 +51,20 @@ import { useUserPreferencesStore } from "../../store/userPreferencesStore";
 import "../../styles/map-atmosphere.css";
 import { openExternal } from "../../utils/browserUtils";
 import { createPopupHTML } from "../../utils/mapRenderer";
-import { calculateDistance } from "../../utils/shopUtils";
+import { calculateDistance, calculateShopStatus } from "../../utils/shopUtils";
 import LiveActivityChips from "./LiveActivityChips.vue";
 import MapLoadingSkeleton from "./MapLoadingSkeleton.vue";
 
-const PRIMARY_STYLE_URL = "mapbox://styles/phirrr/cmlktq68u002601se295iazmm";
+// MapLibre GL does not use mapbox:// style URLs — use env-driven or public fallback
+const PRIMARY_STYLE_URL =
+	import.meta.env.VITE_MAP_STYLE_URL ||
+	import.meta.env.VITE_MAP_STYLE_FALLBACK_URL ||
+	"https://demotiles.maplibre.org/style.json";
 const DARK_STYLE = PRIMARY_STYLE_URL;
 const LIGHT_STYLE = PRIMARY_STYLE_URL;
-const STRICT_E2E_STYLE = "mapbox://styles/mapbox/light-v11";
+const STRICT_E2E_STYLE =
+	import.meta.env.VITE_MAP_STYLE_URL ||
+	"https://demotiles.maplibre.org/style.json";
 const PIN_SOURCE_ID = "pins_source";
 const PIN_LAYER_ID = "unclustered-pins";
 const PIN_HITBOX_LAYER_ID = "unclustered-pins-hitbox";
@@ -77,9 +83,11 @@ const TRAFFIC_REFRESH_INTERVAL_MS = 30000;
 const TRAFFIC_RECOMPUTE_DISTANCE_KM = 0.12;
 const TRAFFIC_CENTER_FALLBACK_DISTANCE_KM = 35;
 const TRAFFIC_NEON_SOURCE_ID = "neon-roads";
-
-const sanitizeEnvToken = (value) =>
-	typeof value === "string" ? value.trim().replace(/^['"]|['"]$/g, "") : "";
+const HOT_ROADS_BASE_INTERVAL_MS = 30000;
+const HOT_ROADS_LOW_POWER_INTERVAL_MS = 60000;
+const HOT_ROADS_MAX_INTERVAL_MS = 120000;
+const HOT_ROADS_REQUEST_TIMEOUT_MS = 8000;
+const HOT_ROADS_MIN_ZOOM = 8;
 
 const { t, te, locale } = useI18n();
 const tt = (key, fallback) => (te(key) ? t(key) : fallback);
@@ -380,10 +388,7 @@ const initMapOnce = (styleOverride = null) => {
 
 	if (!ensureMapboxLoaded()) return;
 
-	// Defer telemetry disabling until map actually initializes (not at module-eval)
-	if (typeof mapboxgl.setTelemetryEnabled === "function") {
-		mapboxgl.setTelemetryEnabled(false);
-	}
+	// MapLibre GL has no telemetry to disable
 
 	const initialStyleUrl =
 		styleOverride ?? styleUrlForTheme(Boolean(props.isDarkMode));
@@ -676,6 +681,7 @@ const pitch = ref(60);
 const bearing = ref(-17.6);
 const mapLoaded = ref(false);
 const activePopup = shallowRef(null);
+const activePopupShopId = ref("");
 const autoOpenedPopupIds = new Set();
 const normalizePopupShopId = (value) => String(value ?? "").trim();
 const nowTick = ref(Date.now());
@@ -901,6 +907,9 @@ const hasActiveRoute = ref(false);
 const lastTrafficCenter = ref(null);
 const lastTrafficRefreshAt = ref(0);
 let trafficRefreshInterval = null;
+let hotRoadPollTimer = null;
+const hotRoadSnapshotId = ref("");
+const hotRoadPollFailures = ref(0);
 const ROUTE_TRAIL_DASH_FRAMES = [
 	[1.2, 2.2],
 	[0.8, 2.6],
@@ -973,6 +982,119 @@ const refreshTrafficSubset = async ({ force = false } = {}) => {
 		radiusKm: TRAFFIC_RADIUS_KM,
 		force,
 	});
+};
+
+const clearHotRoadPollTimer = () => {
+	if (!hotRoadPollTimer) return;
+	clearTimeout(hotRoadPollTimer);
+	hotRoadPollTimer = null;
+};
+
+const computeHotRoadPollInterval = () => {
+	if (isDocumentHidden.value || isOffline.value) return null;
+	const lowPowerMode =
+		props.isLowPowerMode || prefs.isReducedMotion || prefersReducedMotion.value;
+	const base = lowPowerMode
+		? HOT_ROADS_LOW_POWER_INTERVAL_MS
+		: HOT_ROADS_BASE_INTERVAL_MS;
+	return Math.min(
+		HOT_ROADS_MAX_INTERVAL_MS,
+		base * 2 ** Math.min(2, hotRoadPollFailures.value),
+	);
+};
+
+const buildHotRoadBboxParam = () => {
+	const bounds = map.value?.getBounds?.();
+	if (!bounds) return null;
+	const west = Number(bounds.getWest?.());
+	const south = Number(bounds.getSouth?.());
+	const east = Number(bounds.getEast?.());
+	const north = Number(bounds.getNorth?.());
+	const values = [west, south, east, north];
+	if (!values.every(Number.isFinite)) return null;
+	if (west >= east || south >= north) return null;
+	return values.join(",");
+};
+
+const scheduleHotRoadPoll = ({ immediate = false } = {}) => {
+	clearHotRoadPollTimer();
+	const interval = computeHotRoadPollInterval();
+	if (interval === null) return;
+	if (immediate) {
+		void pollHotRoads();
+		return;
+	}
+	hotRoadPollTimer = setTimeout(() => {
+		void pollHotRoads();
+	}, interval);
+};
+
+const pollHotRoads = async () => {
+	if (!map.value || !isMapReady.value) {
+		scheduleHotRoadPoll();
+		return;
+	}
+	if (isDocumentHidden.value || isOffline.value) {
+		clearHotRoadPollTimer();
+		return;
+	}
+	const zoomValue = Number(map.value.getZoom?.() ?? 0);
+	if (!Number.isFinite(zoomValue) || zoomValue < HOT_ROADS_MIN_ZOOM) {
+		scheduleHotRoadPoll();
+		return;
+	}
+	const bbox = buildHotRoadBboxParam();
+	if (!bbox) {
+		scheduleHotRoadPoll();
+		return;
+	}
+
+	const params = new URLSearchParams({ bbox });
+	if (hotRoadSnapshotId.value) {
+		params.set("since", hotRoadSnapshotId.value);
+	}
+
+	try {
+		const response = await apiFetch(`/hot-roads?${params.toString()}`, {
+			includeVisitor: false,
+			timeoutMs: HOT_ROADS_REQUEST_TIMEOUT_MS,
+		});
+		if (!response.ok) {
+			throw new Error(String(response.status));
+		}
+		const payload = await response.json().catch(() => null);
+		if (!payload || typeof payload !== "object") {
+			throw new Error("HOT_ROADS_PAYLOAD_INVALID");
+		}
+		hotRoadSnapshotId.value =
+			typeof payload.snapshot_id === "string" ? payload.snapshot_id : "";
+		hotRoadPollFailures.value = 0;
+
+		const segments = Array.isArray(payload.segments) ? payload.segments : [];
+		if (!payload.unchanged) {
+			if (typeof window !== "undefined") {
+				window.__vibecityHotRoads = {
+					snapshotId: hotRoadSnapshotId.value,
+					segmentCount: segments.length,
+					updatedAt: Date.now(),
+				};
+			}
+			void frontendObservabilityService.reportMapLifecycle("hot_roads_update", {
+				segments: segments.length,
+			});
+		}
+	} catch (error) {
+		hotRoadPollFailures.value = Math.min(3, hotRoadPollFailures.value + 1);
+		void frontendObservabilityService.reportFrontendGuardrail(
+			"hot_roads_poll_error",
+			{
+				failures: hotRoadPollFailures.value,
+				reason: String(error?.message || "unknown").slice(0, 80),
+			},
+		);
+	}
+
+	scheduleHotRoadPoll();
 };
 
 const applyRouteTrailVisibility = () => {
@@ -1280,7 +1402,6 @@ const refreshPins = async () => {
 		pin_state,
 		pin_type,
 		is_event,
-		is_live,
 		status,
 	}) => {
 		const pinStateRaw = String(pin_state || "")
@@ -1298,9 +1419,47 @@ const refreshPins = async () => {
 			pinTypeRaw === "event" ||
 			pinTypeRaw === "giant";
 		if (eventLike) return "event";
-		const liveLike =
-			Boolean(is_live) || pinStateRaw === "live" || statusRaw === "live";
-		return liveLike ? "live" : "off";
+		// Marker color should follow schedule/manual shop status, not transient hotspot flags.
+		const liveLike = pinStateRaw === "live" || statusRaw === "live";
+		if (liveLike) return "live";
+		if (
+			pinStateRaw === "open" ||
+			statusRaw === "open" ||
+			statusRaw === "active"
+		) {
+			return "open";
+		}
+		if (pinStateRaw === "tonight" || statusRaw === "tonight") {
+			return "tonight";
+		}
+		return "off";
+	};
+
+	const pinStateFromStatus = (statusValue) => {
+		const s = String(statusValue || "")
+			.trim()
+			.toUpperCase();
+		if (s === "LIVE") return "live";
+		if (s === "ACTIVE" || s === "OPEN") return "open";
+		if (s === "TONIGHT") return "tonight";
+		return "off";
+	};
+
+	const resolveShopScheduleStatus = (shop) => {
+		if (!shop || typeof shop !== "object") return "OFF";
+		const now = new Date(nowTick.value);
+		const manualStatus = String(
+			shop.originalStatus ?? shop.statusRaw ?? shop.status ?? "",
+		)
+			.trim()
+			.toUpperCase();
+		try {
+			return String(
+				calculateShopStatus({ ...shop, originalStatus: manualStatus }, now),
+			).toUpperCase();
+		} catch {
+			return manualStatus || "OFF";
+		}
 	};
 
 	const toPinFeature = ({
@@ -1358,7 +1517,16 @@ const refreshPins = async () => {
 				is_event: normalizedPinState === "event",
 				is_live:
 					normalizedPinState === "live" || liveVenueRefs.value.has(idStr),
-				status: normalizedPinState === "live" ? "LIVE" : "OFF",
+				status:
+					String(status || "")
+						.trim()
+						.toUpperCase() ||
+					{
+						live: "LIVE",
+						open: "ACTIVE",
+						tonight: "TONIGHT",
+					}[normalizedPinState] ||
+					"OFF",
 				vibe_score: Number(visibility_score ?? 0) || 0,
 				image: image || null,
 			},
@@ -1373,6 +1541,8 @@ const refreshPins = async () => {
 			shop.is_giant_active === true ||
 			shop.isGiantPin === true ||
 			shop.giantActive === true;
+		const scheduleStatus = resolveShopScheduleStatus(shop);
+		const schedulePinState = pinStateFromStatus(scheduleStatus);
 
 		return toPinFeature({
 			id: shop.id,
@@ -1380,7 +1550,7 @@ const refreshPins = async () => {
 			lat: shop.lat ?? shop.latitude,
 			lng: shop.lng ?? shop.longitude,
 			pin_type: isGiant ? "giant" : pinTypeRaw || "normal",
-			pin_state: shop.pin_state || shop.statusNormalized || null,
+			pin_state: isGiant ? "event" : schedulePinState,
 			verified: shop.is_verified || shop.verifiedActive || shop.verified_active,
 			glow: shop.is_glowing || shop.glowActive || shop.glow_active,
 			boost: shop.is_boost_active || shop.boostActive || shop.boost_active,
@@ -1388,9 +1558,9 @@ const refreshPins = async () => {
 			has_coin: resolvePinHasCoin(shop.id, shop.has_coin ?? shop.hasCoin),
 			visibility_score: shop.visibility_score ?? shop.visibilityScore,
 			image: shop.Image_URL1 || shop.coverImage || shop.image_urls?.[0],
-			status: shop.status,
-			is_event: shop.is_event,
-			is_live: shop.is_live,
+			status: scheduleStatus,
+			is_event: isGiant || Boolean(shop.is_event),
+			is_live: scheduleStatus === "LIVE",
 		});
 	};
 
@@ -1468,6 +1638,41 @@ const refreshPins = async () => {
 		return Array.from(merged.values());
 	};
 
+	const reconcileFeatureStatesWithShops = (features = []) =>
+		features.map((feature) => {
+			const id = String(feature?.properties?.id ?? "").trim();
+			if (!id) return feature;
+			const shop = shopsByIdRef.value.get(id) || shopStore.getShopById?.(id);
+			if (!shop) return feature;
+
+			const pinType = String(
+				feature?.properties?.pin_type ?? shop?.pin_type ?? "",
+			).toLowerCase();
+			if (pinType === "giant" || pinType === "event") {
+				return {
+					...feature,
+					properties: {
+						...(feature?.properties || {}),
+						pin_state: "event",
+						status: "LIVE",
+						is_event: true,
+					},
+				};
+			}
+
+			const scheduleStatus = resolveShopScheduleStatus(shop);
+			const schedulePinState = pinStateFromStatus(scheduleStatus);
+			return {
+				...feature,
+				properties: {
+					...(feature?.properties || {}),
+					pin_state: schedulePinState,
+					status: scheduleStatus,
+					is_live: scheduleStatus === "LIVE",
+				},
+			};
+		});
+
 	const buildFallbackFeaturesFromShopsInBounds = () => {
 		if (!shops?.length) return [];
 		const south = b.getSouth();
@@ -1497,9 +1702,10 @@ const refreshPins = async () => {
 	const applyFeatures = (features) => {
 		if (seq !== pinsRefreshSeq) return;
 		if (!map.value) return;
+		const reconciled = reconcileFeatureStatesWithShops(features);
 		applySourceData(PIN_SOURCE_ID, {
 			type: "FeatureCollection",
-			features,
+			features: reconciled,
 		});
 		refreshSmartPulseTargets();
 	};
@@ -1630,9 +1836,14 @@ watch(isMapReady, (ready) => {
 		map.value.on("rotatestart", markMapUserInteraction);
 		map.value.on("pitchstart", markMapUserInteraction);
 		currentMapZoom.value = map.value.getZoom();
-		scheduleMapRefresh({ force: true }); // Initial load
-		refreshSmartPulseTargets();
+		scheduleMapRefresh({ allowSameViewport: true });
+		map.value.once("idle", () => {
+			scheduleMapRefresh({ force: true });
+		});
 		syncBuildingInfoPopupFromSelection();
+
+		// Run initial marker update
+		requestUpdateMarkers();
 
 		// Atmosphere updates now handled by composable watcher
 		if (allowWeatherFx.value) {
@@ -1716,7 +1927,7 @@ const updateRoadDirections = async () => {
 	const [uLat, uLng] = props.userLocation;
 	const [sLat, sLng] = props.selectedShopCoords;
 
-	if (!mapboxgl?.accessToken) return;
+	// MapLibre GL does not require an access token
 	const coords = [uLat, uLng, sLat, sLng];
 
 	// 2. Validate Coordinates
@@ -1750,7 +1961,7 @@ const updateRoadDirections = async () => {
 			{
 				signal: routeAbortController.signal,
 				includeVisitor: false,
-				headers: { "X-Mapbox-Token": mapboxgl.accessToken },
+				headers: {}, // MapLibre GL does not expose an accessToken
 			},
 		);
 
@@ -1829,7 +2040,7 @@ const requestUpdateMarkers = () => {
 watch(
 	activeVibeEffects,
 	(effects) => {
-		if (!map.value || !mapboxgl) return;
+		if (!map.value || !maplibregl) return;
 
 		// 1. Remove markers not in list
 		for (const [id, marker] of vibeMarkersMap.entries()) {
@@ -1846,7 +2057,7 @@ watch(
 				el.className = "vibe-float-marker";
 				el.innerHTML = effect.emoji;
 
-				const marker = new mapboxgl.Marker({
+				const marker = new maplibregl.Marker({
 					element: el,
 					anchor: "bottom",
 				})
@@ -2032,11 +2243,16 @@ const setupMapLayers = () => {
 			filter: ["all", ["!", ["has", "point_count"]]],
 			layout: {
 				"icon-image": [
-					"case",
-					["==", ["get", "pin_state"], "event"],
+					"match",
+					["get", "pin_state"],
+					"event",
 					"pin-purple",
-					["==", ["get", "pin_state"], "live"],
+					"live",
 					"pin-red",
+					"open",
+					"pin-blue",
+					"tonight",
+					"pin-blue",
 					"pin-grey",
 				],
 				"icon-size": ["case", ["==", ["get", "pin_type"], "giant"], 0.27, 0.2],
@@ -2066,11 +2282,16 @@ const setupMapLayers = () => {
 			filter: EMPTY_SELECTED_PIN_FILTER,
 			layout: {
 				"icon-image": [
-					"case",
-					["==", ["get", "pin_state"], "event"],
+					"match",
+					["get", "pin_state"],
+					"event",
 					"pin-purple",
-					["==", ["get", "pin_state"], "live"],
+					"live",
 					"pin-red",
+					"open",
+					"pin-blue",
+					"tonight",
+					"pin-blue",
 					"pin-grey",
 				],
 				"icon-size": ["case", ["==", ["get", "pin_type"], "giant"], 0.32, 0.24],
@@ -2298,27 +2519,15 @@ const distanceToSelectedShop = computed(() => {
 		: `${distance.toFixed(1)} km`;
 });
 
-// ✅ Check Token Validity
+// ✅ MapLibre GL does not require an access token — always valid
 const isTokenInvalid = ref(false);
 
-// ✅ Mapbox token (shared with useMapCore)
-const MAPBOX_TOKEN = sanitizeEnvToken(import.meta.env.VITE_MAPBOX_TOKEN || "");
-
-// ✅ Ensure Mapbox is configured
+// ✅ Ensure MapLibre is loaded (token-free; WebGL check covers initialization readiness)
 const ensureMapboxLoaded = () => {
-	if (!MAPBOX_TOKEN || !MAPBOX_TOKEN.startsWith("pk.")) {
-		isTokenInvalid.value = true;
-		reportMapLifecycle("token_invalid", {
-			reason: "missing_or_invalid_token",
-		});
-		return false;
-	}
-
-	if (mapboxgl) {
-		mapboxgl.accessToken = MAPBOX_TOKEN;
+	// MapLibre does not need a token — library presence is sufficient
+	if (maplibregl) {
 		return true;
 	}
-
 	return false;
 };
 
@@ -2426,6 +2635,7 @@ onMounted(() => {
 			void refreshTrafficSubset();
 		}, TRAFFIC_REFRESH_INTERVAL_MS);
 	}
+	scheduleHotRoadPoll({ immediate: true });
 
 	// Use ResizeObserver instead of manual resize() calls
 	if (mapContainer.value && typeof ResizeObserver !== "undefined") {
@@ -2450,8 +2660,25 @@ watch(isMapReady, (ready) => {
 		setTimeout(() => {
 			mapLoaded.value = true;
 		}, 300);
+		scheduleHotRoadPoll({ immediate: true });
 	}
 });
+
+watch(
+	[
+		isDocumentHidden,
+		isOffline,
+		() => props.isLowPowerMode,
+		prefersReducedMotion,
+	],
+	([hidden, offline]) => {
+		if (hidden || offline) {
+			clearHotRoadPollTimer();
+			return;
+		}
+		scheduleHotRoadPoll({ immediate: true });
+	},
+);
 
 // MVP Unicorn Popup - Logic extracted to mapRenderer.js
 const getPopupHTML = (item) => {
@@ -2471,6 +2698,7 @@ const closeActivePopup = () => {
 		activePopup.value.remove();
 	}
 	activePopup.value = null;
+	activePopupShopId.value = "";
 };
 const getPopupLiftOffset = () => {
 	if (typeof window === "undefined") return 100;
@@ -2481,13 +2709,25 @@ const getPopupLiftOffset = () => {
 // ✅ Show Popup for Item (Fixed button handling)
 const showPopup = (item, { force = false, remember = true } = {}) => {
 	const shopId = normalizePopupShopId(item?.id);
-	if (!force && shopId && autoOpenedPopupIds.has(shopId)) {
-		return false;
+	const isSameShopPopupOpen =
+		Boolean(shopId) &&
+		activePopupShopId.value === shopId &&
+		Boolean(activePopup.value?.isOpen?.());
+	if (
+		!force &&
+		shopId &&
+		autoOpenedPopupIds.has(shopId) &&
+		isSameShopPopupOpen
+	) {
+		return true;
+	}
+	if (isSameShopPopupOpen) {
+		return true;
 	}
 
-	// Guard: Ensure both map and mapboxgl are ready
-	if (!map.value || !mapboxgl) {
-		console.warn("⚠️ Map or mapboxgl not ready for popup");
+	// Guard: Ensure both map and maplibregl are ready
+	if (!map.value || !maplibregl) {
+		console.warn("⚠️ Map or maplibregl not ready for popup");
 		return false;
 	}
 
@@ -2497,7 +2737,7 @@ const showPopup = (item, { force = false, remember = true } = {}) => {
 
 	closeActivePopup();
 
-	const popup = new mapboxgl.Popup({
+	const popup = new maplibregl.Popup({
 		closeButton: false,
 		closeOnClick: false,
 		className: "vibe-mapbox-popup",
@@ -2510,9 +2750,16 @@ const showPopup = (item, { force = false, remember = true } = {}) => {
 		.addTo(map.value);
 
 	activePopup.value = popup;
+	activePopupShopId.value = shopId;
 	if (remember && shopId) {
 		autoOpenedPopupIds.add(shopId);
 	}
+	popup.on("close", () => {
+		if (activePopup.value === popup) {
+			activePopup.value = null;
+			activePopupShopId.value = "";
+		}
+	});
 
 	// ✅ Give popup time to mount before any measurements
 	requestAnimationFrame(() => {
@@ -2951,11 +3198,17 @@ watch(isMapReady, (ready) => {
 		// Uses requestIdleCallback so it doesn't compete with deferred feature init.
 		const _reportPerfMetrics = () => {
 			try {
-				const fcpEntry = performance.getEntriesByName("first-contentful-paint")[0];
-				const lcpEntries = performance.getEntriesByType("largest-contentful-paint");
+				const fcpEntry = performance.getEntriesByName(
+					"first-contentful-paint",
+				)[0];
+				const lcpEntries = performance.getEntriesByType(
+					"largest-contentful-paint",
+				);
 				frontendObservabilityService.trackMapPerformance({
 					fcp: fcpEntry?.startTime,
-					lcp: lcpEntries.length ? lcpEntries[lcpEntries.length - 1].renderTime : undefined,
+					lcp: lcpEntries.length
+						? lcpEntries[lcpEntries.length - 1].renderTime
+						: undefined,
 					mapInteractive: window.__mapMetrics?.interactiveAt,
 					parseOverhead: window.__mapMetrics?.parseOverhead,
 					sentientLoadTime: window.__mapMetrics?.sentientLoadTime,
@@ -3117,7 +3370,10 @@ const applyStyleIfNeeded = (isDarkMode) => {
 		updateEventMarkers();
 		updateUserLocation();
 		refreshSmartPulseTargets();
-		scheduleMapRefresh({ force: true });
+		scheduleMapRefresh({ allowSameViewport: true });
+		map.value.once("idle", () => {
+			scheduleMapRefresh({ force: true });
+		});
 		handleMapStyleLoad();
 	});
 };
@@ -3276,6 +3532,16 @@ watch(
 );
 
 watch(
+	nowTick,
+	() => {
+		if (!map.value || !isMapReady.value) return;
+		requestUpdateMarkers();
+		scheduleMapRefresh({ allowSameViewport: true });
+	},
+	{ deep: false },
+);
+
+watch(
 	() => shopStore.collectedCoins,
 	() => {
 		if (!map.value || !isMapReady.value) return;
@@ -3378,12 +3644,8 @@ watch(
 
 		if (shop) {
 			// Fix 1H: skip regular popup when giant pin modal is open
-			const shopId = normalizePopupShopId(shop?.id);
 			if (!props.isGiantPinView) {
-				const didOpen = showPopup(shop);
-				if (!didOpen && shopId && autoOpenedPopupIds.has(shopId)) {
-					closeActivePopup();
-				}
+				showPopup(shop);
 			}
 			buildingPopupShop.value = shop;
 			syncBuildingPopupContent(shop);
@@ -3448,12 +3710,8 @@ watch(
 
 onMounted(async () => {
 	// ⚡ SKIP HEAVY MAP INIT IN E2E
-	if (
-		IS_E2E &&
-		!IS_STRICT_MAP_E2E &&
-		(!MAPBOX_TOKEN || !MAPBOX_TOKEN.startsWith("pk."))
-	) {
-		console.log("E2E Mode: Skipping Mapbox Initialization");
+	if (IS_E2E && !IS_STRICT_MAP_E2E) {
+		console.log("E2E Mode: Skipping MapLibre Initialization");
 		isMapReady.value = true;
 		return;
 	}
@@ -3538,6 +3796,7 @@ onUnmounted(() => {
 		clearInterval(trafficRefreshInterval);
 		trafficRefreshInterval = null;
 	}
+	clearHotRoadPollTimer();
 
 	teardownMap();
 });
@@ -3841,7 +4100,9 @@ defineExpose({
         role="listitem"
         :aria-label="shop.name"
         @keydown="(e) => handleVenueKeyNav(e, shop, index)"
-      >{{ shop.name }}</li>
+      >
+        {{ shop.name }}
+      </li>
     </ul>
   </div>
 </template>
