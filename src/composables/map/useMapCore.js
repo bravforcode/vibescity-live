@@ -1,13 +1,22 @@
-import mapboxgl from "mapbox-gl";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 import { markRaw, onUnmounted, ref, shallowRef } from "vue";
 import { useInteractionState } from "../useInteractionState";
 
-const MAPBOX_FEATURESET_WARN_SNIPPETS = [
-	"featureNamespace",
-	"featureset",
-	"place-labels",
-	"selector is not associated to the same source",
-	"Couldn't find terrain source", // Suppress spurious terrain warnings during style transitions
+// Env-driven style URL: prefer custom style, then fallback, then safe public default
+const MAP_STYLE =
+	import.meta.env.VITE_MAP_STYLE_URL ||
+	import.meta.env.VITE_MAP_STYLE_FALLBACK_URL ||
+	"https://demotiles.maplibre.org/style.json";
+
+const MAPBOX_SUPPRESSED_WARN_PATTERNS = [
+	[
+		"featureNamespace",
+		"featureset",
+		"selector is not associated to the same source",
+	],
+	["place-labels", "featureset"],
+	["Couldn't find terrain source"], // Suppress spurious terrain warnings during style transitions
 ];
 
 let mapboxWarnFilterRefs = 0;
@@ -18,8 +27,8 @@ const shouldSuppressMapboxFeaturesetWarn = (args) => {
 	const message = args
 		.map((part) => (typeof part === "string" ? part : String(part ?? "")))
 		.join(" ");
-	return MAPBOX_FEATURESET_WARN_SNIPPETS.every((snippet) =>
-		message.includes(snippet),
+	return MAPBOX_SUPPRESSED_WARN_PATTERNS.some((pattern) =>
+		pattern.every((snippet) => message.includes(snippet)),
 	);
 };
 
@@ -51,30 +60,15 @@ export function useMapCore(containerRef, _options = {}) {
 	const isMapReady = ref(false);
 	const isMapLoaded = ref(false);
 	const isStrictMapE2E = import.meta.env.VITE_E2E_MAP_REQUIRED === "true";
-	const HARDCODED_MAPBOX_TOKEN =
-		"pk.eyJ1IjoicGhpcnJyIiwiYSI6ImNta21tbzNobDBndXMzZHB2N3V3cXdtMXQifQ.HlJvxxRdjzhbOLw5WgRPQA";
-	const PRIMARY_STYLE_URL = "mapbox://styles/phirrr/cmlktq68u002601se295iazmm";
-	// Distinct fallback: Mapbox light-v11 (public, no custom token required for basic access)
-	const FALLBACK_STYLE_URL = "mapbox://styles/mapbox/light-v11";
+	// MapLibre GL does not require an access token — no token setup needed.
+	const PRIMARY_STYLE_URL = MAP_STYLE;
+	const FALLBACK_STYLE_URL =
+		import.meta.env.VITE_MAP_STYLE_FALLBACK_URL ||
+		"https://demotiles.maplibre.org/style.json";
 	const STYLE_ENDPOINT_PATH = "/styles/v1/";
 	const EMPTY_VECTOR_TILE_DATA_URI = "data:application/x-protobuf;base64,";
 	let lastRequestedStyleUrl = "";
 	let styleFallbackInProgress = false;
-
-	const token = (
-		import.meta.env.VITE_MAPBOX_TOKEN ||
-		HARDCODED_MAPBOX_TOKEN ||
-		""
-	)
-		.trim()
-		.replace(/^['"]|['"]$/g, "");
-	if (!token) {
-		console.error(
-			"VITE_MAPBOX_TOKEN is not configured and fallback token missing",
-		);
-	}
-	mapboxgl.accessToken = token || "";
-	mapboxgl.setTelemetryEnabled?.(false);
 
 	// Pin images used by symbol layers. Preload on load/style.load and keep
 	// styleimagemissing as a fallback (styles can reset images on setStyle).
@@ -213,14 +207,14 @@ export function useMapCore(containerRef, _options = {}) {
 
 		lastRequestedStyleUrl = style;
 		map.value = markRaw(
-			new mapboxgl.Map({
+			new maplibregl.Map({
 				container: containerRef.value,
 				style: style,
 				center: initialCenter,
 				zoom: initialZoom,
 				minZoom: 3,
 				maxZoom: 22,
-				pitch: 60, // 3D perspective without showing beyond map world
+				pitch: 70, // 3D perspective without showing beyond map world
 				bearing: 0,
 				antialias: false, // Saves ~50% VRAM on mobile/retina
 				attributionControl: false,
