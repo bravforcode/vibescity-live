@@ -60,6 +60,7 @@ const PRIMARY_STYLE_URL =
 	import.meta.env.VITE_MAP_STYLE_URL ||
 	import.meta.env.VITE_MAP_STYLE_FALLBACK_URL ||
 	"https://demotiles.maplibre.org/style.json";
+const NEON_STYLE_URL = "/src/assets/map-styles/vibecity-neon.json";
 const DARK_STYLE = PRIMARY_STYLE_URL;
 const LIGHT_STYLE = PRIMARY_STYLE_URL;
 const STRICT_E2E_STYLE =
@@ -104,9 +105,10 @@ const enableMapEffectsPipelineV2 = computed(() =>
 const enablePerfGuardrailsV2 = computed(() =>
 	featureFlagStore.isEnabled("enable_perf_guardrails_v2"),
 );
-const styleUrlForTheme = (isDarkMode) => {
+const styleUrlForTheme = (_isDarkMode) => {
 	if (IS_STRICT_MAP_E2E) return STRICT_E2E_STYLE;
-	return isDarkMode ? DARK_STYLE : LIGHT_STYLE;
+	// Use neon style for production vibe
+	return NEON_STYLE_URL;
 };
 
 // Wave 3: Task 3.6 — Record parse + setup overhead after stores and composables resolve.
@@ -896,6 +898,10 @@ const {
 	isWeatherNight,
 	shouldRunAtmosphere,
 });
+
+// Vibe Zones for special areas
+const { zonesSourceLoaded, activeZone, addZonesLayers, removeZonesLayers } =
+	useVibeZones(map, isMapReady);
 
 // Wave 2: Task 2.5 — Idle task queue for deferred map work
 const { scheduleIdleTask, executeIdleTasksOnce } = useMapIdleFeatures();
@@ -3945,7 +3951,7 @@ defineExpose({
           </p>
           <ol class="list-decimal list-inside space-y-1">
             <li>
-              <code class="bg-white/10 px-1 rounded">chrome://settings</code>
+              <code class="bg-white/10 px-1 rounded">{{ $t("auto.k_db0beaa4") }}</code>
             </li>
             <li>{{ $t("map.webgl_error.step_2") }}</li>
             <li>{{ $t("map.webgl_error.step_3") }}</li>

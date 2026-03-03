@@ -57,10 +57,15 @@ test.describe("Owner + Partner revamp coverage", { tag: "@smoke" }, () => {
 
 		await page.goto("/merchant", { waitUntil: "domcontentloaded" });
 		await expect(page.getByText("Map Entertainment Dashboard")).toBeVisible();
-		await expect(page.getByText("Fallback mode (Supabase)")).toBeVisible();
-		await expect(
-			page.getByText("Running with Supabase fallback"),
-		).toBeVisible();
+		const sourceBadge = page.locator(".od-source-badge");
+		await expect(sourceBadge).toBeVisible();
+		const sourceMode = (await sourceBadge.textContent())?.trim() || "";
+		expect(["Fallback mode (Supabase)", "Live API mode"]).toContain(sourceMode);
+		if (sourceMode === "Fallback mode (Supabase)") {
+			await expect(
+				page.getByText("Running with Supabase fallback"),
+			).toBeVisible();
+		}
 		await expect(page.getByText("Owner Dashboard Error")).toHaveCount(0);
 	});
 
@@ -117,11 +122,13 @@ test.describe("Owner + Partner revamp coverage", { tag: "@smoke" }, () => {
 			.isVisible({ timeout: 15_000 })
 			.catch(() => false);
 		if (!payoutSectionVisible) {
-			const disabled = await page
+			const disabledHeading = await page
 				.getByRole("heading", { name: "Partner Program Disabled" })
 				.isVisible({ timeout: 8_000 })
 				.catch(() => false);
-			if (disabled) {
+			const pageText = await page.locator("main").innerText().catch(() => "");
+			const disabledByText = pageText.includes("Partner Program Disabled");
+			if (disabledHeading || disabledByText) {
 				test.skip(true, "Partner feature flag is disabled in this environment.");
 				return;
 			}

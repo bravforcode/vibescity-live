@@ -62,6 +62,7 @@
     "perf:monitor": "node scripts/monitor-perf-db.mjs"
   },
   "dependencies": {
+    "@heroicons/vue": "^2.2.0",
     "@iconify-json/flat-color-icons": "^1.2.3",
     "@iconify/vue": "^5.0.0",
     "@mapbox/mapbox-gl-geocoder": "^5.1.2",
