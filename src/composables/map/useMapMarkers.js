@@ -1,6 +1,7 @@
-import mapboxgl from "mapbox-gl";
+import maplibregl from "maplibre-gl";
 import { shallowRef } from "vue";
 import { createGiantPinElement } from "@/utils/mapRenderer";
+import { useSmartMarkers } from "./useSmartMarkers";
 
 const COIN_CSS_INJECTED = { done: false };
 
@@ -77,6 +78,9 @@ export function useMapMarkers(map) {
 	// Fix 3D: inject CSS once at composable init, not inside marker loop
 	injectCoinFlipCSS();
 
+	// Initialize smart markers for real-time status
+	const smartMarkers = useSmartMarkers();
+
 	const markersMap = shallowRef(new Map());
 	const coinMarkersMap = shallowRef(new Map());
 	const eventMarkersMap = shallowRef(new Map());
@@ -98,6 +102,9 @@ export function useMapMarkers(map) {
 	// which handles clustering, coin animations, and boost styling natively.
 	const updateMarkers = (shops, highlightedShopId, options = {}) => {
 		if (!map.value) return;
+
+		// Update smart markers with current shops
+		smartMarkers.updateMarkerStates(shops);
 
 		const {
 			pinsVisible = true,
@@ -178,12 +185,16 @@ export function useMapMarkers(map) {
 				return;
 			}
 			if (!coords) return;
-			// Create marker element
+			// Create marker element with enhanced styling
 			const el = isGiant
 				? createGiantPinElement(shop)
 				: createRegularPinElement(shop);
 
-			const marker = new mapboxgl.Marker({
+			// Apply smart marker styles
+			const markerStyles = smartMarkers.getMarkerStyles(shop);
+			Object.assign(el.style, markerStyles);
+
+			const marker = new maplibregl.Marker({
 				element: el,
 				anchor: "bottom",
 			})
@@ -260,7 +271,7 @@ export function useMapMarkers(map) {
 			coinEl.style.zIndex = "2500";
 			coinEl.innerHTML = createCoinFlipHTML();
 
-			const coinMarker = new mapboxgl.Marker({
+			const coinMarker = new maplibregl.Marker({
 				element: coinEl,
 				anchor: "bottom",
 			})
@@ -320,7 +331,7 @@ export function useMapMarkers(map) {
 			}
 
 			const el = createGiantPinElement(event);
-			const marker = new mapboxgl.Marker({
+			const marker = new maplibregl.Marker({
 				element: el,
 				anchor: "bottom",
 			})

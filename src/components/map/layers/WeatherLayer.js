@@ -1,4 +1,4 @@
-import mapboxgl from "mapbox-gl";
+import maplibregl from "maplibre-gl";
 
 /**
  * WebGL-based Weather Layer for Mapbox GL JS
@@ -140,7 +140,7 @@ export class WeatherLayer {
 
 		// Center calculation for "Following" the camera
 		const center = this.map.getCenter();
-		const mc = mapboxgl.MercatorCoordinate.fromLngLat(center);
+		const mc = maplibregl.MercatorCoordinate.fromLngLat(center);
 		gl.uniform3f(
 			gl.getUniformLocation(this.program, "u_center_mc"),
 			mc.x,
