@@ -65,14 +65,7 @@ test.describe("Map User Flow", () => {
 		const markerClicked = await markers
 			.click({ force: true, timeout: 10_000 })
 			.then(() => true)
-			.catch(async () => {
-				return markers
-					.evaluate((el) => {
-						(el as HTMLElement).click();
-					})
-					.then(() => true)
-					.catch(() => false);
-			});
+			.catch(() => clickWithFallback(markers, 10_000));
 		enforceMapConditionOrSkip(markerClicked, "Map marker click failed.");
 		if (!markerClicked) {
 			return;

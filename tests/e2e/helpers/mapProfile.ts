@@ -249,11 +249,43 @@ export async function clickWithFallback(
 	return locator
 		.evaluate((el) => {
 			const target = el as HTMLElement;
+			target.focus?.();
+			const pointerEventInit = {
+				bubbles: true,
+				cancelable: true,
+				composed: true,
+				pointerId: 1,
+				pointerType: "mouse",
+				isPrimary: true,
+				button: 0,
+			};
+
+			const mouseEventInit = {
+				bubbles: true,
+				cancelable: true,
+				composed: true,
+				button: 0,
+			};
+
+			const dispatch = (eventName: string) => {
+				if (eventName.startsWith("pointer") && "PointerEvent" in window) {
+					target.dispatchEvent(new PointerEvent(eventName, pointerEventInit));
+					return;
+				}
+
+				target.dispatchEvent(new MouseEvent(eventName, mouseEventInit));
+			};
+
+			dispatch("pointerdown");
+			dispatch("mousedown");
+			dispatch("pointerup");
+			dispatch("mouseup");
 			target.dispatchEvent(
 				new MouseEvent("click", {
 					bubbles: true,
 					cancelable: true,
 					composed: true,
+					button: 0,
 				}),
 			);
 			target.click?.();
