@@ -62,22 +62,13 @@ test.describe("Map User Flow", () => {
 			return;
 		}
 
-		const popup = page.locator(".mapboxgl-popup");
-		const markerClicked = await clickWithFallback(markers, 10_000, async () => {
-			const popupVisible = await popup
-				.isVisible({ timeout: 1_500 })
-				.catch(() => false);
-			if (popupVisible) {
-				return true;
-			}
-
-			return waitForVenueDetailSignal(page, 1_500);
-		});
+		const markerClicked = await clickWithFallback(markers, 10_000);
 		enforceMapConditionOrSkip(markerClicked, "Map marker click failed.");
 		if (!markerClicked) {
 			return;
 		}
 
+		const popup = page.locator(".mapboxgl-popup");
 		const popupVisible = await popup
 			.isVisible({ timeout: 10_000 })
 			.catch(() => false);
