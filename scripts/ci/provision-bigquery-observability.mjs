@@ -79,29 +79,81 @@ function parseStructuredSecret(rawValue, label) {
   const raw = trimEnv(rawValue);
   if (!raw) return null;
 
-  const candidates = [raw];
-  if (
-    (raw.startsWith('"') && raw.endsWith('"')) ||
-    (raw.startsWith("'") && raw.endsWith("'"))
-  ) {
-    candidates.push(raw.slice(1, -1));
-  }
+  const normalizeCandidate = (value) =>
+    String(value ?? "")
+      .replace(/^\uFEFF/, "")
+      .trim();
+  const collectCandidates = (value) => {
+    const normalized = normalizeCandidate(value);
+    if (!normalized) return [];
 
-  for (const candidate of candidates) {
+    const next = new Set([normalized]);
+    const fenced = normalized.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+    if (fenced?.[1]) next.add(normalizeCandidate(fenced[1]));
+
+    if (
+      (normalized.startsWith('"') && normalized.endsWith('"')) ||
+      (normalized.startsWith("'") && normalized.endsWith("'"))
+    ) {
+      next.add(normalizeCandidate(normalized.slice(1, -1)));
+    }
+
+    const eqIndex = normalized.indexOf("=");
+    if (eqIndex > 0) {
+      next.add(normalizeCandidate(normalized.slice(eqIndex + 1)));
+    }
+
+    const objectStart = normalized.indexOf("{");
+    const objectEnd = normalized.lastIndexOf("}");
+    if (objectStart !== -1 && objectEnd > objectStart) {
+      next.add(normalizeCandidate(normalized.slice(objectStart, objectEnd + 1)));
+    }
+
+    const arrayStart = normalized.indexOf("[");
+    const arrayEnd = normalized.lastIndexOf("]");
+    if (arrayStart !== -1 && arrayEnd > arrayStart) {
+      next.add(normalizeCandidate(normalized.slice(arrayStart, arrayEnd + 1)));
+    }
+
+    return [...next].filter(Boolean);
+  };
+
+  const tryParseJson = (candidate) => {
     try {
       const parsed = JSON.parse(candidate);
-      return typeof parsed === "string" ? JSON.parse(parsed) : parsed;
+      return typeof parsed === "string" ? tryParseJson(parsed) : parsed;
     } catch {
-      // Try the next format.
+      return null;
+    }
+  };
+
+  const queue = collectCandidates(raw);
+  const seen = new Set();
+
+  while (queue.length) {
+    const candidate = queue.shift();
+    if (!candidate || seen.has(candidate)) continue;
+    seen.add(candidate);
+
+    const parsed = tryParseJson(candidate);
+    if (parsed && typeof parsed === "object") {
+      return parsed;
     }
 
     try {
-      const decoded = Buffer.from(candidate, "base64").toString("utf8").trim();
-      if (!decoded.startsWith("{") && !decoded.startsWith("[")) {
-        continue;
+      const normalizedBase64 = candidate
+        .replace(/^base64[:,]/i, "")
+        .replace(/-/g, "+")
+        .replace(/_/g, "/")
+        .replace(/\s+/g, "");
+      if (!normalizedBase64) continue;
+
+      const decoded = Buffer.from(normalizedBase64, "base64").toString("utf8");
+      for (const decodedCandidate of collectCandidates(decoded)) {
+        if (!seen.has(decodedCandidate)) {
+          queue.push(decodedCandidate);
+        }
       }
-      const parsed = JSON.parse(decoded);
-      return typeof parsed === "string" ? JSON.parse(parsed) : parsed;
     } catch {
       // Try the next format.
     }
