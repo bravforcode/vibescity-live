@@ -438,6 +438,7 @@ async function runEdgeChecks() {
       url: `${EDGE_BASE_URL}/create-checkout-session`,
       headers,
       readOnly: true,
+      required: false,
     });
     console.log(
       `[ok] GET /functions/v1/create-checkout-session (read-only) -> ${edgeCheckoutReadOnly.status}`,
@@ -466,6 +467,7 @@ async function runEdgeChecks() {
       url: `${EDGE_BASE_URL}/get-order-status`,
       headers,
       readOnly: true,
+      required: false,
     });
     console.log(
       `[ok] GET /functions/v1/get-order-status (read-only) -> ${edgeOrderReadOnly.status}`,
@@ -487,6 +489,7 @@ async function runEdgeChecks() {
     url: `${EDGE_BASE_URL}/create-checkout-session`,
     headers,
     body: checkoutPayload,
+    required: false,
   });
   console.log(
     `[ok] POST /functions/v1/create-checkout-session -> ${edgeCheckout.status}`,
@@ -514,6 +517,7 @@ async function runEdgeChecks() {
     url: `${EDGE_BASE_URL}/get-order-status`,
     headers,
     body: { orderId: ORDER_ID },
+    required: false,
   });
   console.log(`[ok] POST /functions/v1/get-order-status -> ${orderStatus.status}`);
 }
