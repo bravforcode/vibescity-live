@@ -6,18 +6,14 @@ Generated from live repository settings on March 7, 2026 for `bravforcode/vibesc
 
 - Repo secrets present: `16`
 - Repo variables present: `27`
-- Remaining repo-level external inputs still missing: `7`
+- Remaining repo-level external inputs still missing: `4`
 
 ## Repo-Level Missing Inputs
 
 | Kind | Name | Workflows | Notes |
 | --- | --- | --- | --- |
-| secret | `ALERT_WEBHOOK_URL` | `seo-data-quality-alert.yml` | External alert destination required |
-| secret | `GOOGLE_CREDENTIALS` | `visual-regression.yml` | Required only for GCS-backed visual baseline sync |
 | secret | `GRAFANA_LOKI_TOKEN` | `monthly-quality-trend.yml`, `synthetic-postdeploy-monitor.yml`, `weekly-lighthouse.yml`, `weekly-quality-trend.yml` | Real observability credential required |
-| secret | `PII_AUDIT_ALERT_WEBHOOK_URL` | `pii-access-anomaly-alert.yml` | External privacy alert destination required |
 | secret | `SONAR_TOKEN` | `sonarcloud.yml` | Repo-level missing, but CI may still pass via org secret |
-| secret | `SUPABASE_KEY` | `venue-scraper.yml` | Real scraper credential required |
 | var | `GRAFANA_LOKI_URL` | `monthly-quality-trend.yml`, `synthetic-postdeploy-monitor.yml`, `weekly-lighthouse.yml`, `weekly-quality-trend.yml` | Real Loki endpoint still required |
 | var | `GRAFANA_LOKI_USER` | `monthly-quality-trend.yml`, `synthetic-postdeploy-monitor.yml`, `weekly-lighthouse.yml`, `weekly-quality-trend.yml` | Optional unless Loki requires basic auth |
 
@@ -66,5 +62,9 @@ Generated from live repository settings on March 7, 2026 for `bravforcode/vibesc
 
 - `GITHUB_TOKEN` is injected automatically by GitHub Actions and is not a repository secret.
 - `SONAR_TOKEN` remains repo-level missing but SonarCloud can still pass if the token is inherited from organization-level secrets.
+- `seo-data-quality-alert.yml` now falls back to `DISCORD_WEBHOOK_URL` or `SYNTHETIC_ALERT_WEBHOOK_URL` when `ALERT_WEBHOOK_URL` is not present.
+- `pii-access-anomaly-alert.yml` now falls back to `DISCORD_WEBHOOK_URL` or `SYNTHETIC_ALERT_WEBHOOK_URL` when `PII_AUDIT_ALERT_WEBHOOK_URL` is not present.
+- `visual-regression.yml` now falls back to `GCV_SERVICE_ACCOUNT_JSON` or `BIGQUERY_SERVICE_ACCOUNT_JSON` when `GOOGLE_CREDENTIALS` is not present.
+- `venue-scraper.yml` now falls back to `SUPABASE_ANON_KEY` when `SUPABASE_KEY` is not present.
 - `POSTDEPLOY_CHECKOUT_VENUE_ID` and `POSTDEPLOY_ORDER_ID` were intentionally set to zero-UUID probe defaults so health checks exercise route existence without requiring live financial IDs.
 - `GRAFANA_LOKI_URL`, `GRAFANA_LOKI_USER`, and `GRAFANA_LOKI_TOKEN` were left unresolved because they require real observability infrastructure coordinates and credentials.

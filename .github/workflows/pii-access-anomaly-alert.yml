@@ -48,7 +48,7 @@ jobs:
         if: ${{ steps.check.outputs.alert == 'true' }}
         continue-on-error: true
         env:
-          ALERT_WEBHOOK_URL: "${{ secrets.PII_AUDIT_ALERT_WEBHOOK_URL }}"
+          ALERT_WEBHOOK_URL: "${{ secrets.PII_AUDIT_ALERT_WEBHOOK_URL || secrets.DISCORD_WEBHOOK_URL || secrets.SYNTHETIC_ALERT_WEBHOOK_URL }}"
           ALERT_TYPE: "pii_access_anomaly"
           ALERT_TEXT: "${{ steps.check.outputs.alert_text }}"
           ALERT_LANE: "pii-audit"

@@ -52,7 +52,7 @@ jobs:
           ALERT_LANE: "ci"
           ALERT_TARGET: "seo-data-quality"
           ALERT_RUN_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          ALERT_WEBHOOK_URL: "${{ secrets.ALERT_WEBHOOK_URL }}"
+          ALERT_WEBHOOK_URL: "${{ secrets.ALERT_WEBHOOK_URL || secrets.DISCORD_WEBHOOK_URL || secrets.SYNTHETIC_ALERT_WEBHOOK_URL }}"
           ALERT_DEDUP_WINDOW_MINUTES: "60"
           ALERT_DEDUP_KEY: "seo-data-quality"
         run: node scripts/ci/send-alert-webhook.mjs
