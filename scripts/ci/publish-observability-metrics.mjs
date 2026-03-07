@@ -83,12 +83,16 @@ async function loadServiceAccount() {
   const jsonPath = process.env.BIGQUERY_SERVICE_ACCOUNT_JSON_PATH;
 
   if (rawJson) {
-    return parseStructuredSecret(rawJson, "BIGQUERY_SERVICE_ACCOUNT_JSON");
+    return normalizeServiceAccount(
+      parseStructuredSecret(rawJson, "BIGQUERY_SERVICE_ACCOUNT_JSON"),
+    );
   }
 
   if (jsonPath && existsSync(jsonPath)) {
     const raw = await readFile(jsonPath, "utf8");
-    return parseStructuredSecret(raw, "BIGQUERY_SERVICE_ACCOUNT_JSON_PATH");
+    return normalizeServiceAccount(
+      parseStructuredSecret(raw, "BIGQUERY_SERVICE_ACCOUNT_JSON_PATH"),
+    );
   }
 
   return null;
@@ -179,6 +183,41 @@ function parseStructuredSecret(rawValue, label) {
   }
 
   throw new Error(`${label} is not valid JSON or base64-encoded JSON.`);
+}
+
+function normalizeServiceAccount(serviceAccount) {
+  if (!serviceAccount || typeof serviceAccount !== "object") {
+    return serviceAccount;
+  }
+
+  const normalizeStringField = (value) => {
+    if (typeof value !== "string") return value;
+    const trimmed = value.replace(/^\uFEFF/, "").trim();
+    if (
+      (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+      (trimmed.startsWith("'") && trimmed.endsWith("'"))
+    ) {
+      return trimmed.slice(1, -1);
+    }
+    return trimmed;
+  };
+
+  const normalized = { ...serviceAccount };
+  normalized.client_email = normalizeStringField(normalized.client_email);
+  normalized.project_id = normalizeStringField(normalized.project_id);
+  normalized.private_key_id = normalizeStringField(normalized.private_key_id);
+  normalized.private_key = normalizeStringField(normalized.private_key);
+
+  if (typeof normalized.private_key === "string") {
+    if (normalized.private_key.includes("\\n") && !normalized.private_key.includes("\n")) {
+      normalized.private_key = normalized.private_key.replace(/\\n/g, "\n");
+    }
+    if (normalized.private_key.includes("\\r") && !normalized.private_key.includes("\r")) {
+      normalized.private_key = normalized.private_key.replace(/\\r/g, "\r");
+    }
+  }
+
+  return normalized;
 }
 
 async function getGoogleAccessToken(serviceAccount) {
