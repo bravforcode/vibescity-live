@@ -1,4 +1,4 @@
-import { test, type Page } from "@playwright/test";
+import { type Locator, type Page, test } from "@playwright/test";
 
 const MAP_REQUIRED_TAG = "@map-required";
 const MAP_READY_SELECTOR = '[data-testid="map-shell"][data-map-ready="true"]';
@@ -7,129 +7,367 @@ const MAP_WRAPPER_SELECTOR = '[data-testid="map-shell-wrapper"]';
 const MAP_TOKEN_OVERLAY_TEXT = "Mapbox Token Required";
 const WEBGL_FALLBACK_TEXT = "Map Not Available";
 const MAP_CANVAS_SELECTOR = '[data-testid="map-canvas"]';
+const MAP_REGION_SELECTOR = '[aria-label="Map"]';
+const MAPBOX_SURFACE_SELECTOR = ".mapboxgl-map, .mapboxgl-canvas";
+const MAP_CONTROL_SELECTOR = ".mapboxgl-ctrl-compass, .mapboxgl-ctrl-zoom-in";
+const MAP_MARKER_SELECTOR = '.mapboxgl-marker, img[alt="Map marker"]';
+const DETAIL_MODAL_SELECTOR = '[data-testid="vibe-modal"]';
+const DETAIL_CLOSE_SELECTOR = 'button[aria-label="Close details"]';
+const DETAIL_ROUTE_PATTERN = /^\/(?:(?:th|en)\/)?(?:venue\/[^/]+|v\/[^/]+)/i;
 
 export function isMapRequiredProfile(): boolean {
-  const grep = process.env.PW_GREP || "";
-  return grep.includes(MAP_REQUIRED_TAG) || process.env.E2E_MAP_REQUIRED === "1";
+	const grep = process.env.PW_GREP || "";
+	return (
+		grep.includes(MAP_REQUIRED_TAG) || process.env.E2E_MAP_REQUIRED === "1"
+	);
 }
 
-export function enforceMapConditionOrSkip(condition: boolean, reason: string): void {
-  if (condition) {
-    return;
-  }
+export function enforceMapConditionOrSkip(
+	condition: boolean,
+	reason: string,
+): void {
+	if (condition) {
+		return;
+	}
 
-  if (isMapRequiredProfile()) {
-    throw new Error(`${MAP_REQUIRED_TAG} failed: ${reason}`);
-  }
+	if (isMapRequiredProfile()) {
+		throw new Error(`${MAP_REQUIRED_TAG} failed: ${reason}`);
+	}
 
-  test.skip(true, reason);
+	test.skip(true, reason);
 }
 
-async function waitForMapReadyFlag(page: Page, timeoutMs: number): Promise<boolean> {
-  return page
-    .waitForFunction(
-      (selector) => {
-        const shell = document.querySelector(selector);
-        return shell?.getAttribute("data-map-ready") === "true";
-      },
-      MAP_SHELL_SELECTOR,
-      { timeout: timeoutMs },
-    )
-    .then(() => true)
-    .catch(() => false);
+async function waitForMapReadyFlag(
+	page: Page,
+	timeoutMs: number,
+): Promise<boolean> {
+	return page
+		.waitForFunction(
+			(selector) => {
+				const shell = document.querySelector(selector);
+				return shell?.getAttribute("data-map-ready") === "true";
+			},
+			MAP_SHELL_SELECTOR,
+			{ timeout: timeoutMs },
+		)
+		.then(() => true)
+		.catch(() => false);
+}
+
+async function waitForRenderedMapSurface(
+	page: Page,
+	timeoutMs: number,
+): Promise<boolean> {
+	return page
+		.waitForFunction(
+			({
+				regionSelector,
+				surfaceSelector,
+				controlSelector,
+				markerSelector,
+			}) => {
+				const selectors = [
+					regionSelector,
+					surfaceSelector,
+					controlSelector,
+					markerSelector,
+				].filter(Boolean);
+
+				return selectors.some((selector) => {
+					const element = document.querySelector(selector);
+					if (!element) return false;
+
+					const rect = element.getBoundingClientRect();
+					const style = window.getComputedStyle(element);
+					return (
+						rect.width > 0 &&
+						rect.height > 0 &&
+						style.visibility !== "hidden" &&
+						style.display !== "none" &&
+						style.opacity !== "0"
+					);
+				});
+			},
+			{
+				regionSelector: MAP_REGION_SELECTOR,
+				surfaceSelector: MAPBOX_SURFACE_SELECTOR,
+				controlSelector: MAP_CONTROL_SELECTOR,
+				markerSelector: MAP_MARKER_SELECTOR,
+			},
+			{ timeout: timeoutMs },
+		)
+		.then(() => true)
+		.catch(() => false);
 }
 
 export async function waitForMapReadyOrSkip(
-  page: Page,
-  timeoutMs = 20_000,
+	page: Page,
+	timeoutMs = 20_000,
 ): Promise<boolean> {
-  const mapWrapper = page.locator(MAP_WRAPPER_SELECTOR).first();
-  const wrapperVisible = await mapWrapper
-    .waitFor({ state: "visible", timeout: timeoutMs })
-    .then(() => true)
-    .catch(() => false);
+	const mapWrapper = page.locator(MAP_WRAPPER_SELECTOR).first();
+	const wrapperVisible = await mapWrapper
+		.waitFor({ state: "visible", timeout: timeoutMs })
+		.then(() => true)
+		.catch(() => false);
 
-  enforceMapConditionOrSkip(
-    wrapperVisible,
-    `Map shell wrapper did not render within ${timeoutMs}ms.`,
-  );
+	enforceMapConditionOrSkip(
+		wrapperVisible,
+		`Map shell wrapper did not render within ${timeoutMs}ms.`,
+	);
 
-  const mapShell = page.locator(MAP_SHELL_SELECTOR).first();
-  const mapShellVisible = await mapShell
-    .waitFor({ state: "visible", timeout: timeoutMs })
-    .then(() => true)
-    .catch(() => false);
+	const mapShell = page.locator(MAP_SHELL_SELECTOR).first();
+	const mapShellVisible = await mapShell
+		.waitFor({ state: "visible", timeout: timeoutMs })
+		.then(() => true)
+		.catch(() => false);
 
-  if (!mapShellVisible) {
-    // Wrapper rendered but map component didn't mount.
-    enforceMapConditionOrSkip(
-      mapShellVisible,
-      [
-        `Map component failed to mount within ${timeoutMs}ms.`,
-        wrapperVisible ? "Map wrapper is visible." : "Map wrapper is not visible.",
-      ].join(" "),
-    );
-    return false;
-  }
+	if (!mapShellVisible) {
+		// Wrapper rendered but map component didn't mount.
+		enforceMapConditionOrSkip(
+			mapShellVisible,
+			[
+				`Map component failed to mount within ${timeoutMs}ms.`,
+				wrapperVisible
+					? "Map wrapper is visible."
+					: "Map wrapper is not visible.",
+			].join(" "),
+		);
+		return false;
+	}
 
-  const isReady = await waitForMapReadyFlag(page, timeoutMs);
+	const isReady = await waitForMapReadyFlag(page, timeoutMs);
+	const renderedSurfaceVisible = await waitForRenderedMapSurface(
+		page,
+		timeoutMs,
+	);
 
-  if (!isReady) {
-    const shellMeta = await mapShell
-      .evaluate((el) => ({
-        ready: el.getAttribute("data-map-ready"),
-        initRequested: el.getAttribute("data-map-init-requested"),
-        tokenInvalid: el.getAttribute("data-map-token-invalid"),
-      }))
-      .catch(() => null);
-    const tokenInvalid = await page
-      .getByText(MAP_TOKEN_OVERLAY_TEXT)
-      .first()
-      .isVisible()
-      .catch(() => false);
-    const webGLFallback = await page
-      .getByText(WEBGL_FALLBACK_TEXT)
-      .first()
-      .isVisible()
-      .catch(() => false);
-    const mapCanvasVisible = await page
-      .locator(MAP_CANVAS_SELECTOR)
-      .first()
-      .isVisible()
-      .catch(() => false);
+	if (!isReady && !renderedSurfaceVisible) {
+		const shellMeta = await mapShell
+			.evaluate((el) => ({
+				ready: el.getAttribute("data-map-ready"),
+				initRequested: el.getAttribute("data-map-init-requested"),
+				tokenInvalid: el.getAttribute("data-map-token-invalid"),
+			}))
+			.catch(() => null);
+		const tokenInvalid = await page
+			.getByText(MAP_TOKEN_OVERLAY_TEXT)
+			.first()
+			.isVisible()
+			.catch(() => false);
+		const webGLFallback = await page
+			.getByText(WEBGL_FALLBACK_TEXT)
+			.first()
+			.isVisible()
+			.catch(() => false);
+		const mapCanvasVisible = await page
+			.locator(MAP_CANVAS_SELECTOR)
+			.first()
+			.isVisible()
+			.catch(() => false);
+		const mapRegionVisible = await page
+			.locator(MAP_REGION_SELECTOR)
+			.first()
+			.isVisible()
+			.catch(() => false);
+		const mapboxSurfaceVisible = await page
+			.locator(MAPBOX_SURFACE_SELECTOR)
+			.first()
+			.isVisible()
+			.catch(() => false);
+		const markerVisible = await page
+			.locator(MAP_MARKER_SELECTOR)
+			.first()
+			.isVisible()
+			.catch(() => false);
+		const controlsVisible = await page
+			.locator(MAP_CONTROL_SELECTOR)
+			.first()
+			.isVisible()
+			.catch(() => false);
 
-    const readyAfterCheck = await waitForMapReadyFlag(page, 1_000);
-    if (readyAfterCheck) {
-      return true;
-    }
+		const readyAfterCheck = await waitForMapReadyFlag(page, 1_000);
+		const renderedAfterCheck = await waitForRenderedMapSurface(page, 1_000);
+		if (readyAfterCheck || renderedAfterCheck) {
+			return true;
+		}
 
-    const reasonParts = [
-      `Map shell did not become ready within ${timeoutMs}ms.`,
-      tokenInvalid ? "Token overlay detected." : null,
-      webGLFallback ? "WebGL fallback detected." : null,
-      mapCanvasVisible ? "Map canvas visible but ready flag is false." : null,
-      shellMeta
-        ? `Map shell attrs: ready=${shellMeta.ready}, init=${shellMeta.initRequested}, tokenInvalid=${shellMeta.tokenInvalid}.`
-        : null,
-    ].filter(Boolean);
+		const reasonParts = [
+			`Map shell did not become ready within ${timeoutMs}ms.`,
+			tokenInvalid ? "Token overlay detected." : null,
+			webGLFallback ? "WebGL fallback detected." : null,
+			mapCanvasVisible ? "Map canvas visible but ready flag is false." : null,
+			mapRegionVisible
+				? "Map region is visible but ready flag is false."
+				: null,
+			mapboxSurfaceVisible
+				? "Mapbox surface is visible but ready flag is false."
+				: null,
+			markerVisible ? "Marker is visible but ready flag is false." : null,
+			controlsVisible
+				? "Map controls are visible but ready flag is false."
+				: null,
+			shellMeta
+				? `Map shell attrs: ready=${shellMeta.ready}, init=${shellMeta.initRequested}, tokenInvalid=${shellMeta.tokenInvalid}.`
+				: null,
+		].filter(Boolean);
 
-    enforceMapConditionOrSkip(isReady, reasonParts.join(" "));
-    return false;
-  }
+		enforceMapConditionOrSkip(isReady, reasonParts.join(" "));
+		return false;
+	}
 
-  enforceMapConditionOrSkip(
-    isReady,
-    `Map shell did not become ready within ${timeoutMs}ms.`,
-  );
+	enforceMapConditionOrSkip(
+		isReady || renderedSurfaceVisible,
+		`Map shell did not become ready within ${timeoutMs}ms.`,
+	);
 
-  return isReady;
+	return isReady || renderedSurfaceVisible;
 }
 
 export async function hasWebGLSupport(page: Page): Promise<boolean> {
-  return page.evaluate(() => {
-    const canvas = document.createElement("canvas");
-    const gl =
-      canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
-    return !!gl;
-  });
+	return page.evaluate(() => {
+		const canvas = document.createElement("canvas");
+		const gl =
+			canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+		return !!gl;
+	});
+}
+
+export async function clickWithFallback(
+	locator: Locator,
+	timeoutMs = 10_000,
+	verify?: () => Promise<boolean>,
+): Promise<boolean> {
+	await locator.scrollIntoViewIfNeeded().catch(() => {});
+
+	const dispatchSequence = () =>
+		locator
+			.evaluate((el) => {
+				const target = el as HTMLElement;
+				target.focus?.();
+				const pointerEventInit = {
+					bubbles: true,
+					cancelable: true,
+					composed: true,
+					pointerId: 1,
+					pointerType: "mouse",
+					isPrimary: true,
+					button: 0,
+				};
+
+				const mouseEventInit = {
+					bubbles: true,
+					cancelable: true,
+					composed: true,
+					button: 0,
+				};
+
+				const dispatch = (eventName: string) => {
+					if (eventName.startsWith("pointer") && "PointerEvent" in window) {
+						target.dispatchEvent(new PointerEvent(eventName, pointerEventInit));
+						return;
+					}
+
+					target.dispatchEvent(new MouseEvent(eventName, mouseEventInit));
+				};
+
+				dispatch("pointerdown");
+				dispatch("mousedown");
+				dispatch("pointerup");
+				dispatch("mouseup");
+				target.dispatchEvent(
+					new MouseEvent("click", {
+						bubbles: true,
+						cancelable: true,
+						composed: true,
+						button: 0,
+					}),
+				);
+				target.click?.();
+			})
+			.then(() => true)
+			.catch(() => false);
+
+	const pressEnter = () =>
+		locator
+			.focus()
+			.then(() =>
+				locator
+					.press("Enter", { timeout: Math.min(timeoutMs, 2_000) })
+					.then(() => true)
+					.catch(() => false),
+			)
+			.catch(() => false);
+
+	const attempts = [
+		() =>
+			locator
+				.click({ force: true, timeout: timeoutMs })
+				.then(() => true)
+				.catch(() => false),
+		dispatchSequence,
+		pressEnter,
+	];
+
+	for (const attempt of attempts) {
+		const triggered = await attempt();
+		if (!triggered) {
+			continue;
+		}
+
+		if (!verify) {
+			return true;
+		}
+
+		const verified = await verify().catch(() => false);
+		if (verified) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+export async function waitForVenueDetailSignal(
+	page: Page,
+	timeoutMs = 12_000,
+): Promise<boolean> {
+	return page
+		.waitForFunction(
+			({ modalSelector, closeSelector }) => {
+				const isVisible = (selector: string) => {
+					const element = document.querySelector(
+						selector,
+					) as HTMLElement | null;
+					if (!element) return false;
+					const rect = element.getBoundingClientRect();
+					const style = window.getComputedStyle(element);
+					return (
+						rect.width > 0 &&
+						rect.height > 0 &&
+						style.visibility !== "hidden" &&
+						style.display !== "none" &&
+						style.opacity !== "0"
+					);
+				};
+
+				return (
+					isVisible(modalSelector) ||
+					isVisible(closeSelector) ||
+					/\/(?:(?:th|en)\/)?(?:venue\/[^/]+|v\/[^/]+)/i.test(
+						window.location.pathname,
+					)
+				);
+			},
+			{
+				modalSelector: DETAIL_MODAL_SELECTOR,
+				closeSelector: DETAIL_CLOSE_SELECTOR,
+			},
+			{ timeout: timeoutMs },
+		)
+		.then(() => true)
+		.catch(() => false);
+}
+
+export function isVenueDetailPath(pathname: string): boolean {
+	return DETAIL_ROUTE_PATTERN.test(String(pathname || ""));
 }

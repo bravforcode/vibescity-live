@@ -116,7 +116,6 @@ tests/e2e/screenshots/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-package-lock.json
 yarn.lock
 
 # Ignore additional generated files

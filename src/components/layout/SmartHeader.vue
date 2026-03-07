@@ -330,6 +330,18 @@ const selectResult = (shop: Shop) => {
 };
 
 /**
+ * Commit selection on pointer down so CI/mobile-like timing does not lose the
+ * click when the search input blurs before the click event completes.
+ */
+const handleResultPointerDown = (
+	event: MouseEvent | PointerEvent,
+	shop: Shop,
+) => {
+	event.preventDefault();
+	selectResult(shop);
+};
+
+/**
  * Open sidebar with haptic
  */
 const openSidebar = () => {
@@ -543,6 +555,8 @@ onUnmounted(() => {
               :class="{
                 'search-result--selected': selectedResultIndex === index,
               }"
+              @mousedown="handleResultPointerDown($event, shop)"
+              @pointerdown="handleResultPointerDown($event, shop)"
               @click="selectResult(shop)"
               @mouseenter="selectedResultIndex = index"
             >

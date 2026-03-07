@@ -4,37 +4,37 @@
  * Premium gestures, physics, visual depth, and universal pointer support.
  */
 
-import { useHaptics } from "@/composables/useHaptics";
 import {
-  Car,
-  ChevronUp,
-  Clock,
-  Heart,
-  ImageOff,
-  Share2,
-  Volume2,
-  VolumeX,
+	Car,
+	ChevronUp,
+	Clock,
+	Heart,
+	ImageOff,
+	Share2,
+	Volume2,
+	VolumeX,
 } from "lucide-vue-next";
 import { computed, onUnmounted, ref, watch } from "vue";
+import { useHaptics } from "@/composables/useHaptics";
 import { useFavoritesStore } from "../../store/favoritesStore";
 import { useShopStore } from "../../store/shopStore";
 
 const props = defineProps({
-  threshold: { type: Number, default: 90 },
-  showExpand: { type: Boolean, default: true },
-  isSelected: { type: Boolean, default: false }, // Highest Z-Index
-  isImmersive: { type: Boolean, default: false },
-  isActive: { type: Boolean, default: false },
-  shop: { type: Object },
+	threshold: { type: Number, default: 90 },
+	showExpand: { type: Boolean, default: true },
+	isSelected: { type: Boolean, default: false }, // Highest Z-Index
+	isImmersive: { type: Boolean, default: false },
+	isActive: { type: Boolean, default: false },
+	shop: { type: Object },
 });
 
 const emit = defineEmits([
-  "swipe-left",
-  "swipe-right",
-  "expand",
-  "toggle-favorite",
-  "share",
-  "open-ride",
+	"swipe-left",
+	"swipe-right",
+	"expand",
+	"toggle-favorite",
+	"share",
+	"open-ride",
 ]);
 
 const { selectFeedback, successFeedback, impactFeedback } = useHaptics();
@@ -46,31 +46,31 @@ const favoritesStore = useFavoritesStore();
 // ==========================================
 
 const displayName = computed(
-  () => props.shop?.name || props.shop?.Name || "Venue",
+	() => props.shop?.name || props.shop?.Name || "Venue",
 );
 const displayCategory = computed(
-  () =>
-    props.shop?.category ||
-    props.shop?.Category ||
-    props.shop?.type ||
-    "General",
+	() =>
+		props.shop?.category ||
+		props.shop?.Category ||
+		props.shop?.type ||
+		"General",
 );
 const displayTime = computed(() => {
-  const o = props.shop?.openTime || props.shop?.OpenTime || "10:00";
-  const c = props.shop?.closeTime || props.shop?.CloseTime || "22:00";
-  return `${o} - ${c}`;
+	const o = props.shop?.openTime || props.shop?.OpenTime || "10:00";
+	const c = props.shop?.closeTime || props.shop?.CloseTime || "22:00";
+	return `${o} - ${c}`;
 });
 const displayDistance = computed(() => {
-  const d = props.shop?.distance || props.shop?.Distance;
-  return d === undefined ? "Nearby" : `${Number(d).toFixed(1)}km`;
+	const d = props.shop?.distance || props.shop?.Distance;
+	return d === undefined ? "Nearby" : `${Number(d).toFixed(1)}km`;
 });
 
 const displayRating = computed(() => {
-  return props.shop?.rating ?? "-";
+	return props.shop?.rating ?? "-";
 });
 
 const isFavorite = computed(() => {
-  return props.shop?.id ? favoritesStore.isFavorite(props.shop.id) : false;
+	return props.shop?.id ? favoritesStore.isFavorite(props.shop.id) : false;
 });
 
 // ==========================================
@@ -80,17 +80,17 @@ const isFavorite = computed(() => {
 const showHeartAnim = ref(false);
 
 const toggleFavorite = () => {
-  if (props.shop?.id) {
-    const added = favoritesStore.toggleFavorite(props.shop.id);
-    successFeedback();
-    if (added) {
-      showHeartAnim.value = true;
-      setTimeout(() => {
-        showHeartAnim.value = false;
-      }, 800);
-    }
-    emit("toggle-favorite", { shopId: props.shop.id, isFavorite: added });
-  }
+	if (props.shop?.id) {
+		const added = favoritesStore.toggleFavorite(props.shop.id);
+		successFeedback();
+		if (added) {
+			showHeartAnim.value = true;
+			setTimeout(() => {
+				showHeartAnim.value = false;
+			}, 800);
+		}
+		emit("toggle-favorite", { shopId: props.shop.id, isFavorite: added });
+	}
 };
 
 // ==========================================
@@ -101,17 +101,17 @@ const lastPointerTap = ref(0);
 const DOUBLE_TAP_DELAY = 300;
 
 const handlePointerTap = (e) => {
-  // Ignore secondary clicks (right click)
-  if (e.pointerType === "mouse" && e.button !== 0) return;
+	// Ignore secondary clicks (right click)
+	if (e.pointerType === "mouse" && e.button !== 0) return;
 
-  const now = Date.now();
-  if (now - lastPointerTap.value < DOUBLE_TAP_DELAY) {
-    // Double Tap!
-    toggleFavorite();
-    lastPointerTap.value = 0;
-  } else {
-    lastPointerTap.value = now;
-  }
+	const now = Date.now();
+	if (now - lastPointerTap.value < DOUBLE_TAP_DELAY) {
+		// Double Tap!
+		toggleFavorite();
+		lastPointerTap.value = 0;
+	} else {
+		lastPointerTap.value = now;
+	}
 };
 
 // ==========================================
@@ -119,28 +119,28 @@ const handlePointerTap = (e) => {
 // ==========================================
 
 const shareShop = async () => {
-  selectFeedback();
-  const shop = props.shop;
-  if (!shop) return;
+	selectFeedback();
+	const shop = props.shop;
+	if (!shop) return;
 
-  const shareUrl = `${window.location.origin}/venue/${shop.id}`;
-  const shareData = {
-    title: shop.name,
-    text: `Check out ${shop.name} on VibeCity!`,
-    url: shareUrl,
-  };
+	const shareUrl = `${window.location.origin}/venue/${shop.id}`;
+	const shareData = {
+		title: shop.name,
+		text: `Check out ${shop.name} on VibeCity!`,
+		url: shareUrl,
+	};
 
-  try {
-    if (navigator.share) {
-      await navigator.share(shareData);
-    } else {
-      await navigator.clipboard.writeText(shareUrl);
-      // Removed alert for cleaner UX, could emit event for toast
-    }
-    emit("share", { shop, url: shareUrl });
-  } catch (err) {
-    // Share cancelled or failed
-  }
+	try {
+		if (navigator.share) {
+			await navigator.share(shareData);
+		} else {
+			await navigator.clipboard.writeText(shareUrl);
+			// Removed alert for cleaner UX, could emit event for toast
+		}
+		emit("share", { shop, url: shareUrl });
+	} catch (err) {
+		// Share cancelled or failed
+	}
 };
 
 // ==========================================
@@ -153,42 +153,42 @@ const videoError = ref(false);
 const isMuted = ref(true);
 
 const toggleMute = () => {
-  if (videoElement.value) {
-    isMuted.value = !isMuted.value;
-    videoElement.value.muted = isMuted.value;
-    selectFeedback();
-  }
+	if (videoElement.value) {
+		isMuted.value = !isMuted.value;
+		videoElement.value.muted = isMuted.value;
+		selectFeedback();
+	}
 };
 
 onUnmounted(() => {
-  if (videoElement.value) {
-    videoElement.value.pause();
-    videoElement.value.src = "";
-    videoElement.value.load();
-  }
+	if (videoElement.value) {
+		videoElement.value.pause();
+		videoElement.value.src = "";
+		videoElement.value.load();
+	}
 });
 
 watch(
-  () => props.isActive,
-  (active) => {
-    if (active) {
-      if (props.shop?.id) {
-        shopStore.incrementView(props.shop.id);
-      }
-      if (videoElement.value && isVideoLoaded.value) {
-        videoElement.value.play().catch(() => {
-          isMuted.value = true;
-          if (videoElement.value) {
-            videoElement.value.muted = true;
-            videoElement.value.play().catch(() => {});
-          }
-        });
-      }
-    } else if (videoElement.value) {
-      videoElement.value.pause();
-    }
-  },
-  { immediate: true },
+	() => props.isActive,
+	(active) => {
+		if (active) {
+			if (props.shop?.id) {
+				shopStore.incrementView(props.shop.id);
+			}
+			if (videoElement.value && isVideoLoaded.value) {
+				videoElement.value.play().catch(() => {
+					isMuted.value = true;
+					if (videoElement.value) {
+						videoElement.value.muted = true;
+						videoElement.value.play().catch(() => {});
+					}
+				});
+			}
+		} else if (videoElement.value) {
+			videoElement.value.pause();
+		}
+	},
+	{ immediate: true },
 );
 
 // ==========================================
@@ -203,80 +203,80 @@ const isDragging = ref(false);
 const hasTriggeredSnap = ref(false);
 
 const applyResistance = (diff) => {
-  const limit = 200;
-  // Logarithmic resistance
-  return (1 - Math.exp(-Math.abs(diff) / 300)) * limit;
+	const limit = 200;
+	// Logarithmic resistance
+	return (1 - Math.exp(-Math.abs(diff) / 300)) * limit;
 };
 
 const handleTouchStart = (e) => {
-  if (props.isImmersive) return;
-  touchStartY.value = e.touches[0].clientY;
-  touchStartX.value = e.touches[0].clientX;
-  isDragging.value = true;
-  hasTriggeredSnap.value = false;
+	if (props.isImmersive) return;
+	touchStartY.value = e.touches[0].clientY;
+	touchStartX.value = e.touches[0].clientX;
+	isDragging.value = true;
+	hasTriggeredSnap.value = false;
 };
 
 const handleTouchMove = (e) => {
-  if (!isDragging.value) return;
+	if (!isDragging.value) return;
 
-  const currentY = e.touches[0].clientY;
-  const currentX = e.touches[0].clientX;
+	const currentY = e.touches[0].clientY;
+	const currentX = e.touches[0].clientX;
 
-  // Use rAF managed internally by browser for touch events usually,
-  // but explicit rAF can help sync expensive logic
-  requestAnimationFrame(() => {
-    const diffY = currentY - touchStartY.value;
-    const diffX = currentX - touchStartX.value;
+	// Use rAF managed internally by browser for touch events usually,
+	// but explicit rAF can help sync expensive logic
+	requestAnimationFrame(() => {
+		const diffY = currentY - touchStartY.value;
+		const diffX = currentX - touchStartX.value;
 
-    // Horizontal Swipe Protection (Lock Axis)
-    if (Math.abs(diffX) > Math.abs(diffY) * 1.5) {
-      if (pullUpDistance.value !== 0) pullUpDistance.value = 0;
-      return;
-    }
+		// Horizontal Swipe Protection (Lock Axis)
+		if (Math.abs(diffX) > Math.abs(diffY) * 1.5) {
+			if (pullUpDistance.value !== 0) pullUpDistance.value = 0;
+			return;
+		}
 
-    if (diffY < 0) {
-      // Pulling Up
-      if (e.cancelable) e.preventDefault();
-      pullUpDistance.value = applyResistance(diffY);
+		if (diffY < 0) {
+			// Pulling Up
+			if (e.cancelable) e.preventDefault();
+			pullUpDistance.value = applyResistance(diffY);
 
-      // Haptic Snap Feedback
-      if (
-        pullUpDistance.value > props.threshold * 0.8 &&
-        !hasTriggeredSnap.value
-      ) {
-        impactFeedback("light"); // Crisp snap feel
-        hasTriggeredSnap.value = true;
-      } else if (
-        pullUpDistance.value < props.threshold * 0.8 &&
-        hasTriggeredSnap.value
-      ) {
-        hasTriggeredSnap.value = false;
-      }
-    }
-  });
+			// Haptic Snap Feedback
+			if (
+				pullUpDistance.value > props.threshold * 0.8 &&
+				!hasTriggeredSnap.value
+			) {
+				impactFeedback("light"); // Crisp snap feel
+				hasTriggeredSnap.value = true;
+			} else if (
+				pullUpDistance.value < props.threshold * 0.8 &&
+				hasTriggeredSnap.value
+			) {
+				hasTriggeredSnap.value = false;
+			}
+		}
+	});
 };
 
 const handleTouchEnd = () => {
-  isDragging.value = false;
+	isDragging.value = false;
 
-  // Easier activation (40% threshold)
-  if (pullUpDistance.value > props.threshold * 0.4) {
-    impactFeedback("medium");
-    emit("expand");
+	// Easier activation (40% threshold)
+	if (pullUpDistance.value > props.threshold * 0.4) {
+		impactFeedback("medium");
+		emit("expand");
 
-    // Smooth reset
-    requestAnimationFrame(() => {
-      pullUpDistance.value = 0;
-    });
-  } else {
-    // Snap back
-    pullUpDistance.value = 0;
-  }
+		// Smooth reset
+		requestAnimationFrame(() => {
+			pullUpDistance.value = 0;
+		});
+	} else {
+		// Snap back
+		pullUpDistance.value = 0;
+	}
 };
 
 const handleManualExpand = () => {
-  impactFeedback("medium");
-  emit("expand");
+	impactFeedback("medium");
+	emit("expand");
 };
 
 // ==========================================
@@ -284,25 +284,25 @@ const handleManualExpand = () => {
 // ==========================================
 
 const cardStyle = computed(() => {
-  const progress = Math.min(pullUpDistance.value / props.threshold, 1);
-  const scale = 1 - progress * 0.05;
+	const progress = Math.min(pullUpDistance.value / props.threshold, 1);
+	const scale = 1 - progress * 0.05;
 
-  return {
-    transform: `
+	return {
+		transform: `
       translateY(${-pullUpDistance.value}px)
       scale(${scale})
       perspective(1000px)
     `,
-    borderRadius: `${24 + progress * 8}px`,
-    transition: isDragging.value
-      ? "none"
-      : "transform 0.5s cubic-bezier(0.19, 1, 0.22, 1), border-radius 0.3s ease",
-    willChange: "transform, border-radius",
-  };
+		borderRadius: `${24 + progress * 8}px`,
+		transition: isDragging.value
+			? "none"
+			: "transform 0.5s cubic-bezier(0.19, 1, 0.22, 1), border-radius 0.3s ease",
+		willChange: "transform, border-radius",
+	};
 });
 
 const uiOpacity = computed(() =>
-  Math.max(0, 1 - pullUpDistance.value / (props.threshold * 0.6)),
+	Math.max(0, 1 - pullUpDistance.value / (props.threshold * 0.6)),
 );
 </script>
 

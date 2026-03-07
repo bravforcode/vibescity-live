@@ -30,6 +30,10 @@ function toBool(value, fallback = false) {
   return ["1", "true", "yes", "on"].includes(normalized);
 }
 
+function trimEnv(value) {
+  return String(value ?? "").trim();
+}
+
 function base64Url(input) {
   return Buffer.from(input)
     .toString("base64")
@@ -63,12 +67,140 @@ async function loadServiceAccount() {
   const rawJson = process.env.BIGQUERY_SERVICE_ACCOUNT_JSON;
   const jsonPath = process.env.BIGQUERY_SERVICE_ACCOUNT_JSON_PATH;
 
-  if (rawJson) return JSON.parse(rawJson);
+  if (rawJson) {
+    return normalizeServiceAccount(
+      parseStructuredSecret(rawJson, "BIGQUERY_SERVICE_ACCOUNT_JSON"),
+    );
+  }
   if (jsonPath && existsSync(jsonPath)) {
     const raw = await readFile(jsonPath, "utf8");
-    return JSON.parse(raw);
+    return normalizeServiceAccount(
+      parseStructuredSecret(raw, "BIGQUERY_SERVICE_ACCOUNT_JSON_PATH"),
+    );
   }
   return null;
+}
+
+function parseStructuredSecret(rawValue, label) {
+  const raw = trimEnv(rawValue);
+  if (!raw) return null;
+
+  const normalizeCandidate = (value) =>
+    String(value ?? "")
+      .replace(/^\uFEFF/, "")
+      .trim();
+  const collectCandidates = (value) => {
+    const normalized = normalizeCandidate(value);
+    if (!normalized) return [];
+
+    const next = new Set([normalized]);
+    const fenced = normalized.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+    if (fenced?.[1]) next.add(normalizeCandidate(fenced[1]));
+
+    if (
+      (normalized.startsWith('"') && normalized.endsWith('"')) ||
+      (normalized.startsWith("'") && normalized.endsWith("'"))
+    ) {
+      next.add(normalizeCandidate(normalized.slice(1, -1)));
+    }
+
+    const eqIndex = normalized.indexOf("=");
+    if (eqIndex > 0) {
+      next.add(normalizeCandidate(normalized.slice(eqIndex + 1)));
+    }
+
+    const objectStart = normalized.indexOf("{");
+    const objectEnd = normalized.lastIndexOf("}");
+    if (objectStart !== -1 && objectEnd > objectStart) {
+      next.add(normalizeCandidate(normalized.slice(objectStart, objectEnd + 1)));
+    }
+
+    const arrayStart = normalized.indexOf("[");
+    const arrayEnd = normalized.lastIndexOf("]");
+    if (arrayStart !== -1 && arrayEnd > arrayStart) {
+      next.add(normalizeCandidate(normalized.slice(arrayStart, arrayEnd + 1)));
+    }
+
+    return [...next].filter(Boolean);
+  };
+
+  const tryParseJson = (candidate) => {
+    try {
+      const parsed = JSON.parse(candidate);
+      return typeof parsed === "string" ? tryParseJson(parsed) : parsed;
+    } catch {
+      return null;
+    }
+  };
+
+  const queue = collectCandidates(raw);
+  const seen = new Set();
+
+  while (queue.length) {
+    const candidate = queue.shift();
+    if (!candidate || seen.has(candidate)) continue;
+    seen.add(candidate);
+
+    const parsed = tryParseJson(candidate);
+    if (parsed && typeof parsed === "object") {
+      return parsed;
+    }
+
+    try {
+      const normalizedBase64 = candidate
+        .replace(/^base64[:,]/i, "")
+        .replace(/-/g, "+")
+        .replace(/_/g, "/")
+        .replace(/\s+/g, "");
+      if (!normalizedBase64) continue;
+
+      const decoded = Buffer.from(normalizedBase64, "base64").toString("utf8");
+      for (const decodedCandidate of collectCandidates(decoded)) {
+        if (!seen.has(decodedCandidate)) {
+          queue.push(decodedCandidate);
+        }
+      }
+    } catch {
+      // Try the next format.
+    }
+  }
+
+  throw new Error(`${label} is not valid JSON or base64-encoded JSON.`);
+}
+
+function normalizeServiceAccount(serviceAccount) {
+  if (!serviceAccount || typeof serviceAccount !== "object") {
+    return serviceAccount;
+  }
+
+  const normalizeStringField = (value) => {
+    if (typeof value !== "string") return value;
+    const trimmed = value.replace(/^\uFEFF/, "").trim();
+    if (
+      (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+      (trimmed.startsWith("'") && trimmed.endsWith("'"))
+    ) {
+      return trimmed.slice(1, -1);
+    }
+    return trimmed;
+  };
+
+  const normalized = { ...serviceAccount };
+  normalized.client_email = normalizeStringField(normalized.client_email);
+  normalized.project_id = normalizeStringField(normalized.project_id);
+  normalized.private_key_id = normalizeStringField(normalized.private_key_id);
+  normalized.private_key = normalizeStringField(normalized.private_key);
+
+  if (typeof normalized.private_key === "string") {
+    if (normalized.private_key.includes("\\n") && !normalized.private_key.includes("\n")) {
+      normalized.private_key = normalized.private_key.replace(/\\n/g, "\n");
+    }
+    if (normalized.private_key.includes("\\r") && !normalized.private_key.includes("\r")) {
+      normalized.private_key = normalized.private_key.replace(/\\r/g, "\r");
+    }
+  }
+
+  return normalized;
 }
 
 async function getGoogleAccessToken(serviceAccount) {
@@ -435,8 +567,8 @@ async function main() {
     process.env.BIGQUERY_PROVISION_OUTPUT_PATH || "reports/ci/bigquery-provision-log.json";
   const failOnError = toBool(process.env.BIGQUERY_PROVISION_FAIL_ON_ERROR, false);
 
-  const projectId = process.env.BIGQUERY_PROJECT_ID || "";
-  const dataset = process.env.BIGQUERY_DATASET || "";
+  const projectId = trimEnv(process.env.BIGQUERY_PROJECT_ID);
+  const dataset = trimEnv(process.env.BIGQUERY_DATASET);
   const serviceAccount = await loadServiceAccount();
 
   const configured = Boolean(projectId && dataset && serviceAccount?.client_email);
@@ -472,7 +604,7 @@ async function main() {
       toInt(process.env.BIGQUERY_DATASET_DEFAULT_PARTITION_RETENTION_DAYS, 0),
     );
 
-    const datasetLocation = process.env.BIGQUERY_DATASET_LOCATION || "US";
+    const datasetLocation = trimEnv(process.env.BIGQUERY_DATASET_LOCATION) || "US";
     const datasetResult = await ensureDataset({
       accessToken,
       projectId,
@@ -580,4 +712,3 @@ main().catch(async (error) => {
   await appendSummary(lines);
   process.exit(1);
 });
-

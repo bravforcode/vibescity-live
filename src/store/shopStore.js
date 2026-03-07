@@ -331,7 +331,10 @@ export const useShopStore = defineStore(
 					} catch (v2Err) {
 						// V2 feed RPC may not exist yet – fall through to standard query
 						if (import.meta.env.DEV) {
-							console.warn("🏪 V2 feed failed, falling back to standard query:", v2Err?.message || v2Err);
+							console.warn(
+								"🏪 V2 feed failed, falling back to standard query:",
+								v2Err?.message || v2Err,
+							);
 						}
 					}
 				}

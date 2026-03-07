@@ -10,7 +10,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
 	]
 		.filter(Boolean)
 		.join(", ");
-	throw new Error(`Missing required env vars: ${missing}. Check your .env file.`);
+	throw new Error(
+		`Missing required env vars: ${missing}. Check your .env file.`,
+	);
 }
 
 const getVisitorHeader = () => {

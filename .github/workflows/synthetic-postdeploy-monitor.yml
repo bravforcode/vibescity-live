@@ -28,22 +28,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "latest"
-
-      - name: Cache Bun install
-        uses: actions/cache@v4
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
+          cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile || bun install
+        run: npm ci
 
       - name: DNS precheck for vibecity-api.fly.dev
         id: dns_precheck
@@ -91,7 +80,7 @@ jobs:
           POSTDEPLOY_RETRY_DELAY_MS: "3000"
           POSTDEPLOY_FETCH_TIMEOUT_MS: "10000"
           POSTDEPLOY_REPORT_PATH: "reports/ci/postdeploy-route-health.json"
-        run: bun run healthcheck:postdeploy
+        run: npm run healthcheck:postdeploy
 
       - name: Evaluate route-level SLO thresholds
         id: route_slo_eval
@@ -178,25 +167,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "latest"
-
-      - name: Cache Bun install
-        uses: actions/cache@v4
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
+          cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile || bun install
+        run: npm ci
 
       - name: Install Playwright browser (Chromium)
-        run: bunx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium
 
       - name: Validate MAPBOX_PUBLIC_TOKEN (synthetic browser)
         run: |
@@ -263,7 +241,7 @@ jobs:
           PW_LOW_MEM: "1"
           E2E_MAP_REQUIRED: "1"
           VITE_MAPBOX_TOKEN: "${{ secrets.MAPBOX_PUBLIC_TOKEN }}"
-        run: bun run test:e2e:smoke-map-lite
+        run: npm run test:e2e:smoke-map-lite
 
       - name: Synthetic browser summary
         if: ${{ always() }}
@@ -312,7 +290,6 @@ jobs:
         with:
           name: synthetic-api-route-report
           path: reports/ci
-          if-no-artifact-found: warn
 
       - name: Download route SLO evaluation
         if: ${{ always() }}
@@ -320,7 +297,6 @@ jobs:
         with:
           name: route-slo-evaluation
           path: reports/ci
-          if-no-artifact-found: warn
 
       - name: Build release health snapshot
         env:
@@ -349,7 +325,7 @@ jobs:
         env:
           BIGQUERY_PROJECT_ID: "${{ vars.BIGQUERY_PROJECT_ID }}"
           BIGQUERY_DATASET: "${{ vars.BIGQUERY_DATASET }}"
-          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON }}"
+          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON || secrets.GOOGLE_CREDENTIALS || secrets.GCV_SERVICE_ACCOUNT_JSON }}"
           BIGQUERY_ALLOW_CREATE_DATASET: "0"
           BIGQUERY_ALLOW_CREATE_TABLES: "1"
           BIGQUERY_APPLY_PARTITION_RETENTION: "1"
@@ -375,7 +351,7 @@ jobs:
           OBS_METRICS_FAIL_ON_ERROR: "0"
           BIGQUERY_PROJECT_ID: "${{ vars.BIGQUERY_PROJECT_ID }}"
           BIGQUERY_DATASET: "${{ vars.BIGQUERY_DATASET }}"
-          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON }}"
+          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON || secrets.GOOGLE_CREDENTIALS || secrets.GCV_SERVICE_ACCOUNT_JSON }}"
           GRAFANA_LOKI_URL: "${{ vars.GRAFANA_LOKI_URL }}"
           GRAFANA_LOKI_USER: "${{ vars.GRAFANA_LOKI_USER }}"
           GRAFANA_LOKI_TOKEN: "${{ secrets.GRAFANA_LOKI_TOKEN }}"
@@ -402,7 +378,7 @@ jobs:
           INCIDENT_SUPPRESS_REASON: "${{ vars.INCIDENT_SUPPRESS_REASON }}"
           BIGQUERY_PROJECT_ID: "${{ vars.BIGQUERY_PROJECT_ID }}"
           BIGQUERY_DATASET: "${{ vars.BIGQUERY_DATASET }}"
-          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON }}"
+          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON || secrets.GOOGLE_CREDENTIALS || secrets.GCV_SERVICE_ACCOUNT_JSON }}"
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
           GITHUB_REPOSITORY: "${{ github.repository }}"
           GITHUB_SERVER_URL: "${{ github.server_url }}"
@@ -467,3 +443,4 @@ jobs:
           path: reports/ci/step-summary-release-health.md
           retention-days: 14
           if-no-files-found: ignore
+

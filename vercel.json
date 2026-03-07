@@ -1,4 +1,6 @@
 {
+  "installCommand": "npm ci",
+  "buildCommand": "npm run build",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index.py" },
     { "source": "/", "destination": "/api/v1/seo/redirect/root" },

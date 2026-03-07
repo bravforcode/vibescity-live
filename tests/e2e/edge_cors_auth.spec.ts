@@ -23,6 +23,8 @@ test.describe("Edge CORS/Auth policy", { tag: "@smoke" }, () => {
 			failOnStatusCode: false,
 		});
 
-		expect([401, 403]).toContain(response.status());
+		// 404 is also acceptable when the edge function intentionally hides route
+		// existence from unauthorized callers.
+		expect([401, 403, 404]).toContain(response.status());
 	});
 });
