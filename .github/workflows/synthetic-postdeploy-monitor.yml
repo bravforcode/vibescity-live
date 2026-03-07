@@ -290,7 +290,6 @@ jobs:
         with:
           name: synthetic-api-route-report
           path: reports/ci
-          if-no-artifact-found: warn
 
       - name: Download route SLO evaluation
         if: ${{ always() }}
@@ -298,7 +297,6 @@ jobs:
         with:
           name: route-slo-evaluation
           path: reports/ci
-          if-no-artifact-found: warn
 
       - name: Build release health snapshot
         env:
@@ -327,7 +325,7 @@ jobs:
         env:
           BIGQUERY_PROJECT_ID: "${{ vars.BIGQUERY_PROJECT_ID }}"
           BIGQUERY_DATASET: "${{ vars.BIGQUERY_DATASET }}"
-          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.GOOGLE_CREDENTIALS || secrets.GCV_SERVICE_ACCOUNT_JSON || secrets.BIGQUERY_SERVICE_ACCOUNT_JSON }}"
+          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON || secrets.GOOGLE_CREDENTIALS || secrets.GCV_SERVICE_ACCOUNT_JSON }}"
           BIGQUERY_ALLOW_CREATE_DATASET: "0"
           BIGQUERY_ALLOW_CREATE_TABLES: "1"
           BIGQUERY_APPLY_PARTITION_RETENTION: "1"
@@ -353,7 +351,7 @@ jobs:
           OBS_METRICS_FAIL_ON_ERROR: "0"
           BIGQUERY_PROJECT_ID: "${{ vars.BIGQUERY_PROJECT_ID }}"
           BIGQUERY_DATASET: "${{ vars.BIGQUERY_DATASET }}"
-          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.GOOGLE_CREDENTIALS || secrets.GCV_SERVICE_ACCOUNT_JSON || secrets.BIGQUERY_SERVICE_ACCOUNT_JSON }}"
+          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON || secrets.GOOGLE_CREDENTIALS || secrets.GCV_SERVICE_ACCOUNT_JSON }}"
           GRAFANA_LOKI_URL: "${{ vars.GRAFANA_LOKI_URL }}"
           GRAFANA_LOKI_USER: "${{ vars.GRAFANA_LOKI_USER }}"
           GRAFANA_LOKI_TOKEN: "${{ secrets.GRAFANA_LOKI_TOKEN }}"
@@ -380,7 +378,7 @@ jobs:
           INCIDENT_SUPPRESS_REASON: "${{ vars.INCIDENT_SUPPRESS_REASON }}"
           BIGQUERY_PROJECT_ID: "${{ vars.BIGQUERY_PROJECT_ID }}"
           BIGQUERY_DATASET: "${{ vars.BIGQUERY_DATASET }}"
-          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.GOOGLE_CREDENTIALS || secrets.GCV_SERVICE_ACCOUNT_JSON || secrets.BIGQUERY_SERVICE_ACCOUNT_JSON }}"
+          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON || secrets.GOOGLE_CREDENTIALS || secrets.GCV_SERVICE_ACCOUNT_JSON }}"
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
           GITHUB_REPOSITORY: "${{ github.repository }}"
           GITHUB_SERVER_URL: "${{ github.server_url }}"
