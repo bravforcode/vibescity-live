@@ -61,7 +61,9 @@ test.describe("VibeCity Core User Journey", () => {
 			.catch(() => false);
 		let openedFromSearch = false;
 		if (resultVisible) {
-			await clickWithFallback(firstResult, 10_000);
+			await clickWithFallback(firstResult, 10_000, () =>
+				waitForVenueDetailSignal(page, 1_500),
+			);
 			openedFromSearch = true;
 		} else {
 			const detailsButton = page
@@ -77,7 +79,9 @@ test.describe("VibeCity Core User Journey", () => {
 			if (!detailsVisible) {
 				return;
 			}
-			await clickWithFallback(detailsButton, 5_000);
+			await clickWithFallback(detailsButton, 5_000, () =>
+				waitForVenueDetailSignal(page, 1_500),
+			);
 		}
 
 		// Verify Modal Opens using test id

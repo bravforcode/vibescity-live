@@ -235,63 +235,96 @@ export async function hasWebGLSupport(page: Page): Promise<boolean> {
 export async function clickWithFallback(
 	locator: Locator,
 	timeoutMs = 10_000,
+	verify?: () => Promise<boolean>,
 ): Promise<boolean> {
 	await locator.scrollIntoViewIfNeeded().catch(() => {});
 
-	const directClick = await locator
-		.click({ force: true, timeout: timeoutMs })
-		.then(() => true)
-		.catch(() => false);
-	if (directClick) {
-		return true;
-	}
+	const dispatchSequence = () =>
+		locator
+			.evaluate((el) => {
+				const target = el as HTMLElement;
+				target.focus?.();
+				const pointerEventInit = {
+					bubbles: true,
+					cancelable: true,
+					composed: true,
+					pointerId: 1,
+					pointerType: "mouse",
+					isPrimary: true,
+					button: 0,
+				};
 
-	return locator
-		.evaluate((el) => {
-			const target = el as HTMLElement;
-			target.focus?.();
-			const pointerEventInit = {
-				bubbles: true,
-				cancelable: true,
-				composed: true,
-				pointerId: 1,
-				pointerType: "mouse",
-				isPrimary: true,
-				button: 0,
-			};
-
-			const mouseEventInit = {
-				bubbles: true,
-				cancelable: true,
-				composed: true,
-				button: 0,
-			};
-
-			const dispatch = (eventName: string) => {
-				if (eventName.startsWith("pointer") && "PointerEvent" in window) {
-					target.dispatchEvent(new PointerEvent(eventName, pointerEventInit));
-					return;
-				}
-
-				target.dispatchEvent(new MouseEvent(eventName, mouseEventInit));
-			};
-
-			dispatch("pointerdown");
-			dispatch("mousedown");
-			dispatch("pointerup");
-			dispatch("mouseup");
-			target.dispatchEvent(
-				new MouseEvent("click", {
+				const mouseEventInit = {
 					bubbles: true,
 					cancelable: true,
 					composed: true,
 					button: 0,
-				}),
-			);
-			target.click?.();
-		})
-		.then(() => true)
-		.catch(() => false);
+				};
+
+				const dispatch = (eventName: string) => {
+					if (eventName.startsWith("pointer") && "PointerEvent" in window) {
+						target.dispatchEvent(new PointerEvent(eventName, pointerEventInit));
+						return;
+					}
+
+					target.dispatchEvent(new MouseEvent(eventName, mouseEventInit));
+				};
+
+				dispatch("pointerdown");
+				dispatch("mousedown");
+				dispatch("pointerup");
+				dispatch("mouseup");
+				target.dispatchEvent(
+					new MouseEvent("click", {
+						bubbles: true,
+						cancelable: true,
+						composed: true,
+						button: 0,
+					}),
+				);
+				target.click?.();
+			})
+			.then(() => true)
+			.catch(() => false);
+
+	const pressEnter = () =>
+		locator
+			.focus()
+			.then(() =>
+				locator
+					.press("Enter", { timeout: Math.min(timeoutMs, 2_000) })
+					.then(() => true)
+					.catch(() => false),
+			)
+			.catch(() => false);
+
+	const attempts = [
+		() =>
+			locator
+				.click({ force: true, timeout: timeoutMs })
+				.then(() => true)
+				.catch(() => false),
+		dispatchSequence,
+		pressEnter,
+	];
+
+	for (const attempt of attempts) {
+		const triggered = await attempt();
+		if (!triggered) {
+			continue;
+		}
+
+		if (!verify) {
+			return true;
+		}
+
+		const verified = await verify().catch(() => false);
+		if (verified) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 export async function waitForVenueDetailSignal(

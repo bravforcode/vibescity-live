@@ -62,16 +62,22 @@ test.describe("Map User Flow", () => {
 			return;
 		}
 
-		const markerClicked = await markers
-			.click({ force: true, timeout: 10_000 })
-			.then(() => true)
-			.catch(() => clickWithFallback(markers, 10_000));
+		const popup = page.locator(".mapboxgl-popup");
+		const markerClicked = await clickWithFallback(markers, 10_000, async () => {
+			const popupVisible = await popup
+				.isVisible({ timeout: 1_500 })
+				.catch(() => false);
+			if (popupVisible) {
+				return true;
+			}
+
+			return waitForVenueDetailSignal(page, 1_500);
+		});
 		enforceMapConditionOrSkip(markerClicked, "Map marker click failed.");
 		if (!markerClicked) {
 			return;
 		}
 
-		const popup = page.locator(".mapboxgl-popup");
 		const popupVisible = await popup
 			.isVisible({ timeout: 10_000 })
 			.catch(() => false);
@@ -88,7 +94,9 @@ test.describe("Map User Flow", () => {
 				.isVisible({ timeout: 5_000 })
 				.catch(() => false);
 			if (detailsVisible) {
-				await clickWithFallback(detailsButton, 5_000);
+				await clickWithFallback(detailsButton, 5_000, () =>
+					waitForVenueDetailSignal(page, 1_500),
+				);
 				drawerVisible = await drawer
 					.isVisible({ timeout: 10_000 })
 					.catch(() => false);

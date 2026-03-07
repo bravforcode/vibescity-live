@@ -503,9 +503,13 @@ test.describe("VibeCity – Smoke Tests", { tag: "@smoke" }, () => {
 
 			try {
 				if (detailsVisible) {
-					await clickWithFallback(detailsButton, 10_000);
+					await clickWithFallback(detailsButton, 10_000, () =>
+						waitForVenueDetailSignal(page, 1_500),
+					);
 				} else {
-					await clickWithFallback(shopCard, 10_000);
+					await clickWithFallback(shopCard, 10_000, () =>
+						waitForVenueDetailSignal(page, 1_500),
+					);
 				}
 			} catch {
 				enforceMapConditionOrSkip(
