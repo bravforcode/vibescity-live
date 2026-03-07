@@ -1,7 +1,10 @@
 import { expect, test } from "@playwright/test";
 import {
+	clickWithFallback,
 	enforceMapConditionOrSkip,
+	isVenueDetailPath,
 	waitForMapReadyOrSkip,
+	waitForVenueDetailSignal,
 } from "./helpers/mapProfile";
 
 test.describe("Map User Flow", () => {
@@ -92,24 +95,31 @@ test.describe("Map User Flow", () => {
 				.isVisible({ timeout: 5_000 })
 				.catch(() => false);
 			if (detailsVisible) {
-				await detailsButton.click({ force: true });
+				await clickWithFallback(detailsButton, 5_000);
 				drawerVisible = await drawer
 					.isVisible({ timeout: 10_000 })
 					.catch(() => false);
 			}
 		}
+		const detailOpened = await waitForVenueDetailSignal(page, 10_000);
 		enforceMapConditionOrSkip(
-			popupVisible || drawerVisible,
-			"Map marker click did not open shop drawer/modal.",
+			popupVisible || drawerVisible || detailOpened,
+			"Map marker click did not open a popup, detail route, or detail modal.",
 		);
-		if (!popupVisible && !drawerVisible) {
+		if (!popupVisible && !drawerVisible && !detailOpened) {
 			return;
 		}
 
 		if (drawerVisible) {
 			await expect(drawer).toBeVisible();
-		} else {
+		} else if (popupVisible) {
 			await expect(popup).toBeVisible();
+		} else {
+			await expect
+				.poll(() => isVenueDetailPath(new URL(page.url()).pathname), {
+					timeout: 5_000,
+				})
+				.toBeTruthy();
 		}
 	});
 

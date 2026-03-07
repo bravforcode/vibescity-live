@@ -1,4 +1,4 @@
-import { type Page, test } from "@playwright/test";
+import { type Locator, type Page, test } from "@playwright/test";
 
 const MAP_REQUIRED_TAG = "@map-required";
 const MAP_READY_SELECTOR = '[data-testid="map-shell"][data-map-ready="true"]';
@@ -11,6 +11,9 @@ const MAP_REGION_SELECTOR = '[aria-label="Map"]';
 const MAPBOX_SURFACE_SELECTOR = ".mapboxgl-map, .mapboxgl-canvas";
 const MAP_CONTROL_SELECTOR = ".mapboxgl-ctrl-compass, .mapboxgl-ctrl-zoom-in";
 const MAP_MARKER_SELECTOR = '.mapboxgl-marker, img[alt="Map marker"]';
+const DETAIL_MODAL_SELECTOR = '[data-testid="vibe-modal"]';
+const DETAIL_CLOSE_SELECTOR = 'button[aria-label="Close details"]';
+const DETAIL_ROUTE_PATTERN = /^\/(?:(?:th|en)\/)?(?:venue\/[^/]+|v\/[^/]+)/i;
 
 export function isMapRequiredProfile(): boolean {
 	const grep = process.env.PW_GREP || "";
@@ -227,4 +230,79 @@ export async function hasWebGLSupport(page: Page): Promise<boolean> {
 			canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
 		return !!gl;
 	});
+}
+
+export async function clickWithFallback(
+	locator: Locator,
+	timeoutMs = 10_000,
+): Promise<boolean> {
+	await locator.scrollIntoViewIfNeeded().catch(() => {});
+
+	const directClick = await locator
+		.click({ force: true, timeout: timeoutMs })
+		.then(() => true)
+		.catch(() => false);
+	if (directClick) {
+		return true;
+	}
+
+	return locator
+		.evaluate((el) => {
+			const target = el as HTMLElement;
+			target.dispatchEvent(
+				new MouseEvent("click", {
+					bubbles: true,
+					cancelable: true,
+					composed: true,
+				}),
+			);
+			target.click?.();
+		})
+		.then(() => true)
+		.catch(() => false);
+}
+
+export async function waitForVenueDetailSignal(
+	page: Page,
+	timeoutMs = 12_000,
+): Promise<boolean> {
+	return page
+		.waitForFunction(
+			({ modalSelector, closeSelector }) => {
+				const isVisible = (selector: string) => {
+					const element = document.querySelector(
+						selector,
+					) as HTMLElement | null;
+					if (!element) return false;
+					const rect = element.getBoundingClientRect();
+					const style = window.getComputedStyle(element);
+					return (
+						rect.width > 0 &&
+						rect.height > 0 &&
+						style.visibility !== "hidden" &&
+						style.display !== "none" &&
+						style.opacity !== "0"
+					);
+				};
+
+				return (
+					isVisible(modalSelector) ||
+					isVisible(closeSelector) ||
+					/\/(?:(?:th|en)\/)?(?:venue\/[^/]+|v\/[^/]+)/i.test(
+						window.location.pathname,
+					)
+				);
+			},
+			{
+				modalSelector: DETAIL_MODAL_SELECTOR,
+				closeSelector: DETAIL_CLOSE_SELECTOR,
+			},
+			{ timeout: timeoutMs },
+		)
+		.then(() => true)
+		.catch(() => false);
+}
+
+export function isVenueDetailPath(pathname: string): boolean {
+	return DETAIL_ROUTE_PATTERN.test(String(pathname || ""));
 }

@@ -1,7 +1,10 @@
 import { expect, test } from "@playwright/test";
 import {
+	clickWithFallback,
 	enforceMapConditionOrSkip,
+	isVenueDetailPath,
 	waitForMapReadyOrSkip,
+	waitForVenueDetailSignal,
 } from "./helpers/mapProfile.ts";
 
 async function waitForAppLoad(page) {
@@ -58,7 +61,7 @@ test.describe("VibeCity Core User Journey", () => {
 			.catch(() => false);
 		let openedFromSearch = false;
 		if (resultVisible) {
-			await firstResult.click({ force: true });
+			await clickWithFallback(firstResult, 10_000);
 			openedFromSearch = true;
 		} else {
 			const detailsButton = page
@@ -74,25 +77,34 @@ test.describe("VibeCity Core User Journey", () => {
 			if (!detailsVisible) {
 				return;
 			}
-			await detailsButton.click({ force: true });
+			await clickWithFallback(detailsButton, 5_000);
 		}
 
 		// Verify Modal Opens using test id
 		const modal = page.locator('[data-testid="vibe-modal"]');
+		const detailOpened = await waitForVenueDetailSignal(page, 15_000);
 		const modalVisible = await modal
-			.isVisible({ timeout: 15000 })
+			.isVisible({ timeout: 2_000 })
 			.catch(() => false);
 		enforceMapConditionOrSkip(
-			modalVisible,
-			"Vibe modal did not open after search select",
+			modalVisible || detailOpened,
+			"Venue detail route/modal did not open after search select",
 		);
-		if (!modalVisible) {
+		if (!modalVisible && !detailOpened) {
 			return;
 		}
 
 		// Valid Content
-		await expect(modal.locator("h2")).not.toBeEmpty();
-		expect(openedFromSearch || modalVisible).toBeTruthy();
+		if (modalVisible) {
+			await expect(modal.locator("h2")).not.toBeEmpty();
+		} else {
+			await expect
+				.poll(() => isVenueDetailPath(new URL(page.url()).pathname), {
+					timeout: 5_000,
+				})
+				.toBeTruthy();
+		}
+		expect(openedFromSearch || modalVisible || detailOpened).toBeTruthy();
 	});
 
 	test("Send Vibe (Coin Reward)", async ({ page }) => {

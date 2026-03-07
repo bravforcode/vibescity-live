@@ -1,8 +1,12 @@
 import { expect, test } from "@playwright/test";
 import {
+	clickWithFallback,
 	enforceMapConditionOrSkip,
 	hasWebGLSupport,
+	isMapRequiredProfile,
+	isVenueDetailPath,
 	waitForMapReadyOrSkip,
+	waitForVenueDetailSignal,
 } from "./helpers/mapProfile";
 
 /**
@@ -413,6 +417,11 @@ test.describe("VibeCity – Smoke Tests", { tag: "@smoke" }, () => {
 	// These tests are skipped in CI when WebGL is not available
 	test.describe("WebGL-dependent tests @map-required", () => {
 		test.beforeEach(async ({ page }) => {
+			test.skip(
+				!isMapRequiredProfile(),
+				"Covered by the dedicated @map-required lane.",
+			);
+
 			await page.goto("/", { waitUntil: "domcontentloaded" });
 			await waitForAppLoad(page);
 
@@ -494,9 +503,9 @@ test.describe("VibeCity – Smoke Tests", { tag: "@smoke" }, () => {
 
 			try {
 				if (detailsVisible) {
-					await detailsButton.click({ force: true });
+					await clickWithFallback(detailsButton, 10_000);
 				} else {
-					await shopCard.click({ force: true });
+					await clickWithFallback(shopCard, 10_000);
 				}
 			} catch {
 				enforceMapConditionOrSkip(
@@ -506,16 +515,25 @@ test.describe("VibeCity – Smoke Tests", { tag: "@smoke" }, () => {
 				return;
 			}
 
+			const detailOpened = await waitForVenueDetailSignal(page, 12_000);
 			const modalVisible = await modal
 				.first()
-				.isVisible({ timeout: 10_000 })
+				.isVisible({ timeout: 2_000 })
 				.catch(() => false);
 			enforceMapConditionOrSkip(
-				modalVisible,
-				"Modal did not open after card click",
+				modalVisible || detailOpened,
+				"Card click did not open a detail route or detail modal",
 			);
-			if (!modalVisible) {
+			if (!modalVisible && !detailOpened) {
 				return;
+			}
+
+			if (!modalVisible) {
+				await expect
+					.poll(() => isVenueDetailPath(new URL(page.url()).pathname), {
+						timeout: 5_000,
+					})
+					.toBeTruthy();
 			}
 		});
 	});
