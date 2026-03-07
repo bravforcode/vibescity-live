@@ -18,6 +18,10 @@ function toBool(value, fallback = false) {
   return ["1", "true", "yes", "on"].includes(normalized);
 }
 
+function trimEnv(value) {
+  return String(value ?? "").trim();
+}
+
 function asArray(value) {
   return Array.isArray(value) ? value : [];
 }
@@ -38,8 +42,8 @@ function labelValue(value, fallback = "unknown") {
 }
 
 function normalizeLokiUrl(raw) {
-  if (!raw) return "";
-  const url = String(raw).replace(/\/+$/, "");
+  const url = trimEnv(raw).replace(/\/+$/, "");
+  if (!url) return "";
   if (url.endsWith("/loki/api/v1/push")) return url;
   return `${url}/loki/api/v1/push`;
 }
@@ -79,15 +83,50 @@ async function loadServiceAccount() {
   const jsonPath = process.env.BIGQUERY_SERVICE_ACCOUNT_JSON_PATH;
 
   if (rawJson) {
-    return JSON.parse(rawJson);
+    return parseStructuredSecret(rawJson, "BIGQUERY_SERVICE_ACCOUNT_JSON");
   }
 
   if (jsonPath && existsSync(jsonPath)) {
     const raw = await readFile(jsonPath, "utf8");
-    return JSON.parse(raw);
+    return parseStructuredSecret(raw, "BIGQUERY_SERVICE_ACCOUNT_JSON_PATH");
   }
 
   return null;
+}
+
+function parseStructuredSecret(rawValue, label) {
+  const raw = trimEnv(rawValue);
+  if (!raw) return null;
+
+  const candidates = [raw];
+  if (
+    (raw.startsWith('"') && raw.endsWith('"')) ||
+    (raw.startsWith("'") && raw.endsWith("'"))
+  ) {
+    candidates.push(raw.slice(1, -1));
+  }
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate);
+      return typeof parsed === "string" ? JSON.parse(parsed) : parsed;
+    } catch {
+      // Try the next format.
+    }
+
+    try {
+      const decoded = Buffer.from(candidate, "base64").toString("utf8").trim();
+      if (!decoded.startsWith("{") && !decoded.startsWith("[")) {
+        continue;
+      }
+      const parsed = JSON.parse(decoded);
+      return typeof parsed === "string" ? JSON.parse(parsed) : parsed;
+    } catch {
+      // Try the next format.
+    }
+  }
+
+  throw new Error(`${label} is not valid JSON or base64-encoded JSON.`);
 }
 
 async function getGoogleAccessToken(serviceAccount) {
@@ -363,8 +402,8 @@ async function pushToLoki(url, logs) {
   const streams = groupLokiStreams(logs);
 
   const headers = { "Content-Type": "application/json" };
-  const user = process.env.GRAFANA_LOKI_USER || "";
-  const token = process.env.GRAFANA_LOKI_TOKEN || "";
+  const user = trimEnv(process.env.GRAFANA_LOKI_USER);
+  const token = trimEnv(process.env.GRAFANA_LOKI_TOKEN);
 
   if (user && token) {
     headers.Authorization = `Basic ${Buffer.from(`${user}:${token}`).toString("base64")}`;
@@ -474,8 +513,8 @@ async function main() {
     source_paths: ctx.paths,
   };
 
-  const projectId = process.env.BIGQUERY_PROJECT_ID || "";
-  const dataset = process.env.BIGQUERY_DATASET || "";
+  const projectId = trimEnv(process.env.BIGQUERY_PROJECT_ID);
+  const dataset = trimEnv(process.env.BIGQUERY_DATASET);
   const serviceAccount = await loadServiceAccount();
   const bqConfigured = Boolean(projectId && dataset && serviceAccount?.client_email);
 

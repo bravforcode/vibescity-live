@@ -17,6 +17,10 @@ function toBool(value, fallback = false) {
   return ["1", "true", "yes", "on"].includes(normalized);
 }
 
+function trimEnv(value) {
+  return String(value ?? "").trim();
+}
+
 function asArray(value) {
   return Array.isArray(value) ? value : [];
 }
@@ -133,12 +137,47 @@ async function readJsonIfExists(path) {
 async function loadServiceAccount() {
   const rawJson = process.env.BIGQUERY_SERVICE_ACCOUNT_JSON;
   const jsonPath = process.env.BIGQUERY_SERVICE_ACCOUNT_JSON_PATH;
-  if (rawJson) return JSON.parse(rawJson);
+  if (rawJson) return parseStructuredSecret(rawJson, "BIGQUERY_SERVICE_ACCOUNT_JSON");
   if (jsonPath && existsSync(jsonPath)) {
     const raw = await readFile(jsonPath, "utf8");
-    return JSON.parse(raw);
+    return parseStructuredSecret(raw, "BIGQUERY_SERVICE_ACCOUNT_JSON_PATH");
   }
   return null;
+}
+
+function parseStructuredSecret(rawValue, label) {
+  const raw = trimEnv(rawValue);
+  if (!raw) return null;
+
+  const candidates = [raw];
+  if (
+    (raw.startsWith('"') && raw.endsWith('"')) ||
+    (raw.startsWith("'") && raw.endsWith("'"))
+  ) {
+    candidates.push(raw.slice(1, -1));
+  }
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate);
+      return typeof parsed === "string" ? JSON.parse(parsed) : parsed;
+    } catch {
+      // Try the next format.
+    }
+
+    try {
+      const decoded = Buffer.from(candidate, "base64").toString("utf8").trim();
+      if (!decoded.startsWith("{") && !decoded.startsWith("[")) {
+        continue;
+      }
+      const parsed = JSON.parse(decoded);
+      return typeof parsed === "string" ? JSON.parse(parsed) : parsed;
+    } catch {
+      // Try the next format.
+    }
+  }
+
+  throw new Error(`${label} is not valid JSON or base64-encoded JSON.`);
 }
 
 async function getGoogleAccessToken(serviceAccount) {
@@ -455,8 +494,8 @@ async function main() {
   }
   const signals = [...signalByKey.values()];
 
-  const projectId = process.env.BIGQUERY_PROJECT_ID || "";
-  const dataset = process.env.BIGQUERY_DATASET || "";
+  const projectId = trimEnv(process.env.BIGQUERY_PROJECT_ID);
+  const dataset = trimEnv(process.env.BIGQUERY_DATASET);
   const routeTable = process.env.INCIDENT_ROUTE_TABLE || "route_check_events";
   const qualityTable = process.env.INCIDENT_QUALITY_TABLE || "quality_trend_events";
   const serviceAccount = await loadServiceAccount();
