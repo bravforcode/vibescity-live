@@ -131,17 +131,15 @@ test.describe("Owner + Partner revamp coverage", { tag: "@smoke" }, () => {
 		});
 
 		await page.goto("/merchant", { waitUntil: "domcontentloaded" });
-		await expect(page.getByText("Map Entertainment Dashboard")).toBeVisible();
+		await expect(page.getByTestId("owner-dashboard-root").first()).toBeVisible();
 		const sourceBadge = page.getByTestId("owner-source-badge");
 		await expect(sourceBadge).toBeVisible();
 		const sourceMode = (await sourceBadge.textContent())?.trim() || "";
 		expect(["Fallback mode (Supabase)", "Live API mode"]).toContain(sourceMode);
 		if (sourceMode === "Fallback mode (Supabase)") {
-			await expect(
-				page.getByText("Running with Supabase fallback"),
-			).toBeVisible();
+			await expect(page.getByText("portfolio, venues, insights")).toBeVisible();
 		}
-		await expect(page.getByText("Owner Dashboard Error")).toHaveCount(0);
+		await expect(page.getByRole("alert")).toHaveCount(0);
 	});
 
 	test("partner payout form exposes Thai banks + international fields", async ({
