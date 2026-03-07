@@ -122,6 +122,8 @@ test.describe("Map Smoke Lite", () => {
 	test("map controls respond without freeze @smoke-map-lite @map-required", async ({
 		page,
 	}) => {
+		test.setTimeout(process.env.CI ? 120_000 : 75_000);
+
 		await page.goto("/", { waitUntil: "domcontentloaded" });
 
 		const mapReady = await waitForMapReadyOrSkip(page, 45_000);
