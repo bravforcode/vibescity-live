@@ -14,17 +14,18 @@ const e2eWsUrl =
 const sanitizeEnvToken = (value = "") =>
   value.trim().replace(/^['"]|['"]$/g, "");
 
-const readMapboxTokenFromDotEnv = () => {
-  const envCandidates = [".env.local", ".env"];
+const readEnvValueFromDotEnv = (key: string) => {
+  const envCandidates = [".env.local", ".env", ".env.e2e"];
   for (const file of envCandidates) {
     try {
       const fullPath = path.resolve(process.cwd(), file);
       if (!fs.existsSync(fullPath)) continue;
       const content = fs.readFileSync(fullPath, "utf8");
-      const match = content.match(/^\s*VITE_MAPBOX_TOKEN\s*=\s*(.+)\s*$/m);
+      const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const match = content.match(new RegExp(`^\\s*${escapedKey}\\s*=\\s*(.+)\\s*$`, "m"));
       if (match?.[1]) {
-        const token = sanitizeEnvToken(match[1]);
-        if (token) return token;
+        const value = sanitizeEnvToken(match[1]);
+        if (value) return value;
       }
     } catch {
       // Ignore dotenv read errors in test config.
@@ -33,8 +34,22 @@ const readMapboxTokenFromDotEnv = () => {
   return "";
 };
 
+const supabaseUrl = sanitizeEnvToken(
+  process.env.VITE_SUPABASE_URL ||
+    process.env.SUPABASE_URL ||
+    readEnvValueFromDotEnv("VITE_SUPABASE_URL"),
+);
+
+const supabaseAnonKey = sanitizeEnvToken(
+  process.env.VITE_SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    readEnvValueFromDotEnv("VITE_SUPABASE_ANON_KEY"),
+);
+
 const mapboxToken = sanitizeEnvToken(
-  process.env.VITE_MAPBOX_TOKEN || readMapboxTokenFromDotEnv(),
+  process.env.VITE_MAPBOX_TOKEN ||
+    process.env.MAPBOX_PUBLIC_TOKEN ||
+    readEnvValueFromDotEnv("VITE_MAPBOX_TOKEN"),
 );
 
 if (
@@ -108,6 +123,12 @@ export default defineConfig({
         env: {
           VITE_E2E: "true",
           VITE_WS_URL: e2eWsUrl,
+          ...(supabaseUrl
+            ? { VITE_SUPABASE_URL: supabaseUrl }
+            : {}),
+          ...(supabaseAnonKey
+            ? { VITE_SUPABASE_ANON_KEY: supabaseAnonKey }
+            : {}),
           VITE_E2E_MAP_REQUIRED:
             process.env.E2E_MAP_REQUIRED === "1" ? "true" : "false",
           // ✅ ใส่ flag ให้ app ปิดของหนัก ๆ ตอนเทสได้ เช่น map animation / realtime

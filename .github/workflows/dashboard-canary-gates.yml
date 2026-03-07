@@ -17,6 +17,9 @@ concurrency:
 env:
   VITE_BUILD_VERSION: ${{ github.sha }}
   VITE_COMMIT_SHA: ${{ github.sha }}
+  VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+  VITE_MAPBOX_TOKEN: ${{ secrets.MAPBOX_PUBLIC_TOKEN }}
 
 jobs:
   dashboard-canary-e2e:

@@ -1,23 +1,23 @@
 <script setup>
-import { useHaptics } from "@/composables/useHaptics";
 import {
-  CalendarDays,
-  ChevronRight,
-  Coffee,
-  Crown,
-  Gift,
-  Handshake,
-  Heart,
-  LogOut,
-  Music,
-  Settings,
-  ShoppingBag,
-  Star,
-  Volume2,
-  VolumeX,
+	CalendarDays,
+	ChevronRight,
+	Coffee,
+	Crown,
+	Gift,
+	Handshake,
+	Heart,
+	LogOut,
+	Music,
+	Settings,
+	ShoppingBag,
+	Star,
+	Volume2,
+	VolumeX,
 } from "lucide-vue-next";
 import { computed, ref } from "vue"; // ✅ Added computed
 import { useI18n } from "vue-i18n"; // ✅ Added i18n
+import { useHaptics } from "@/composables/useHaptics";
 
 import LanguageToggle from "./LanguageToggle.vue"; // ✅ Reusing LanguageToggle component
 import SettingsPanel from "./SettingsPanel.vue"; // ✅ New Settings Panel
@@ -26,81 +26,81 @@ import SOSPanel from "./SOSPanel.vue";
 const { t } = useI18n(); // ✅ Hook
 
 const props = defineProps({
-  isOpen: {
-    type: Boolean,
-    default: false,
-  },
-  userStats: {
-    type: Object,
-    default: () => ({
-      name: "Explorer",
-      level: 1,
-      coins: 0,
-      avatar: null,
-    }),
-  },
-  isMuted: {
-    type: Boolean,
-    default: false,
-  },
-  currentLanguage: {
-    type: String,
-    default: "en",
-  },
-  showPartnerProgram: {
-    type: Boolean,
-    default: false,
-  },
+	isOpen: {
+		type: Boolean,
+		default: false,
+	},
+	userStats: {
+		type: Object,
+		default: () => ({
+			name: "Explorer",
+			level: 1,
+			coins: 0,
+			avatar: null,
+		}),
+	},
+	isMuted: {
+		type: Boolean,
+		default: false,
+	},
+	currentLanguage: {
+		type: String,
+		default: "en",
+	},
+	showPartnerProgram: {
+		type: Boolean,
+		default: false,
+	},
 });
 
 const emit = defineEmits([
-  "close",
-  "navigate",
-  "toggle-mute",
-  "toggle-language",
-  "open-merchant",
-  "open-sos",
-  "take-me-home",
-  "open-dashboard",
-  "open-partner",
-  "open-daily-checkin",
-  "open-lucky-wheel",
-  "logout",
+	"close",
+	"navigate",
+	"toggle-mute",
+	"toggle-language",
+	"open-merchant",
+	"open-sos",
+	"take-me-home",
+	"open-dashboard",
+	"open-partner",
+	"open-daily-checkin",
+	"open-lucky-wheel",
+	"logout",
 ]);
 const { selectFeedback, successFeedback } = useHaptics();
 
 // ✅ Computed Navigation Items for Reactivity
 const menuItems = computed(() => [
-  {
-    id: "favorites",
-    label: t("menu.favorites") || "My Favorites",
-    icon: Heart,
-    color: "bg-pink-600",
-  },
-  {
-    id: "nightlife",
-    label: t("menu.nightlife") || "Nightlife",
-    icon: Music,
-    color: "bg-purple-500",
-  },
-  {
-    id: "cafe",
-    label: t("menu.cafe") || "Cafe & Bistro",
-    icon: Coffee,
-    color: "bg-orange-400",
-  },
-  {
-    id: "fashion",
-    label: t("menu.fashion") || "Fashion",
-    icon: ShoppingBag,
-    color: "bg-pink-500",
-  },
-  {
-    id: "events",
-    label: t("menu.events") || "Events",
-    icon: Star,
-    color: "bg-yellow-400",
-  },
+	{
+		id: "favorites",
+		label: t("menu.favorites") || "My Favorites",
+		icon: Heart,
+		color: "bg-pink-600",
+	},
+	{
+		id: "nightlife",
+		label: t("menu.nightlife") || "Nightlife",
+		icon: Music,
+		color: "bg-purple-500",
+	},
+	{
+		id: "cafe",
+		label: t("menu.cafe") || "Cafe & Bistro",
+		icon: Coffee,
+		color: "bg-orange-400",
+	},
+	{
+		id: "fashion",
+		label: t("menu.fashion") || "Fashion",
+		icon: ShoppingBag,
+		color: "bg-pink-500",
+	},
+	{
+		id: "events",
+		label: t("menu.events") || "Events",
+		icon: Star,
+		color: "bg-yellow-400",
+	},
 ]);
 
 // SOS & Settings State
@@ -108,26 +108,26 @@ const showSOSPanel = ref(false);
 const showSettingsPanel = ref(false);
 
 const handleSOS = () => {
-  selectFeedback();
-  showSOSPanel.value = true;
-  emit("open-sos");
+	selectFeedback();
+	showSOSPanel.value = true;
+	emit("open-sos");
 };
 
 const handleTakeMeHome = () => {
-  successFeedback();
-  emit("take-me-home");
-  emit("close");
+	successFeedback();
+	emit("take-me-home");
+	emit("close");
 };
 
 const handleClose = () => {
-  selectFeedback();
-  emit("close");
+	selectFeedback();
+	emit("close");
 };
 
 const handleNavigate = (id) => {
-  successFeedback();
-  emit("navigate", id);
-  emit("close");
+	successFeedback();
+	emit("navigate", id);
+	emit("close");
 };
 </script>
 

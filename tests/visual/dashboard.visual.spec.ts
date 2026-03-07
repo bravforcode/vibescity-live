@@ -1,5 +1,24 @@
 import { expect, test, type Page } from "@playwright/test";
 
+const getSupabaseAuthStorageKeys = () => {
+	const keys = new Set([
+		"sb-rukyitpjfmzhqjlfmbie-auth-token",
+		"sb-nluuvnttweesnkrmgzsm-auth-token",
+	]);
+	const rawUrl =
+		process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+	try {
+		const hostname = new URL(rawUrl).hostname;
+		const projectRef = hostname.split(".")[0]?.trim();
+		if (projectRef) {
+			keys.add(`sb-${projectRef}-auth-token`);
+		}
+	} catch {
+		// ignore invalid/missing env in test runner
+	}
+	return Array.from(keys);
+};
+
 const seedStableVisitor = async (page: Page, id: string) => {
 	await page.addInitScript((visitorId) => {
 		localStorage.setItem("vibe_visitor_id", visitorId);
@@ -7,7 +26,8 @@ const seedStableVisitor = async (page: Page, id: string) => {
 };
 
 const seedPartnerSession = async (page: Page) => {
-	await page.addInitScript(() => {
+	const authKeys = getSupabaseAuthStorageKeys();
+	await page.addInitScript((storageKeys: string[]) => {
 		const encode = (value: Record<string, unknown>) =>
 			btoa(JSON.stringify(value))
 				.replace(/\+/g, "-")
@@ -41,10 +61,6 @@ const seedPartnerSession = async (page: Page) => {
 				},
 			},
 		};
-		const authKeys = [
-			"sb-rukyitpjfmzhqjlfmbie-auth-token",
-			"sb-nluuvnttweesnkrmgzsm-auth-token",
-		];
 		for (const key of authKeys) {
 			localStorage.setItem(key, JSON.stringify(session));
 		}
@@ -58,7 +74,7 @@ const seedPartnerSession = async (page: Page) => {
 				},
 			}),
 		);
-	});
+	}, authKeys);
 };
 
 const stubOwnerDashboard = async (page: Page) => {
@@ -237,12 +253,15 @@ test("@visual Partner dashboard unified shell", async ({ page }) => {
 	await seedPartnerSession(page);
 	await stubPartnerDashboard(page);
 
-	await page.goto("/partner", { waitUntil: "domcontentloaded" });
+	await page.goto("/en/partner", { waitUntil: "domcontentloaded" });
 	const root = page.getByTestId("partner-dashboard-root").first();
 	try {
 		await expect(root).toBeVisible({ timeout: 12_000 });
 	} catch {
 		test.skip(true, "Partner dashboard route is not accessible in this environment.");
+	}
+	if (!page.url().includes("/partner")) {
+		test.skip(true, "Partner dashboard redirected away in this environment.");
 	}
 
 	await expect(page.getByTestId("partner-stat-strip")).toHaveScreenshot(

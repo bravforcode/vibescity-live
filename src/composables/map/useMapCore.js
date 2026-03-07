@@ -13,10 +13,7 @@ export function useMapCore(containerRef, _options = {}) {
 	let lastRequestedStyleUrl = "";
 	let styleFallbackInProgress = false;
 
-	const token = (
-		import.meta.env.VITE_MAPBOX_TOKEN ||
-		""
-	)
+	const token = (import.meta.env.VITE_MAPBOX_TOKEN || "")
 		.trim()
 		.replace(/^['"]|['"]$/g, "");
 	if (!token) {

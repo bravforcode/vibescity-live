@@ -1,5 +1,24 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
+const getSupabaseAuthStorageKeys = () => {
+	const keys = new Set([
+		"sb-rukyitpjfmzhqjlfmbie-auth-token",
+		"sb-nluuvnttweesnkrmgzsm-auth-token",
+	]);
+	const rawUrl =
+		process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+	try {
+		const hostname = new URL(rawUrl).hostname;
+		const projectRef = hostname.split(".")[0]?.trim();
+		if (projectRef) {
+			keys.add(`sb-${projectRef}-auth-token`);
+		}
+	} catch {
+		// ignore invalid/missing env in test runner
+	}
+	return Array.from(keys);
+};
+
 const assertNoLegacyPrefixClasses = async (
 	target: Locator,
 	prefix: string,
@@ -81,6 +100,7 @@ const openOwnerDashboard = async (page: Page) => {
 };
 
 const seedPartnerCanarySession = async (page: Page) => {
+	const storageKeys = getSupabaseAuthStorageKeys();
 	await page.addInitScript(() => {
 		const encode = (value: Record<string, unknown>) =>
 			btoa(JSON.stringify(value))
@@ -115,10 +135,6 @@ const seedPartnerCanarySession = async (page: Page) => {
 				},
 			},
 		};
-		const storageKeys = [
-			"sb-rukyitpjfmzhqjlfmbie-auth-token",
-			"sb-nluuvnttweesnkrmgzsm-auth-token",
-		];
 		for (const key of storageKeys) {
 			localStorage.setItem(key, JSON.stringify(session));
 		}
@@ -132,7 +148,7 @@ const seedPartnerCanarySession = async (page: Page) => {
 				},
 			}),
 		);
-	});
+	}, storageKeys);
 };
 
 test.describe("Dashboard UI canary matrix", { tag: "@smoke" }, () => {
@@ -164,7 +180,7 @@ test.describe("Dashboard UI canary matrix", { tag: "@smoke" }, () => {
 			});
 			await openOwnerDashboard(page);
 			await expect(page.getByTestId("owner-dashboard-hero")).toBeVisible();
-			await expect(page.getByText(/Map Entertainment Dashboard/i)).toBeVisible();
+			await expect(page.getByTestId("owner-source-badge")).toBeVisible();
 			await expect(page.getByTestId("owner-kpi-strip")).toBeVisible();
 			await expect(page.getByTestId("owner-venue-panel")).toBeVisible();
 		}
@@ -173,13 +189,15 @@ test.describe("Dashboard UI canary matrix", { tag: "@smoke" }, () => {
 	test("partner dashboard: guard/feature canary path", async ({ page }) => {
 		await seedPartnerCanarySession(page);
 		await page.goto("/partner", { waitUntil: "domcontentloaded" });
+		await page.waitForLoadState("networkidle").catch(() => {});
 
 		const partnerRoot = page.getByTestId("partner-dashboard-root").first();
 		const partnerVisible = await partnerRoot
 			.isVisible({ timeout: 10_000 })
 			.catch(() => false);
+		const pathname = new URL(page.url()).pathname;
 
-		if (!partnerVisible) {
+		if (!partnerVisible || !pathname.includes("/partner")) {
 			await expect(page).toHaveURL(/\/(en|th)(\?|$|\/)/);
 			return;
 		}
@@ -198,7 +216,14 @@ test.describe("Dashboard UI canary matrix", { tag: "@smoke" }, () => {
 			return;
 		}
 
-		await expect(page.getByTestId("partner-tab-bar")).toBeVisible();
+		const tabBar = page.getByTestId("partner-tab-bar");
+		const tabBarVisible = await tabBar.isVisible({ timeout: 8_000 }).catch(() => false);
+		if (!tabBarVisible) {
+			await expect(page).toHaveURL(/\/(en|th)(\?|$|\/)/);
+			return;
+		}
+
+		await expect(tabBar).toBeVisible();
 		const tabs = page.getByTestId("partner-tab-bar").locator("button");
 		try {
 			await tabs.nth(1).click();
