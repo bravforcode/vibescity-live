@@ -75,6 +75,7 @@ export default defineConfig({
 				timeout: 180_000,
 				env: {
 					VITE_E2E: "true",
+					VITE_API_URL: baseURL,
 					VITE_DISABLE_ANIMATIONS: "true",
 					...(supabaseUrl
 						? { VITE_SUPABASE_URL: supabaseUrl }
