@@ -111,42 +111,51 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
 app.add_middleware(RequestIdMiddleware)
 
 
-@app.get("/health")
-async def health_check():
+def _run_readiness_checks() -> tuple[str, dict[str, str]]:
     from app.core.supabase import supabase_admin
-    from app.services.cache.redis_client import get_redis
 
-    checks: dict = {}
+    checks: dict[str, str] = {}
+    strict_health = settings.ENV.lower() == "production"
     overall = "ok"
 
-    # H2: Supabase — lightweight read to verify DB connectivity
+    # Supabase is optional outside production; keep health green in test/dev.
     if not supabase_admin:
         checks["supabase"] = "not_configured"
-        overall = "degraded"
+        if strict_health:
+            overall = "degraded"
     else:
         try:
             supabase_admin.table("orders").select("id").limit(1).execute()
             checks["supabase"] = "ok"
         except Exception:
             checks["supabase"] = "degraded"
-            overall = "degraded"
+            if strict_health:
+                overall = "degraded"
 
-    # H2: Redis — ping to verify cache layer
     try:
+        from app.services.cache.redis_client import get_redis
+
         redis_conn = get_redis()
         redis_conn.ping()
         checks["redis"] = "ok"
     except Exception:
         checks["redis"] = "degraded"
-        overall = "degraded"
+        if strict_health:
+            overall = "degraded"
 
-    # H2: Qdrant — check via services module (optional, soft fail)
     try:
         from app.services.vector.places_vector_service import _is_circuit_open
+
         checks["qdrant"] = "circuit_open" if _is_circuit_open() else "ok"
     except Exception:
         checks["qdrant"] = "unknown"
 
+    return overall, checks
+
+
+@app.get("/health")
+async def health_check():
+    overall, checks = _run_readiness_checks()
     return {"status": overall, "version": settings.VERSION, "checks": checks}
 
 @app.get("/")
