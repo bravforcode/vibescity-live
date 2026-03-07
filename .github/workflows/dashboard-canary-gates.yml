@@ -1,0 +1,88 @@
+name: Dashboard Canary Promotion Gates
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dashboard-canary-gates-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VITE_BUILD_VERSION: ${{ github.sha }}
+  VITE_COMMIT_SHA: ${{ github.sha }}
+
+jobs:
+  dashboard-canary-e2e:
+    name: dashboard-canary-e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright browsers (webkit + chromium)
+        run: npx playwright install --with-deps webkit chromium
+
+      - name: Run dashboard canary E2E matrix
+        run: npx playwright test tests/e2e/dashboard_canary_matrix.spec.ts
+
+      - name: Upload Playwright report (canary e2e)
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-canary-e2e-report-${{ github.run_id }}
+          path: |
+            playwright-report/**
+            test-results/**
+            reports/e2e/junit.xml
+          if-no-files-found: warn
+          retention-days: 14
+
+  dashboard-visual-regression:
+    name: dashboard-visual-regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run dashboard visual regression
+        run: npx playwright test tests/visual/dashboard.visual.spec.ts --config=playwright.visual.config.ts
+
+      - name: Upload Playwright report (dashboard visual)
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-visual-report-${{ github.run_id }}
+          path: |
+            playwright-report/**
+            test-results/**
+            tests/visual/dashboard.visual.spec.ts-snapshots/**
+          if-no-files-found: warn
+          retention-days: 14

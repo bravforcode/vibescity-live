@@ -3,6 +3,9 @@ import generatePayload from "promptpay-qr";
 import QrcodeVue from "qrcode.vue";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useDashboardGuard } from "@/composables/useDashboardGuard";
+import { usePermission } from "@/composables/usePermission";
+import { mask } from "@/utils/dataMasking";
 import {
 	PAYOUT_COUNTRY_OPTIONS,
 	PAYOUT_CURRENCY_OPTIONS,
@@ -16,6 +19,10 @@ import { useFeatureFlagStore } from "../store/featureFlagStore";
 const featureFlagStore = useFeatureFlagStore();
 const router = useRouter();
 const route = useRoute();
+useDashboardGuard("partner", {
+	allowVisitorFallback: false,
+	strictAuth: false,
+});
 
 // Manual payment constants (same as MerchantRegister)
 const PROMPTPAY_ID = "0113222743";
@@ -40,6 +47,17 @@ const copyAccountNumber = async () => {
 	}
 };
 
+const toggleRevenueReveal = () => {
+	if (!canRevealSensitive.value) return;
+	if (!isRevenueRevealed.value && typeof window !== "undefined") {
+		const confirmed = window.confirm(
+			"Reveal sensitive financial amount on this screen?",
+		);
+		if (!confirmed) return;
+	}
+	isRevenueRevealed.value = !isRevenueRevealed.value;
+};
+
 // Tab state for mobile forms
 const activeTab = ref("profile"); // "profile" | "payout"
 
@@ -48,6 +66,7 @@ const errorMessage = ref("");
 const isSavingProfile = ref(false);
 const isSavingBank = ref(false);
 const isStartingSubscription = ref(false);
+const isRevenueRevealed = ref(false);
 
 const visitorId = ref("");
 const status = ref({
@@ -82,9 +101,22 @@ const bankForm = reactive({
 const partnerEnabled = computed(() =>
 	featureFlagStore.isEnabled("enable_partner_program"),
 );
+const { hasPermission: canViewFinancial } = usePermission("view:financial");
+const { hasPermission: canEditBank } = usePermission("edit:bank");
+const { hasPermission: canManageProfile } = usePermission("view:kpi");
 const hasAccess = computed(() => Boolean(status.value?.has_access));
 const statusLabel = computed(() =>
 	String(status.value?.status || "inactive").toUpperCase(),
+);
+const canRevealSensitive = computed(
+	() =>
+		featureFlagStore.isEnabled("ff_sensitive_reveal") &&
+		Boolean(canViewFinancial.value),
+);
+const totalPaidDisplay = computed(() =>
+	isRevenueRevealed.value
+		? formatMoney(summary.value?.total_paid_thb)
+		: mask.revenue(summary.value?.total_paid_thb, "partner"),
 );
 const paywallReason = computed(() =>
 	hasAccess.value
@@ -164,7 +196,7 @@ const resolveHomePath = () => {
 	if (locale === "th" || locale === "en") {
 		return `/${locale}`;
 	}
-	return "/th";
+	return "/en";
 };
 
 const exitPartnerDashboard = () => {
@@ -231,6 +263,10 @@ const loadDashboard = async () => {
 };
 
 const createOrUpdateProfile = async () => {
+	if (!canManageProfile.value) {
+		errorMessage.value = "Permission denied for profile update.";
+		return;
+	}
 	if (!hasAccess.value) {
 		await startPartnerSubscription();
 		return;
@@ -286,6 +322,10 @@ const startPartnerSubscription = async () => {
 };
 
 const saveBank = async () => {
+	if (!canEditBank.value) {
+		errorMessage.value = "Permission denied for payout configuration.";
+		return;
+	}
 	if (!hasAccess.value) {
 		await startPartnerSubscription();
 		return;
@@ -335,116 +375,134 @@ onMounted(() => {
 </script>
 
 <template>
-  <main class="pd-root" aria-label="Partner Dashboard">
-    <!-- Background glows -->
-    <div class="pd-bg" aria-hidden="true">
-      <div class="pd-bg--emerald" />
-      <div class="pd-bg--blue" />
-      <div class="pd-bg--rose" />
+  <main
+    class="relative min-h-dvh w-full overflow-x-hidden px-4 pb-8 pt-20 text-white md:px-6 md:pt-24"
+    :aria-label="$t('auto.k_203425a5')"
+    data-testid="partner-dashboard-root"
+  >
+    <div class="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[#08091a]" aria-hidden="true">
+      <div class="absolute -right-20 -top-24 h-80 w-80 rounded-full bg-emerald-500/20 blur-[100px]" />
+      <div class="absolute -left-24 -top-20 h-72 w-72 rounded-full bg-blue-500/20 blur-[100px]" />
+      <div class="absolute bottom-[-160px] left-1/4 h-96 w-96 rounded-full bg-cyan-500/15 blur-[110px]" />
     </div>
 
-    <div class="pd-container">
-      <!-- â"€â"€ Hero â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ -->
-      <header class="pd-hero">
-        <div class="pd-hero-left">
-          <p class="pd-eyebrow">Partner Program</p>
-          <h1 class="pd-hero-title">Your Earnings Hub</h1>
-          <p class="pd-hero-sub">Refer friends, earn commissions, get paid.</p>
-        </div>
-        <div class="pd-hero-actions">
-          <button
-            type="button"
-            class="pd-chip"
-            :disabled="isLoading"
-            @click="loadDashboard"
-          >
-            Refresh
-          </button>
-          <button
-            type="button"
-            class="pd-chip pd-chip--exit"
-            @click="exitPartnerDashboard"
-          >
-            Exit
-          </button>
+    <div class="mx-auto flex w-full max-w-7xl flex-col gap-4 md:gap-5">
+      <header class="relative overflow-hidden rounded-2xl border border-white/10 bg-gray-900/90 p-5 shadow-2xl backdrop-blur-xl md:p-6">
+        <div class="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-transparent to-blue-500/10" />
+        <div class="relative z-10 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div class="space-y-2">
+            <p class="text-[11px] font-black uppercase tracking-[0.3em] text-white/55">{{ $t('auto.k_b0128d7d') }}</p>
+            <h1 class="text-2xl font-black leading-tight md:text-3xl">
+              <span class="bg-gradient-to-r from-emerald-300 to-cyan-300 bg-clip-text text-transparent">{{ $t('auto.k_d76cf692') }}</span>
+            </h1>
+            <p class="max-w-2xl text-sm text-white/70 md:text-base">{{ $t('auto.k_e810bff8') }}</p>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              class="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs font-bold text-white/80 transition hover:bg-white/10"
+              :disabled="isLoading"
+              @click="loadDashboard"
+            >
+              Refresh
+            </button>
+            <button
+              type="button"
+              class="rounded-xl bg-gradient-to-r from-emerald-600 to-cyan-600 px-3 py-2 text-xs font-black text-white shadow-lg transition hover:scale-[1.02] active:scale-[0.98]"
+              @click="exitPartnerDashboard"
+            >
+              Exit
+            </button>
+          </div>
         </div>
       </header>
 
-      <!-- â"€â"€ Loading â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ -->
-      <section v-if="isLoading" class="pd-panel pd-loading" aria-live="polite">
-        <div class="pd-spinner" aria-hidden="true" />
-        <p class="pd-loading-text">Loading partner data...</p>
+      <section v-if="isLoading" class="rounded-2xl border border-white/10 bg-gray-900/85 p-4 shadow-2xl backdrop-blur-xl" aria-live="polite">
+        <div class="flex items-center gap-3">
+          <div class="h-5 w-5 animate-spin rounded-full border-2 border-cyan-300/30 border-t-cyan-300" aria-hidden="true" />
+          <p class="text-sm text-white/75">{{ $t('auto.k_903ab19f') }}</p>
+        </div>
+        <div class="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+          <div v-for="n in 6" :key="`partner-stat-skeleton-${n}`" class="h-20 animate-pulse rounded-2xl border border-white/10 bg-white/5" />
+        </div>
       </section>
 
       <template v-else>
-        <!-- â"€â"€ Program Disabled â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ -->
-        <section
-          v-if="!partnerEnabled"
-          class="pd-panel pd-panel--warn"
-          role="alert"
-        >
-          <h2 class="pd-section-title">Partner Program Disabled</h2>
-          <p class="pd-section-sub">
-            Feature flag <code>enable_partner_program</code> is currently off.
+        <section v-if="!partnerEnabled" class="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4 text-amber-100" role="alert">
+          <h2 class="text-base font-black text-amber-200">{{ $t('auto.k_4f943d97') }}</h2>
+          <p class="mt-1 text-sm text-amber-100/90">
+            {{ $t('auto.k_afbe4519') }}
+            <code class="rounded bg-black/30 px-1.5 py-0.5 text-xs">enable_partner_program</code>
+            {{ $t('auto.k_5d743acc') }}
           </p>
         </section>
 
         <template v-else>
-          <!-- â"€â"€ Stat Strip â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ -->
-          <section class="pd-stat-strip" aria-label="Account overview">
-            <article class="pd-stat">
-              <p class="pd-stat-label">Access</p>
+          <section
+            class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6"
+            :aria-label="$t('auto.k_d89ccc97')"
+            data-testid="partner-stat-strip"
+          >
+            <article class="rounded-2xl border border-white/10 bg-black/30 p-4">
+              <p class="text-[11px] font-black uppercase tracking-[0.2em] text-white/60">Access</p>
               <p
-                class="pd-stat-value"
-                :class="
-                  hasAccess ? 'pd-stat-value--green' : 'pd-stat-value--amber'
-                "
+                class="mt-2 text-lg font-black"
+                :class="hasAccess ? 'text-emerald-300' : 'text-amber-300'"
               >
                 {{ hasAccess ? "PAID" : "UNPAID" }}
               </p>
             </article>
-            <article class="pd-stat">
-              <p class="pd-stat-label">Status</p>
-              <p class="pd-stat-value">{{ statusLabel }}</p>
+
+            <article class="rounded-2xl border border-white/10 bg-black/30 p-4">
+              <p class="text-[11px] font-black uppercase tracking-[0.2em] text-white/60">Status</p>
+              <p class="mt-2 text-lg font-black text-white">{{ statusLabel }}</p>
             </article>
-            <article class="pd-stat">
-              <p class="pd-stat-label">Renews</p>
-              <p class="pd-stat-value pd-stat-value--sm">
-                {{ formatDate(status.current_period_end) }}
-              </p>
+
+            <article class="rounded-2xl border border-white/10 bg-black/30 p-4">
+              <p class="text-[11px] font-black uppercase tracking-[0.2em] text-white/60">Renews</p>
+              <p class="mt-2 text-sm font-bold text-white/90">{{ formatDate(status.current_period_end) }}</p>
             </article>
-            <article class="pd-stat">
-              <p class="pd-stat-label">Orders (90d)</p>
-              <p class="pd-stat-value">
-                {{ Number(summary?.total_orders || 0) }}
-              </p>
+
+            <article class="rounded-2xl border border-white/10 bg-black/30 p-4">
+              <p class="text-[11px] font-black uppercase tracking-[0.2em] text-white/60">{{ $t('auto.k_7842dd7e') }}</p>
+              <p class="mt-2 text-lg font-black text-white">{{ Number(summary?.total_orders || 0) }}</p>
             </article>
-            <article class="pd-stat">
-              <p class="pd-stat-label">Verified</p>
-              <p class="pd-stat-value">
-                {{ Number(summary?.verified_orders || 0) }}
-              </p>
+
+            <article class="rounded-2xl border border-white/10 bg-black/30 p-4">
+              <p class="text-[11px] font-black uppercase tracking-[0.2em] text-white/60">Verified</p>
+              <p class="mt-2 text-lg font-black text-white">{{ Number(summary?.verified_orders || 0) }}</p>
             </article>
-            <article class="pd-stat">
-              <p class="pd-stat-label">Total Paid</p>
-              <p class="pd-stat-value pd-stat-value--sm pd-stat-value--green">
-                {{ formatMoney(summary?.total_paid_thb) }}
-              </p>
+
+            <article class="rounded-2xl border border-white/10 bg-black/30 p-4">
+              <p class="text-[11px] font-black uppercase tracking-[0.2em] text-white/60">{{ $t('auto.k_220b1871') }}</p>
+              <p class="mt-2 text-sm font-black text-emerald-300">{{ totalPaidDisplay }}</p>
+              <button
+                v-if="canRevealSensitive"
+                type="button"
+                class="mt-2 rounded-lg border border-white/15 bg-white/10 px-2 py-1 text-[11px] font-bold text-white/85 transition hover:bg-white/15"
+                @click="toggleRevenueReveal"
+              >
+                {{ isRevenueRevealed ? "Hide" : "Reveal" }}
+              </button>
             </article>
           </section>
 
-          <!-- Subscription CTA -->
-          <section class="pd-panel">
-            <div class="pd-sub-wrap">
-              <div class="pd-sub-copy">
-                <h2 class="pd-section-title">Subscription</h2>
-                <p class="pd-section-sub">Partner Program - 899 THB/month</p>
-                <p v-if="!hasAccess" class="pd-sub-hint">{{ paywallReason }}</p>
+          <section
+            class="rounded-2xl border border-white/10 bg-gray-900/90 p-4 shadow-2xl backdrop-blur-xl md:p-5"
+            data-testid="partner-subscription-panel"
+          >
+            <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h2 class="text-lg font-black text-white">Subscription</h2>
+                <p class="mt-1 text-sm text-white/55">{{ $t('auto.k_8bd0ab97') }}</p>
+                <p v-if="!hasAccess" class="mt-1 text-xs text-amber-200">{{ paywallReason }}</p>
               </div>
-              <div class="pd-sub-buttons">
+
+              <div class="grid gap-2 sm:grid-cols-2">
                 <button
                   type="button"
-                  class="pd-cta"
+                  class="rounded-xl bg-gradient-to-r from-emerald-600 to-cyan-600 px-4 py-3 text-sm font-black text-white shadow-lg transition hover:scale-[1.01] active:scale-[0.98] disabled:opacity-60"
                   :disabled="isStartingSubscription"
                   @click="startPartnerSubscription"
                 >
@@ -456,47 +514,40 @@ onMounted(() => {
                         : "Pay with Card / PromptPay"
                   }}
                 </button>
+
                 <button
                   v-if="!hasAccess"
                   type="button"
-                  class="pd-cta pd-cta--manual"
+                  class="rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-bold text-white transition hover:bg-white/15"
                   @click="showManualPayment = !showManualPayment"
                 >
-                  {{
-                    showManualPayment
-                      ? "Hide Transfer Info"
-                      : "Bank Transfer / QR"
-                  }}
+                  {{ showManualPayment ? "Hide Transfer Info" : "Bank Transfer / QR" }}
                 </button>
               </div>
             </div>
 
-            <!-- Manual Payment Section -->
-            <div v-if="showManualPayment && !hasAccess" class="pd-manual-pay">
-              <div class="pd-manual-tabs">
+            <div v-if="showManualPayment && !hasAccess" class="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
+              <div class="mb-4 flex rounded-xl border border-white/10 bg-black/40 p-1">
                 <button
-                  :class="[
-                    'pd-manual-tab',
-                    paymentTab === 'qr' && 'pd-manual-tab--active',
-                  ]"
+                  type="button"
+                  class="flex-1 rounded-lg px-3 py-2 text-xs font-bold transition"
+                  :class="paymentTab === 'qr' ? 'bg-white text-black' : 'text-white/65 hover:text-white'"
                   @click="paymentTab = 'qr'"
                 >
-                  Scan QR
+                  {{ $t('auto.k_334aaf1b') }}
                 </button>
                 <button
-                  :class="[
-                    'pd-manual-tab',
-                    paymentTab === 'bank' && 'pd-manual-tab--active',
-                  ]"
+                  type="button"
+                  class="flex-1 rounded-lg px-3 py-2 text-xs font-bold transition"
+                  :class="paymentTab === 'bank' ? 'bg-white text-black' : 'text-white/65 hover:text-white'"
                   @click="paymentTab = 'bank'"
                 >
-                  Bank Transfer
+                  {{ $t('auto.k_24cd9456') }}
                 </button>
               </div>
 
-              <!-- QR Tab -->
-              <div v-if="paymentTab === 'qr'" class="pd-qr-section">
-                <div class="pd-qr-box">
+              <div v-if="paymentTab === 'qr'" class="flex flex-col items-center gap-2 rounded-xl bg-white p-4 text-black">
+                <div class="rounded-lg bg-white p-2">
                   <qrcode-vue
                     v-if="qrPayload"
                     :value="qrPayload"
@@ -504,115 +555,118 @@ onMounted(() => {
                     level="H"
                   />
                 </div>
-                <p class="pd-qr-label">
-                  Scan PromptPay to pay {{ PARTNER_PRICE.toLocaleString() }} THB
-                </p>
-                <p class="pd-qr-sub">PromptPay ID: {{ PROMPTPAY_ID }}</p>
+                <p class="text-xs font-black">{{ $t('auto.k_b1b13573') }} {{ PARTNER_PRICE.toLocaleString() }} THB</p>
+                <p class="text-xs text-gray-600">{{ $t('auto.k_31b8251a') }} {{ PROMPTPAY_ID }}</p>
               </div>
 
-              <!-- Bank Transfer Tab -->
-              <div v-else class="pd-bank-section">
-                <div class="pd-bank-row">
-                  <span class="pd-bank-label">Bank Name</span>
-                  <span class="pd-bank-value">{{ BANK_NAME }}</span>
+              <div v-else class="space-y-2 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white">
+                <div class="flex items-center justify-between gap-3">
+                  <span class="text-white/60">{{ $t('auto.k_e41a07b6') }}</span>
+                  <span class="font-bold">{{ BANK_NAME }}</span>
                 </div>
-                <div class="pd-bank-row">
-                  <span class="pd-bank-label">Account Number</span>
-                  <button class="pd-bank-copy" @click="copyAccountNumber">
-                    <span class="pd-bank-mono">{{ BANK_ACCOUNT_DISPLAY }}</span>
-                    <span class="pd-bank-copy-tag">COPY</span>
+                <div class="flex items-center justify-between gap-3">
+                  <span class="text-white/60">{{ $t('auto.k_a86d4ce5') }}</span>
+                  <button
+                    type="button"
+                    class="rounded-lg border border-white/20 bg-black/30 px-3 py-2 font-mono text-xs text-white transition hover:bg-white/10"
+                    @click="copyAccountNumber"
+                  >
+                    {{ BANK_ACCOUNT_DISPLAY }}
                   </button>
                 </div>
-                <div class="pd-bank-row">
-                  <span class="pd-bank-label">Account Name</span>
-                  <span class="pd-bank-value">{{ ACCOUNT_NAME }}</span>
+                <div class="flex items-center justify-between gap-3">
+                  <span class="text-white/60">{{ $t('auto.k_993dc46f') }}</span>
+                  <span class="font-bold">{{ ACCOUNT_NAME }}</span>
                 </div>
-                <div class="pd-bank-row">
-                  <span class="pd-bank-label">Amount</span>
-                  <span class="pd-bank-value pd-bank-value--highlight"
-                    >{{ PARTNER_PRICE.toLocaleString() }} THB</span
-                  >
+                <div class="flex items-center justify-between gap-3">
+                  <span class="text-white/60">Amount</span>
+                  <span class="font-black text-emerald-300">{{ PARTNER_PRICE.toLocaleString() }} THB</span>
                 </div>
               </div>
 
-              <p class="pd-manual-note">
-                After transfer, send slip screenshot to support for activation.
-              </p>
+              <p class="mt-3 text-xs text-white/60">{{ $t('auto.k_bd2e6383') }}</p>
             </div>
           </section>
 
-          <!-- â"€â"€ Tab Switcher (mobile shows one at a time) â"€ -->
-          <div class="pd-tab-bar" role="tablist" aria-label="Partner forms">
+          <div
+            class="flex rounded-2xl border border-white/10 bg-black/40 p-1"
+            role="tablist"
+            :aria-label="$t('auto.k_922f6a8e')"
+            data-testid="partner-tab-bar"
+          >
             <button
               role="tab"
-              class="pd-tab"
-              :class="{ 'pd-tab--active': activeTab === 'profile' }"
+              class="flex-1 rounded-xl px-3 py-2 text-sm font-bold transition"
+              :class="activeTab === 'profile' ? 'bg-white text-black' : 'text-white/65 hover:text-white'"
               :aria-selected="activeTab === 'profile'"
               @click="activeTab = 'profile'"
             >
-              Profile & Referral
+              {{ $t('auto.k_d2aa39c5') }}
             </button>
             <button
               role="tab"
-              class="pd-tab"
-              :class="{ 'pd-tab--active': activeTab === 'payout' }"
+              class="flex-1 rounded-xl px-3 py-2 text-sm font-bold transition"
+              :class="activeTab === 'payout' ? 'bg-white text-black' : 'text-white/65 hover:text-white'"
               :aria-selected="activeTab === 'payout'"
               @click="activeTab = 'payout'"
             >
-              Payout Setup
+              {{ $t('auto.k_4a3af5a') }}
             </button>
           </div>
 
-          <!-- --- Forms Grid -------------------------------------------------- -->
-          <div class="pd-forms-grid">
-            <!-- Profile Form -->
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-2" data-testid="partner-forms-grid">
             <article
-              class="pd-panel"
+              class="rounded-2xl border border-white/10 bg-gray-900/90 p-4 shadow-2xl backdrop-blur-xl"
               role="tabpanel"
-              :class="{ 'pd-panel--hidden': activeTab !== 'profile' }"
-              aria-label="Partner Profile"
+              :class="activeTab !== 'profile' ? 'hidden md:block' : ''"
+              :aria-label="$t('auto.k_a5d87ce4')"
             >
-              <div class="pd-panel-head">
+              <div class="flex items-center justify-between gap-3">
                 <div>
-                  <h3 class="pd-section-title">Partner Profile</h3>
-                  <p class="pd-section-sub">Referral setup and identity.</p>
+                  <h3 class="text-base font-black text-white">{{ $t('auto.k_a5d87ce4') }}</h3>
+                  <p class="text-sm text-white/55">{{ $t('auto.k_e5b7e934') }}</p>
                 </div>
                 <span
-                  class="pd-badge"
-                  :class="hasAccess ? 'pd-badge--green' : 'pd-badge--dim'"
+                  class="rounded-full border px-2 py-1 text-[11px] font-bold uppercase"
+                  :class="
+                    hasAccess
+                      ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-200'
+                      : 'border-white/20 bg-white/10 text-white/65'
+                  "
                 >
                   {{ hasAccess ? "Editable" : "Read-only" }}
                 </span>
               </div>
 
-              <div class="pd-field-group">
-                <label class="pd-label">
-                  Display Name
+              <div class="mt-4 space-y-3">
+                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
+                  {{ $t('auto.k_ce42c7ac') }}
                   <input
                     v-model.trim="profileForm.displayName"
                     type="text"
-                    class="pd-input"
-                    placeholder="Your name"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-white/40 outline-none focus:border-emerald-400"
+                    :placeholder="$t('auto.k_3a0663bd')"
                     :disabled="isSavingProfile || isStartingSubscription"
                   />
                 </label>
-                <label class="pd-label">
-                  Referral Code
+
+                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
+                  {{ $t('auto.k_8023bef5') }}
                   <input
                     v-model.trim="profileForm.referralCode"
                     type="text"
-                    class="pd-input"
-                    placeholder="e.g. PARTNER1234"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-white/40 outline-none focus:border-emerald-400"
+                    :placeholder="$t('auto.k_a6c1cc8d')"
                     :disabled="isSavingProfile || isStartingSubscription"
                   />
                 </label>
               </div>
 
-              <div class="pd-action-row">
+              <div class="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <button
                   type="button"
-                  class="pd-btn pd-btn--primary"
-                  :disabled="isSavingProfile || isStartingSubscription"
+                  class="rounded-xl bg-gradient-to-r from-emerald-600 to-cyan-600 px-4 py-3 text-sm font-black text-white shadow-lg transition hover:scale-[1.01] active:scale-[0.98] disabled:opacity-60"
+                  :disabled="isSavingProfile || isStartingSubscription || !canManageProfile"
                   @click="createOrUpdateProfile"
                 >
                   {{
@@ -625,46 +679,49 @@ onMounted(() => {
                 </button>
                 <button
                   type="button"
-                  class="pd-btn pd-btn--secondary"
+                  class="rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-bold text-white transition hover:bg-white/15 disabled:opacity-60"
                   :disabled="!referralLink"
                   @click="copyReferralLink"
                 >
-                  Copy Link
+                  {{ $t('auto.k_a6a045fc') }}
                 </button>
               </div>
 
-              <div v-if="referralLink" class="pd-link-box">
-                <span class="pd-link-label">Your referral link</span>
-                <p class="pd-link-text">{{ referralLink }}</p>
+              <div v-if="referralLink" class="mt-4 rounded-xl border border-white/10 bg-black/30 p-3">
+                <span class="text-[11px] font-bold uppercase tracking-wide text-white/60">{{ $t('auto.k_520dd2c1') }}</span>
+                <p class="mt-1 break-all text-sm text-white">{{ referralLink }}</p>
               </div>
             </article>
 
-            <!-- Payout Form -->
             <article
-              class="pd-panel"
+              class="rounded-2xl border border-white/10 bg-gray-900/90 p-4 shadow-2xl backdrop-blur-xl"
               role="tabpanel"
-              :class="{ 'pd-panel--hidden': activeTab !== 'payout' }"
-              aria-label="Payout Setup"
+              :class="activeTab !== 'payout' ? 'hidden md:block' : ''"
+              :aria-label="$t('auto.k_4a3af5a')"
             >
-              <div class="pd-panel-head">
+              <div class="flex items-center justify-between gap-3">
                 <div>
-                  <h3 class="pd-section-title">Payout Setup</h3>
-                  <p class="pd-section-sub">Thai banks + international wire.</p>
+                  <h3 class="text-base font-black text-white">{{ $t('auto.k_4a3af5a') }}</h3>
+                  <p class="text-sm text-white/55">{{ $t('auto.k_c2f76f18') }}</p>
                 </div>
                 <span
-                  class="pd-badge"
-                  :class="hasAccess ? 'pd-badge--green' : 'pd-badge--red'"
+                  class="rounded-full border px-2 py-1 text-[11px] font-bold uppercase"
+                  :class="
+                    hasAccess
+                      ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-200'
+                      : 'border-rose-500/40 bg-rose-500/20 text-rose-200'
+                  "
                 >
                   {{ hasAccess ? "Unlocked" : "Locked" }}
                 </span>
               </div>
 
-              <div class="pd-field-group pd-field-group--2col">
-                <label class="pd-label pd-label--full">
-                  Thai Bank
+              <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                <label class="block text-xs font-bold uppercase tracking-wide text-white/60 lg:col-span-2">
+                  {{ $t('auto.k_d9fb161b') }}
                   <select
                     v-model="bankForm.bankCode"
-                    class="pd-input"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400"
                     :disabled="isSavingBank || isStartingSubscription"
                   >
                     <option
@@ -672,42 +729,46 @@ onMounted(() => {
                       :key="bank.code"
                       :value="bank.code"
                     >
-                      {{ bank.code }} â€" {{ bank.name }}
+                      {{ bank.code }} - {{ bank.name }}
                     </option>
                   </select>
                 </label>
-                <label class="pd-label">
-                  Account Name
+
+                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
+                  {{ $t('auto.k_993dc46f') }}
                   <input
                     v-model.trim="bankForm.accountName"
                     type="text"
-                    class="pd-input"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400"
                     :disabled="isSavingBank || isStartingSubscription"
                   />
                 </label>
-                <label class="pd-label">
-                  Account Number
+
+                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
+                  {{ $t('auto.k_a86d4ce5') }}
                   <input
                     v-model.trim="bankForm.accountNumber"
                     type="text"
-                    class="pd-input pd-input--sensitive"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white outline-none focus:border-cyan-400"
                     :disabled="isSavingBank || isStartingSubscription"
                   />
                 </label>
-                <label class="pd-label">
-                  PromptPay ID
+
+                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
+                  {{ $t('auto.k_2315e84') }}
                   <input
                     v-model.trim="bankForm.promptpayId"
                     type="text"
-                    class="pd-input pd-input--sensitive"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white outline-none focus:border-cyan-400"
                     :disabled="isSavingBank || isStartingSubscription"
                   />
                 </label>
-                <label class="pd-label">
-                  Country
+
+                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
+                  Bank Country
                   <select
                     v-model="bankForm.bankCountry"
-                    class="pd-input"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400"
                     :disabled="isSavingBank || isStartingSubscription"
                   >
                     <option
@@ -719,11 +780,12 @@ onMounted(() => {
                     </option>
                   </select>
                 </label>
-                <label class="pd-label">
+
+                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
                   Currency
                   <select
                     v-model="bankForm.currency"
-                    class="pd-input"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400"
                     :disabled="isSavingBank || isStartingSubscription"
                   >
                     <option
@@ -735,11 +797,12 @@ onMounted(() => {
                     </option>
                   </select>
                 </label>
-                <label class="pd-label">
+
+                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
                   Account Type
                   <select
                     v-model="bankForm.accountType"
-                    class="pd-input"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400"
                     :disabled="isSavingBank || isStartingSubscription"
                   >
                     <option value="savings">Savings</option>
@@ -748,51 +811,54 @@ onMounted(() => {
                     <option value="other">Other</option>
                   </select>
                 </label>
-                <label class="pd-label">
-                  Bank Name (Int'l)
+
+                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
+                  Bank Name (International)
                   <input
                     v-model.trim="bankForm.bankName"
                     type="text"
-                    class="pd-input"
-                    :placeholder="
-                      isThaiPayout ? 'Optional' : 'Required for foreign payouts'
-                    "
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-white/40 outline-none focus:border-cyan-400"
+                    :placeholder="isThaiPayout ? 'Optional' : 'Required for foreign payouts'"
                     :disabled="isSavingBank || isStartingSubscription"
                   />
                 </label>
-                <label class="pd-label">
+
+                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
                   Branch Name
                   <input
                     v-model.trim="bankForm.branchName"
                     type="text"
-                    class="pd-input"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400"
                     :disabled="isSavingBank || isStartingSubscription"
                   />
                 </label>
-                <label class="pd-label">
+
+                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
                   SWIFT Code
                   <input
                     v-model.trim="bankForm.swiftCode"
                     type="text"
-                    class="pd-input pd-input--sensitive"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white outline-none focus:border-cyan-400"
                     :disabled="isSavingBank || isStartingSubscription"
                   />
                 </label>
-                <label class="pd-label">
+
+                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
                   IBAN
                   <input
                     v-model.trim="bankForm.iban"
                     type="text"
-                    class="pd-input pd-input--sensitive"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white outline-none focus:border-cyan-400"
                     :disabled="isSavingBank || isStartingSubscription"
                   />
                 </label>
-                <label class="pd-label">
+
+                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
                   Routing Number
                   <input
                     v-model.trim="bankForm.routingNumber"
                     type="text"
-                    class="pd-input pd-input--sensitive"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white outline-none focus:border-cyan-400"
                     :disabled="isSavingBank || isStartingSubscription"
                   />
                 </label>
@@ -800,8 +866,8 @@ onMounted(() => {
 
               <button
                 type="button"
-                class="pd-btn pd-btn--primary pd-btn--full"
-                :disabled="isSavingBank || isStartingSubscription"
+                class="mt-4 w-full rounded-xl bg-gradient-to-r from-emerald-600 to-cyan-600 px-4 py-3 text-sm font-black text-white shadow-lg transition hover:scale-[1.01] active:scale-[0.98] disabled:opacity-60"
+                :disabled="isSavingBank || isStartingSubscription || !canEditBank"
                 @click="saveBank"
               >
                 {{
@@ -815,783 +881,53 @@ onMounted(() => {
             </article>
           </div>
 
-          <!-- â"€â"€ Recent Orders â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ -->
-          <section class="pd-panel">
-            <h3 class="pd-section-title">
-              Recent Orders <span class="pd-section-badge">90d</span>
+          <section
+            class="rounded-2xl border border-white/10 bg-gray-900/90 p-4 shadow-2xl backdrop-blur-xl"
+            data-testid="partner-orders-panel"
+          >
+            <h3 class="text-base font-black text-white">
+              {{ $t('auto.k_30f69cb3') }}
+              <span class="ml-1 rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-[11px] font-bold text-white/70">90d</span>
             </h3>
-            <ul class="pd-order-list">
-              <li v-for="order in orders" :key="order.id" class="pd-order-item">
-                <div class="pd-order-row">
-                  <p class="pd-order-sku">
-                    {{ order.sku || "partner_program" }}
-                  </p>
-                  <p class="pd-order-amount">{{ formatMoney(order.amount) }}</p>
+
+            <ul class="mt-3 space-y-2">
+              <li
+                v-for="order in orders"
+                :key="order.id"
+                class="rounded-xl border border-white/10 bg-black/30 p-3"
+              >
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-sm font-bold text-white">{{ order.sku || "partner_program" }}</p>
+                  <p class="text-sm font-black text-emerald-300">{{ formatMoney(order.amount) }}</p>
                 </div>
-                <div class="pd-order-meta">
+                <div class="mt-1 flex items-center justify-between gap-3 text-xs">
                   <span
-                    class="pd-order-status"
+                    class="rounded-full border px-2 py-0.5 font-bold uppercase"
                     :class="{
-                      'pd-order-status--paid': [
-                        'paid',
-                        'succeeded',
-                        'active',
-                      ].includes(order.status),
-                      'pd-order-status--pending': order.status === 'pending',
-                      'pd-order-status--fail': ['failed', 'canceled'].includes(
-                        order.status,
-                      ),
+                      'border-emerald-500/40 bg-emerald-500/20 text-emerald-200': ['paid', 'succeeded', 'active'].includes(order.status),
+                      'border-amber-500/40 bg-amber-500/20 text-amber-200': order.status === 'pending',
+                      'border-rose-500/40 bg-rose-500/20 text-rose-200': ['failed', 'canceled'].includes(order.status),
                     }"
-                    >{{ order.status }}</span
                   >
-                  <span class="pd-order-date">{{
-                    formatDate(order.created_at)
-                  }}</span>
+                    {{ order.status }}
+                  </span>
+                  <span class="text-white/55">{{ formatDate(order.created_at) }}</span>
                 </div>
               </li>
-              <li v-if="orders.length === 0" class="pd-order-empty">
-                No partner orders in the latest 90 days.
+              <li
+                v-if="orders.length === 0"
+                class="rounded-xl border border-white/10 bg-black/30 p-3 text-sm text-white/55"
+              >
+                {{ $t('auto.k_e86cd544') }}
               </li>
             </ul>
           </section>
         </template>
       </template>
 
-      <!-- â"€â"€ Error Banner â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ -->
-      <div v-if="errorMessage" class="pd-error" role="alert">
+      <div v-if="errorMessage" class="rounded-xl border border-red-500/30 bg-red-950/40 px-4 py-3 text-sm text-red-100" role="alert">
         <p>{{ errorMessage }}</p>
       </div>
     </div>
   </main>
 </template>
-
-<style scoped>
-.pd-root {
-  position: relative;
-  min-height: 100dvh;
-  width: 100%;
-  max-width: 100vw;
-  overflow-x: hidden;
-  padding: 16px;
-  padding-top: 80px;
-  color: #fff;
-  font-family:
-    system-ui,
-    -apple-system,
-    sans-serif;
-}
-@media (min-width: 768px) {
-  .pd-root {
-    padding: 24px;
-    padding-top: 88px;
-  }
-}
-.pd-bg {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background: #08091a;
-  overflow: hidden;
-}
-.pd-bg--emerald,
-.pd-bg--blue,
-.pd-bg--rose {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(90px);
-  opacity: 0.3;
-  will-change: transform;
-}
-.pd-bg--emerald {
-  width: 520px;
-  height: 520px;
-  top: -140px;
-  right: -60px;
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.5), transparent);
-}
-.pd-bg--blue {
-  width: 460px;
-  height: 460px;
-  top: -100px;
-  left: -80px;
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.45), transparent);
-}
-.pd-bg--rose {
-  width: 600px;
-  height: 600px;
-  bottom: -180px;
-  left: 0;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.25), transparent);
-}
-.pd-container {
-  width: 100%;
-  max-width: 1140px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.pd-hero {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 18px 20px;
-  border-radius: 20px;
-  border: 1px solid rgba(139, 92, 246, 0.18);
-  background: linear-gradient(
-    140deg,
-    rgba(12, 10, 40, 0.95),
-    rgba(8, 9, 26, 0.9)
-  );
-  backdrop-filter: blur(20px);
-}
-.pd-eyebrow {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.22em;
-  color: rgba(139, 92, 246, 0.9);
-  font-weight: 700;
-  margin-bottom: 5px;
-}
-.pd-hero-title {
-  font-size: clamp(1.35rem, 4vw, 1.9rem);
-  font-weight: 900;
-  letter-spacing: -0.025em;
-  line-height: 1.1;
-  color: #fff;
-  margin-bottom: 4px;
-}
-.pd-hero-sub {
-  font-size: 0.82rem;
-  color: rgba(255, 255, 255, 0.5);
-}
-.pd-hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-.pd-chip {
-  padding: 10px 18px;
-  min-height: 44px;
-  border-radius: 12px;
-  border: 1px solid rgba(139, 92, 246, 0.2);
-  background: rgba(139, 92, 246, 0.08);
-  font-size: 0.8rem;
-  font-weight: 800;
-  color: rgba(255, 255, 255, 0.75);
-  transition:
-    background 0.15s,
-    transform 0.1s;
-  touch-action: manipulation;
-  cursor: pointer;
-}
-.pd-chip:hover {
-  background: rgba(139, 92, 246, 0.16);
-}
-.pd-chip:active {
-  transform: scale(0.96);
-}
-.pd-chip--exit {
-  border-color: rgba(239, 68, 68, 0.35);
-  background: rgba(239, 68, 68, 0.12);
-  color: #fca5a5;
-  font-size: 0.85rem;
-  font-weight: 900;
-  min-height: 48px;
-  padding: 12px 22px;
-}
-.pd-chip--exit:hover {
-  background: rgba(239, 68, 68, 0.22);
-  border-color: rgba(239, 68, 68, 0.5);
-}
-.pd-panel {
-  border: 1px solid rgba(139, 92, 246, 0.12);
-  border-radius: 18px;
-  padding: 18px;
-  background: rgba(12, 10, 40, 0.6);
-  backdrop-filter: blur(12px);
-}
-.pd-panel--warn {
-  border-color: rgba(245, 158, 11, 0.25);
-  background: rgba(245, 158, 11, 0.06);
-}
-.pd-panel--hidden {
-  display: none;
-}
-@media (min-width: 768px) {
-  .pd-panel--hidden {
-    display: block !important;
-  }
-}
-.pd-panel-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-.pd-loading {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 24px;
-}
-.pd-spinner {
-  width: 22px;
-  height: 22px;
-  border: 2px solid rgba(139, 92, 246, 0.35);
-  border-top-color: #8b5cf6;
-  border-radius: 50%;
-  animation: pd-spin 0.8s linear infinite;
-  flex-shrink: 0;
-}
-@keyframes pd-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.pd-loading-text {
-  font-size: 0.84rem;
-  color: rgba(255, 255, 255, 0.55);
-}
-.pd-section-title {
-  font-size: 0.95rem;
-  font-weight: 900;
-  color: #fff;
-  margin-bottom: 2px;
-}
-.pd-section-sub {
-  font-size: 0.76rem;
-  color: rgba(255, 255, 255, 0.45);
-}
-.pd-section-badge {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  font-size: 9px;
-  font-weight: 800;
-  background: rgba(139, 92, 246, 0.18);
-  color: #a78bfa;
-  vertical-align: middle;
-}
-.pd-stat-strip {
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 4px;
-}
-.pd-stat-strip::-webkit-scrollbar {
-  display: none;
-}
-@media (min-width: 1024px) {
-  .pd-stat-strip {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    overflow: visible;
-  }
-}
-.pd-stat {
-  flex: 0 0 130px;
-  min-width: 130px;
-  scroll-snap-align: start;
-  border: 1px solid rgba(139, 92, 246, 0.1);
-  border-radius: 14px;
-  padding: 14px;
-  background: rgba(12, 10, 40, 0.5);
-}
-@media (min-width: 1024px) {
-  .pd-stat {
-    flex: initial;
-    min-width: 0;
-  }
-}
-.pd-stat-label {
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: rgba(255, 255, 255, 0.45);
-  margin-bottom: 8px;
-  font-weight: 700;
-}
-.pd-stat-value {
-  font-size: 1.5rem;
-  font-weight: 900;
-  color: #fff;
-  letter-spacing: -0.025em;
-  line-height: 1;
-}
-.pd-stat-value--sm {
-  font-size: 0.85rem;
-  line-height: 1.4;
-}
-.pd-stat-value--green {
-  color: #34d399;
-}
-.pd-stat-value--amber {
-  color: #fbbf24;
-}
-.pd-sub-wrap {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-}
-.pd-sub-copy {
-  flex: 1 1 200px;
-}
-.pd-sub-hint {
-  margin-top: 4px;
-  font-size: 0.75rem;
-  color: #fbbf24;
-}
-.pd-cta {
-  flex: 1 1 100%;
-  min-height: 52px;
-  border-radius: 14px;
-  border: none;
-  background: linear-gradient(135deg, #8b5cf6, #6366f1, #3b82f6);
-  color: #fff;
-  font-size: 0.95rem;
-  font-weight: 900;
-  transition:
-    filter 0.15s,
-    transform 0.1s,
-    box-shadow 0.2s;
-  touch-action: manipulation;
-  cursor: pointer;
-  box-shadow: 0 4px 24px rgba(139, 92, 246, 0.25);
-}
-@media (min-width: 640px) {
-  .pd-cta {
-    flex: 0 0 auto;
-    padding: 0 28px;
-  }
-}
-.pd-cta:hover {
-  filter: brightness(1.1);
-  box-shadow: 0 6px 32px rgba(139, 92, 246, 0.35);
-}
-.pd-cta:active {
-  transform: scale(0.98);
-}
-.pd-cta:disabled {
-  opacity: 0.55;
-  box-shadow: none;
-}
-.pd-tab-bar {
-  display: flex;
-  gap: 8px;
-  padding: 4px;
-  border-radius: 14px;
-  background: rgba(12, 10, 40, 0.5);
-  border: 1px solid rgba(139, 92, 246, 0.12);
-}
-@media (min-width: 768px) {
-  .pd-tab-bar {
-    display: none;
-  }
-}
-.pd-tab {
-  flex: 1;
-  padding: 10px 14px;
-  min-height: 44px;
-  border-radius: 10px;
-  font-size: 0.8rem;
-  font-weight: 800;
-  color: rgba(255, 255, 255, 0.5);
-  transition:
-    background 0.15s,
-    color 0.15s;
-  touch-action: manipulation;
-  cursor: pointer;
-}
-.pd-tab--active {
-  background: rgba(139, 92, 246, 0.2);
-  color: #a78bfa;
-  border: 1px solid rgba(139, 92, 246, 0.3);
-}
-.pd-forms-grid {
-  display: grid;
-  gap: 14px;
-}
-@media (min-width: 768px) {
-  .pd-forms-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-.pd-badge {
-  flex-shrink: 0;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 800;
-  border: 1px solid transparent;
-}
-.pd-badge--green {
-  background: rgba(34, 197, 94, 0.12);
-  border-color: rgba(34, 197, 94, 0.25);
-  color: #86efac;
-}
-.pd-badge--dim {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.45);
-}
-.pd-badge--red {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgba(239, 68, 68, 0.2);
-  color: #fca5a5;
-}
-.pd-field-group {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-.pd-field-group--2col {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-.pd-label {
-  display: block;
-  font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.65);
-  font-weight: 600;
-}
-.pd-label--full {
-  grid-column: 1/-1;
-}
-.pd-input {
-  display: block;
-  width: 100%;
-  margin-top: 5px;
-  border: 1px solid rgba(139, 92, 246, 0.18);
-  background: rgba(12, 10, 40, 0.5);
-  border-radius: 10px;
-  padding: 11px 14px;
-  min-height: 44px;
-  color: #fff;
-  font-size: 0.84rem;
-  outline: none;
-  transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
-  -webkit-appearance: none;
-  appearance: none;
-}
-.pd-input:focus-visible {
-  border-color: rgba(139, 92, 246, 0.6);
-  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.15);
-}
-.pd-input::placeholder {
-  color: rgba(255, 255, 255, 0.25);
-}
-.pd-input:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-.pd-input--sensitive {
-  font-family: monospace;
-  letter-spacing: 0.04em;
-}
-.pd-action-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-.pd-btn {
-  padding: 11px 18px;
-  min-height: 44px;
-  border-radius: 10px;
-  font-size: 0.84rem;
-  font-weight: 900;
-  transition:
-    filter 0.15s,
-    transform 0.1s;
-  touch-action: manipulation;
-  cursor: pointer;
-}
-.pd-btn:active {
-  transform: scale(0.97);
-}
-.pd-btn:disabled {
-  opacity: 0.5;
-}
-.pd-btn--primary {
-  background: linear-gradient(135deg, #8b5cf6, #6366f1);
-  color: #fff;
-  border: none;
-  box-shadow: 0 2px 12px rgba(139, 92, 246, 0.2);
-}
-.pd-btn--primary:hover {
-  filter: brightness(1.1);
-}
-.pd-btn--secondary {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(139, 92, 246, 0.2);
-  color: rgba(255, 255, 255, 0.8);
-}
-.pd-btn--secondary:hover {
-  background: rgba(139, 92, 246, 0.1);
-}
-.pd-btn--full {
-  width: 100%;
-}
-.pd-link-box {
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(139, 92, 246, 0.2);
-  padding: 12px 14px;
-}
-.pd-link-label {
-  display: block;
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: rgba(139, 92, 246, 0.7);
-  font-weight: 700;
-  margin-bottom: 4px;
-}
-.pd-link-text {
-  font-size: 0.8rem;
-  color: #a78bfa;
-  word-break: break-all;
-  font-family: monospace;
-}
-.pd-order-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
-  list-style: none;
-  padding: 0;
-}
-.pd-order-item {
-  border: 1px solid rgba(139, 92, 246, 0.08);
-  border-radius: 12px;
-  padding: 12px 14px;
-  background: rgba(12, 10, 40, 0.4);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.pd-order-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.pd-order-sku {
-  font-size: 0.85rem;
-  font-weight: 800;
-  color: #fff;
-}
-.pd-order-amount {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: #a78bfa;
-}
-.pd-order-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.pd-order-status {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 9px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  background: rgba(255, 255, 255, 0.07);
-  color: rgba(255, 255, 255, 0.5);
-}
-.pd-order-status--paid {
-  background: rgba(34, 197, 94, 0.15);
-  color: #86efac;
-}
-.pd-order-status--pending {
-  background: rgba(245, 158, 11, 0.15);
-  color: #fcd34d;
-}
-.pd-order-status--fail {
-  background: rgba(239, 68, 68, 0.12);
-  color: #fca5a5;
-}
-.pd-order-date {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
-}
-.pd-order-empty {
-  padding: 20px;
-  text-align: center;
-  font-size: 0.84rem;
-  color: rgba(255, 255, 255, 0.38);
-}
-.pd-sub-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  flex: 1 1 100%;
-}
-@media (min-width: 640px) {
-  .pd-sub-buttons {
-    flex: 0 0 auto;
-  }
-}
-.pd-cta--manual {
-  background: rgba(139, 92, 246, 0.12);
-  border: 1px solid rgba(139, 92, 246, 0.25);
-  box-shadow: none;
-}
-.pd-cta--manual:hover {
-  background: rgba(139, 92, 246, 0.2);
-}
-.pd-manual-pay {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid rgba(139, 92, 246, 0.1);
-}
-.pd-manual-tabs {
-  display: flex;
-  gap: 6px;
-  padding: 3px;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.3);
-  margin-bottom: 14px;
-}
-.pd-manual-tab {
-  flex: 1;
-  padding: 9px 12px;
-  min-height: 40px;
-  border-radius: 8px;
-  font-size: 0.78rem;
-  font-weight: 800;
-  color: rgba(255, 255, 255, 0.5);
-  transition:
-    background 0.15s,
-    color 0.15s;
-  cursor: pointer;
-}
-.pd-manual-tab--active {
-  background: rgba(255, 255, 255, 0.95);
-  color: #000;
-}
-.pd-qr-section {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 16px 0;
-}
-.pd-qr-box {
-  background: #fff;
-  padding: 16px;
-  border-radius: 16px;
-  display: inline-flex;
-}
-.pd-qr-label {
-  font-size: 0.84rem;
-  font-weight: 800;
-  color: #fff;
-}
-.pd-qr-sub {
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.45);
-}
-.pd-bank-section {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(139, 92, 246, 0.1);
-}
-.pd-bank-row {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.pd-bank-label {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: rgba(255, 255, 255, 0.4);
-  font-weight: 700;
-}
-.pd-bank-value {
-  font-size: 0.88rem;
-  font-weight: 800;
-  color: #fff;
-}
-.pd-bank-value--highlight {
-  color: #34d399;
-}
-.pd-bank-copy {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 9px 12px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(139, 92, 246, 0.15);
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.pd-bank-copy:hover {
-  background: rgba(139, 92, 246, 0.1);
-}
-.pd-bank-mono {
-  font-family: monospace;
-  font-size: 1rem;
-  font-weight: 800;
-  color: #fff;
-  letter-spacing: 0.06em;
-}
-.pd-bank-copy-tag {
-  font-size: 9px;
-  font-weight: 800;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.15);
-  color: rgba(255, 255, 255, 0.6);
-}
-.pd-manual-note {
-  margin-top: 12px;
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.4);
-  text-align: center;
-}
-.pd-error {
-  padding: 14px 16px;
-  border-radius: 12px;
-  border: 1px solid rgba(239, 68, 68, 0.28);
-  background: rgba(239, 68, 68, 0.08);
-  font-size: 0.84rem;
-  color: #fca5a5;
-}
-@media (prefers-reduced-motion: reduce) {
-  .pd-spinner {
-    animation: none;
-  }
-  .pd-cta,
-  .pd-btn,
-  .pd-chip,
-  .pd-input,
-  .pd-tab {
-    transition: none;
-  }
-}
-</style>

@@ -38,8 +38,11 @@
     "ci:seo-lint": "node scripts/ci/seo-lint.mjs",
     "ci:db-migration-safety": "node scripts/ci/validate-migrations-safety.mjs",
     "ci:sw-contract": "node scripts/ci/check-sw-contract.mjs",
+    "ci:perf-budget": "node scripts/ci/check-perf-budget.mjs --budget perf-budget.json",
+    "ci:bundle-budget": "node scripts/check-bundle-sizes.mjs",
     "ci:source-console-budget": "node scripts/ci/check-source-console-budget.mjs",
     "ci:source-i18n": "node scripts/ci/check-source-i18n-hardcoded.mjs",
+    "ci:vite-public-secrets": "node scripts/ci/check-vite-public-secrets.mjs",
     "ci:prod-ready": "node scripts/ci/prod-ready-gate.mjs",
     "ci:cache-warm-seo": "node scripts/ci/cache-warm-seo.mjs",
     "ci:secret-scan:gitleaks": "node scripts/ci/secret-scan-gitleaks.mjs",
@@ -58,8 +61,21 @@
     "knip:files": "knip -c knip.json --include files --no-progress",
     "knip:exports": "knip -c knip.json --include exports,types,duplicates --no-progress",
     "perf:baseline": "lighthouse http://localhost:5173 --throttling-method=simulate --cpu-slowdown-multiplier=4 --output=json --output-path=baseline-lh.json",
+    "perf:fps:mobile": "node scripts/performance/run-mobile-fps-benchmark.mjs --output reports/performance/map-fps-benchmark.json",
+    "perf:fps:ios:ingest": "node scripts/performance/ingest-ios-instruments-export.mjs",
+    "perf:fps:real-device": "node scripts/performance/run-real-device-mobile-benchmark.mjs --output reports/performance/map-fps-real-device.json",
+    "ci:map-fps-guardrail": "node scripts/ci/check-map-fps-guardrail.mjs --input reports/performance/map-fps-benchmark.json",
+    "perf:all": "node scripts/performance/run-perf-all.mjs",
+    "ci:branch-protect:map-fps": "node scripts/ci/set-map-fps-required-check.mjs --branch main --context map-fps-guardrail",
+    "ci:branch-protect:dashboard-canary": "node scripts/ci/set-dashboard-canary-required-checks.mjs --branch main",
     "perf:compare": "node scripts/compare-perf.mjs",
-    "perf:monitor": "node scripts/monitor-perf-db.mjs"
+    "perf:monitor": "node scripts/monitor-perf-db.mjs",
+    "prepare": "husky",
+    "dev:backend": "cd backend && python run_backend.py",
+    "types:api": "openapi-typescript http://127.0.0.1:8000/openapi.json -o src/types/api.types.ts",
+    "types:db": "supabase gen types typescript --local > src/types/database.types.ts",
+    "dev:all": "run-p dev dev:backend types:sync",
+    "types:sync": "node scripts/dev-types-watcher.mjs"
   },
   "dependencies": {
     "@heroicons/vue": "^2.2.0",
@@ -103,6 +119,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.11",
+    "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.58.0",
     "@rsbuild/core": "^1.7.2",
     "@rsbuild/plugin-vue": "^1.2.3",
@@ -119,9 +136,15 @@
     "autoprefixer": "^10.4.23",
     "cross-env": "^10.1.0",
     "happy-dom": "^20.3.7",
+    "husky": "^9.1.7",
     "jsdom": "^27.4.0",
     "knip": "^5.83.0",
+    "lighthouse": "^12.8.2",
+    "lint-staged": "^16.3.2",
+    "npm-run-all": "^4.1.5",
+    "openapi-typescript": "^7.13.0",
     "pinia-plugin-persistedstate": "^4.7.1",
+    "playwright": "^1.58.2",
     "postcss": "^8.5.6",
     "rollup-plugin-visualizer": "^6.0.5",
     "storybook": "^10.2.0",
@@ -136,5 +159,11 @@
     "workbox-build": "^7.4.0",
     "workbox-window": "^7.4.0",
     "xml2js": "^0.6.2"
+  },
+  "lint-staged": {
+    "*.{js,ts,jsx,tsx,vue}": [
+      "biome check --no-errors-on-unmatched --write",
+      "biome format --no-errors-on-unmatched --write"
+    ]
   }
 }

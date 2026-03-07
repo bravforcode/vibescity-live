@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
+import { useDashboardGuard } from "@/composables/useDashboardGuard";
 import { useNotifications } from "@/composables/useNotifications";
 import { ownerService } from "../../services/ownerService";
 import {
@@ -12,6 +13,7 @@ import BuyPinsPanel from "./BuyPinsPanel.vue";
 
 const router = useRouter();
 const { notifyError } = useNotifications();
+useDashboardGuard("owner", { allowVisitorFallback: true, strictAuth: false });
 
 const loading = ref(true);
 const dashboardError = ref("");
@@ -360,319 +362,364 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="od-root" data-testid="owner-dashboard-root">
-    <div class="od-bg" aria-hidden="true">
-      <div class="od-bg-glow od-bg-glow--purple" />
-      <div class="od-bg-glow od-bg-glow--indigo" />
-      <div class="od-bg-glow od-bg-glow--rose" />
+  <div
+    class="relative min-h-dvh w-full overflow-x-hidden px-4 pb-8 pt-20 text-white md:px-6 md:pt-24"
+    data-testid="owner-dashboard-root"
+  >
+    <div class="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[#08091a]" aria-hidden="true">
+      <div class="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-blue-500/20 blur-[100px]" />
+      <div class="absolute -right-20 -top-16 h-80 w-80 rounded-full bg-purple-500/20 blur-[100px]" />
+      <div class="absolute bottom-[-180px] left-1/4 h-96 w-96 rounded-full bg-fuchsia-500/15 blur-[110px]" />
     </div>
 
-    <div class="od-container">
-      <!-- ── Sticky Header ──────────────────────────────────── -->
-      <header class="od-hero" data-testid="owner-dashboard-hero">
-        <div class="od-hero-left">
-          <p class="od-eyebrow">VibeCity Owner Console</p>
-          <h1 class="od-hero-title">Venue Command Center</h1>
-          <p class="od-hero-sub break-all">
-            ID: <span class="od-hero-id">{{ visitorId || "–" }}</span>
-          </p>
-          <span
-            class="od-source-badge"
-            :class="
-              sourceBadge.mode === 'fallback'
-                ? 'od-source-badge--warn'
-                : 'od-source-badge--ok'
-            "
-            >{{ sourceBadge.label }}</span
-          >
-        </div>
-        <div class="od-hero-actions">
-          <button
-            v-for="d in [7, 30]"
-            :key="d"
-            class="od-chip"
-            :class="{ 'od-chip--active': days === d }"
-            @click="reloadInsights(d)"
-          >
-            {{ d }}d
-          </button>
-          <button class="od-chip" @click="fetchDashboardData">Refresh</button>
-          <button class="od-btn od-btn--exit" @click="safeExit">Exit Dashboard</button>
+    <div class="mx-auto flex w-full max-w-7xl flex-col gap-4 md:gap-5">
+      <header
+        class="relative overflow-hidden rounded-2xl border border-white/10 bg-gray-900/90 p-5 shadow-2xl backdrop-blur-xl md:p-6"
+        data-testid="owner-dashboard-hero"
+      >
+        <div class="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-500/10 via-transparent to-purple-500/10" />
+        <div class="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div class="space-y-2">
+            <p class="text-[11px] font-black uppercase tracking-[0.3em] text-white/55">{{ $t('auto.k_912f3194') }}</p>
+            <h1 class="text-2xl font-black leading-tight md:text-3xl">
+              <span class="bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent">{{ $t('auto.k_1fd0f9d7') }}</span>
+            </h1>
+            <p class="max-w-2xl text-sm text-white/70 md:text-base">{{ $t('auto.k_97f32e4a') }}</p>
+            <p class="break-all text-xs text-white/55 md:text-sm">
+              {{ $t('auto.k_2aaa7eae') }}
+              <span class="font-mono text-white/80">{{ visitorId || "-" }}</span>
+            </p>
+            <span
+              class="inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wide"
+              data-testid="owner-source-badge"
+              :class="
+                sourceBadge.mode === 'fallback'
+                  ? 'border-amber-400/35 bg-amber-500/20 text-amber-200'
+                  : 'border-emerald-400/35 bg-emerald-500/20 text-emerald-200'
+              "
+            >
+              {{ sourceBadge.label }}
+            </span>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              v-for="d in [7, 30]"
+              :key="d"
+              class="rounded-xl border px-3 py-2 text-xs font-bold transition"
+              :class="
+                days === d
+                  ? 'border-blue-400/60 bg-blue-500/20 text-white shadow-lg shadow-blue-500/20'
+                  : 'border-white/10 bg-black/40 text-white/75 hover:bg-white/10'
+              "
+              @click="reloadInsights(d)"
+            >
+              {{ d }}d
+            </button>
+            <button
+              class="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs font-bold text-white/80 transition hover:bg-white/10"
+              @click="fetchDashboardData"
+            >
+              Refresh
+            </button>
+            <button
+              class="rounded-xl bg-gradient-to-r from-rose-600 to-fuchsia-600 px-3 py-2 text-xs font-black text-white shadow-lg shadow-rose-900/40 transition hover:scale-[1.02] active:scale-[0.98]"
+              @click="safeExit"
+            >
+              {{ $t('auto.k_999dbe89') }}
+            </button>
+          </div>
         </div>
       </header>
 
-      <!-- ── Loading skeleton ───────────────────────────────── -->
       <section
         v-if="loading"
-        class="od-skeleton-wrap"
-        aria-label="Loading dashboard"
+        class="rounded-2xl border border-white/10 bg-gray-900/85 p-4 shadow-2xl backdrop-blur-xl"
+        :aria-label="$t('auto.k_21902d8b')"
       >
-        <div class="od-skeleton-strip">
-          <div v-for="n in 6" :key="n" class="od-skeleton od-skeleton--kpi" />
+        <div class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+          <div v-for="n in 6" :key="`owner-kpi-skeleton-${n}`" class="h-20 animate-pulse rounded-2xl border border-white/10 bg-white/5" />
         </div>
-        <div class="od-skeleton od-skeleton--wide" />
+        <div class="mt-4 h-52 animate-pulse rounded-2xl border border-white/10 bg-white/5" />
       </section>
 
-      <!-- ── Error state ─────────────────────────────────────── -->
-      <div v-else-if="dashboardError" class="od-error-panel" role="alert">
-        <p class="od-error-title">Alert: Dashboard Error</p>
-        <p class="od-error-body">{{ dashboardError }}</p>
+      <div v-else-if="dashboardError" class="rounded-2xl border border-red-500/30 bg-red-950/40 p-4 text-red-100" role="alert">
+        <p class="text-sm font-black uppercase tracking-wide text-red-300">{{ $t('auto.k_15365c2f') }}</p>
+        <p class="mt-1 text-sm text-red-100/90">{{ dashboardError }}</p>
       </div>
 
       <template v-else>
-        <!-- ── Notices ─────────────────────────────────────── -->
-        <div v-if="fallbackModules.length" class="od-notice od-notice--warn">
-          Running fallback mode for:
+        <div v-if="fallbackModules.length" class="rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          {{ $t('auto.k_37d0e407') }}
           <strong>{{ fallbackModules.join(", ") }}</strong>
         </div>
-        <div v-if="dashboardNotice" class="od-notice od-notice--info">
+        <div v-if="dashboardNotice" class="rounded-xl border border-blue-400/25 bg-blue-500/10 px-4 py-3 text-sm text-blue-100">
           {{ dashboardNotice }}
         </div>
 
-        <!-- ── KPI Strip ──────────────────────────────────── -->
-        <section class="od-kpi-strip" aria-label="Key performance indicators">
-          <article v-for="card in kpiCards" :key="card.label" class="od-kpi">
-            <p class="od-kpi-label">{{ card.label }}</p>
-            <p class="od-kpi-value" :class="card.tone">
-              {{ card.value }}
-            </p>
+        <section
+          class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6"
+          :aria-label="$t('auto.k_20207130')"
+          data-testid="owner-kpi-strip"
+        >
+          <article
+            v-for="card in kpiCards"
+            :key="card.label"
+            class="relative overflow-hidden rounded-2xl border border-white/10 bg-black/30 p-4 shadow-xl"
+          >
+            <div class="absolute inset-0 bg-gradient-to-br opacity-70" :class="card.tone" />
+            <div class="relative z-10">
+              <p class="text-[11px] font-black uppercase tracking-[0.2em] text-white/65">{{ card.label }}</p>
+              <p class="mt-2 text-xl font-black md:text-2xl">{{ card.value }}</p>
+            </div>
           </article>
         </section>
 
-        <!-- ── Venue Panel ────────────────────────────────── -->
-        <section class="od-panel">
-          <div class="od-panel-header">
+        <section
+          class="rounded-2xl border border-white/10 bg-gray-900/90 p-4 shadow-2xl backdrop-blur-xl md:p-5"
+          data-testid="owner-venue-panel"
+        >
+          <div class="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h2 class="od-panel-title">Your Venues</h2>
-              <p class="od-panel-sub">{{ filteredVenues.length }} results</p>
+              <h2 class="text-lg font-black text-white md:text-xl">{{ $t('auto.k_33ac197a') }}</h2>
+              <p class="text-sm text-white/55">{{ filteredVenues.length }} results</p>
             </div>
           </div>
 
-          <!-- Filters -->
-          <div class="od-filters">
-            <label class="od-filter-wrap od-filter-wrap--grow">
-              <span class="sr-only">Search venues</span>
+          <div class="mt-4 grid grid-cols-1 gap-2 md:grid-cols-3">
+            <label class="md:col-span-1">
+              <span class="sr-only">{{ $t('auto.k_a6567c3f') }}</span>
               <input
                 v-model.trim="searchText"
                 type="search"
-                class="od-field"
-                placeholder="Search venue or category..."
+                class="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none transition focus:border-blue-400"
+                :placeholder="$t('auto.k_314a739d')"
               />
             </label>
-            <label class="od-filter-wrap">
-              <span class="sr-only">Filter by status</span>
-              <select v-model="statusFilter" class="od-field">
-                <option value="all">All Status</option>
+            <label>
+              <span class="sr-only">{{ $t('auto.k_81d2e3b6') }}</span>
+              <select
+                v-model="statusFilter"
+                class="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none transition focus:border-blue-400"
+              >
+                <option value="all">{{ $t('auto.k_96e23776') }}</option>
                 <option value="live">Live</option>
                 <option value="promoted">Promoted</option>
-                <option value="needs-work">Needs Work</option>
+                <option value="needs-work">{{ $t('auto.k_d9cf45d3') }}</option>
               </select>
             </label>
-            <label class="od-filter-wrap">
-              <span class="sr-only">Sort by</span>
-              <select v-model="sortKey" class="od-field">
-                <option value="views">Views ↓</option>
-                <option value="rating">Rating ↓</option>
-                <option value="completeness">Quality ↓</option>
-                <option value="updated">Updated ↓</option>
-                <option value="live">Live First</option>
+            <label>
+              <span class="sr-only">{{ $t('auto.k_e64a63fe') }}</span>
+              <select
+                v-model="sortKey"
+                class="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none transition focus:border-blue-400"
+              >
+                <option value="views">{{ $t('auto.k_5af1c930') }}</option>
+                <option value="rating">{{ $t('auto.k_398a09d9') }}</option>
+                <option value="completeness">{{ $t('auto.k_695f8a13') }}</option>
+                <option value="updated">{{ $t('auto.k_8674d279') }}</option>
+                <option value="live">{{ $t('auto.k_46f4cfd9') }}</option>
               </select>
             </label>
           </div>
 
-          <!-- Mobile card list (<768px) -->
-          <ul class="od-card-list" role="list">
+          <ul class="mt-4 space-y-3 md:hidden" role="list">
             <li
               v-for="venue in filteredVenues"
               :key="venue.id"
-              class="od-venue-card"
+              class="rounded-2xl border border-white/10 bg-white/5 p-3"
             >
-              <div class="od-venue-card-row">
+              <div class="flex items-start gap-3">
                 <img
                   v-if="venue.image"
                   :src="venue.image"
                   :alt="venue.name"
-                  class="od-venue-thumb"
+                  class="h-14 w-14 rounded-xl object-cover"
                   loading="lazy"
                 />
                 <div
                   v-else
-                  class="od-venue-thumb od-venue-thumb--placeholder"
+                  class="flex h-14 w-14 items-center justify-center rounded-xl bg-black/40 text-lg font-black text-white/80"
                   aria-hidden="true"
                 >
                   {{ (venue.name || "?").charAt(0).toUpperCase() }}
                 </div>
-                <div class="od-venue-info">
-                  <p class="od-venue-name">{{ venue.name || "Unnamed" }}</p>
-                  <p class="od-venue-cat">{{ venue.category || "–" }}</p>
-                  <div class="od-venue-meta">
+
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm font-bold text-white">{{ venue.name || "Unnamed" }}</p>
+                  <p class="text-xs text-white/55">{{ venue.category || "-" }}</p>
+                  <div class="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-white/75">
                     <span
-                      class="od-status-chip"
+                      class="rounded-full border px-2 py-0.5 font-bold uppercase"
                       :class="
                         venue.is_live
-                          ? 'od-status-chip--live'
-                          : 'od-status-chip--off'
+                          ? 'border-emerald-400/40 bg-emerald-500/20 text-emerald-200'
+                          : 'border-white/20 bg-white/10 text-white/65'
                       "
-                      >{{ venue.status || "–" }}</span
                     >
-                    <span class="od-meta-stat"
-                      >Views: {{ formatNumber(venue.total_views) }}</span
-                    >
-                    <span class="od-meta-stat"
-                      >Rating: {{ Number(venue.rating || 0).toFixed(1) }}</span
-                    >
+                      {{ venue.status || "-" }}
+                    </span>
+                    <span>{{ $t('auto.k_cd15a811') }} {{ formatNumber(venue.total_views) }}</span>
+                    <span>{{ $t('auto.k_686db27e') }} {{ Number(venue.rating || 0).toFixed(1) }}</span>
                     <span
-                      class="od-score"
+                      class="rounded-full border px-2 py-0.5 font-bold"
                       :class="
                         Number(venue?.completeness?.score || 0) >= 70
-                          ? 'od-score--good'
-                          : 'od-score--warn'
+                          ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-200'
+                          : 'border-amber-500/40 bg-amber-500/20 text-amber-200'
                       "
-                      >{{ Number(venue?.completeness?.score || 0) }}%</span
                     >
+                      {{ Number(venue?.completeness?.score || 0) }}%
+                    </span>
                   </div>
                 </div>
               </div>
-              <div class="od-venue-card-actions">
+
+              <div class="mt-3 grid grid-cols-2 gap-2">
                 <button
-                  class="od-btn od-btn--promote"
+                  class="rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-3 py-2 text-xs font-black text-white shadow-lg transition hover:scale-[1.01] active:scale-[0.98]"
                   @click="openPromote(venue)"
                 >
-                  Promote Shop
+                  {{ $t('auto.k_e51b60ed') }}
                 </button>
-                <button class="od-btn od-btn--edit" @click="openEdit(venue)">
+                <button
+                  class="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-bold text-white transition hover:bg-white/15"
+                  @click="openEdit(venue)"
+                >
                   Edit
                 </button>
               </div>
             </li>
-            <li v-if="filteredVenues.length === 0" class="od-card-empty">
-              No venues match current filters.
+            <li
+              v-if="filteredVenues.length === 0"
+              class="rounded-xl border border-white/10 bg-black/30 p-4 text-center text-sm text-white/60"
+            >
+              {{ $t('auto.k_5ffd12cd') }}
             </li>
           </ul>
 
-          <!-- Desktop table (≥768px) -->
-          <div class="od-table-scroll">
-            <table class="od-table">
-              <thead>
-                <tr>
-                  <th>Venue</th>
-                  <th>Status</th>
-                  <th>Views</th>
-                  <th>Rating</th>
-                  <th>Quality</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="venue in filteredVenues" :key="venue.id + '-desk'">
-                  <td>
-                    <div class="od-venue-cell">
-                      <img
-                        v-if="venue.image"
-                        :src="venue.image"
-                        :alt="venue.name"
-                        class="od-venue-thumb"
-                        loading="lazy"
-                      />
-                      <div
-                        v-else
-                        class="od-venue-thumb od-venue-thumb--placeholder"
-                        aria-hidden="true"
-                      >
-                        {{ (venue.name || "?").charAt(0).toUpperCase() }}
+          <div class="mt-4 hidden overflow-hidden rounded-xl border border-white/10 bg-black/25 md:block">
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm">
+                <thead class="bg-white/5 text-[11px] uppercase tracking-[0.2em] text-white/55">
+                  <tr>
+                    <th class="px-4 py-3 text-left">Venue</th>
+                    <th class="px-4 py-3 text-left">Status</th>
+                    <th class="px-4 py-3 text-right">Views</th>
+                    <th class="px-4 py-3 text-right">Rating</th>
+                    <th class="px-4 py-3 text-left">Quality</th>
+                    <th class="px-4 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="venue in filteredVenues"
+                    :key="`${venue.id}-desk`"
+                    class="border-t border-white/10 text-white/85 hover:bg-white/5"
+                  >
+                    <td class="px-4 py-3">
+                      <div class="flex items-center gap-3">
+                        <img
+                          v-if="venue.image"
+                          :src="venue.image"
+                          :alt="venue.name"
+                          class="h-11 w-11 rounded-lg object-cover"
+                          loading="lazy"
+                        />
+                        <div
+                          v-else
+                          class="flex h-11 w-11 items-center justify-center rounded-lg bg-black/40 text-base font-black text-white/70"
+                          aria-hidden="true"
+                        >
+                          {{ (venue.name || "?").charAt(0).toUpperCase() }}
+                        </div>
+                        <div class="min-w-0">
+                          <p class="truncate font-semibold text-white">{{ venue.name || "Unnamed" }}</p>
+                          <p class="truncate text-xs text-white/55">{{ venue.category || "-" }}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p class="od-venue-name">
-                          {{ venue.name || "Unnamed" }}
-                        </p>
-                        <p class="od-venue-cat">{{ venue.category || "–" }}</p>
+                    </td>
+                    <td class="px-4 py-3">
+                      <span
+                        class="rounded-full border px-2 py-0.5 text-[11px] font-bold uppercase"
+                        :class="
+                          venue.is_live
+                            ? 'border-emerald-400/40 bg-emerald-500/20 text-emerald-200'
+                            : 'border-white/20 bg-white/10 text-white/65'
+                        "
+                      >
+                        {{ venue.status || "-" }}
+                      </span>
+                    </td>
+                    <td class="px-4 py-3 text-right font-medium">{{ formatNumber(venue.total_views) }}</td>
+                    <td class="px-4 py-3 text-right font-medium">{{ Number(venue.rating || 0).toFixed(1) }}</td>
+                    <td class="px-4 py-3">
+                      <span
+                        class="rounded-full border px-2 py-0.5 text-[11px] font-bold"
+                        :class="
+                          Number(venue?.completeness?.score || 0) >= 70
+                            ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-200'
+                            : 'border-amber-500/40 bg-amber-500/20 text-amber-200'
+                        "
+                      >
+                        {{ Number(venue?.completeness?.score || 0) }}%
+                      </span>
+                    </td>
+                    <td class="px-4 py-3">
+                      <div class="flex justify-end gap-2">
+                        <button
+                          class="rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-3 py-2 text-xs font-black text-white shadow-lg transition hover:scale-[1.01] active:scale-[0.98]"
+                          @click="openPromote(venue)"
+                        >
+                          {{ $t('auto.k_e51b60ed') }}
+                        </button>
+                        <button
+                          class="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-bold text-white transition hover:bg-white/15"
+                          @click="openEdit(venue)"
+                        >
+                          Edit
+                        </button>
                       </div>
-                    </div>
-                  </td>
-                  <td>
-                    <span
-                      class="od-status-chip"
-                      :class="
-                        venue.is_live
-                          ? 'od-status-chip--live'
-                          : 'od-status-chip--off'
-                      "
-                      >{{ venue.status || "–" }}</span
-                    >
-                  </td>
-                  <td class="od-num">{{ formatNumber(venue.total_views) }}</td>
-                  <td class="od-num">
-                    {{ Number(venue.rating || 0).toFixed(1) }}
-                  </td>
-                  <td>
-                    <span
-                      class="od-score"
-                      :class="
-                        Number(venue?.completeness?.score || 0) >= 70
-                          ? 'od-score--good'
-                          : 'od-score--warn'
-                      "
-                      >{{ Number(venue?.completeness?.score || 0) }}%</span
-                    >
-                  </td>
-                  <td>
-                    <div class="od-row-actions">
-                      <button
-                        class="od-btn od-btn--promote"
-                        @click="openPromote(venue)"
-                      >
-                        Promote Shop
-                      </button>
-                      <button
-                        class="od-btn od-btn--edit"
-                        @click="openEdit(venue)"
-                      >
-                        Edit
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-                <tr v-if="filteredVenues.length === 0">
-                  <td colspan="6" class="od-table-empty">
-                    No venues match current filters.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                    </td>
+                  </tr>
+                  <tr v-if="filteredVenues.length === 0">
+                    <td colspan="6" class="px-4 py-6 text-center text-sm text-white/55">{{ $t('auto.k_5ffd12cd') }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
 
-        <!-- ── Insights Row ───────────────────────────────── -->
-        <div class="od-insights-grid">
-          <!-- Expiry Timeline -->
-          <article class="od-panel">
-            <h3 class="od-panel-title">Expiry Timeline</h3>
-            <p class="od-panel-sub">Verified | Glow | Boost | Giant</p>
-            <ul class="od-timeline-list">
+        <div class="grid grid-cols-1 gap-4 xl:grid-cols-2" data-testid="owner-insights-grid">
+          <article class="rounded-2xl border border-white/10 bg-gray-900/90 p-4 shadow-2xl backdrop-blur-xl">
+            <h3 class="text-lg font-black text-white">{{ $t('auto.k_76befe71') }}</h3>
+            <p class="mt-1 text-sm text-white/55">{{ $t('auto.k_444a80f8') }}</p>
+            <ul class="mt-4 space-y-2">
               <li
                 v-for="row in expiryTimeline"
                 :key="`${row.venueId}-${row.feature}-${row.at}`"
-                class="od-timeline-item"
+                class="flex items-start gap-3 rounded-xl border border-white/10 bg-black/30 p-3"
               >
-                <div class="od-timeline-dot" aria-hidden="true" />
-                <div>
-                  <p class="od-timeline-name">
-                    {{ row.venueName }} | {{ row.feature }}
-                  </p>
-                  <p class="od-timeline-date">{{ formatDate(row.at) }}</p>
+                <div class="mt-1 h-2.5 w-2.5 rounded-full bg-blue-300" aria-hidden="true" />
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-bold text-white">{{ row.venueName }} | {{ row.feature }}</p>
+                  <p class="text-xs text-white/60">{{ formatDate(row.at) }}</p>
                 </div>
               </li>
-              <li v-if="expiryTimeline.length === 0" class="od-empty-item">
-                No expiring items.
+              <li
+                v-if="expiryTimeline.length === 0"
+                class="rounded-xl border border-white/10 bg-black/30 p-3 text-sm text-white/55"
+              >
+                {{ $t('auto.k_51f00314') }}
               </li>
             </ul>
           </article>
 
-          <!-- Content Quality -->
-          <article class="od-panel">
-            <h3 class="od-panel-title">Content Quality</h3>
-            <p class="od-panel-sub">Missing fields blocking discovery</p>
-            <ul class="od-quality-list">
+          <article class="rounded-2xl border border-white/10 bg-gray-900/90 p-4 shadow-2xl backdrop-blur-xl">
+            <h3 class="text-lg font-black text-white">{{ $t('auto.k_36db2343') }}</h3>
+            <p class="mt-1 text-sm text-white/55">{{ $t('auto.k_7512e171') }}</p>
+            <ul class="mt-4 space-y-2">
               <li
                 v-for="[key, label] in [
                   ['image', 'Cover image'],
@@ -682,76 +729,80 @@ onMounted(() => {
                   ['pin', 'Pin type'],
                 ]"
                 :key="key"
-                class="od-quality-item"
+                class="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/30 p-3"
               >
-                <span class="od-quality-label">{{ label }}</span>
+                <span class="text-sm text-white/80">{{ label }}</span>
                 <span
-                  class="od-quality-count"
+                  class="rounded-full border px-2 py-1 text-[11px] font-bold"
                   :class="
                     qualitySummary[key] > 0
-                      ? 'od-quality-count--warn'
-                      : 'od-quality-count--ok'
+                      ? 'border-amber-500/40 bg-amber-500/20 text-amber-200'
+                      : 'border-emerald-500/40 bg-emerald-500/20 text-emerald-200'
                   "
                 >
                   {{
                     qualitySummary[key] > 0
                       ? `${formatNumber(qualitySummary[key])} missing`
-                      : "OK - All set"
+                      : 'OK - All set'
                   }}
                 </span>
               </li>
             </ul>
           </article>
 
-          <!-- Growth Actions -->
-          <article class="od-panel">
-            <h3 class="od-panel-title">Growth Actions</h3>
-            <ul class="od-actions-list">
+          <article class="rounded-2xl border border-white/10 bg-gray-900/90 p-4 shadow-2xl backdrop-blur-xl">
+            <h3 class="text-lg font-black text-white">{{ $t('auto.k_601ae409') }}</h3>
+            <ul class="mt-4 space-y-2">
               <li
                 v-for="(action, i) in growthActions"
                 :key="`${action.type}-${i}`"
-                class="od-action-item"
+                class="rounded-xl border p-3"
                 :class="{
-                  'od-action-item--high': action.priority === 'high',
-                  'od-action-item--medium': action.priority === 'medium',
+                  'border-red-500/30 bg-red-500/10': action.priority === 'high',
+                  'border-amber-500/30 bg-amber-500/10': action.priority === 'medium',
+                  'border-white/10 bg-black/30': action.priority !== 'high' && action.priority !== 'medium',
                 }"
               >
-                <p class="od-action-label">{{ action.label }}</p>
-                <p class="od-action-desc">{{ action.description }}</p>
+                <p class="text-sm font-bold text-white">{{ action.label }}</p>
+                <p class="mt-1 text-xs text-white/70">{{ action.description }}</p>
                 <span
-                  class="od-priority-tag od-priority-tag--{{ action.priority || 'normal' }}"
-                  >{{ action.priority || "normal" }}</span
+                  class="mt-2 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase"
+                  :class="{
+                    'border-red-500/40 bg-red-500/20 text-red-200': action.priority === 'high',
+                    'border-amber-500/40 bg-amber-500/20 text-amber-200': action.priority === 'medium',
+                    'border-white/15 bg-white/10 text-white/70': !action.priority || action.priority === 'normal',
+                  }"
                 >
+                  {{ action.priority || 'normal' }}
+                </span>
               </li>
-              <li v-if="growthActions.length === 0" class="od-empty-item">
-                No immediate actions.
+              <li
+                v-if="growthActions.length === 0"
+                class="rounded-xl border border-white/10 bg-black/30 p-3 text-sm text-white/55"
+              >
+                {{ $t('auto.k_bf22d9ce') }}
               </li>
             </ul>
           </article>
 
-          <!-- Activity Chart -->
-          <article class="od-panel">
-            <h3 class="od-panel-title">Activity ({{ days }}d)</h3>
-            <p class="od-panel-sub">
-              {{ formatNumber(insights.summary?.events_total) }} events |
-              {{ formatNumber(insights.summary?.unique_visitors_total) }}
-              visitors
+          <article class="rounded-2xl border border-white/10 bg-gray-900/90 p-4 shadow-2xl backdrop-blur-xl">
+            <h3 class="text-lg font-black text-white">{{ $t('auto.k_df2efd04') }}{{ days }}{{ $t('auto.k_a01d39ae') }}</h3>
+            <p class="mt-1 text-sm text-white/55">
+              {{ formatNumber(insights.summary?.events_total) }} {{ $t('auto.k_5ab9bef0') }} {{ formatNumber(insights.summary?.unique_visitors_total) }} visitors
             </p>
-            <ul class="od-trend-list">
+            <ul class="mt-4 space-y-2">
               <li
                 v-for="row in trendRows"
                 :key="row.date"
-                class="od-trend-item"
+                class="rounded-xl border border-white/10 bg-black/30 p-3"
               >
-                <div class="od-trend-header">
-                  <span class="od-trend-date">{{ row.date }}</span>
-                  <span class="od-trend-val">{{
-                    formatNumber(row.events)
-                  }}</span>
+                <div class="flex items-center justify-between text-xs text-white/70">
+                  <span>{{ row.date }}</span>
+                  <span class="font-bold text-white">{{ formatNumber(row.events) }}</span>
                 </div>
-                <div class="od-trend-track">
+                <div class="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
                   <div
-                    class="od-trend-fill"
+                    class="h-full rounded-full bg-gradient-to-r from-blue-500 to-purple-500"
                     :style="{
                       width: `${Math.max(2, Math.round((Number(row.events || 0) / trendMax) * 100))}%`,
                     }"
@@ -760,7 +811,7 @@ onMounted(() => {
                     :aria-label="`${row.date}: ${row.events} events`"
                   />
                 </div>
-                <div class="od-trend-footer">
+                <div class="mt-2 flex items-center justify-between text-[11px] text-white/60">
                   <span>{{ formatNumber(row.active_venues) }} venues</span>
                   <span>{{ formatNumber(row.unique_visitors) }} visitors</span>
                 </div>
@@ -771,23 +822,24 @@ onMounted(() => {
       </template>
     </div>
 
-    <!-- ── Modals ─────────────────────────────────────────── -->
     <Teleport to="body">
       <div
         v-if="promotingVenue"
-        class="od-modal-backdrop"
+        class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md"
         data-testid="owner-promote-modal"
         @click.self="closePromote"
       >
-        <div class="od-modal-inner">
+        <div class="relative w-full max-w-6xl overflow-hidden rounded-3xl border border-white/10 bg-gray-900/95 shadow-2xl">
           <button
-            class="od-modal-close"
+            class="absolute right-3 top-3 z-20 rounded-full border border-white/15 bg-black/60 px-3 py-1 text-xs font-bold text-white transition hover:bg-white/10"
             @click="closePromote"
-            aria-label="Close promote panel"
+            :aria-label="$t('auto.k_3079324d')"
           >
             Close
           </button>
-          <BuyPinsPanel :shop-id="promotingVenue.id" />
+          <div class="max-h-[90vh] overflow-y-auto p-4 pt-12 md:p-6">
+            <BuyPinsPanel :shop-id="promotingVenue.id" />
+          </div>
         </div>
       </div>
     </Teleport>
@@ -799,932 +851,3 @@ onMounted(() => {
     />
   </div>
 </template>
-
-<style scoped>
-/* ── Root & Background ───────────────────────────────────────── */
-.od-root {
-  position: relative;
-  min-height: 100dvh;
-  width: 100%;
-  max-width: 100vw;
-  overflow-x: hidden;
-  padding: 16px;
-  padding-top: 80px;
-  color: #fff;
-  font-family:
-    system-ui,
-    -apple-system,
-    sans-serif;
-}
-
-@media (min-width: 768px) {
-  .od-root {
-    padding: 24px;
-    padding-top: 88px;
-  }
-}
-
-.od-bg {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background: #08091a;
-  overflow: hidden;
-}
-
-.od-bg-glow {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(90px);
-  opacity: 0.35;
-  will-change: transform;
-  transform: translateZ(0);
-}
-
-.od-bg-glow--purple {
-  width: 560px;
-  height: 560px;
-  top: -160px;
-  left: -80px;
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.4), transparent);
-}
-
-.od-bg-glow--indigo {
-  width: 480px;
-  height: 480px;
-  top: -80px;
-  right: -80px;
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.4), transparent);
-}
-
-.od-bg-glow--rose {
-  width: 640px;
-  height: 640px;
-  bottom: -200px;
-  right: 0;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.3), transparent);
-}
-
-/* ── Container ───────────────────────────────────────────────── */
-.od-container {
-  width: 100%;
-  max-width: 1280px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-/* ── Hero / Header ───────────────────────────────────────────── */
-.od-hero {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 18px 20px;
-  border-radius: 20px;
-  border: 1px solid rgba(255 255 255 / 0.09);
-  background:
-    linear-gradient(140deg, rgba(18 18 28 / 0.95), rgba(8 8 16 / 0.9)),
-    linear-gradient(120deg, rgba(139, 92, 246, 0.06), rgba(59, 130, 246, 0.06));
-  backdrop-filter: blur(20px);
-}
-
-.od-eyebrow {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.22em;
-  color: rgba(167, 139, 250, 0.85);
-  font-weight: 700;
-  margin-bottom: 5px;
-}
-
-.od-hero-title {
-  font-size: clamp(1.35rem, 4vw, 1.9rem);
-  font-weight: 900;
-  letter-spacing: -0.025em;
-  line-height: 1.1;
-  color: #fff;
-  margin-bottom: 5px;
-}
-
-.od-hero-sub {
-  font-size: 0.72rem;
-  color: rgba(255 255 255 / 0.45);
-  margin-bottom: 8px;
-}
-
-.od-hero-id {
-  color: rgba(167, 139, 250, 0.8);
-  font-weight: 600;
-}
-
-.od-hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-
-/* ── Source Badge ────────────────────────────────────────────── */
-.od-source-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 800;
-}
-
-.od-source-badge--ok {
-  background: rgba(34 197 94 / 0.12);
-  border: 1px solid rgba(34 197 94 / 0.25);
-  color: #86efac;
-}
-
-.od-source-badge--warn {
-  background: rgba(139, 92, 246, 0.12);
-  border: 1px solid rgba(139, 92, 246, 0.3);
-  color: #c4b5fd;
-}
-
-/* ── Chips ────────────────────────────────────────────────────── */
-.od-chip {
-  padding: 9px 16px;
-  min-height: 38px;
-  border-radius: 10px;
-  border: 1px solid rgba(255 255 255 / 0.13);
-  background: rgba(255 255 255 / 0.04);
-  font-size: 0.75rem;
-  font-weight: 800;
-  color: rgba(255 255 255 / 0.7);
-  transition:
-    background 0.15s,
-    color 0.15s,
-    transform 0.1s;
-  touch-action: manipulation;
-}
-
-.od-chip:hover {
-  background: rgba(255 255 255 / 0.1);
-  color: #fff;
-}
-.od-chip:active {
-  transform: scale(0.96);
-}
-
-.od-chip--active {
-  border-color: rgba(139, 92, 246, 0.45);
-  background: rgba(139, 92, 246, 0.15);
-  color: #a78bfa;
-}
-
-.od-btn--exit {
-  border-color: rgba(239, 68, 68, 0.4);
-  background: rgba(239, 68, 68, 0.12);
-  color: #fca5a5;
-  min-height: 44px;
-  padding: 0 16px;
-  border-radius: 10px;
-  border-width: 1px;
-  border-style: solid;
-  font-weight: 900;
-  margin-left: auto;
-  cursor: pointer;
-  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
-}
-.od-btn--exit:hover {
-  background: rgba(239, 68, 68, 0.2);
-  color: #fef2f2;
-}
-
-/* ── Notices ─────────────────────────────────────────────────── */
-.od-notice {
-  padding: 12px 16px;
-  border-radius: 12px;
-  font-size: 0.82rem;
-}
-
-.od-notice--warn {
-  background: rgba(245 158 11 / 0.08);
-  border: 1px solid rgba(245 158 11 / 0.22);
-  color: #fde68a;
-}
-
-.od-notice--info {
-  background: rgba(20 184 166 / 0.08);
-  border: 1px solid rgba(20 184 166 / 0.22);
-  color: #99f6e4;
-}
-
-/* ── KPI Strip ───────────────────────────────────────────────── */
-.od-kpi-strip {
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 4px;
-}
-
-.od-kpi-strip::-webkit-scrollbar {
-  display: none;
-}
-
-@media (min-width: 1024px) {
-  .od-kpi-strip {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    overflow: visible;
-  }
-}
-
-.od-kpi {
-  flex: 0 0 140px;
-  scroll-snap-align: start;
-  border: 1px solid rgba(255 255 255 / 0.09);
-  border-radius: 16px;
-  padding: 16px;
-  background: rgba(255 255 255 / 0.03);
-  min-width: 140px;
-}
-
-@media (min-width: 1024px) {
-  .od-kpi {
-    flex: initial;
-    min-width: 0;
-  }
-}
-
-.od-kpi-label {
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: rgba(255 255 255 / 0.5);
-  margin-bottom: 10px;
-  font-weight: 700;
-}
-
-.od-kpi-value {
-  font-size: 1.6rem;
-  font-weight: 900;
-  color: #fff;
-  letter-spacing: -0.025em;
-  line-height: 1;
-}
-
-/* ── Panel ───────────────────────────────────────────────────── */
-.od-panel {
-  border: 1px solid rgba(255 255 255 / 0.08);
-  border-radius: 18px;
-  padding: 18px;
-  background: rgba(255 255 255 / 0.02);
-  backdrop-filter: blur(12px);
-}
-
-.od-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
-}
-
-.od-panel-title {
-  font-size: 1rem;
-  font-weight: 900;
-  color: #fff;
-  margin-bottom: 2px;
-}
-
-.od-panel-sub {
-  font-size: 0.72rem;
-  color: rgba(255 255 255 / 0.4);
-  margin-bottom: 12px;
-}
-
-/* ── Filters ─────────────────────────────────────────────────── */
-.od-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
-.od-filter-wrap {
-  display: flex;
-  flex-direction: column;
-}
-.od-filter-wrap--grow {
-  flex: 1 1 150px;
-  min-width: 0;
-}
-
-.od-field {
-  border: 1px solid rgba(255 255 255 / 0.11);
-  background: rgba(255 255 255 / 0.04);
-  border-radius: 10px;
-  padding: 11px 14px;
-  min-height: 44px;
-  color: #fff;
-  font-size: 0.84rem;
-  outline: none;
-  transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
-  -webkit-appearance: none;
-  appearance: none;
-}
-
-.od-field:focus-visible {
-  border-color: rgba(139, 92, 246, 0.6);
-  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.15);
-}
-
-.od-field::placeholder {
-  color: rgba(255 255 255 / 0.28);
-}
-
-/* ── Mobile Card List (hidden on ≥768px) ───────────────────── */
-.od-card-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-@media (min-width: 768px) {
-  .od-card-list {
-    display: none;
-  }
-}
-
-.od-venue-card {
-  border: 1px solid rgba(255 255 255 / 0.08);
-  border-radius: 14px;
-  padding: 14px;
-  background: rgba(255 255 255 / 0.02);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  transition: background 0.12s;
-}
-
-.od-venue-card:active {
-  background: rgba(255 255 255 / 0.04);
-}
-
-.od-venue-card-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.od-venue-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.od-venue-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-top: 6px;
-}
-
-.od-meta-stat {
-  font-size: 11px;
-  color: rgba(255 255 255 / 0.55);
-  font-weight: 600;
-}
-
-.od-venue-card-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.od-venue-card-actions .od-btn {
-  flex: 1;
-  justify-content: center;
-  min-height: 44px;
-  font-size: 13px;
-}
-
-.od-card-empty {
-  padding: 24px;
-  text-align: center;
-  color: rgba(255 255 255 / 0.38);
-  font-size: 0.84rem;
-}
-
-/* ── Desktop Table (hidden on <768px) ───────────────────────── */
-.od-table-scroll {
-  display: none;
-  overflow-x: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255 255 255 / 0.08) transparent;
-  -webkit-overflow-scrolling: touch;
-}
-
-@media (min-width: 768px) {
-  .od-table-scroll {
-    display: block;
-  }
-}
-
-.od-table {
-  width: 100%;
-  min-width: 640px;
-  border-collapse: collapse;
-  font-size: 0.85rem;
-}
-
-.od-table thead tr th {
-  padding: 8px 12px;
-  text-align: left;
-  font-size: 9px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: rgba(255 255 255 / 0.35);
-  border-bottom: 1px solid rgba(255 255 255 / 0.07);
-}
-
-.od-table tbody tr {
-  border-bottom: 1px solid rgba(255 255 255 / 0.04);
-  transition: background 0.12s;
-}
-
-.od-table tbody tr:hover {
-  background: rgba(255 255 255 / 0.025);
-}
-.od-table td {
-  padding: 12px;
-  vertical-align: middle;
-}
-.od-table-empty {
-  text-align: center;
-  padding: 28px;
-  color: rgba(255 255 255 / 0.35);
-  font-size: 0.85rem;
-}
-
-/* ── Venue Cell ──────────────────────────────────────────────── */
-.od-venue-cell {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.od-venue-thumb {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  object-fit: cover;
-  flex-shrink: 0;
-  background: rgba(255 255 255 / 0.05);
-}
-
-.od-venue-thumb--placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.1rem;
-  font-weight: 900;
-  color: rgba(255 255 255 / 0.35);
-  background: linear-gradient(
-    135deg,
-    rgba(139, 92, 246, 0.15),
-    rgba(20 184 166 / 0.15)
-  );
-}
-
-.od-venue-name {
-  font-size: 0.875rem;
-  font-weight: 800;
-  color: #fff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 180px;
-}
-
-.od-venue-cat {
-  font-size: 10px;
-  color: rgba(255 255 255 / 0.4);
-  margin-top: 2px;
-}
-
-.od-num {
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: #fff;
-  text-align: right;
-}
-
-/* ── Status & Score Chips ────────────────────────────────────── */
-.od-status-chip {
-  display: inline-block;
-  padding: 3px 9px;
-  border-radius: 999px;
-  font-size: 9px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  white-space: nowrap;
-}
-
-.od-status-chip--live {
-  background: rgba(34 197 94 / 0.15);
-  border: 1px solid rgba(34 197 94 / 0.28);
-  color: #86efac;
-}
-
-.od-status-chip--off {
-  background: rgba(255 255 255 / 0.05);
-  border: 1px solid rgba(255 255 255 / 0.1);
-  color: rgba(255 255 255 / 0.45);
-}
-
-.od-score {
-  display: inline-block;
-  padding: 3px 9px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 900;
-}
-
-.od-score--good {
-  background: rgba(34 197 94 / 0.12);
-  color: #86efac;
-}
-.od-score--warn {
-  background: rgba(139, 92, 246, 0.12);
-  color: #c4b5fd;
-}
-
-/* ── Action Buttons ──────────────────────────────────────────── */
-.od-row-actions {
-  display: flex;
-  gap: 6px;
-}
-
-.od-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 7px 14px;
-  min-height: 36px;
-  border-radius: 9px;
-  font-size: 12px;
-  font-weight: 800;
-  transition:
-    filter 0.15s,
-    transform 0.1s;
-  touch-action: manipulation;
-  white-space: nowrap;
-}
-
-.od-btn:active {
-  transform: scale(0.95);
-}
-
-/* Purple-Gold Promote (🚫 Purple Ban — no purple here) */
-.od-btn--promote {
-  background: linear-gradient(90deg, #8b5cf6, #3b82f6);
-  color: #1c0a00;
-  box-shadow: 0 2px 12px rgba(139, 92, 246, 0.3);
-}
-
-.od-btn--promote:hover {
-  filter: brightness(1.08);
-}
-
-.od-btn--edit {
-  background: rgba(255 255 255 / 0.07);
-  border: 1px solid rgba(255 255 255 / 0.13);
-  color: rgba(255 255 255 / 0.8);
-}
-
-.od-btn--edit:hover {
-  background: rgba(255 255 255 / 0.12);
-}
-
-/* ── Insights Grid ───────────────────────────────────────────── */
-.od-insights-grid {
-  display: grid;
-  gap: 14px;
-  grid-template-columns: 1fr;
-}
-
-@media (min-width: 768px) {
-  .od-insights-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-/* ── Timeline ────────────────────────────────────────────────── */
-.od-timeline-list {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-
-.od-timeline-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255 255 255 / 0.06);
-  background: rgba(255 255 255 / 0.02);
-}
-
-.od-timeline-dot {
-  flex-shrink: 0;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #a78bfa;
-  margin-top: 5px;
-  box-shadow: 0 0 8px rgba(139, 92, 246, 0.5);
-}
-
-.od-timeline-name {
-  font-size: 0.84rem;
-  font-weight: 700;
-  color: #fff;
-}
-.od-timeline-date {
-  font-size: 10px;
-  color: rgba(255 255 255 / 0.4);
-  margin-top: 1px;
-}
-
-/* ── Content Quality ─────────────────────────────────────────── */
-.od-quality-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.od-quality-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 11px 14px;
-  border-radius: 10px;
-  border: 1px solid rgba(255 255 255 / 0.06);
-  background: rgba(255 255 255 / 0.02);
-}
-
-.od-quality-label {
-  font-size: 0.85rem;
-  color: rgba(255 255 255 / 0.75);
-}
-
-.od-quality-count {
-  font-size: 0.82rem;
-  font-weight: 900;
-}
-
-.od-quality-count--warn {
-  color: #c4b5fd;
-}
-.od-quality-count--ok {
-  color: #86efac;
-}
-
-/* ── Growth Actions ──────────────────────────────────────────── */
-.od-actions-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.od-action-item {
-  padding: 12px 14px;
-  border-radius: 11px;
-  border-left: 3px solid rgba(255 255 255 / 0.1);
-  background: rgba(255 255 255 / 0.02);
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.od-action-item--high {
-  border-left-color: #f87171;
-  background: rgba(239 68 68 / 0.05);
-}
-
-.od-action-item--medium {
-  border-left-color: #fb923c;
-  background: rgba(251 146 60 / 0.05);
-}
-
-.od-action-label {
-  font-size: 0.84rem;
-  font-weight: 800;
-  color: #fff;
-}
-.od-action-desc {
-  font-size: 0.75rem;
-  color: rgba(255 255 255 / 0.5);
-}
-
-.od-priority-tag {
-  display: inline-block;
-  width: fit-content;
-  margin-top: 4px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 9px;
-  font-weight: 800;
-  text-transform: uppercase;
-  background: rgba(255 255 255 / 0.07);
-  color: rgba(255 255 255 / 0.45);
-}
-
-/* ── Trend / Activity ────────────────────────────────────────── */
-.od-trend-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.od-trend-item {
-  padding: 9px 10px;
-  border-radius: 10px;
-  border: 1px solid rgba(255 255 255 / 0.05);
-  background: rgba(255 255 255 / 0.02);
-}
-
-.od-trend-header {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 5px;
-}
-
-.od-trend-date {
-  font-size: 10px;
-  color: rgba(255 255 255 / 0.5);
-}
-.od-trend-val {
-  font-size: 10px;
-  font-weight: 800;
-  color: #fff;
-}
-
-.od-trend-track {
-  height: 5px;
-  border-radius: 999px;
-  background: rgba(255 255 255 / 0.07);
-  overflow: hidden;
-  margin-bottom: 5px;
-}
-
-.od-trend-fill {
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #8b5cf6, #3b82f6);
-  transition: width 0.4s ease;
-}
-
-.od-trend-footer {
-  display: flex;
-  justify-content: space-between;
-  font-size: 9px;
-  color: rgba(255 255 255 / 0.38);
-}
-
-/* ── Modals ──────────────────────────────────────────────────── */
-.od-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  background: rgba(0 0 0 / 0.88);
-  backdrop-filter: blur(10px);
-}
-
-.od-modal-inner {
-  position: relative;
-  width: 100%;
-  max-width: 1200px;
-  border-radius: 24px;
-  overflow: hidden;
-}
-
-.od-modal-close {
-  position: absolute;
-  top: -38px;
-  right: 0;
-  font-size: 0.85rem;
-  color: rgba(255 255 255 / 0.6);
-  min-width: 44px;
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* ── Skeleton Loading ────────────────────────────────────────── */
-.od-skeleton-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.od-skeleton-strip {
-  display: flex;
-  gap: 10px;
-  overflow: hidden;
-}
-
-.od-skeleton {
-  border-radius: 14px;
-  background: linear-gradient(
-    90deg,
-    rgba(255 255 255 / 0.03) 20%,
-    rgba(255 255 255 / 0.08) 50%,
-    rgba(255 255 255 / 0.03) 80%
-  );
-  background-size: 220% 100%;
-  animation: od-shimmer 1.6s linear infinite;
-}
-
-.od-skeleton--kpi {
-  height: 80px;
-  flex: 0 0 140px;
-  min-width: 140px;
-}
-.od-skeleton--wide {
-  height: 220px;
-}
-
-@keyframes od-shimmer {
-  from {
-    background-position: 200% 0;
-  }
-  to {
-    background-position: -20% 0;
-  }
-}
-
-/* ── Error & Empty ───────────────────────────────────────────── */
-.od-error-panel {
-  padding: 20px;
-  border-radius: 14px;
-  border: 1px solid rgba(239 68 68 / 0.3);
-  background: rgba(239 68 68 / 0.08);
-}
-
-.od-error-title {
-  font-size: 0.95rem;
-  font-weight: 800;
-  color: #fca5a5;
-  margin-bottom: 4px;
-}
-.od-error-body {
-  font-size: 0.82rem;
-  color: rgba(252 165 165 / 0.8);
-}
-.od-empty-item {
-  padding: 12px;
-  font-size: 0.82rem;
-  color: rgba(255 255 255 / 0.35);
-}
-
-/* ── Accessibility ───────────────────────────────────────────── */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .od-skeleton {
-    animation: none;
-  }
-  .od-trend-fill,
-  .od-chip,
-  .od-btn,
-  .od-field,
-  .od-table tbody tr {
-    transition: none;
-  }
-}
-</style>
