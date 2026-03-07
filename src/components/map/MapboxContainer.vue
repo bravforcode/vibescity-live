@@ -34,8 +34,6 @@ import { calculateDistance } from "../../utils/shopUtils";
 // import { WeatherLayer } from "./layers/WeatherLayer"; // Moved
 import LiveActivityChips from "./LiveActivityChips.vue";
 
-const DARK_STYLE = "mapbox://styles/phirrr/cmlktq68u002601se295iazmm";
-const LIGHT_STYLE = "mapbox://styles/mapbox/light-v11";
 const PIN_SOURCE_ID = "pins_source";
 const PIN_LAYER_ID = "unclustered-pins";
 const CLUSTER_LAYER_ID = "clusters";
@@ -46,6 +44,13 @@ const IS_STRICT_MAP_E2E = import.meta.env.VITE_E2E_MAP_REQUIRED === "true";
 
 const sanitizeEnvToken = (value) =>
 	typeof value === "string" ? value.trim().replace(/^['"]|['"]$/g, "") : "";
+
+const DARK_STYLE =
+	sanitizeEnvToken(import.meta.env.VITE_MAPBOX_DARK_STYLE_URL) ||
+	"mapbox://styles/phirrr/cmlktq68u002601se295iazmm";
+const LIGHT_STYLE =
+	sanitizeEnvToken(import.meta.env.VITE_MAPBOX_LIGHT_STYLE_URL) ||
+	"mapbox://styles/mapbox/light-v11";
 
 const { t, te, locale } = useI18n();
 const tt = (key, fallback) => (te(key) ? t(key) : fallback);

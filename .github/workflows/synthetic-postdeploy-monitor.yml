@@ -28,22 +28,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "latest"
-
-      - name: Cache Bun install
-        uses: actions/cache@v4
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
+          cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile || bun install
+        run: npm ci
 
       - name: DNS precheck for vibecity-api.fly.dev
         id: dns_precheck
@@ -91,7 +80,7 @@ jobs:
           POSTDEPLOY_RETRY_DELAY_MS: "3000"
           POSTDEPLOY_FETCH_TIMEOUT_MS: "10000"
           POSTDEPLOY_REPORT_PATH: "reports/ci/postdeploy-route-health.json"
-        run: bun run healthcheck:postdeploy
+        run: npm run healthcheck:postdeploy
 
       - name: Evaluate route-level SLO thresholds
         id: route_slo_eval
@@ -178,25 +167,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "latest"
-
-      - name: Cache Bun install
-        uses: actions/cache@v4
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
+          cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile || bun install
+        run: npm ci
 
       - name: Install Playwright browser (Chromium)
-        run: bunx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium
 
       - name: Validate MAPBOX_PUBLIC_TOKEN (synthetic browser)
         run: |
@@ -263,7 +241,7 @@ jobs:
           PW_LOW_MEM: "1"
           E2E_MAP_REQUIRED: "1"
           VITE_MAPBOX_TOKEN: "${{ secrets.MAPBOX_PUBLIC_TOKEN }}"
-        run: bun run test:e2e:smoke-map-lite
+        run: npm run test:e2e:smoke-map-lite
 
       - name: Synthetic browser summary
         if: ${{ always() }}

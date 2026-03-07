@@ -3,6 +3,7 @@
   "private": true,
   "version": "2.0.0",
   "type": "module",
+  "packageManager": "npm@10.8.2",
   "scripts": {
     "dev": "rsbuild dev --port 5173",
     "build": "rsbuild build && node scripts/prerender-venues.mjs",
@@ -46,6 +47,7 @@
     "ci:prod-ready": "node scripts/ci/prod-ready-gate.mjs",
     "ci:cache-warm-seo": "node scripts/ci/cache-warm-seo.mjs",
     "ci:secret-scan:gitleaks": "node scripts/ci/secret-scan-gitleaks.mjs",
+    "ci:package-manager-policy": "node scripts/ci/check-package-manager-policy.mjs",
     "ci:provision-bq-analytics": "node scripts/ci/provision-bigquery-analytics.mjs",
     "ci:export-analytics-warehouse": "node scripts/ci/export-analytics-archive-daily-to-bigquery.mjs",
     "ci:publish-metrics": "node scripts/ci/publish-observability-metrics.mjs",

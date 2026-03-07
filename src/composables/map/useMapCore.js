@@ -6,8 +6,14 @@ export function useMapCore(containerRef, _options = {}) {
 	const isMapReady = ref(false);
 	const isMapLoaded = ref(false);
 	const isStrictMapE2E = import.meta.env.VITE_E2E_MAP_REQUIRED === "true";
-	const PRIMARY_STYLE_URL = "mapbox://styles/phirrr/cmlktq68u002601se295iazmm";
-	const FALLBACK_STYLE_URL = PRIMARY_STYLE_URL;
+	const sanitizeEnvToken = (value = "") =>
+		value.trim().replace(/^['"]|['"]$/g, "");
+	const PRIMARY_STYLE_URL =
+		sanitizeEnvToken(import.meta.env.VITE_MAPBOX_DARK_STYLE_URL || "") ||
+		"mapbox://styles/phirrr/cmlktq68u002601se295iazmm";
+	const FALLBACK_STYLE_URL =
+		sanitizeEnvToken(import.meta.env.VITE_MAPBOX_FALLBACK_STYLE_URL || "") ||
+		PRIMARY_STYLE_URL;
 	const STYLE_ENDPOINT_PATH = "/styles/v1/";
 	const EMPTY_VECTOR_TILE_DATA_URI = "data:application/x-protobuf;base64,";
 	let lastRequestedStyleUrl = "";
@@ -59,7 +65,7 @@ export function useMapCore(containerRef, _options = {}) {
 	const isStyleNotFoundError = (err) => {
 		const status = err?.status;
 		const url = typeof err?.url === "string" ? err.url : "";
-		return status === 404 && url.includes("/styles/v1/");
+		return [401, 403, 404].includes(status) && url.includes(STYLE_ENDPOINT_PATH);
 	};
 
 	const applyFallbackStyle = (reason = "") => {
@@ -90,7 +96,7 @@ export function useMapCore(containerRef, _options = {}) {
 	const initMap = (
 		initialCenter = [98.968, 18.7985],
 		initialZoom = 15,
-		style = "mapbox://styles/phirrr/cmlkql2fl002101sfarlm0ptr",
+		style = PRIMARY_STYLE_URL,
 	) => {
 		if (!containerRef.value) return;
 

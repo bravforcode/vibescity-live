@@ -277,7 +277,7 @@ export function useMapAtmosphere(
 	};
 
 	const updateWeatherVisuals = () => {
-		if (!map.value || !isMapReady.value) return;
+		if (!allowWeatherFx.value || !map.value || !isMapReady.value) return;
 
 		if (!map.value.getLayer("weather-layer")) {
 			const labelLayerId = getFirstExistingLayerId([

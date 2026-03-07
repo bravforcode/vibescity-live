@@ -8,8 +8,8 @@
 ## Quick Setup
 
 ```bash
-bun install
-bun run dev
+npm ci
+npm run dev
 ```
 
 ดูขั้นตอนใช้งานแบบละเอียดได้ที่ `QUICKSTART.md`
@@ -19,12 +19,12 @@ bun run dev
 ถ้าใช้งานผ่าน WSL ให้ติดตั้ง dependencies ด้วยคำสั่งนี้:
 
 ```bash
-bun install --os linux --cpu x64
+npm ci
 ```
 
 ## WSL Bootstrap
 
-รันคำสั่งเดียวเพื่อ setup Bun/Linux dependencies และตรวจ Biome พร้อมใช้งาน:
+รันคำสั่งเดียวเพื่อ setup Node/npm dependencies และตรวจ Biome พร้อมใช้งาน:
 
 ```bash
 bash scripts/dev/wsl-bootstrap.sh

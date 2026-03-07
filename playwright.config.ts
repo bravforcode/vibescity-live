@@ -132,6 +132,17 @@ export default defineConfig({
             : {}),
           VITE_E2E_MAP_REQUIRED:
             process.env.E2E_MAP_REQUIRED === "1" ? "true" : "false",
+          VITE_ANALYTICS_ENABLED: "false",
+          VITE_PII_AUDIT_ENABLED: "false",
+          VITE_MAPBOX_DARK_STYLE_URL:
+            process.env.E2E_MAP_REQUIRED === "1"
+              ? "mapbox://styles/mapbox/dark-v11"
+              : "",
+          VITE_MAPBOX_LIGHT_STYLE_URL: "mapbox://styles/mapbox/light-v11",
+          VITE_MAPBOX_FALLBACK_STYLE_URL:
+            process.env.E2E_MAP_REQUIRED === "1"
+              ? "mapbox://styles/mapbox/dark-v11"
+              : "",
           // ✅ ใส่ flag ให้ app ปิดของหนัก ๆ ตอนเทสได้ เช่น map animation / realtime
           // คุณเอาไปใช้ในโค้ดได้: if (import.meta.env.VITE_E2E) { ... }
           VITE_DISABLE_ANIMATIONS: "true",
