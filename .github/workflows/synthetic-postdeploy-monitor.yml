@@ -73,6 +73,7 @@ jobs:
         env:
           POSTDEPLOY_API_BASE_URL: "https://vibecity-api.fly.dev"
           POSTDEPLOY_EDGE_BASE_URL: "${{ vars.POSTDEPLOY_EDGE_BASE_URL || 'https://nluuvnttweesnkrmgzsm.supabase.co/functions/v1' }}"
+          POSTDEPLOY_SUPABASE_URL: "${{ secrets.SUPABASE_URL }}"
           POSTDEPLOY_SUPABASE_JWT: "${{ secrets.POSTDEPLOY_SUPABASE_JWT }}"
           POSTDEPLOY_ORDER_ID: "${{ vars.POSTDEPLOY_ORDER_ID || secrets.POSTDEPLOY_ORDER_ID }}"
           POSTDEPLOY_READ_ONLY: "1"
@@ -114,6 +115,7 @@ jobs:
             echo "## Synthetic Monitor: API Read-Only"
             echo "- Job status: ${{ job.status }}"
             echo "- API base: https://vibecity-api.fly.dev"
+            echo "- Supabase base: ${{ secrets.SUPABASE_URL }}"
             echo "- DNS precheck: ${{ steps.dns_precheck.outcome }}"
             echo "- API healthcheck: ${{ steps.api_healthcheck.outcome }}"
             echo "- Route SLO evaluation: ${{ steps.route_slo_eval.outcome }}"

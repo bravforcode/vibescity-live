@@ -2,17 +2,60 @@
 import "dotenv/config";
 import { mkdir, writeFile } from "node:fs/promises";
 
-const API_BASE_URL = (
-  process.env.POSTDEPLOY_API_BASE_URL ||
-  process.env.VITE_API_URL ||
-  ""
-).replace(/\/+$/, "");
+const trimTrailingSlash = (value) => String(value || "").replace(/\/+$/, "");
 
-const EDGE_BASE_URL = (
-  process.env.POSTDEPLOY_EDGE_BASE_URL ||
-  process.env.VITE_SUPABASE_EDGE_URL ||
-  (process.env.SUPABASE_URL ? `${process.env.SUPABASE_URL}/functions/v1` : "")
-).replace(/\/+$/, "");
+const sanitizeUrl = (value) => trimTrailingSlash(String(value || "").trim());
+
+const getUrlHostname = (value) => {
+  try {
+    return new URL(value).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+};
+
+const buildSupabaseEdgeBaseUrl = (supabaseBaseUrl) =>
+  supabaseBaseUrl ? `${trimTrailingSlash(supabaseBaseUrl)}/functions/v1` : "";
+
+const ALLOW_EDGE_HOST_MISMATCH =
+  process.env.POSTDEPLOY_ALLOW_EDGE_HOST_MISMATCH === "1";
+
+const API_BASE_URL = sanitizeUrl(
+  process.env.POSTDEPLOY_API_BASE_URL || process.env.VITE_API_URL || "",
+);
+
+const SUPABASE_BASE_URL = sanitizeUrl(
+  process.env.POSTDEPLOY_SUPABASE_URL ||
+    process.env.SUPABASE_URL ||
+    process.env.VITE_SUPABASE_URL ||
+    "",
+);
+
+function resolveEdgeBaseUrl() {
+  const explicitEdgeBase = sanitizeUrl(
+    process.env.POSTDEPLOY_EDGE_BASE_URL || process.env.VITE_SUPABASE_EDGE_URL || "",
+  );
+  const derivedEdgeBase = buildSupabaseEdgeBaseUrl(SUPABASE_BASE_URL);
+
+  if (explicitEdgeBase && derivedEdgeBase && !ALLOW_EDGE_HOST_MISMATCH) {
+    const explicitHost = getUrlHostname(explicitEdgeBase);
+    const supabaseHost = getUrlHostname(SUPABASE_BASE_URL);
+    if (explicitHost && supabaseHost && explicitHost !== supabaseHost) {
+      console.warn(
+        [
+          `POSTDEPLOY_EDGE_BASE_URL host mismatch detected (${explicitHost} != ${supabaseHost}).`,
+          `Using ${derivedEdgeBase} derived from POSTDEPLOY_SUPABASE_URL/SUPABASE_URL.`,
+          "Set POSTDEPLOY_ALLOW_EDGE_HOST_MISMATCH=1 to keep the explicit edge host.",
+        ].join(" "),
+      );
+      return derivedEdgeBase;
+    }
+  }
+
+  return explicitEdgeBase || derivedEdgeBase;
+}
+
+const EDGE_BASE_URL = resolveEdgeBaseUrl();
 
 const EDGE_JWT =
   process.env.POSTDEPLOY_SUPABASE_JWT ||
@@ -433,15 +476,19 @@ async function runEdgeChecks() {
   if (READ_ONLY) {
     const edgeCheckoutReadOnly = await callRoute({
       phase: "edge",
-      name: "GET /functions/v1/create-checkout-session (read-only)",
-      method: "GET",
+      name: "OPTIONS /functions/v1/create-checkout-session (read-only)",
+      method: "OPTIONS",
       url: `${EDGE_BASE_URL}/create-checkout-session`,
-      headers,
+      headers: {
+        ...headers,
+        Origin: CHECKOUT_RETURN_URL,
+        "Access-Control-Request-Method": "POST",
+      },
       readOnly: true,
       required: false,
     });
     console.log(
-      `[ok] GET /functions/v1/create-checkout-session (read-only) -> ${edgeCheckoutReadOnly.status}`,
+      `[ok] OPTIONS /functions/v1/create-checkout-session (read-only) -> ${edgeCheckoutReadOnly.status}`,
     );
 
     if (!ORDER_ID) {

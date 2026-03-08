@@ -41,63 +41,84 @@ async function waitForMapReadyFlag(
 	page: Page,
 	timeoutMs: number,
 ): Promise<boolean> {
-	return page
-		.waitForFunction(
-			(selector) => {
-				const shell = document.querySelector(selector);
-				return shell?.getAttribute("data-map-ready") === "true";
-			},
-			MAP_SHELL_SELECTOR,
-			{ timeout: timeoutMs },
-		)
-		.then(() => true)
-		.catch(() => false);
+	return pollForMapCondition(
+		page,
+		(selector) => {
+			const shell = document.querySelector(selector);
+			return shell?.getAttribute("data-map-ready") === "true";
+		},
+		MAP_SHELL_SELECTOR,
+		timeoutMs,
+	);
 }
 
 async function waitForRenderedMapSurface(
 	page: Page,
 	timeoutMs: number,
 ): Promise<boolean> {
-	return page
-		.waitForFunction(
-			({
+	return pollForMapCondition(
+		page,
+		({
+			regionSelector,
+			surfaceSelector,
+			controlSelector,
+			markerSelector,
+		}) => {
+			const selectors = [
 				regionSelector,
 				surfaceSelector,
 				controlSelector,
 				markerSelector,
-			}) => {
-				const selectors = [
-					regionSelector,
-					surfaceSelector,
-					controlSelector,
-					markerSelector,
-				].filter(Boolean);
+			].filter(Boolean);
 
-				return selectors.some((selector) => {
-					const element = document.querySelector(selector);
-					if (!element) return false;
+			return selectors.some((selector) => {
+				const element = document.querySelector(selector);
+				if (!element) return false;
 
-					const rect = element.getBoundingClientRect();
-					const style = window.getComputedStyle(element);
-					return (
-						rect.width > 0 &&
-						rect.height > 0 &&
-						style.visibility !== "hidden" &&
-						style.display !== "none" &&
-						style.opacity !== "0"
-					);
-				});
-			},
-			{
-				regionSelector: MAP_REGION_SELECTOR,
-				surfaceSelector: MAPBOX_SURFACE_SELECTOR,
-				controlSelector: MAP_CONTROL_SELECTOR,
-				markerSelector: MAP_MARKER_SELECTOR,
-			},
-			{ timeout: timeoutMs },
-		)
-		.then(() => true)
-		.catch(() => false);
+				const rect = element.getBoundingClientRect();
+				const style = window.getComputedStyle(element);
+				return (
+					rect.width > 0 &&
+					rect.height > 0 &&
+					style.visibility !== "hidden" &&
+					style.display !== "none" &&
+					style.opacity !== "0"
+				);
+			});
+		},
+		{
+			regionSelector: MAP_REGION_SELECTOR,
+			surfaceSelector: MAPBOX_SURFACE_SELECTOR,
+			controlSelector: MAP_CONTROL_SELECTOR,
+			markerSelector: MAP_MARKER_SELECTOR,
+		},
+		timeoutMs,
+	);
+}
+
+async function pollForMapCondition<TArg>(
+	page: Page,
+	predicate: (arg: TArg) => boolean,
+	arg: TArg,
+	timeoutMs: number,
+	intervalMs = 500,
+): Promise<boolean> {
+	const startedAt = Date.now();
+	while (Date.now() - startedAt < timeoutMs) {
+		try {
+			const matched = await page.evaluate(predicate, arg);
+			if (matched) return true;
+		} catch {
+			// Headless CI can reset execution context during hydration/style swaps.
+			// Keep polling until the overall timeout expires.
+		}
+
+		const remaining = timeoutMs - (Date.now() - startedAt);
+		if (remaining <= 0) break;
+		await page.waitForTimeout(Math.min(intervalMs, remaining));
+	}
+
+	return false;
 }
 
 export async function waitForMapReadyOrSkip(

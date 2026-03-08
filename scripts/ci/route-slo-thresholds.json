@@ -31,11 +31,11 @@
     },
     {
       "endpoint_key": "edge_checkout_session",
-      "method": "GET",
+      "method": "OPTIONS",
       "path": "/functions/v1/create-checkout-session",
       "required": false,
       "max_latency_ms_p95": 6000,
-      "allowed_statuses_read_only": [200, 401, 403, 405],
+      "allowed_statuses_read_only": [200, 204, 401, 403],
       "allowed_statuses_write_mode": [200, 400, 401, 403, 422]
     },
     {

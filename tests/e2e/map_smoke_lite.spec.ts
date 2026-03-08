@@ -113,6 +113,7 @@ test.describe("Map Smoke Lite", () => {
 	test("map shell is present and map reaches ready state @smoke-map-lite @map-required", async ({
 		page,
 	}) => {
+		test.setTimeout(process.env.CI ? 90_000 : 60_000);
 		await page.goto("/", { waitUntil: "domcontentloaded" });
 
 		const mapReady = await waitForMapReadyOrSkip(page, 45_000);
