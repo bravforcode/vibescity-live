@@ -56,12 +56,13 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Post-deploy healthcheck
         env:
           POSTDEPLOY_API_BASE_URL: "https://vibecity-api.fly.dev"
           POSTDEPLOY_EDGE_BASE_URL: "${{ vars.POSTDEPLOY_EDGE_BASE_URL || 'https://nluuvnttweesnkrmgzsm.supabase.co/functions/v1' }}"
+          POSTDEPLOY_SUPABASE_URL: "${{ secrets.SUPABASE_URL }}"
           POSTDEPLOY_SUPABASE_JWT: "${{ secrets.POSTDEPLOY_SUPABASE_JWT }}"
           POSTDEPLOY_CHECKOUT_VENUE_ID: "${{ vars.POSTDEPLOY_CHECKOUT_VENUE_ID || secrets.POSTDEPLOY_CHECKOUT_VENUE_ID }}"
           POSTDEPLOY_ORDER_ID: "${{ vars.POSTDEPLOY_ORDER_ID || secrets.POSTDEPLOY_ORDER_ID }}"
@@ -79,4 +80,5 @@ jobs:
             echo "- API base: https://vibecity-api.fly.dev"
             echo "- Read-only mode: disabled (deploy gate)"
             echo "- Edge base: ${{ vars.POSTDEPLOY_EDGE_BASE_URL || 'https://nluuvnttweesnkrmgzsm.supabase.co/functions/v1' }}"
+            echo "- Supabase base: ${{ secrets.SUPABASE_URL }}"
           } >> "$GITHUB_STEP_SUMMARY"

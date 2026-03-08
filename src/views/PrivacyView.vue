@@ -71,60 +71,60 @@ const lastUpdated = "2026-02-27";
 const SITE_ORIGIN = "https://vibecity.live";
 const SUPPORTED_LOCALES = new Set(["th", "en"]);
 const normalizeLocale = (value) => {
-  const raw = String(value || "")
-    .trim()
-    .toLowerCase();
-  return SUPPORTED_LOCALES.has(raw) ? raw : null;
+	const raw = String(value || "")
+		.trim()
+		.toLowerCase();
+	return SUPPORTED_LOCALES.has(raw) ? raw : null;
 };
 const route = useRoute();
 const getStoredLocale = () => {
-  if (typeof window === "undefined") return null;
-  const stored =
-    localStorage.getItem("locale") || localStorage.getItem("vibe_locale") || "";
-  return normalizeLocale(stored);
+	if (typeof window === "undefined") return null;
+	const stored =
+		localStorage.getItem("locale") || localStorage.getItem("vibe_locale") || "";
+	return normalizeLocale(stored);
 };
 const currentLocale = computed(() => {
-  const fromRoute = normalizeLocale(route.params.locale);
-  return fromRoute || getStoredLocale() || "th";
+	const fromRoute = normalizeLocale(route.params.locale);
+	return fromRoute || getStoredLocale() || "th";
 });
 const canonicalPath = computed(() => `/${currentLocale.value}/privacy`);
 const canonicalUrl = computed(() => `${SITE_ORIGIN}${canonicalPath.value}`);
 const hreflangLinks = computed(() => [
-  {
-    rel: "alternate",
-    hreflang: "th",
-    href: `${SITE_ORIGIN}/th/privacy`,
-  },
-  {
-    rel: "alternate",
-    hreflang: "en",
-    href: `${SITE_ORIGIN}/en/privacy`,
-  },
-  {
-    rel: "alternate",
-    hreflang: "x-default",
-    href: `${SITE_ORIGIN}/th/privacy`,
-  },
+	{
+		rel: "alternate",
+		hreflang: "th",
+		href: `${SITE_ORIGIN}/th/privacy`,
+	},
+	{
+		rel: "alternate",
+		hreflang: "en",
+		href: `${SITE_ORIGIN}/en/privacy`,
+	},
+	{
+		rel: "alternate",
+		hreflang: "x-default",
+		href: `${SITE_ORIGIN}/th/privacy`,
+	},
 ]);
 
 useHead(() => ({
-  title: "Privacy Policy | VibeCity",
-  link: [
-    { rel: "canonical", href: canonicalUrl.value },
-    ...hreflangLinks.value,
-  ],
-  meta: [
-    {
-      name: "description",
-      content: "VibeCity privacy policy and analytics consent settings.",
-    },
-    { property: "og:title", content: "Privacy Policy | VibeCity" },
-    {
-      property: "og:description",
-      content: "How VibeCity handles analytics and privacy.",
-    },
-    { property: "og:url", content: canonicalUrl.value },
-    { property: "og:type", content: "website" },
-  ],
+	title: "Privacy Policy | VibeCity",
+	link: [
+		{ rel: "canonical", href: canonicalUrl.value },
+		...hreflangLinks.value,
+	],
+	meta: [
+		{
+			name: "description",
+			content: "VibeCity privacy policy and analytics consent settings.",
+		},
+		{ property: "og:title", content: "Privacy Policy | VibeCity" },
+		{
+			property: "og:description",
+			content: "How VibeCity handles analytics and privacy.",
+		},
+		{ property: "og:url", content: canonicalUrl.value },
+		{ property: "og:type", content: "website" },
+	],
 }));
 </script>

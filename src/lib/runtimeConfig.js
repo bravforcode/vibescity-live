@@ -15,6 +15,17 @@ const sanitize = (value) => {
 	return value.trim();
 };
 
+const getUrlHostname = (value) => {
+	try {
+		return new URL(value).hostname.toLowerCase();
+	} catch {
+		return "";
+	}
+};
+
+const buildSupabaseEdgeBaseUrl = (supabaseBase) =>
+	`${trimTrailingSlash(supabaseBase)}/functions/v1`;
+
 const rewriteLocalhostHostnameForDev = (rawValue) => {
 	if (!import.meta.env.DEV) return rawValue;
 	if (typeof window === "undefined") return rawValue;
@@ -127,6 +138,17 @@ export const getApiV1BaseUrl = () => {
 
 export const getSupabaseEdgeBaseUrl = () => {
 	const explicitEdge = sanitize(import.meta.env.VITE_SUPABASE_EDGE_URL);
+	const supabaseBaseEnv = sanitize(import.meta.env.VITE_SUPABASE_URL);
+	const allowHostMismatch =
+		import.meta.env.VITE_SUPABASE_EDGE_HOST_MISMATCH === "true";
+	const validatedSupabaseBase = supabaseBaseEnv
+		? trimTrailingSlash(
+				requireClientEnv("VITE_SUPABASE_URL", {
+					message:
+						"VITE_SUPABASE_EDGE_URL or VITE_SUPABASE_URL is required for Edge Functions.",
+				}),
+			)
+		: "";
 	if (explicitEdge) {
 		const check = validateUrl(explicitEdge, "VITE_SUPABASE_EDGE_URL");
 		if (!check.valid) {
@@ -143,18 +165,38 @@ export const getSupabaseEdgeBaseUrl = () => {
 					"VITE_SUPABASE_EDGE_URL points to localhost in production.",
 				);
 			}
+
+			if (validatedSupabaseBase && !allowHostMismatch) {
+				const explicitHost = getUrlHostname(explicitEdge);
+				const supabaseHost = getUrlHostname(validatedSupabaseBase);
+				if (explicitHost && supabaseHost && explicitHost !== supabaseHost) {
+					const derivedEdgeBase = buildSupabaseEdgeBaseUrl(
+						validatedSupabaseBase,
+					);
+					console.warn(
+						[
+							"⚠️ VITE_SUPABASE_EDGE_URL host does not match VITE_SUPABASE_URL.",
+							`Falling back to ${derivedEdgeBase}.`,
+							"Set VITE_SUPABASE_EDGE_HOST_MISMATCH=true to allow intentional cross-project edge routing.",
+						].join(" "),
+					);
+					return derivedEdgeBase;
+				}
+			}
 			return trimTrailingSlash(explicitEdge);
 		}
 	}
 
-	const supabaseBase = trimTrailingSlash(
-		requireClientEnv("VITE_SUPABASE_URL", {
-			message:
-				"VITE_SUPABASE_EDGE_URL or VITE_SUPABASE_URL is required for Edge Functions.",
-		}),
-	);
+	const supabaseBase =
+		validatedSupabaseBase ||
+		trimTrailingSlash(
+			requireClientEnv("VITE_SUPABASE_URL", {
+				message:
+					"VITE_SUPABASE_EDGE_URL or VITE_SUPABASE_URL is required for Edge Functions.",
+			}),
+		);
 
-	return `${supabaseBase}/functions/v1`;
+	return buildSupabaseEdgeBaseUrl(supabaseBase);
 };
 
 /**

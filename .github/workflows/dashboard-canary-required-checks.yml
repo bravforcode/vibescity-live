@@ -1,0 +1,57 @@
+name: Dashboard Canary Required Checks
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Target branch protection branch"
+        required: true
+        default: "main"
+      dry_run:
+        description: "Preview without applying changes"
+        required: true
+        default: "false"
+        type: choice
+        options: ["false", "true"]
+      bootstrap_unprotected:
+        description: "Create baseline branch protection if branch is currently unprotected"
+        required: true
+        default: "false"
+        type: choice
+        options: ["false", "true"]
+
+permissions:
+  contents: read
+
+jobs:
+  set-required-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate branch protection token
+        run: |
+          if [ -z "${{ secrets.BRANCH_PROTECTION_TOKEN }}" ]; then
+            echo "Missing BRANCH_PROTECTION_TOKEN secret (repo admin scope required)."
+            exit 1
+          fi
+
+      - name: Apply dashboard canary required checks
+        env:
+          GITHUB_TOKEN: ${{ secrets.BRANCH_PROTECTION_TOKEN }}
+        shell: bash
+        run: |
+          ARGS=(--branch "${{ inputs.branch }}")
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            ARGS+=(--dry-run)
+          fi
+          if [[ "${{ inputs.bootstrap_unprotected }}" == "true" ]]; then
+            ARGS+=(--bootstrap-unprotected)
+          fi
+          node scripts/ci/set-dashboard-canary-required-checks.mjs "${ARGS[@]}"

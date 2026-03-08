@@ -1,6 +1,6 @@
 # WSL Biome Troubleshooting
 
-Use this guide when `bun run lint` fails in WSL with errors like:
+Use this guide when `npm run lint` fails in WSL with errors like:
 
 ```text
 Cannot find module '@biomejs/cli-linux-x64/biome'
@@ -17,11 +17,11 @@ bash scripts/dev/wsl-bootstrap.sh
 ## What the bootstrap script does
 
 1. Verifies Linux/WSL environment.
-2. Uses `bun` from PATH or `~/.bun/bin/bun`.
+2. Uses `npm` from PATH.
 3. Runs:
 
 ```bash
-bun install --os linux --cpu x64
+npm ci
 ```
 
 4. Ensures Linux Biome binaries exist in `node_modules/@biomejs`:
@@ -31,7 +31,7 @@ bun install --os linux --cpu x64
 5. Verifies with:
 
 ```bash
-bun run lint -- --help
+npm run lint -- --help
 ```
 
 ## Manual fallback
@@ -39,14 +39,14 @@ bun run lint -- --help
 If you do not want to run the script, execute:
 
 ```bash
-bun install --os linux --cpu x64
-bun run lint -- --help
+npm ci
+npm run lint -- --help
 ```
 
 If lint still fails, remove and reinstall dependencies:
 
 ```bash
 rm -rf node_modules
-bun install --os linux --cpu x64
-bun run lint -- --help
+npm ci
+npm run lint -- --help
 ```

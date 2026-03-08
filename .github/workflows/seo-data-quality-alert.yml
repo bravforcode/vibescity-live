@@ -24,22 +24,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "latest"
-
-      - name: Cache Bun install
-        uses: actions/cache@v4
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
+          cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile || bun install
+        run: npm ci
 
       - name: Run SEO data quality check
         id: quality
@@ -63,7 +52,7 @@ jobs:
           ALERT_LANE: "ci"
           ALERT_TARGET: "seo-data-quality"
           ALERT_RUN_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          ALERT_WEBHOOK_URL: "${{ secrets.ALERT_WEBHOOK_URL }}"
+          ALERT_WEBHOOK_URL: "${{ secrets.ALERT_WEBHOOK_URL || secrets.DISCORD_WEBHOOK_URL || secrets.SYNTHETIC_ALERT_WEBHOOK_URL }}"
           ALERT_DEDUP_WINDOW_MINUTES: "60"
           ALERT_DEDUP_KEY: "seo-data-quality"
         run: node scripts/ci/send-alert-webhook.mjs

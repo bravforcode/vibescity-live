@@ -28,7 +28,7 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build monthly strict/quarantine/synthetic trend summary
         id: trend
@@ -81,7 +81,7 @@ jobs:
           OBS_METRICS_FAIL_ON_ERROR: "0"
           BIGQUERY_PROJECT_ID: "${{ vars.BIGQUERY_PROJECT_ID }}"
           BIGQUERY_DATASET: "${{ vars.BIGQUERY_DATASET }}"
-          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON }}"
+          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON || secrets.GOOGLE_CREDENTIALS || secrets.GCV_SERVICE_ACCOUNT_JSON }}"
           GRAFANA_LOKI_URL: "${{ vars.GRAFANA_LOKI_URL }}"
           GRAFANA_LOKI_USER: "${{ vars.GRAFANA_LOKI_USER }}"
           GRAFANA_LOKI_TOKEN: "${{ secrets.GRAFANA_LOKI_TOKEN }}"
@@ -99,7 +99,7 @@ jobs:
           INCIDENT_FAIL_ON_ERROR: "0"
           BIGQUERY_PROJECT_ID: "${{ vars.BIGQUERY_PROJECT_ID }}"
           BIGQUERY_DATASET: "${{ vars.BIGQUERY_DATASET }}"
-          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON }}"
+          BIGQUERY_SERVICE_ACCOUNT_JSON: "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_JSON || secrets.GOOGLE_CREDENTIALS || secrets.GCV_SERVICE_ACCOUNT_JSON }}"
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
           GITHUB_REPOSITORY: "${{ github.repository }}"
           GITHUB_SERVER_URL: "${{ github.server_url }}"
@@ -138,3 +138,4 @@ jobs:
           path: reports/ci/step-summary-monthly-quality-trend.md
           retention-days: 60
           if-no-files-found: ignore
+

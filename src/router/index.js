@@ -16,7 +16,7 @@ const routes = [
 		path: "/:locale(th|en)",
 		name: "HomeLocale",
 		component: HomeView,
-		meta: { title: "VibeCity - Chiang Mai Entertainment" },
+		meta: { title: "VibeCity - Thailand Entertainment" },
 	},
 	{
 		path: "/:locale(th|en)/venue/:id",
@@ -52,7 +52,13 @@ const routes = [
 		path: "/:locale(th|en)/partner",
 		name: "PartnerLocale",
 		component: PartnerDashboard,
-		meta: { title: "Partner Dashboard - VibeCity", requiresAuth: true },
+		meta: { title: "Partner Dashboard - VibeCity", requiredRole: "partner" },
+	},
+	{
+		path: "/:locale(th|en)/merchant",
+		name: "MerchantLocale",
+		component: MerchantDashboard,
+		meta: { title: "Merchant Portal - VibeCity", requiredRole: "owner" },
 	},
 
 	// Legacy (non-locale) public routes for dev fallback
@@ -60,7 +66,7 @@ const routes = [
 		path: "/",
 		name: "Home",
 		component: HomeView,
-		meta: { title: "VibeCity - Chiang Mai Entertainment", legacyLocale: true },
+		meta: { title: "VibeCity - Thailand Entertainment", legacyLocale: true },
 	},
 	{
 		path: "/venue/:id",
@@ -98,8 +104,8 @@ const routes = [
 		component: PartnerDashboard,
 		meta: {
 			title: "Partner Dashboard - VibeCity",
-			requiresAuth: true,
 			legacyLocale: true,
+			requiredRole: "partner",
 		},
 	},
 
@@ -114,7 +120,7 @@ const routes = [
 		component: MerchantDashboard,
 		meta: {
 			title: "Merchant Portal - VibeCity",
-			requiresAuth: true,
+			requiredRole: "owner",
 		},
 	},
 	{
@@ -125,6 +131,14 @@ const routes = [
 			title: "Admin - VibeCity",
 			requiresAuth: true,
 			requiresAdmin: true,
+		},
+	},
+	{
+		path: "/admin-signin",
+		name: "AdminSignIn",
+		component: () => import("../views/AdminView.vue"),
+		meta: {
+			title: "Admin Sign In - VibeCity",
 		},
 	},
 
@@ -163,25 +177,21 @@ const setLocaleCookie = (locale) => {
 	});
 };
 
-const readBool = (value) => {
-	if (value && typeof value === "object" && "value" in value) {
-		return Boolean(value.value);
-	}
-	return Boolean(value);
-};
-
 const getPreferredLocale = () => {
 	if (typeof window !== "undefined") {
 		const stored = localStorage.getItem("locale") || readCookie(LOCALE_COOKIE);
 		if (SUPPORTED_LOCALES.has(stored)) return stored;
 	}
-	return "th";
+	return "en";
 };
 
 const localeFromPath = (path) => {
 	const match = String(path || "").match(/^\/(th|en)(\/|$)/);
 	return match ? match[1] : null;
 };
+
+const isMerchantPath = (path) =>
+	path.startsWith("/merchant") || /^\/(th|en)\/merchant(\/|$)/.test(path);
 
 const isPublicPath = (path) =>
 	path === "/" ||
@@ -259,39 +269,15 @@ router.beforeEach(async (to, _from, next) => {
 	}
 
 	// 3. Merchant Route Protection
-	if (to.path.startsWith("/merchant")) {
-		if (!visitorId) {
-			// If no visitor ID, they definitely don't own any shops yet
-			// Redirect them home to explore/create first
-			const { useNotifications } = await import(
-				"@/composables/useNotifications"
-			);
-			useNotifications().notifyError(
-				"Access Denied: Please create a shop first to access the dashboard.",
-			);
-			return next("/");
-		}
-		// Ideally we check if they actually own anything here, but for MVP checking presence of ID is step 1.
-		// The dashboard itself handles "No Venues" state gracefully.
-	}
-
-	// Partner route requires authenticated user session.
-	if (to.name === "PartnerDashboard" || to.name === "PartnerLocale") {
-		const { useUserStore } = await import("../store/userStore");
-		const userStore = useUserStore();
+	if (isMerchantPath(to.path)) {
 		try {
-			await userStore.initAuth?.();
+			const { getOrCreateVisitorId, bootstrapVisitor } = await import(
+				"../services/visitorIdentity"
+			);
+			getOrCreateVisitorId();
+			void bootstrapVisitor().catch(() => {});
 		} catch {
-			// fail closed below
-		}
-		if (!readBool(userStore.isAuthenticated)) {
-			const { useNotifications } = await import(
-				"@/composables/useNotifications"
-			);
-			useNotifications().notifyError(
-				"Please sign in before opening Partner Dashboard.",
-			);
-			return next("/");
+			// fail open: dashboard still handles missing visitor state
 		}
 	}
 
@@ -308,13 +294,99 @@ router.beforeEach(async (to, _from, next) => {
 			// fail closed below
 		}
 
-		if (!readBool(userStore.isAdmin)) {
+		// Non-admin users must never stay on /admin.
+		if (!userStore.isAuthenticated || !userStore.isAdmin) {
 			console.warn("Unauthorized Admin Access Attempt");
 			return next("/");
 		}
 	}
 
+	// 5. Role guard for owner/partner dashboards (legacy-compatible).
+	if (to.meta.requiredRole) {
+		const { useUserStore } = await import("../store/userStore");
+		const userStore = useUserStore();
+		try {
+			await userStore.initAuth?.();
+		} catch {
+			// fallback below
+		}
+		const requiredRole = String(to.meta.requiredRole || "")
+			.trim()
+			.toLowerCase();
+		const hasRole =
+			typeof userStore.hasRole === "function"
+				? userStore.hasRole(requiredRole)
+				: false;
+		const visitorId = localStorage.getItem("vibe_visitor_id");
+		const allowLegacyOwnerFallback =
+			requiredRole === "owner" && Boolean(visitorId);
+		const allowLegacyPartnerFallback =
+			requiredRole === "partner" &&
+			featureFlagFallbackEnabled("enable_partner_program");
+
+		if (!userStore.isAdmin && !hasRole) {
+			if (allowLegacyOwnerFallback || allowLegacyPartnerFallback) {
+				return next();
+			}
+			const preferred = getPreferredLocale();
+			return next(`/${preferred}`);
+		}
+	}
+
 	next();
+});
+
+const featureFlagFallbackEnabled = (flag) => {
+	try {
+		const storeState = JSON.parse(
+			localStorage.getItem("pinia-feature-flags") || "{}",
+		);
+		const flags = storeState?.flags || {};
+		return Boolean(flags?.[flag]);
+	} catch {
+		return false;
+	}
+};
+
+const focusRouteLandmark = () => {
+	if (typeof window === "undefined" || typeof document === "undefined") return;
+
+	window.requestAnimationFrame(() => {
+		const h1 = document.querySelector("#main-content h1, main h1");
+		const mainContent = document.getElementById("main-content");
+		const target = h1 || mainContent;
+		if (!(target instanceof HTMLElement)) return;
+
+		const hadTabIndex = target.hasAttribute("tabindex");
+		if (!hadTabIndex) {
+			target.setAttribute("tabindex", "-1");
+		}
+
+		target.focus({ preventScroll: true });
+		if (!hadTabIndex) {
+			target.removeAttribute("tabindex");
+		}
+	});
+};
+
+router.afterEach(() => {
+	focusRouteLandmark();
+});
+
+// ✅ Auto-reload on ChunkLoadError
+router.onError((error, to) => {
+	if (
+		error.message.includes("Failed to fetch dynamically imported module") ||
+		error.name === "ChunkLoadError"
+	) {
+		if (to?.fullPath) {
+			window.location.href = to.fullPath;
+		} else {
+			window.location.reload();
+		}
+	} else {
+		console.error("[Vue Router Error]:", error);
+	}
 });
 
 export default router;

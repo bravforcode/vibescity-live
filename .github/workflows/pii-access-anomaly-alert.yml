@@ -24,22 +24,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "latest"
-
-      - name: Cache Bun install
-        uses: actions/cache@v4
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
+          cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile || bun install
+        run: npm ci
 
       - name: Check PII access anomalies
         id: check
@@ -59,7 +48,7 @@ jobs:
         if: ${{ steps.check.outputs.alert == 'true' }}
         continue-on-error: true
         env:
-          ALERT_WEBHOOK_URL: "${{ secrets.PII_AUDIT_ALERT_WEBHOOK_URL }}"
+          ALERT_WEBHOOK_URL: "${{ secrets.PII_AUDIT_ALERT_WEBHOOK_URL || secrets.DISCORD_WEBHOOK_URL || secrets.SYNTHETIC_ALERT_WEBHOOK_URL }}"
           ALERT_TYPE: "pii_access_anomaly"
           ALERT_TEXT: "${{ steps.check.outputs.alert_text }}"
           ALERT_LANE: "pii-audit"

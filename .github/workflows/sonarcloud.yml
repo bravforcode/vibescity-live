@@ -39,7 +39,7 @@ jobs:
           node-version: "20"
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       # =========================
       # 🧪 UNIT TESTS + COVERAGE
@@ -62,7 +62,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
 
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
@@ -100,11 +100,16 @@ jobs:
             echo "::warning::No Playwright JUnit report found. Generated empty Sonar generic report."
           fi
 
-      - name: Detect Sonar token
-        id: sonar_token
+      - name: Detect Sonar CI quality gate mode
+        id: sonar_mode
         run: |
           if [ -n "${{ secrets.SONAR_TOKEN }}" ]; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            if [ "${{ vars.SONAR_CI_QUALITY_GATE_ENABLED }}" = "true" ]; then
+              echo "enabled=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "::warning::SonarCloud CI quality gate is skipped because Automatic Analysis is still enabled or CI enforcement has not been explicitly enabled. Disable Automatic Analysis in SonarCloud, then set repo variable SONAR_CI_QUALITY_GATE_ENABLED=true to enforce this gate."
+              echo "enabled=false" >> "$GITHUB_OUTPUT"
+            fi
           else
             echo "::warning::SONAR_TOKEN is not configured. Skipping SonarCloud quality gate step."
             echo "enabled=false" >> "$GITHUB_OUTPUT"
@@ -114,7 +119,7 @@ jobs:
       # 🔒 SONARCLOUD
       # =========================
       - name: SonarCloud Scan (Quality Gate)
-        if: ${{ steps.sonar_token.outputs.enabled == 'true' }}
+        if: ${{ steps.sonar_mode.outputs.enabled == 'true' }}
         uses: SonarSource/sonarcloud-github-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -139,4 +144,10 @@ jobs:
           echo "- 🎭 **E2E Report (Playwright)**" >> $GITHUB_STEP_SUMMARY
           echo "  - 📦 Artifact: playwright-report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "🔒 **Quality Gate:** enforced by SonarCloud" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.sonar_mode.outputs.enabled }}" = "true" ]; then
+            echo "🔒 **Quality Gate:** enforced by SonarCloud CI scan" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "🔒 **Quality Gate:** SonarCloud CI scan skipped" >> $GITHUB_STEP_SUMMARY
+            echo "  - Automatic Analysis is still active or CI enforcement is not explicitly enabled." >> $GITHUB_STEP_SUMMARY
+            echo "  - To enforce this gate, disable Automatic Analysis in SonarCloud and set \`SONAR_CI_QUALITY_GATE_ENABLED=true\` at repo variable level." >> $GITHUB_STEP_SUMMARY
+          fi

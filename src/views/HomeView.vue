@@ -19,8 +19,8 @@ import FilterMenuSync from "../components/ui/FilterMenu.vue";
 import SidebarDrawer from "../components/ui/SidebarDrawer.vue"; // ✅ Sync Import to fix loading
 import { useAppLogic } from "../composables/useAppLogic";
 import { useLocalAds } from "../composables/useLocalAds";
-import { getSiteOrigin } from "../lib/runtimeConfig";
 import { setClientCookie } from "../lib/cookies";
+import { getSiteOrigin } from "../lib/runtimeConfig";
 import { useFeatureFlagStore } from "../store/featureFlagStore";
 
 // ✅ Async Components (Preserved)

@@ -64,19 +64,35 @@ async function discoverQuarantineTests() {
     );
   }
 
-  const { stdout, stderr } = await execFileAsync(process.execPath, args, {
-    maxBuffer: 10 * 1024 * 1024,
-    env: {
-      ...process.env,
-      PW_NO_WEBSERVER: process.env.PW_NO_WEBSERVER || "1",
-    },
-  });
+  try {
+    const { stdout, stderr } = await execFileAsync(process.execPath, args, {
+      maxBuffer: 10 * 1024 * 1024,
+      env: {
+        ...process.env,
+        PW_NO_WEBSERVER: process.env.PW_NO_WEBSERVER || "1",
+      },
+    });
 
-  if (stderr?.trim()) {
-    console.warn(`[warn] playwright --list stderr: ${stderr.trim()}`);
+    if (stderr?.trim()) {
+      console.warn(`[warn] playwright --list stderr: ${stderr.trim()}`);
+    }
+
+    return parseListOutput(stdout);
+  } catch (error) {
+    const combinedMessage = [
+      error?.message,
+      error?.stdout,
+      error?.stderr,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    if (combinedMessage.includes("No tests found")) {
+      return [];
+    }
+
+    throw error;
   }
-
-  return parseListOutput(stdout);
 }
 
 async function loadMetadata() {
