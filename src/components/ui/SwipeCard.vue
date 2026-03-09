@@ -549,14 +549,6 @@ const handleManualExpand = () => {
             aria-hidden="true"
           />
         </button>
-        <!-- Share -->
-        <button
-          class="sc-action-btn"
-          :aria-label="t('common.share')"
-          @click.stop="shareShop"
-        >
-          <Share2 class="w-[18px] h-[18px]" />
-        </button>
       </div>
 
       <!-- ── Heart Burst Animation ─────────────── -->
@@ -608,18 +600,28 @@ const handleManualExpand = () => {
           </div>
         </div>
 
-        <!-- CTA -->
-        <button
-          class="sc-cta"
-          :aria-label="`${t('common.ride')} to ${displayName}`"
-          @click.stop="emit('open-ride')"
-        >
-          <Car class="w-4 h-4 flex-shrink-0" aria-hidden="true" />
-          <span>{{ t("common.ride") }}</span>
-          <span class="ml-auto text-[10px] font-normal opacity-60">{{
-            displayDistance
-          }}</span>
-        </button>
+        <!-- CTA: Share + Ride (stacked full-width) -->
+        <div class="flex flex-col gap-2">
+          <button
+            class="sc-cta sc-cta--full"
+            :aria-label="t('common.share')"
+            @click.stop="shareShop"
+          >
+            <Share2 class="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+            <span>{{ t("common.share") }}</span>
+          </button>
+          <button
+            class="sc-cta sc-cta--full"
+            :aria-label="`${t('common.ride')} to ${displayName}`"
+            @click.stop="emit('open-ride')"
+          >
+            <Car class="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+            <span>{{ t("common.ride") }}</span>
+            <span class="ml-auto text-[10px] font-normal opacity-60">{{
+              displayDistance
+            }}</span>
+          </button>
+        </div>
       </div>
     </div>
     <!-- /sc-surface -->
@@ -973,6 +975,7 @@ const handleManualExpand = () => {
   width: 100%;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   padding: 11px 16px;
   border-radius: 14px;
@@ -988,6 +991,9 @@ const handleManualExpand = () => {
     filter 0.18s ease,
     transform 0.14s ease;
   will-change: transform;
+}
+.sc-cta--full {
+  padding: 11px 16px;
 }
 .sc-cta:active {
   transform: scale(0.97);
