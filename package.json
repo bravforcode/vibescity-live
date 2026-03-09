@@ -88,7 +88,9 @@
     "flags:audit": "node scripts/ci/audit-feature-flags.mjs",
     "api:validate": "node scripts/ci/validate-api-contract-enhanced.mjs",
     "test:device-matrix": "node scripts/ci/generate-device-matrix.mjs",
-    "i18n:validate-thai": "node scripts/ci/validate-thai-locale.mjs"
+    "i18n:validate-thai": "node scripts/ci/validate-thai-locale.mjs",
+    "monitor:flag-sunsets": "node scripts/ci/monitor-flag-sunsets.mjs",
+    "audit:cleanup": "cat scripts/cleanup-unused-components.md"
   },
   "dependencies": {
     "@heroicons/vue": "^2.2.0",
