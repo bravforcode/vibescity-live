@@ -211,7 +211,10 @@
 		"you_are_offline": "Offline mode enabled",
 		"limited_functionality": "Actions will sync when online",
 		"connection_restored": "Connection restored",
-		"syncing_data": "Syncing queued actions"
+		"syncing_data": "Syncing queued actions",
+		"install_vibecity": "Install VibeCity",
+		"install_desc": "Faster loading & offline access",
+		"install_btn": "Install"
 	},
 	"feed": {
 		"no_items": "No items to display",
