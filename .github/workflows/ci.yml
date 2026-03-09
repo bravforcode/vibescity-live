@@ -48,6 +48,31 @@ jobs:
       - name: Guard SQL runlist safety rules
         run: node scripts/ci/check-runlist-guards.mjs
 
+  data-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Feature flag audit
+        run: npm run flags:audit
+
+      - name: Thai locale validator
+        run: npm run i18n:validate-thai
+
+      - name: Venue data validator
+        if: ${{ vars.SUPABASE_URL != '' && secrets.SUPABASE_SERVICE_ROLE_KEY != '' }}
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npm run venue:validate
+
   backend-tests:
     runs-on: ubuntu-latest
     steps:
