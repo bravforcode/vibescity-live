@@ -296,6 +296,7 @@
 		"reload_component": "Reload Component"
 	},
 	"a11y": {
+		"skip_to_content": "Skip to main content",
 		"add_favorite": "Add to favorites",
 		"remove_favorite": "Remove from favorites",
 		"collapse_details": "Collapse details",
@@ -1103,6 +1104,13 @@
 		"k_1ccc1cf2": "My Location",
 		"k_d260a26f": "Explore Nearby",
 		"k_deb987b1": "Please wait before claiming again",
-		"k_53a492d5": "Vibe claim is on cooldown"
+		"k_53a492d5": "Vibe claim is on cooldown",
+		"k_b6068981": "Bank Country",
+		"k_62144e21": "Bank Name (International)",
+		"k_fc0dd480": "ข้ามไปเนื้อหาหลัก / Skip to main content",
+		"k_e45aa30c": "ยกเลิก",
+		"k_939c7ad6": "ไม่พบร้านค้าในหมวดนี้",
+		"k_ab09f6ea": "ชั้น",
+		"k_1cf89574": "เปิด"
 	}
 }

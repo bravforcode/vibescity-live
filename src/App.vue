@@ -72,15 +72,17 @@ watch(
 
 <template>
   <!-- Skip Link for Keyboard Accessibility -->
-  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <a href="#main-content" class="skip-link">{{ $t("a11y.skip_to_content") }}</a>
   <StickyOfflineBanner />
   <ReloadPrompt />
   <ConsentBanner />
-  <router-view v-slot="{ Component }">
-    <Transition name="page" mode="out-in">
-      <component :is="Component" />
-    </Transition>
-  </router-view>
+  <main id="main-content">
+    <router-view v-slot="{ Component }">
+      <Transition name="page" mode="out-in">
+        <component :is="Component" />
+      </Transition>
+    </router-view>
+  </main>
   <VibeNotification />
 </template>
 

@@ -71,7 +71,7 @@ const confirmClearData = () => {
         class="fixed inset-0 z-[7000] flex items-end sm:items-center justify-center pointer-events-auto"
       >
         <!-- Backdrop -->
-        <div
+        <div role="button" tabindex="0"
           class="absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity"
           @click="emit('close')"
         ></div>
@@ -327,9 +327,7 @@ const confirmClearData = () => {
         <div
           v-if="mapEffectsLocked"
           class="p-4 rounded-2xl bg-amber-500/10 border border-amber-400/20 text-amber-200 text-xs font-semibold"
-        >
-          Cars-only mode is active near your location. Atmosphere effects are disabled.
-        </div>
+        > {{ $t("auto.k_234ff278") }} </div>
 
         <!-- Ambient FX -->
         <div
@@ -572,17 +570,17 @@ const confirmClearData = () => {
         <div class="grid grid-cols-2 gap-4 mt-2">
           <a
             href="#"
-            class="text-xs text-white/30 hover:text-white text-center py-2"
+            class="text-xs text-white/50 hover:text-white text-center py-2"
             >{{ t("settings.privacy") }}</a
           >
           <a
             href="#"
-            class="text-xs text-white/30 hover:text-white text-center py-2"
+            class="text-xs text-white/50 hover:text-white text-center py-2"
             >{{ t("settings.terms") }}</a
           >
         </div>
 
-        <div class="text-center text-[10px] text-white/20 font-mono pt-4">
+        <div class="text-center text-[10px] text-white/50 font-mono pt-4">
           {{ t('profile.version', { version: appVersion }) }}
         </div>
       </div>

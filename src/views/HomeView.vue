@@ -28,6 +28,7 @@ import { setClientCookie } from "../lib/cookies";
 import { getSiteOrigin } from "../lib/runtimeConfig";
 import { useFeatureFlagStore } from "../store/featureFlagStore";
 import { useUserStore } from "../store/userStore";
+import { defineResilientAsync } from "../utils/asyncComponentFactory";
 
 const IS_STRICT_MAP_E2E = import.meta.env.VITE_E2E_MAP_REQUIRED === "true";
 const MapContainer = IS_STRICT_MAP_E2E
@@ -37,35 +38,35 @@ const MapContainer = IS_STRICT_MAP_E2E
 				? () => Promise.resolve(MapboxContainerSync)
 				: () => import("../components/map/MapboxContainer.vue"),
 		);
-const VideoPanel = defineAsyncComponent(
+const VideoPanel = defineResilientAsync(
 	() => import("../components/panel/VideoPanel.vue"),
 );
 // SidebarDrawer moved to sync above
-const VibeError = defineAsyncComponent(
+const VibeError = defineResilientAsync(
 	() => import("../components/ui/VibeError.vue"),
 );
-const VibeSkeleton = defineAsyncComponent(
+const VibeSkeleton = defineResilientAsync(
 	() => import("../components/ui/VibeSkeleton.vue"),
 );
-const SwipeCard = defineAsyncComponent(
+const SwipeCard = defineResilientAsync(
 	() => import("../components/ui/SwipeCard.vue"),
 );
-const ImmersiveFeed = defineAsyncComponent(
+const ImmersiveFeed = defineResilientAsync(
 	() => import("../components/feed/ImmersiveFeed.vue"),
 );
-const MerchantRegister = defineAsyncComponent(
+const MerchantRegister = defineResilientAsync(
 	() => import("../components/panel/MerchantRegister.vue"),
 );
-const AddShopModal = defineAsyncComponent(
+const AddShopModal = defineResilientAsync(
 	() => import("../components/ugc/AddShopModal.vue"),
 );
-const DailyCheckin = defineAsyncComponent(
+const DailyCheckin = defineResilientAsync(
 	() => import("../components/ui/DailyCheckin.vue"),
 );
-const LuckyWheel = defineAsyncComponent(
+const LuckyWheel = defineResilientAsync(
 	() => import("../components/ui/LuckyWheel.vue"),
 );
-const LocalAdBanner = defineAsyncComponent(
+const LocalAdBanner = defineResilientAsync(
 	() => import("../components/ads/LocalAdBanner.vue"),
 );
 
@@ -77,14 +78,14 @@ const currentAd = computed(() => visibleAds.value?.[0] ?? null);
 
 const FilterMenu = IS_STRICT_MAP_E2E
 	? FilterMenuSync
-	: defineAsyncComponent(() => import("../components/ui/FilterMenu.vue"));
-const RelatedShopsDrawer = defineAsyncComponent(
+	: defineResilientAsync(() => import("../components/ui/FilterMenu.vue"));
+const RelatedShopsDrawer = defineResilientAsync(
 	() => import("../components/ui/RelatedShopsDrawer.vue"),
 );
-const SafetyPanel = defineAsyncComponent(
+const SafetyPanel = defineResilientAsync(
 	() => import("../components/ui/SafetyPanel.vue"),
 );
-const FavoritesModal = defineAsyncComponent(
+const FavoritesModal = defineResilientAsync(
 	() => import("../components/modal/FavoritesModal.vue"),
 );
 const showFilterMenu = ref(false);
@@ -677,7 +678,7 @@ const ogLocaleAlternate = computed(() =>
 	currentLocale.value === "en" ? "th_TH" : "en_US",
 );
 
-const ogType = computed(() => (isVenueRoute.value ? "place" : "website"));
+const ogType = computed(() => "website");
 
 useHead(() => ({
 	title: seoTitle.value,
@@ -699,11 +700,13 @@ useHead(() => ({
 		{ property: "og:locale", content: ogLocale.value },
 		{ property: "og:locale:alternate", content: ogLocaleAlternate.value },
 		{ property: "og:image", content: seoOgImageUrl.value },
+		{ property: "og:image:alt", content: seoDescription.value },
 
 		{ name: "twitter:card", content: "summary_large_image" },
 		{ name: "twitter:title", content: seoTitle.value },
 		{ name: "twitter:description", content: seoDescription.value },
 		{ name: "twitter:image", content: seoOgImageUrl.value },
+		{ name: "twitter:site", content: "@vibecitylive" },
 	],
 	script:
 		venueJsonLd.value || categoryJsonLd.value
@@ -834,9 +837,7 @@ const hasFilteredResults = computed(() => {
 
 <template>
   <ErrorBoundary>
-    <a href="#main-content" class="skip-link">
-      ข้ามไปเนื้อหาหลัก / Skip to main content
-    </a>
+    <a href="#main-content" class="skip-link"> {{ $t("auto.k_fc0dd480") }} </a>
     <main
       id="main-content"
       :class="[
@@ -1065,7 +1066,7 @@ const hasFilteredResults = computed(() => {
                 <button
                   type="button"
                   class="absolute top-4 left-4 z-50 cursor-pointer pointer-events-auto rounded-md p-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
-                  aria-label="Go to VibeCity home"
+                  :aria-label="$t('auto.k_ab5ff062')"
                   @click="handleLogoClick"
                 >
                   <h1
@@ -1198,7 +1199,7 @@ const hasFilteredResults = computed(() => {
                 :show-expand="false"
                 class="w-full aspect-[16/10] md:aspect-[4/3] rounded-xl overflow-hidden shadow-lg border border-white/10"
               >
-                <img
+                <img loading="lazy"
                   :src="shop.Image_URL1"
                   :alt="shop.name || 'Shop preview'"
                   class="w-full h-full object-cover"
@@ -1271,7 +1272,7 @@ const hasFilteredResults = computed(() => {
                 <div
                   class="flex flex-col items-center justify-center h-full bg-gradient-to-b from-zinc-950 to-zinc-900 gap-4"
                 >
-                  <p class="text-white/60 text-sm">Feed failed to load</p>
+                  <p class="text-white/60 text-sm">{{ $t("auto.k_a043935") }}</p>
                   <button
                     @click="reset"
                     class="px-4 py-2 min-h-[44px] rounded-xl bg-white/10 text-white text-sm font-bold cursor-pointer"

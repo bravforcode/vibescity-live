@@ -128,7 +128,7 @@ defineExpose({ close });
 <template>
   <div class="sd-root" role="presentation" data-testid="sidebar-drawer-shell">
     <Transition name="sd-backdrop">
-      <div
+      <div role="button" tabindex="0"
         v-if="isOpen"
         class="sd-backdrop"
         aria-hidden="true"
@@ -149,10 +149,10 @@ defineExpose({ close });
         <header class="sd-header">
           <div class="sd-avatar-ring">
             <div class="sd-avatar-inner">
-              <img
+              <img loading="lazy"
                 v-if="safeUser.avatar"
                 :src="safeUser.avatar"
-                alt="User avatar"
+                :alt="$t('auto.k_eac08187')"
                 class="sd-avatar-img"
               >
               <span v-else class="sd-avatar-initial" aria-hidden="true">{{ userInitial }}</span>
@@ -164,7 +164,7 @@ defineExpose({ close });
             <div class="sd-user-meta">
               <span class="sd-level-badge">
                 <Zap class="w-3 h-3" aria-hidden="true" />
-                Lv.{{ userLevel }}
+                {{ "Lv. " + userLevel }}
               </span>
               <span class="sd-coin-badge" :aria-label="`${userCoins} coins`">
                 🪙 {{ userCoins.toLocaleString() }}
@@ -182,7 +182,7 @@ defineExpose({ close });
             </div>
           </div>
 
-          <button class="sd-close-btn" aria-label="Close sidebar" @click="close">
+          <button class="sd-close-btn" :aria-label="$t('auto.k_c862ab23')" @click="close">
             <X class="w-5 h-5" aria-hidden="true" />
           </button>
         </header>
@@ -195,7 +195,7 @@ defineExpose({ close });
               type="button"
               class="sd-item sd-item--purple"
               data-testid="sidebar-action-daily-checkin"
-              aria-label="Open daily check-in"
+              :aria-label="$t('auto.k_7388f8ac')"
               @click="go('open-daily-checkin')"
             >
               <span class="sd-item-icon sd-item-icon--purple">
@@ -211,7 +211,7 @@ defineExpose({ close });
             <button
               type="button"
               class="sd-item sd-item--amber"
-              aria-label="Open lucky wheel"
+              :aria-label="$t('auto.k_60335be')"
               @click="go('open-lucky-wheel')"
             >
               <span class="sd-item-icon sd-item-icon--amber">
@@ -253,7 +253,7 @@ defineExpose({ close });
               type="button"
               class="sd-item sd-item--blue"
               data-testid="sidebar-action-promote-shop"
-              aria-label="Promote your shop"
+              :aria-label="$t('auto.k_d535838e')"
               @click="go('open-merchant')"
             >
               <span class="sd-item-icon sd-item-icon--blue">
@@ -270,7 +270,7 @@ defineExpose({ close });
               type="button"
               class="sd-item sd-item--amber"
               data-testid="sidebar-action-owner-dashboard"
-              aria-label="Owner dashboard"
+              :aria-label="$t('auto.k_67406ca0')"
               @click="go('open-dashboard')"
             >
               <span class="sd-item-icon sd-item-icon--amber">
@@ -288,7 +288,7 @@ defineExpose({ close });
               type="button"
               class="sd-item sd-item--cyan"
               data-testid="sidebar-action-partner-program"
-              aria-label="Partner program"
+              :aria-label="$t('auto.k_88032c1d')"
               @click="go('open-partner')"
             >
               <span class="sd-item-icon sd-item-icon--cyan">
@@ -336,7 +336,7 @@ defineExpose({ close });
               type="button"
               class="sd-item sd-item--ghost"
               data-testid="sidebar-open-settings"
-              aria-label="Open settings"
+              :aria-label="$t('auto.k_1336b4d6')"
               @click="showSettingsPanel = true; selectFeedback();"
             >
               <span class="sd-item-icon sd-item-icon--ghost">
@@ -506,8 +506,8 @@ defineExpose({ close });
 
 .sd-close-btn {
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   display: flex;
   align-items: center;

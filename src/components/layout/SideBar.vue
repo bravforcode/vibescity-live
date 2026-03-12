@@ -275,7 +275,7 @@ onUnmounted(() => {
   <div class="pointer-events-none">
     <!-- Backdrop -->
     <transition name="fade">
-      <div
+      <div role="button" tabindex="0"
         v-if="isOpen"
         class="fixed inset-0 bg-black/60 backdrop-blur-sm pointer-events-auto sm:hidden"
         :style="{ zIndex: Z.SIDEBAR_BACKDROP }"
@@ -308,8 +308,8 @@ onUnmounted(() => {
           <button
             ref="firstFocusableRef"
             @click="emit('close')"
-            class="text-white/30 hover:text-white transition p-1 rounded-lg hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-white/20"
-            aria-label="Close sidebar"
+            class="text-white/60 hover:text-white transition p-2.5 rounded-lg hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50"
+            :aria-label="$t('auto.k_c862ab23')"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -337,11 +337,11 @@ onUnmounted(() => {
               @click="isFiltersExpanded = !isFiltersExpanded"
               :aria-expanded="isFiltersExpanded"
               aria-controls="filters-panel"
-              class="w-full px-6 py-4 flex items-center justify-between hover:bg-white/5 transition group focus:outline-none focus:bg-white/5"
+              class="w-full px-6 py-4 flex items-center justify-between hover:bg-white/5 transition group focus:focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:bg-white/5"
             >
               <div class="flex flex-col items-start gap-0.5">
                 <span
-                  class="text-[10px] text-white/30 font-black uppercase tracking-[0.2em]"
+                  class="text-[10px] text-white/50 font-black uppercase tracking-[0.2em]"
                 >
                   {{ t("sidebar.active_filters") }}
                   <span v-if="activeFilterCount > 0" class="ml-1 text-white/50"
@@ -396,7 +396,7 @@ onUnmounted(() => {
                 >
                   <span
                     id="status-filter-label"
-                    class="text-[9px] text-white/20 font-black uppercase tracking-[0.2em]"
+                    class="text-[9px] text-white/50 font-black uppercase tracking-[0.2em]"
                   >
                     {{ t("sidebar.quick_status") }}
                   </span>
@@ -408,7 +408,7 @@ onUnmounted(() => {
                       :aria-pressed="activeStatus === status"
                       :aria-label="`Filter by ${status.toLowerCase()} status`"
                       :class="[
-                        'h-9 px-3 text-left text-[10px] font-black uppercase tracking-widest transition border rounded-sm focus:outline-none focus:ring-2 focus:ring-white/30',
+                        'h-9 px-3 text-left text-[10px] font-black uppercase tracking-widest transition border rounded-sm focus:focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:ring-2 focus:ring-white/30',
                         activeStatus === status
                           ? 'bg-white text-black border-white shadow-lg'
                           : 'bg-white/5 text-white/50 border-white/5 hover:bg-white/10 hover:text-white/70',
@@ -428,7 +428,7 @@ onUnmounted(() => {
                   <div class="flex items-center justify-between">
                     <span
                       id="category-filter-label"
-                      class="text-[9px] text-white/20 font-black uppercase tracking-[0.2em]"
+                      class="text-[9px] text-white/50 font-black uppercase tracking-[0.2em]"
                     >
                       {{ t("sidebar.categories") }}
                     </span>
@@ -436,12 +436,12 @@ onUnmounted(() => {
                       @click="resetCategories"
                       :disabled="activeCategories.length === 0"
                       :class="[
-                        'text-[9px] font-black uppercase tracking-widest transition-colors rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-400',
+                        'text-[9px] font-black uppercase tracking-widest transition-colors rounded px-2 py-1 focus:focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:ring-2 focus:ring-blue-400',
                         activeCategories.length === 0
-                          ? 'text-white/20 cursor-not-allowed'
+                          ? 'text-white/50 cursor-not-allowed'
                           : 'text-blue-500 hover:text-blue-400',
                       ]"
-                      aria-label="Reset category filters"
+                      :aria-label="$t('auto.k_ee7b59ab')"
                     >
                       {{ t("sidebar.reset") }}
                     </button>
@@ -454,7 +454,7 @@ onUnmounted(() => {
                       :aria-pressed="activeCategories.includes(cat)"
                       :aria-label="`Toggle ${cat} category`"
                       :class="[
-                        'px-3 py-1.5 text-[9px] font-black uppercase tracking-widest transition border rounded-sm focus:outline-none focus:ring-2 focus:ring-white/30',
+                        'px-3 py-1.5 text-[9px] font-black uppercase tracking-widest transition border rounded-sm focus:focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:ring-2 focus:ring-white/30',
                         activeCategories.includes(cat)
                           ? 'bg-red-600 text-white border-red-600 shadow-md scale-105'
                           : 'bg-white/5 text-white/50 border-white/5 hover:border-white/20 hover:bg-white/10',
@@ -472,7 +472,7 @@ onUnmounted(() => {
           <div class="flex-1 p-6 space-y-4">
             <div class="flex items-center justify-between">
               <span
-                class="text-[10px] text-white/30 font-black uppercase tracking-[0.2em]"
+                class="text-[10px] text-white/50 font-black uppercase tracking-[0.2em]"
               >
                 {{ t("sidebar.trending_now") }}
               </span>
@@ -502,7 +502,7 @@ onUnmounted(() => {
                 @keydown.space.prevent="handleShopClick(shop)"
                 :aria-label="`${shop.name}, ${shop.status} status${shop._isFlash ? ', flash sale active' : ''}${shop.isGolden ? ', highlighted' : ''}`"
                 :class="[
-                  'group bg-white/5 hover:bg-white/10 border border-white/5 p-3 flex flex-col gap-2 cursor-pointer transition rounded-sm focus:outline-none focus:ring-2 focus:ring-white/30',
+                  'group bg-white/5 hover:bg-white/10 border border-white/5 p-3 flex flex-col gap-2 cursor-pointer transition rounded-sm focus:focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:ring-2 focus:ring-white/30',
                   selectedShopId === shop.id
                     ? 'bg-white/20 border-white/20 scale-[0.98] ring-2 ring-white/50'
                     : 'active:scale-[0.98]',
@@ -521,20 +521,16 @@ onUnmounted(() => {
                     v-if="shop._badgeType === 'highlight'"
                     class="sidebar-highlight-badge shrink-0"
                     role="status"
-                    aria-label="Highlighted venue"
-                  >
-                    ⭐ HIGHLIGHT
-                  </div>
+                    :aria-label="$t('auto.k_1397b561')"
+                  > {{ $t("auto.k_b3854d8f") }} </div>
 
                   <!-- 2. FLASH SALE Badge -->
                   <div
                     v-else-if="shop._badgeType === 'flash'"
                     class="sidebar-flash-badge shrink-0"
                     role="status"
-                    aria-label="Flash sale active"
-                  >
-                    ⚡ FLASH
-                  </div>
+                    :aria-label="$t('auto.k_71aad8a')"
+                  > {{ $t("auto.k_703caa16") }} </div>
 
                   <!-- 3. STATUS Badge -->
                   <div
@@ -563,17 +559,17 @@ onUnmounted(() => {
                 <div class="flex items-center justify-between mt-1">
                   <div v-if="shop.category" class="flex items-center gap-2">
                     <span
-                      class="text-[9px] text-white/30 uppercase tracking-wider"
+                      class="text-[9px] text-white/50 uppercase tracking-wider"
                     >
                       {{ shop.category }}
                     </span>
                   </div>
                   <!-- ✅ Ride Button -->
-                  <button
+                  <button :aria-label="$t('a11y.action')"
                     @click.stop="handleRideClick(shop)"
                     class="px-2 py-1 rounded bg-blue-600/20 text-blue-400 text-[10px] font-bold border border-blue-500/30 hover:bg-blue-600 hover:text-white transition-colors flex items-center gap-1"
                   >
-                    <span>🚗 Ride</span>
+                    <span>{{ $t("auto.k_52f967f5") }}</span>
                   </button>
                 </div>
               </div>
@@ -592,7 +588,7 @@ onUnmounted(() => {
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      class="w-8 h-8 text-white/20"
+                      class="w-8 h-8 text-white/50"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -615,7 +611,7 @@ onUnmounted(() => {
                     {{ t("sidebar.no_venues") }}
                   </p>
                   <p
-                    class="text-[10px] text-white/20 font-medium max-w-[200px] mx-auto leading-relaxed"
+                    class="text-[10px] text-white/50 font-medium max-w-[200px] mx-auto leading-relaxed"
                   >
                     {{ t("sidebar.adjust_filters") }}
                   </p>
@@ -624,8 +620,8 @@ onUnmounted(() => {
                 <button
                   ref="lastFocusableRef"
                   @click="resetAllFilters"
-                  class="mx-auto px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-[10px] font-black uppercase tracking-widest rounded-sm transition border border-white/10 hover:border-white/30 focus:outline-none focus:ring-2 focus:ring-white/30"
-                  aria-label="Clear all filters"
+                  class="mx-auto px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-[10px] font-black uppercase tracking-widest rounded-sm transition border border-white/10 hover:border-white/30 focus:focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:ring-2 focus:ring-white/30"
+                  :aria-label="$t('auto.k_a26a029e')"
                 >
                   {{ t("sidebar.clear_all") }}
                 </button>
@@ -637,7 +633,7 @@ onUnmounted(() => {
         <!-- Footer -->
         <div class="p-6 border-t border-white/5 bg-zinc-950">
           <p
-            class="text-[9px] text-white/20 font-medium uppercase tracking-widest text-center"
+            class="text-[9px] text-white/50 font-medium uppercase tracking-widest text-center"
           >
             {{ t("sidebar.footer", { year: currentYear }) }}
           </p>

@@ -9,24 +9,35 @@
 
       <!-- Search Input -->
       <div class="search-input-wrapper">
-        <MagnifyingGlassIcon class="search-icon" />
+        <label for="vibe-search-input" class="sr-only">{{ $t("nav.search") }}</label>
+        <MagnifyingGlassIcon class="search-icon" aria-hidden="true" />
         <input
+          id="vibe-search-input"
           ref="searchInput"
           v-model="searchQuery"
           type="text"
           :placeholder="placeholder"
           class="search-input"
+          role="combobox"
+          :aria-expanded="showSuggestions && suggestions.length > 0"
+          aria-autocomplete="list"
+          aria-controls="vibe-search-suggestions"
+          :aria-activedescendant="selectedIndex >= 0 ? `suggestion-${selectedIndex}` : undefined"
           @input="handleInput"
           @focus="handleFocus"
           @blur="handleBlur"
           @keydown.enter="handleSubmit"
+          @keydown.down.prevent="selectedIndex = Math.min(selectedIndex + 1, suggestions.length - 1)"
+          @keydown.up.prevent="selectedIndex = Math.max(selectedIndex - 1, -1)"
+          @keydown.escape="showSuggestions = false"
         />
         <button
           v-if="searchQuery"
           @click="clearSearch"
           class="clear-btn"
+          :aria-label="$t('nav.clearSearch')"
         >
-          <XMarkIcon class="w-4 h-4" />
+          <XMarkIcon class="w-4 h-4" aria-hidden="true" />
         </button>
       </div>
 
@@ -35,8 +46,10 @@
         @click="openFilters"
         class="filter-btn"
         :class="{ 'has-active-filters': hasActiveFilters }"
+        :aria-label="$t('nav.openFilter')"
+        :aria-expanded="hasActiveFilters"
       >
-        <FunnelIcon class="w-4 h-4" />
+        <FunnelIcon class="w-4 h-4" aria-hidden="true" />
       </button>
     </div>
 
@@ -44,10 +57,13 @@
     <Transition name="search-dropdown">
       <div
         v-if="showSuggestions && (suggestions.length > 0 || isLoading)"
+        id="vibe-search-suggestions"
         class="search-suggestions"
+        role="listbox"
+        :aria-label="$t('nav.searchResults')"
       >
         <!-- Loading State -->
-        <div v-if="isLoading" class="suggestion-item loading">
+        <div v-if="isLoading" class="suggestion-item loading" role="status">
           <div class="loading-spinner"></div>
           <span>{{ $t("nav.searching") }}</span>
         </div>
@@ -56,9 +72,12 @@
         <template v-else>
           <div
             v-for="(suggestion, index) in suggestions"
+            :id="`suggestion-${index}`"
             :key="suggestion.id"
             class="suggestion-item"
             :class="{ 'is-selected': selectedIndex === index }"
+            role="option"
+            :aria-selected="selectedIndex === index"
             @click="selectSuggestion(suggestion)"
             @mouseenter="selectedIndex = index"
           >
@@ -177,8 +196,8 @@ const handleBlur = () => {
 };
 
 const handleSubmit = () => {
-	if (selectedIndex.value >= 0 && suggestions.value[selectedIndex.value]) {
-		selectSuggestion(suggestions.value[selectedIndex.value]);
+	if (selectedIndex.value >= 0 && props.suggestions[selectedIndex.value]) {
+		selectSuggestion(props.suggestions[selectedIndex.value]);
 	} else {
 		emit("submit", searchQuery.value);
 	}
@@ -206,7 +225,7 @@ const openFilters = () => {
 
 // Keyboard navigation
 watch(selectedIndex, (newIndex) => {
-	if (newIndex >= 0 && suggestions.value[newIndex]) {
+	if (newIndex >= 0 && props.suggestions[newIndex]) {
 		// Scroll selected item into view
 		nextTick(() => {
 			const items = document.querySelectorAll(".suggestion-item");
@@ -250,7 +269,7 @@ watch(selectedIndex, (newIndex) => {
 }
 
 .search-input {
-  @apply w-full pl-10 pr-10 py-2 bg-transparent text-white placeholder-gray-500 border-0 outline-none;
+  @apply w-full pl-10 pr-10 py-2 bg-transparent text-white placeholder-gray-500 border-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50;
   font-size: 16px; /* Prevents zoom on iOS */
 }
 
@@ -259,7 +278,7 @@ watch(selectedIndex, (newIndex) => {
 }
 
 .filter-btn {
-  @apply p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all duration-200;
+  @apply p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition duration-200;
 }
 
 .filter-btn.has-active-filters {
@@ -331,7 +350,7 @@ watch(selectedIndex, (newIndex) => {
 /* Transitions */
 .search-dropdown-enter-active,
 .search-dropdown-leave-active {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .search-dropdown-enter-from {
