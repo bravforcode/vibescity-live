@@ -216,6 +216,14 @@
 		"install_desc": "Faster loading & offline access",
 		"install_btn": "Install"
 	},
+	"pwa": {
+		"new_content_title": "New Content Available",
+		"new_content_desc": "A new version of VibeCity is available. Update now to get the latest vibes.",
+		"offline_ready_title": "Ready for Offline",
+		"offline_ready_desc": "App cached successfully. You can now use VibeCity without internet.",
+		"update_now": "Update Now",
+		"dismiss": "Dismiss"
+	},
 	"feed": {
 		"no_items": "No items to display",
 		"no_venues": "No venues in this area",
@@ -406,7 +414,12 @@
 		"register": "Register",
 		"shop_name": "Shop Name",
 		"description": "Description",
-		"upload_slip": "Upload Payment Slip"
+		"upload_slip": "Upload Payment Slip",
+		"add_ons": "Add-ons",
+		"copy": "COPY",
+		"upload_payment_slip": "Upload Payment Slip",
+		"submitting": "Submitting\u2026",
+		"confirm_promote": "Confirm & Promote"
 	},
 	"dashboard_owner": {
 		"title": "Owner Dashboard",
@@ -427,7 +440,8 @@
 	"filter": {
 		"title": "Filter",
 		"apply": "Apply Filters",
-		"reset": "Reset"
+		"reset": "Reset",
+		"show_results": "Show Results"
 	},
 	"lucky_wheel": {
 		"title": "Lucky Wheel",

@@ -157,7 +157,7 @@
             <h4
               class="text-xs font-black text-white/60 uppercase tracking-wider"
             >
-              Add-ons
+              {{ t('merchant.add_ons') }}
             </h4>
             <div class="grid grid-cols-2 gap-2">
               <button
@@ -232,7 +232,7 @@
             >
               <span>{{ BANK_ACCOUNT_DISPLAY }}</span>
               <span class="text-[10px] bg-white/20 px-1.5 py-0.5 rounded"
-                >COPY</span
+                >{{ t('merchant.copy') }}</span
               >
             </button>
 
@@ -254,7 +254,7 @@
             class="w-full py-3 rounded-xl border-dashed border-2 border-white/20 text-white/50 hover:text-white hover:border-white/50 transition flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50"
           >
             <Upload class="w-4 h-4" />
-            {{ slipFile ? slipFile.name : "Upload Payment Slip" }}
+            {{ slipFile ? slipFile.name : t('merchant.upload_payment_slip') }}
           </button>
           <div
             v-if="previewUrl"
@@ -285,7 +285,7 @@
           :disabled="isSubmitting"
           class="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-black text-lg shadow-lg hover:shadow-blue-500/20 active:scale-95 transition disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50"
         >
-          {{ isSubmitting ? "Submitting…" : "Confirm & Promote" }}
+          {{ isSubmitting ? t('merchant.submitting') : t('merchant.confirm_promote') }}
         </button>
       </div>
     </div>
@@ -298,8 +298,11 @@ import { MapPin, Upload } from "lucide-vue-next";
 import generatePayload from "promptpay-qr";
 import QrcodeVue from "qrcode.vue";
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useNotifications } from "@/composables/useNotifications";
 import { supabase } from "@/lib/supabase";
+
+const { t } = useI18n();
 
 const props = defineProps({ isOpen: Boolean });
 const emit = defineEmits(["close"]);

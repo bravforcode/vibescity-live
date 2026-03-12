@@ -8,12 +8,16 @@
 <script setup>
 import { Check, Sparkles, X } from "lucide-vue-next";
 import { computed, nextTick, onUnmounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useBodyScrollLock } from "@/composables/useBodyScrollLock";
 import { useHaptics } from "@/composables/useHaptics";
+
 import {
 	FILTER_CATEGORIES,
 	isValidCategoryId,
 } from "@/constants/filterCategories";
+
+const { t } = useI18n();
 
 const props = defineProps({
 	isOpen: Boolean,
@@ -278,7 +282,7 @@ onUnmounted(() => {
     </p>
 
     <!-- Backdrop -->
-    <div
+    <div role="button" tabindex="0"
       class="fm-backdrop"
       :class="{
         'fm-backdrop--visible': isVisible,
@@ -309,9 +313,7 @@ onUnmounted(() => {
       <div class="fm-header">
         <div class="fm-header__left">
           <Sparkles class="fm-header__icon" aria-hidden="true" />
-          <h2 id="filter-title" class="fm-header__title">
-            Filter Vibe
-          </h2>
+          <h2 id="filter-title" class="fm-header__title"> {{ $t("auto.k_37ca2c09") }} </h2>
           <Transition name="fm-badge">
             <span
               v-if="selectedCount > 0"
@@ -324,7 +326,7 @@ onUnmounted(() => {
         </div>
         <button
           @click="close"
-          aria-label="Close filter menu"
+          :aria-label="$t('auto.k_f77d05a6')"
           class="fm-close"
         >
           <X class="fm-close__icon" aria-hidden="true" />
@@ -336,7 +338,7 @@ onUnmounted(() => {
         ref="listRef"
         class="fm-grid-scroll"
         role="group"
-        aria-label="Filter categories"
+        :aria-label="$t('auto.k_2ce5c51d')"
       >
         <div class="fm-grid">
           <button
@@ -420,21 +422,20 @@ onUnmounted(() => {
           <button
             v-if="selectedCount > 0"
             @click="clearAll"
-            aria-label="Clear all filters"
+            :aria-label="$t('auto.k_a26a029e')"
             class="fm-btn-clear"
-          >
-            Clear ({{ selectedCount }})
+          > {{ $t("auto.k_7a9766aa") }}{{ selectedCount }})
           </button>
         </Transition>
 
         <button
           @click="applyFilters"
-          aria-label="Apply selected filters"
+          :aria-label="$t('auto.k_6059a403')"
           class="fm-btn-apply"
           :class="{ 'fm-btn-apply--has-selection': selectedCount > 0 }"
         >
           <span class="fm-btn-apply__text">
-            {{ selectedCount > 0 ? "Show Results" : "Apply Filters" }}
+            {{ selectedCount > 0 ? t('filter.show_results') : t('filter.apply') }}
           </span>
         </button>
       </div>

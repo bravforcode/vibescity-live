@@ -216,6 +216,14 @@
 		"install_desc": "โหลดเร็วขึ้น & ใช้งานออฟไลน์",
 		"install_btn": "ติดตั้ง"
 	},
+	"pwa": {
+		"new_content_title": "มีเนื้อหาใหม่",
+		"new_content_desc": "VibeCity เวอร์ชันใหม่พร้อมแล้ว อัปเดตเลยเพื่อรับประสบการณ์ล่าสุด",
+		"offline_ready_title": "พร้อมใช้งานออฟไลน์",
+		"offline_ready_desc": "แคชแอปสำเร็จ คุณสามารถใช้ VibeCity ได้โดยไม่ต้องเชื่อมต่ออินเทอร์เน็ต",
+		"update_now": "อัปเดตเลย",
+		"dismiss": "ปิด"
+	},
 	"feed": {
 		"no_items": "ไม่มีรายการให้แสดง",
 		"no_venues": "ไม่มีสถานที่ในพื้นที่นี้",
@@ -406,7 +414,12 @@
 		"register": "ลงทะเบียน",
 		"shop_name": "ชื่อร้านค้า",
 		"description": "รายละเอียด",
-		"upload_slip": "อัปโหลดสลิปการชำระเงิน"
+		"upload_slip": "อัปโหลดสลิปการชำระเงิน",
+		"add_ons": "ส่วนเสริม",
+		"copy": "คัดลอก",
+		"upload_payment_slip": "อัปโหลดสลิปการชำระเงิน",
+		"submitting": "กำลังส่ง\u2026",
+		"confirm_promote": "ยืนยันและโปรโมท"
 	},
 	"dashboard_owner": {
 		"title": "แดชบอร์ดเจ้าของร้าน",
@@ -427,7 +440,8 @@
 	"filter": {
 		"title": "ตัวกรอง",
 		"apply": "ใช้ตัวกรอง",
-		"reset": "รีเซ็ต"
+		"reset": "รีเซ็ต",
+		"show_results": "แสดงผลลัพธ์"
 	},
 	"lucky_wheel": {
 		"title": "วงล้อโชคดี",
