@@ -4,18 +4,15 @@
       class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-6"
     >
       <div>
-        <h1 class="text-3xl font-bold">Admin Dashboard</h1>
-        <p class="text-sm text-gray-400">
-          Review submissions, audit manual transfers, and present usage
-          analytics.
-        </p>
+        <h1 class="text-3xl font-bold">{{ $t("auto.k_4fb9b4c0") }}</h1>
+        <p class="text-sm text-gray-400"> {{ $t("auto.k_66ab3e") }} </p>
       </div>
 
       <div
         v-if="userStore.isAdmin"
         class="flex flex-wrap gap-2"
         role="tablist"
-        aria-label="Admin sections"
+        :aria-label="$t('auto.k_c8554678')"
         @keydown="handleTabKeydown"
       >
         <button
@@ -32,8 +29,7 @@
               : 'bg-gray-800 border-gray-700 text-gray-300 hover:text-white hover:border-gray-600',
           ]"
           @click="setActiveTab('review')"
-        >
-          Review ({{ pendingShops.length }})
+        > {{ $t("auto.k_9d5de7c1") }}{{ pendingShops.length }})
         </button>
         <button
           type="button"
@@ -49,8 +45,7 @@
               : 'bg-gray-800 border-gray-700 text-gray-300 hover:text-white hover:border-gray-600',
           ]"
           @click="setActiveTab('slips')"
-        >
-          Slips ({{ slipSummary.total }})
+        > {{ $t("auto.k_2e5990") }}{{ slipSummary.total }})
         </button>
         <button
           type="button"
@@ -66,9 +61,7 @@
               : 'bg-gray-800 border-gray-700 text-gray-300 hover:text-white hover:border-gray-600',
           ]"
           @click="setActiveTab('usage')"
-        >
-          Usage Analytics
-        </button>
+        > {{ $t("auto.k_4046eae0") }} </button>
         <button
           type="button"
           data-tab="pii"
@@ -83,9 +76,7 @@
               : 'bg-gray-800 border-gray-700 text-gray-300 hover:text-white hover:border-gray-600',
           ]"
           @click="setActiveTab('pii')"
-        >
-          PII Audit
-        </button>
+        > {{ $t("auto.k_1b02dffa") }} </button>
         <button
           type="button"
           data-tab="ads"
@@ -100,9 +91,7 @@
               : 'bg-gray-800 border-gray-700 text-gray-300 hover:text-white hover:border-gray-600',
           ]"
           @click="setActiveTab('ads')"
-        >
-          📍 Local Ads
-        </button>
+        > {{ $t("auto.k_12fed442") }} </button>
 
         <span class="hidden sm:inline text-gray-600 px-1">|</span>
 
@@ -132,24 +121,22 @@
       v-if="!userStore.isAdmin"
       class="mb-6 rounded-xl border border-gray-700 bg-gray-800/70 p-5 max-w-2xl"
     >
-      <h2 class="text-lg font-semibold">Admin Sign In Required</h2>
-      <p class="mt-1 text-sm text-gray-300">
-        ลงชื่อเข้าใช้ด้วยบัญชีแอดมินก่อนใช้งานแดชบอร์ด
-      </p>
+      <h2 class="text-lg font-semibold">{{ $t("auto.k_e280580d") }}</h2>
+      <p class="mt-1 text-sm text-gray-300"> {{ $t("auto.k_e9333b") }} </p>
       <div class="mt-4 grid gap-3">
-        <input
+        <input :aria-label="$t('a11y.input_field')"
           v-model.trim="adminAuthEmail"
           type="email"
           autocomplete="email"
           class="w-full rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-sm text-white"
-          placeholder="admin@email.com"
+          :placeholder="$t('auto.k_f731277f')"
         />
-        <input
+        <input :aria-label="$t('a11y.input_field')"
           v-model="adminAuthPassword"
           type="password"
           autocomplete="current-password"
           class="w-full rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-sm text-white"
-          placeholder="Password (optional if using magic link)"
+          :placeholder="$t('auto.k_30b9119b')"
         />
         <div class="flex flex-wrap gap-2">
           <button
@@ -165,9 +152,7 @@
             class="rounded-lg bg-gray-700 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-600 disabled:opacity-60"
             :disabled="adminAuthLoading"
             @click="sendAdminMagicLink"
-          >
-            Send magic link
-          </button>
+          > {{ $t("auto.k_7305770c") }} </button>
         </div>
         <p
           v-if="adminAuthMessage"
@@ -191,7 +176,7 @@
           class="mb-4 rounded-xl border border-red-500/40 bg-red-950/40 p-4 text-red-100"
           role="alert"
         >
-          <div class="text-sm font-bold">Failed to fetch pending shops</div>
+          <div class="text-sm font-bold">{{ $t("auto.k_43592c43") }}</div>
           <p class="mt-1 text-xs text-red-200/90">{{ error }}</p>
           <button
             type="button"
@@ -211,13 +196,13 @@
         </div>
 
         <div v-else>
-          <h2 class="text-xl font-semibold mb-4">Pending Shops</h2>
+          <h2 class="text-xl font-semibold mb-4">{{ $t("auto.k_3bf4a801") }}</h2>
 
           <div
             v-if="pendingShops.length === 0"
             class="rounded-xl border border-gray-700 bg-gray-800/70 p-4 text-gray-300"
           >
-            <p>No pending shops to review. Good job!</p>
+            <p>{{ $t("auto.k_9991e3ea") }}</p>
             <button
               type="button"
               class="mt-3 rounded-lg bg-gray-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-600 transition-colors"
@@ -237,18 +222,16 @@
               <div
                 class="w-full md:w-48 h-32 bg-gray-700 rounded overflow-hidden"
               >
-                <img
+                <img loading="lazy"
                   v-if="shop.images && shop.images.length"
                   :src="shop.images[0]"
                   class="w-full h-full object-cover"
-                  alt="Shop intent"
+                  :alt="$t('auto.k_d50ee809')"
                 />
                 <div
                   v-else
                   class="flex items-center justify-center h-full text-gray-500"
-                >
-                  No Image
-                </div>
+                > {{ $t("auto.k_24a02503") }} </div>
               </div>
 
               <!-- Content -->
@@ -265,15 +248,11 @@
                   <button
                     @click="handleApprove(shop.id)"
                     class="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded transition-colors duration-150"
-                  >
-                    Approve & Award
-                  </button>
+                  > {{ $t("auto.k_a6987039") }} </button>
                   <button
                     @click="openPromoteModal(shop.id)"
                     class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded transition-colors duration-150"
-                  >
-                    Promote Giant
-                  </button>
+                  > {{ $t("auto.k_6ff4dcfa") }} </button>
                   <button
                     @click="handleReject(shop.id)"
                     class="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded transition-colors duration-150"
@@ -293,18 +272,14 @@
           class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4"
         >
           <div>
-            <h2 class="text-xl font-semibold">Slip Verification Logs</h2>
-            <p class="text-sm text-gray-400">
-              Auto-review results + audit metadata for manual transfers
-            </p>
+            <h2 class="text-xl font-semibold">{{ $t("auto.k_24799855") }}</h2>
+            <p class="text-sm text-gray-400"> {{ $t("auto.k_b98f0395") }} </p>
           </div>
           <div class="flex flex-wrap gap-2">
             <button
               @click="fetchSlipLogs"
               class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded transition"
-            >
-              Refresh Logs
-            </button>
+            > {{ $t("auto.k_e6beb897") }} </button>
             <button
               @click="runSheetSync"
               :disabled="sheetSyncLoading"
@@ -355,59 +330,57 @@
           <input
             v-model="slipSearch"
             type="search"
-            aria-label="Search slips by SKU or visitor ID"
+            :aria-label="$t('auto.k_cfa8bf92')"
             autocomplete="off"
-            placeholder="Search by SKU or Visitor ID"
+            :placeholder="$t('auto.k_67ac924f')"
             class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
           />
           <input
             v-model="slipBuyerName"
             type="text"
-            aria-label="Filter slips by buyer name"
+            :aria-label="$t('auto.k_b1d352b1')"
             autocomplete="name"
-            placeholder="Buyer name"
+            :placeholder="$t('auto.k_f12f33db')"
             class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
           />
           <input
             v-model="slipBuyerEmail"
             type="email"
-            aria-label="Filter slips by buyer email"
+            :aria-label="$t('auto.k_7078a956')"
             autocomplete="email"
-            placeholder="Buyer email"
+            :placeholder="$t('auto.k_41322540')"
             class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
           />
           <select
             v-model="slipStatus"
             class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
           >
-            <option value="all">All statuses</option>
+            <option value="all">{{ $t("auto.k_6c4b8a4e") }}</option>
             <option value="paid">Paid</option>
             <option value="rejected">Rejected</option>
             <option value="pending">Pending</option>
-            <option value="pending_review">Pending Review</option>
+            <option value="pending_review">{{ $t("auto.k_2f4605c8") }}</option>
           </select>
           <select
             v-model.number="slipLimit"
             class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
           >
-            <option :value="25">25 rows</option>
-            <option :value="50">50 rows</option>
-            <option :value="100">100 rows</option>
+            <option :value="25">{{ $t("auto.k_540fba15") }}</option>
+            <option :value="50">{{ $t("auto.k_d3680715") }}</option>
+            <option :value="100">{{ $t("auto.k_7ee77d39") }}</option>
           </select>
           <select
             v-model="slipExportGroup"
             class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
           >
-            <option value="none">Export group: none</option>
-            <option value="status">Group by status (ZIP)</option>
-            <option value="date">Group by date (ZIP)</option>
+            <option value="none">{{ $t("auto.k_8969bdd0") }}</option>
+            <option value="status">{{ $t("auto.k_b3235687") }}</option>
+            <option value="date">{{ $t("auto.k_e35af265") }}</option>
           </select>
           <button
             @click="fetchSlipLogs"
             class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded transition"
-          >
-            Apply Filters
-          </button>
+          > {{ $t("auto.k_a00347a0") }} </button>
         </div>
 
         <div
@@ -436,20 +409,15 @@
             <button
               @click="exportSlipLogs('page')"
               class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded text-xs"
-            >
-              Export Current Page
-            </button>
+            > {{ $t("auto.k_b04c6959") }} </button>
             <button
               @click="exportSlipLogs('all')"
               class="bg-indigo-700 hover:bg-indigo-600 text-white px-4 py-2 rounded text-xs"
-            >
-              Export All (Filtered)
-            </button>
+            > {{ $t("auto.k_ad5fd4e6") }} </button>
             <button
               @click="exportSlipLogs('zip')"
               class="bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-2 rounded text-xs"
-            >
-              Export ZIP ({{ slipExportGroupLabel }})
+            > {{ $t("auto.k_ccdf40e8") }}{{ slipExportGroupLabel }})
             </button>
           </div>
         </div>
@@ -458,14 +426,10 @@
           {{ slipError }}
         </div>
 
-        <div v-if="slipLoading" class="text-center py-8 text-gray-400">
-          Loading slip verification logs...
-        </div>
+        <div v-if="slipLoading" class="text-center py-8 text-gray-400"> {{ $t("auto.k_2dfc65d9") }} </div>
 
         <div v-else>
-          <div v-if="slipLogs.length === 0" class="text-gray-400">
-            No slip verifications found.
-          </div>
+          <div v-if="slipLogs.length === 0" class="text-gray-400"> {{ $t("auto.k_d57da2ee") }} </div>
           <div v-else class="grid gap-4">
             <div
               v-for="order in slipLogs"
@@ -476,7 +440,7 @@
                 class="flex flex-col md:flex-row md:items-center md:justify-between gap-2"
               >
                 <div>
-                  <div class="text-xs text-gray-400">Order ID</div>
+                  <div class="text-xs text-gray-400">{{ $t("auto.k_65238350") }}</div>
                   <div class="text-xs font-mono text-gray-200 break-all">
                     {{ order.id }}
                   </div>
@@ -494,7 +458,7 @@
                   <div
                     class="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden h-40"
                   >
-                    <img
+                    <img loading="lazy"
                       v-if="order.slip_url"
                       :src="order.slip_url"
                       alt="Slip"
@@ -503,9 +467,7 @@
                     <div
                       v-else
                       class="h-full flex items-center justify-center text-gray-500 text-xs"
-                    >
-                      No slip image
-                    </div>
+                    > {{ $t("auto.k_c38e29c5") }} </div>
                   </div>
                   <a
                     v-if="order.slip_url"
@@ -513,26 +475,21 @@
                     target="_blank"
                     rel="noreferrer"
                     class="text-xs text-blue-400 hover:text-blue-300 block mt-2"
-                  >
-                    Open full slip
-                  </a>
+                  > {{ $t("auto.k_ea9eff44") }} </a>
                 </div>
 
                 <div class="md:col-span-2 space-y-2 text-sm text-gray-300">
                   <div class="flex flex-wrap gap-4 text-xs text-gray-400">
                     <span
-                      >SKU:
-                      <span class="text-gray-200">{{ order.sku }}</span></span
+                      >{{ $t("auto.k_1d023b00") }} <span class="text-gray-200">{{ order.sku }}</span></span
                     >
                     <span
-                      >Amount:
-                      <span class="text-gray-200"
+                      >{{ $t("auto.k_778beba9") }} <span class="text-gray-200"
                         >฿{{ formatAmount(order.amount) }}</span
                       ></span
                     >
                     <span
-                      >Venue:
-                      <span class="text-gray-200">{{
+                      >{{ $t("auto.k_4b065c52") }} <span class="text-gray-200">{{
                         order.venue_id || "N/A"
                       }}</span></span
                     >
@@ -550,17 +507,14 @@
                           ({{ getSlipMeta(order).reason }})
                         </span>
                       </div>
-                      <div class="text-gray-500 mt-1">
-                        Checked: {{ formatDate(getSlipMeta(order).checked_at) }}
+                      <div class="text-gray-500 mt-1"> {{ $t("auto.k_410aed4") }} {{ formatDate(getSlipMeta(order).checked_at) }}
                       </div>
                     </div>
                     <div>
                       <div class="text-gray-500">Transaction</div>
-                      <div class="text-gray-200">
-                        Ref: {{ getSlipMeta(order).trans_ref || "N/A" }}
+                      <div class="text-gray-200"> {{ $t("auto.k_1f187048") }} {{ getSlipMeta(order).trans_ref || "N/A" }}
                       </div>
-                      <div class="text-gray-500 mt-1">
-                        Date: {{ getSlipMeta(order).trans_date || "N/A" }}
+                      <div class="text-gray-500 mt-1"> {{ $t("auto.k_a5cb7279") }} {{ getSlipMeta(order).trans_date || "N/A" }}
                       </div>
                     </div>
                   </div>
@@ -589,7 +543,7 @@
 
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                     <div>
-                      <div class="text-gray-500">Buyer Info</div>
+                      <div class="text-gray-500">{{ $t("auto.k_43322384") }}</div>
                       <div class="text-gray-200">
                         {{ getSlipAudit(order).buyer_full_name || "N/A" }}
                       </div>
@@ -611,7 +565,7 @@
                       </div>
                     </div>
                     <div>
-                      <div class="text-gray-500">IP + Geo</div>
+                      <div class="text-gray-500">{{ $t("auto.k_953cba20") }}</div>
                       <div class="text-gray-200">
                         {{ getSlipAudit(order).ip_address || "N/A" }}
                       </div>
@@ -621,22 +575,17 @@
                         {{ getSlipAudit(order).geo_city || "N/A" }} ·
                         {{ getSlipAudit(order).geo_postal || "N/A" }}
                       </div>
-                      <div class="text-gray-400 mt-1">
-                        UA: {{ getSlipAudit(order).user_agent || "N/A" }}
+                      <div class="text-gray-400 mt-1"> {{ $t("auto.k_e18ede1b") }} {{ getSlipAudit(order).user_agent || "N/A" }}
                       </div>
                     </div>
                   </div>
 
-                  <div class="text-xs text-gray-500">
-                    Created: {{ formatDate(order.created_at) }}
-                    <span class="mx-2">•</span>
-                    Updated: {{ formatDate(order.updated_at) }}
+                  <div class="text-xs text-gray-500"> {{ $t("auto.k_e99881b3") }} {{ formatDate(order.created_at) }}
+                    <span class="mx-2">•</span> {{ $t("auto.k_b95fa95e") }} {{ formatDate(order.updated_at) }}
                   </div>
 
                   <details class="mt-2">
-                    <summary class="cursor-pointer text-xs text-blue-300">
-                      Audit Metadata
-                    </summary>
+                    <summary class="cursor-pointer text-xs text-blue-300"> {{ $t("auto.k_d38bc22d") }} </summary>
                     <pre
                       class="text-xs bg-gray-900 border border-gray-700 rounded-lg p-3 mt-2 overflow-auto whitespace-pre-wrap"
                       >{{ formatMetadata(order.metadata) }}</pre
@@ -655,11 +604,8 @@
           class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4"
         >
           <div>
-            <h2 class="text-xl font-semibold">Usage Analytics</h2>
-            <p class="text-sm text-gray-400">
-              Sessions, visitors, and activity summary for demos and reporting
-              (no raw IPs).
-            </p>
+            <h2 class="text-xl font-semibold">{{ $t("auto.k_4046eae0") }}</h2>
+            <p class="text-sm text-gray-400"> {{ $t("auto.k_fc51c129") }} </p>
           </div>
           <div class="flex flex-col sm:flex-row gap-2">
             <button
@@ -671,29 +617,23 @@
             <button
               @click="exportAnalytics"
               class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded transition-colors duration-150"
-            >
-              Export CSV
-            </button>
+            > {{ $t("auto.k_1f58f993") }} </button>
           </div>
         </div>
 
         <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-4">
           <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <label class="text-xs text-gray-400">
-              Range (days)
-              <select
+            <label class="text-xs text-gray-400"> {{ $t("auto.k_226aea58") }} <select
                 v-model.number="analyticsDays"
                 class="mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
               >
-                <option :value="7">Last 7 days</option>
-                <option :value="14">Last 14 days</option>
-                <option :value="30">Last 30 days</option>
+                <option :value="7">{{ $t("auto.k_35b9d98f") }}</option>
+                <option :value="14">{{ $t("auto.k_cfbe0421") }}</option>
+                <option :value="30">{{ $t("auto.k_d0778b33") }}</option>
               </select>
             </label>
 
-            <label class="text-xs text-gray-400">
-              Country (optional, ISO)
-              <input
+            <label class="text-xs text-gray-400"> {{ $t("auto.k_b0448941") }} <input :aria-label="$t('a11y.input_field')"
                 v-model="analyticsCountry"
                 placeholder="TH"
                 maxlength="8"
@@ -701,9 +641,7 @@
               />
             </label>
 
-            <label class="text-xs text-gray-400">
-              Event type (optional)
-              <input
+            <label class="text-xs text-gray-400"> {{ $t("auto.k_d260c880") }} <input :aria-label="$t('a11y.input_field')"
                 v-model="analyticsEventType"
                 placeholder="venue_view"
                 maxlength="64"
@@ -713,32 +651,21 @@
           </div>
 
           <div class="mt-3 flex flex-col gap-1 text-xs text-gray-400">
-            <div v-if="analyticsData?.range">
-              Range:
-              <span class="text-gray-200">{{ analyticsData.range.from }}</span>
+            <div v-if="analyticsData?.range"> {{ $t("auto.k_fd2f1658") }} <span class="text-gray-200">{{ analyticsData.range.from }}</span>
               <span class="mx-1">→</span>
               <span class="text-gray-200">{{ analyticsData.range.to }}</span>
-              <span class="mx-2">•</span>
-              Column:
-              <span class="text-gray-200">{{
+              <span class="mx-2">•</span> {{ $t("auto.k_3315e2c7") }} <span class="text-gray-200">{{
                 analyticsData.range.sessions_time_column
               }}</span>
               <span v-if="analyticsData?.request_id" class="mx-2">•</span>
-              <span v-if="analyticsData?.request_id">
-                Request:
-                <span class="text-gray-200">{{
+              <span v-if="analyticsData?.request_id"> {{ $t("auto.k_7b05f6b8") }} <span class="text-gray-200">{{
                   analyticsData.request_id
                 }}</span>
               </span>
             </div>
-            <div v-if="analyticsData?.range?.truncated" class="text-yellow-300">
-              Truncated at {{ analyticsData.range.max_session_rows }} sessions.
-              Increase
-              <code class="text-yellow-200"
+            <div v-if="analyticsData?.range?.truncated" class="text-yellow-300"> {{ $t("auto.k_619efc5e") }} {{ analyticsData.range.max_session_rows }} {{ $t("auto.k_1beb3be2") }} <code class="text-yellow-200"
                 >ANALYTICS_DASHBOARD_MAX_SESSION_ROWS</code
-              >
-              to fetch more.
-            </div>
+              > {{ $t("auto.k_fec92241") }} </div>
           </div>
         </div>
 
@@ -747,7 +674,7 @@
           class="mb-4 rounded-xl border border-red-500/40 bg-red-950/40 p-4 text-red-100"
           role="alert"
         >
-          <div class="text-sm font-bold">Failed to fetch analytics</div>
+          <div class="text-sm font-bold">{{ $t("auto.k_b3ef0c39") }}</div>
           <p class="mt-1 text-xs text-red-200/90">{{ analyticsError }}</p>
           <button
             type="button"
@@ -778,13 +705,13 @@
               </div>
             </div>
             <div class="bg-gray-800 border border-gray-700 rounded-lg p-3">
-              <div class="text-xs text-gray-400">Unique Visitors</div>
+              <div class="text-xs text-gray-400">{{ $t("auto.k_de0efc79") }}</div>
               <div class="text-lg font-bold">
                 {{ analyticsData.kpis.unique_visitors_total }}
               </div>
             </div>
             <div class="bg-gray-800 border border-gray-700 rounded-lg p-3">
-              <div class="text-xs text-gray-400">Live (15m)</div>
+              <div class="text-xs text-gray-400">{{ $t("auto.k_cb3e9c5b") }}</div>
               <div class="text-lg font-bold">
                 {{ analyticsData.kpis.live_visitors_15m }}
               </div>
@@ -806,10 +733,9 @@
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div class="bg-gray-800 border border-gray-700 rounded-lg p-4">
               <div class="flex items-center justify-between gap-2">
-                <h3 class="text-sm font-semibold">Sessions by day</h3>
+                <h3 class="text-sm font-semibold">{{ $t("auto.k_a38be8cf") }}</h3>
                 <div class="text-xs text-gray-500">
-                  {{ analyticsData.range.days }} day window
-                </div>
+                  {{ analyticsData.range.days }} {{ $t("auto.k_e8d7857") }} </div>
               </div>
               <div class="overflow-x-auto mt-3">
                 <table class="min-w-full text-sm">
@@ -841,8 +767,8 @@
 
             <div class="bg-gray-800 border border-gray-700 rounded-lg p-4">
               <div class="flex items-center justify-between gap-2">
-                <h3 class="text-sm font-semibold">Top countries</h3>
-                <div class="text-xs text-gray-500">Top 20</div>
+                <h3 class="text-sm font-semibold">{{ $t("auto.k_2cc3afae") }}</h3>
+                <div class="text-xs text-gray-500">{{ $t("auto.k_ba99e466") }}</div>
               </div>
               <div class="overflow-x-auto mt-3">
                 <table class="min-w-full text-sm">
@@ -877,7 +803,7 @@
 
           <div class="bg-gray-800 border border-gray-700 rounded-lg p-4">
             <div class="flex items-center justify-between gap-2">
-              <h3 class="text-sm font-semibold">Recent sessions</h3>
+              <h3 class="text-sm font-semibold">{{ $t("auto.k_23dce5f7") }}</h3>
               <div class="text-xs text-gray-500">
                 {{ analyticsData.recent_sessions?.length || 0 }} rows
               </div>
@@ -886,9 +812,7 @@
             <div
               v-if="!analyticsData.recent_sessions?.length"
               class="text-xs text-gray-500 mt-3"
-            >
-              N/A
-            </div>
+            > {{ $t("auto.k_79db7a01") }} </div>
 
             <div v-else class="overflow-x-auto mt-3">
               <table class="min-w-full text-sm">
@@ -943,9 +867,7 @@
             >
               <div>
                 <h3 class="text-sm font-semibold">Events</h3>
-                <div class="text-xs text-gray-500">
-                  Source:
-                  <span class="text-gray-300">{{
+                <div class="text-xs text-gray-500"> {{ $t("auto.k_d9c7ca66") }} <span class="text-gray-300">{{
                     analyticsData.events.source
                   }}</span>
                 </div>
@@ -954,13 +876,11 @@
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-3">
               <div class="bg-gray-900 border border-gray-700 rounded-lg p-3">
-                <div class="text-xs text-gray-400 mb-2">Events by day</div>
+                <div class="text-xs text-gray-400 mb-2">{{ $t("auto.k_892e2237") }}</div>
                 <div
                   v-if="!analyticsData.events.events_by_day?.length"
                   class="text-xs text-gray-500"
-                >
-                  N/A
-                </div>
+                > {{ $t("auto.k_79db7a01") }} </div>
                 <div v-else class="overflow-x-auto">
                   <table class="min-w-full text-sm">
                     <thead>
@@ -988,13 +908,11 @@
               </div>
 
               <div class="bg-gray-900 border border-gray-700 rounded-lg p-3">
-                <div class="text-xs text-gray-400 mb-2">Top venues</div>
+                <div class="text-xs text-gray-400 mb-2">{{ $t("auto.k_a7812064") }}</div>
                 <div
                   v-if="!analyticsData.events.top_venues?.length"
                   class="text-xs text-gray-500"
-                >
-                  N/A
-                </div>
+                > {{ $t("auto.k_79db7a01") }} </div>
                 <div v-else class="overflow-x-auto">
                   <table class="min-w-full text-sm">
                     <thead>
@@ -1042,17 +960,13 @@
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
               <div class="bg-gray-900 border border-gray-700 rounded-lg p-3">
                 <div class="flex items-center justify-between gap-2">
-                  <div class="text-xs text-gray-400">Top pages</div>
-                  <div class="text-[11px] text-gray-500">
-                    event_type: page_view
-                  </div>
+                  <div class="text-xs text-gray-400">{{ $t("auto.k_3bf13f14") }}</div>
+                  <div class="text-[11px] text-gray-500"> {{ $t("auto.k_d2fb054b") }} </div>
                 </div>
                 <div
                   v-if="!analyticsData.events.top_pages?.length"
                   class="text-xs text-gray-500 mt-3"
-                >
-                  N/A
-                </div>
+                > {{ $t("auto.k_79db7a01") }} </div>
                 <div v-else class="overflow-x-auto mt-3">
                   <table class="min-w-full text-sm">
                     <thead>
@@ -1096,9 +1010,7 @@
                 <div class="flex items-center justify-between gap-2">
                   <div>
                     <div class="text-xs text-gray-400">Funnel</div>
-                    <div class="text-[11px] text-gray-500">
-                      Source:
-                      <span class="text-gray-300">{{
+                    <div class="text-[11px] text-gray-500"> {{ $t("auto.k_d9c7ca66") }} <span class="text-gray-300">{{
                         analyticsData.funnel?.source || "none"
                       }}</span>
                       <span
@@ -1113,9 +1025,7 @@
                 <div
                   v-if="!analyticsData.funnel?.steps?.length"
                   class="text-xs text-gray-500 mt-3"
-                >
-                  N/A
-                </div>
+                > {{ $t("auto.k_79db7a01") }} </div>
 
                 <div v-else class="mt-3 space-y-3">
                   <div class="space-y-1">
@@ -1137,9 +1047,7 @@
                     v-if="analyticsData.funnel.intersections?.length"
                     class="pt-2 border-t border-gray-800"
                   >
-                    <div class="text-[11px] text-gray-500 mb-2">
-                      Conversions (approx)
-                    </div>
+                    <div class="text-[11px] text-gray-500 mb-2"> {{ $t("auto.k_713080dd") }} </div>
                     <div
                       v-for="edge in analyticsData.funnel.intersections"
                       :key="`${edge.from}:${edge.to}`"
@@ -1159,24 +1067,21 @@
 
             <div class="mt-4 bg-gray-900 border border-gray-700 rounded-lg p-3">
               <div class="flex items-center justify-between gap-2">
-                <div class="text-xs text-gray-400">Retention cohorts</div>
-                <div class="text-[11px] text-gray-500">
-                  Horizon: {{ analyticsData.retention?.horizon_days || 0 }}d
+                <div class="text-xs text-gray-400">{{ $t("auto.k_89c97b8f") }}</div>
+                <div class="text-[11px] text-gray-500"> {{ $t("auto.k_cd0cda6") }} {{ analyticsData.retention?.horizon_days || 0 }}d
                 </div>
               </div>
 
               <div
                 v-if="!analyticsData.retention?.cohorts?.length"
                 class="text-xs text-gray-500 mt-3"
-              >
-                N/A
-              </div>
+              > {{ $t("auto.k_79db7a01") }} </div>
 
               <div v-else class="overflow-x-auto mt-3">
                 <table class="min-w-full text-sm">
                   <thead>
                     <tr class="text-xs text-gray-400 border-b border-gray-800">
-                      <th class="text-left py-2 pr-4">Cohort day</th>
+                      <th class="text-left py-2 pr-4">{{ $t("auto.k_37337bc2") }}</th>
                       <th class="text-right py-2 pr-4">Size</th>
                       <th class="text-right py-2 pr-4">D1</th>
                       <th class="text-right py-2 pr-4">D3</th>
@@ -1212,9 +1117,7 @@
           </div>
         </div>
 
-        <div v-else class="text-gray-400">
-          No analytics loaded yet. Click
-          <button
+        <div v-else class="text-gray-400"> {{ $t("auto.k_c54365b1") }} <button
             type="button"
             class="ml-1 rounded-lg border border-gray-600 px-2 py-1 text-xs text-gray-200 hover:bg-gray-800 transition-colors"
             @click="fetchAnalytics"
@@ -1231,11 +1134,8 @@
           class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4"
         >
           <div>
-            <h2 class="text-xl font-semibold">PII Audit (Raw IP)</h2>
-            <p class="text-sm text-gray-400">
-              Raw IP retention: 90 days. Access requires admin (or
-              pii_audit_viewer) + PIN.
-            </p>
+            <h2 class="text-xl font-semibold">{{ $t("auto.k_691e7504") }}</h2>
+            <p class="text-sm text-gray-400"> {{ $t("auto.k_c03950d4") }} </p>
           </div>
           <div class="flex flex-col sm:flex-row gap-2">
             <button
@@ -1248,36 +1148,28 @@
               @click="exportPiiAudit"
               :disabled="piiLoading || piiData?.setup_required"
               class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded transition-colors duration-150"
-            >
-              Export CSV
-            </button>
+            > {{ $t("auto.k_1f58f993") }} </button>
             <button
               @click="exportPiiAccessLog"
               :disabled="piiLoading || piiData?.setup_required"
               class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded transition-colors duration-150"
-            >
-              Export Access Log
-            </button>
+            > {{ $t("auto.k_e4fa0001") }} </button>
           </div>
         </div>
 
         <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-4">
           <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <label class="text-xs text-gray-400">
-              Range (days)
-              <select
+            <label class="text-xs text-gray-400"> {{ $t("auto.k_226aea58") }} <select
                 v-model.number="piiDays"
                 class="mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
               >
-                <option :value="7">Last 7 days</option>
-                <option :value="14">Last 14 days</option>
-                <option :value="30">Last 30 days</option>
+                <option :value="7">{{ $t("auto.k_35b9d98f") }}</option>
+                <option :value="14">{{ $t("auto.k_cfbe0421") }}</option>
+                <option :value="30">{{ $t("auto.k_d0778b33") }}</option>
               </select>
             </label>
 
-            <label class="text-xs text-gray-400">
-              Country (optional, ISO)
-              <input
+            <label class="text-xs text-gray-400"> {{ $t("auto.k_b0448941") }} <input :aria-label="$t('a11y.input_field')"
                 v-model="piiCountry"
                 placeholder="TH"
                 maxlength="8"
@@ -1285,12 +1177,10 @@
               />
             </label>
 
-            <label class="text-xs text-gray-400">
-              Admin PIN
-              <input
+            <label class="text-xs text-gray-400"> {{ $t("auto.k_e30a933b") }} <input :aria-label="$t('a11y.input_field')"
                 v-model="piiPin"
                 type="password"
-                placeholder="Enter PIN"
+                :placeholder="$t('auto.k_a394ab3e')"
                 maxlength="128"
                 autocomplete="off"
                 class="mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
@@ -1298,19 +1188,14 @@
             </label>
           </div>
 
-          <div class="mt-3 text-xs text-yellow-300">
-            Warning: This panel contains sensitive data. Do not share
-            screenshots externally.
-          </div>
+          <div class="mt-3 text-xs text-yellow-300"> {{ $t("auto.k_3e1b1742") }} </div>
         </div>
 
         <div v-if="piiError" class="bg-red-500 text-white p-3 rounded mb-4">
           {{ piiError }}
         </div>
 
-        <div v-if="piiLoading" class="text-center py-8 text-gray-400">
-          Loading PII audit...
-        </div>
+        <div v-if="piiLoading" class="text-center py-8 text-gray-400"> {{ $t("auto.k_bfbc4638") }} </div>
 
         <div v-else-if="piiData" class="space-y-4">
           <div
@@ -1328,13 +1213,13 @@
               </div>
             </div>
             <div class="bg-gray-800 border border-gray-700 rounded-lg p-3">
-              <div class="text-xs text-gray-400">Unique Visitors</div>
+              <div class="text-xs text-gray-400">{{ $t("auto.k_de0efc79") }}</div>
               <div class="text-lg font-bold">
                 {{ piiData.kpis.unique_visitors_total }}
               </div>
             </div>
             <div class="bg-gray-800 border border-gray-700 rounded-lg p-3">
-              <div class="text-xs text-gray-400">Live (15m)</div>
+              <div class="text-xs text-gray-400">{{ $t("auto.k_cb3e9c5b") }}</div>
               <div class="text-lg font-bold">
                 {{ piiData.kpis.live_visitors_15m }}
               </div>
@@ -1354,7 +1239,7 @@
 
           <div class="bg-gray-800 border border-gray-700 rounded-lg p-4">
             <div class="flex items-center justify-between gap-2">
-              <h3 class="text-sm font-semibold">PII Access Report</h3>
+              <h3 class="text-sm font-semibold">{{ $t("auto.k_ddec9fb5") }}</h3>
               <div class="text-xs text-gray-500">
                 {{ piiData.access_report?.rows_fetched || 0 }} rows
               </div>
@@ -1374,7 +1259,7 @@
                 </div>
               </div>
               <div class="bg-gray-900 border border-gray-700 rounded-lg p-3">
-                <div class="text-xs text-gray-400">Total Actions</div>
+                <div class="text-xs text-gray-400">{{ $t("auto.k_14ebebca") }}</div>
                 <div class="text-lg font-bold">
                   {{ piiData.access_report?.totals?.actions ?? 0 }}
                 </div>
@@ -1396,7 +1281,7 @@
                     <th class="text-right py-2 pr-4">Views</th>
                     <th class="text-right py-2 pr-4">Exports</th>
                     <th class="text-right py-2 pr-4">Total</th>
-                    <th class="text-left py-2">Last Seen</th>
+                    <th class="text-left py-2">{{ $t("auto.k_bb68a138") }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1425,9 +1310,7 @@
                     </td>
                   </tr>
                   <tr v-if="!piiData.access_report?.top_viewers?.length">
-                    <td colspan="6" class="py-3 text-xs text-gray-500">
-                      No access log data for this window.
-                    </td>
+                    <td colspan="6" class="py-3 text-xs text-gray-500"> {{ $t("auto.k_9e4e9985") }} </td>
                   </tr>
                 </tbody>
               </table>
@@ -1437,8 +1320,8 @@
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div class="bg-gray-800 border border-gray-700 rounded-lg p-4">
               <div class="flex items-center justify-between gap-2">
-                <h3 class="text-sm font-semibold">Top countries</h3>
-                <div class="text-xs text-gray-500">Top 20</div>
+                <h3 class="text-sm font-semibold">{{ $t("auto.k_2cc3afae") }}</h3>
+                <div class="text-xs text-gray-500">{{ $t("auto.k_ba99e466") }}</div>
               </div>
               <div class="overflow-x-auto mt-3">
                 <table class="min-w-full text-sm">
@@ -1472,7 +1355,7 @@
 
             <div class="bg-gray-800 border border-gray-700 rounded-lg p-4">
               <div class="flex items-center justify-between gap-2">
-                <h3 class="text-sm font-semibold">Recent sessions</h3>
+                <h3 class="text-sm font-semibold">{{ $t("auto.k_23dce5f7") }}</h3>
                 <div class="text-xs text-gray-500">
                   {{ piiData.recent_sessions?.length || 0 }} rows
                 </div>
@@ -1481,9 +1364,7 @@
               <div
                 v-if="!piiData.recent_sessions?.length"
                 class="text-xs text-gray-500 mt-3"
-              >
-                N/A
-              </div>
+              > {{ $t("auto.k_79db7a01") }} </div>
 
               <div v-else class="overflow-x-auto mt-3">
                 <table class="min-w-full text-sm">
@@ -1533,9 +1414,7 @@
           </div>
         </div>
 
-        <div v-else class="text-gray-400">
-          No PII audit loaded yet. Enter PIN and click
-          <span class="text-gray-200">Refresh</span>.
+        <div v-else class="text-gray-400"> {{ $t("auto.k_de392aa0") }} <span class="text-gray-200">Refresh</span>.
         </div>
       </div>
 
@@ -1568,7 +1447,7 @@
         <div
           class="bg-gray-800 p-6 rounded-lg max-w-md w-full border border-gray-700"
         >
-          <h3 class="text-xl font-bold mb-4">Promote to Giant Pin 🌟</h3>
+          <h3 class="text-xl font-bold mb-4">{{ $t("auto.k_f8b552ef") }}</h3>
 
           <div class="space-y-4">
             <div>
@@ -1577,9 +1456,9 @@
                 v-model="promoteModal.category"
                 class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white"
               >
-                <option value="shopping_mall">Shopping Mall</option>
-                <option value="night_market">Night Market</option>
-                <option value="transport_hub">Transport Hub</option>
+                <option value="shopping_mall">{{ $t("auto.k_43d684cd") }}</option>
+                <option value="night_market">{{ $t("auto.k_52f81e37") }}</option>
+                <option value="transport_hub">{{ $t("auto.k_19e6c0ad") }}</option>
                 <option value="stadium">Stadium</option>
                 <option value="landmark">Landmark</option>
               </select>
@@ -1587,9 +1466,9 @@
 
             <div>
               <label class="block text-sm text-gray-400 mb-1"
-                >Scale ({{ promoteModal.scale }})</label
+                >{{ $t("auto.k_2c018651") }}{{ promoteModal.scale }})</label
               >
-              <input
+              <input :aria-label="$t('a11y.input_field')"
                 type="range"
                 min="1"
                 max="2"
@@ -1600,8 +1479,8 @@
             </div>
 
             <div>
-              <label class="block text-sm text-gray-400 mb-1">Glow Color</label>
-              <input
+              <label class="block text-sm text-gray-400 mb-1">{{ $t("auto.k_54b47ebb") }}</label>
+              <input :aria-label="$t('a11y.input_field')"
                 type="color"
                 v-model="promoteModal.color"
                 class="w-full h-10 bg-transparent cursor-pointer"
@@ -1610,9 +1489,9 @@
 
             <div>
               <label class="block text-sm text-gray-400 mb-1"
-                >Anchor Rank</label
+                >{{ $t("auto.k_ea2b4b12") }}</label
               >
-              <input
+              <input :aria-label="$t('a11y.input_field')"
                 type="number"
                 v-model.number="promoteModal.rank"
                 class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white"
@@ -1630,9 +1509,7 @@
             <button
               @click="confirmPromote"
               class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded font-bold"
-            >
-              Confirm Promote
-            </button>
+            > {{ $t("auto.k_cb7f1093") }} </button>
           </div>
         </div>
       </div>
@@ -1669,6 +1546,7 @@ import { useHead } from "@unhead/vue";
 import { computed, defineAsyncComponent, onMounted, ref, watch } from "vue";
 import { useNotifications } from "@/composables/useNotifications";
 import { usePresence } from "@/composables/usePresence";
+import i18n from "@/i18n.js";
 import { adminAnalyticsService } from "../services/adminAnalyticsService";
 import { adminPiiAuditService } from "../services/adminPiiAuditService";
 import { adminService } from "../services/adminService";
@@ -1708,7 +1586,7 @@ const pendingShops = ref([]);
 const loading = ref(true);
 const error = ref(null);
 const pendingLoaded = ref(false);
-const adminAuthEmail = ref("omchai.g44@gmail.com");
+const adminAuthEmail = ref("");
 const adminAuthPassword = ref("");
 const adminAuthLoading = ref(false);
 const adminAuthMessage = ref("");
@@ -1863,7 +1741,7 @@ const handleAdminSignIn = async () => {
 	adminAuthMessageType.value = "info";
 	try {
 		if (!adminAuthEmail.value || !adminAuthPassword.value) {
-			throw new Error("กรอกอีเมลและรหัสผ่านให้ครบ หรือใช้ปุ่ม magic link");
+			throw new Error(i18n.global.t("auto.k_48f7f7de"));
 		}
 		await userStore.loginWithPassword({
 			email: adminAuthEmail.value,
@@ -1871,7 +1749,7 @@ const handleAdminSignIn = async () => {
 		});
 		await userStore.refreshAuth?.();
 		if (!userStore.isAdmin) {
-			throw new Error("บัญชีนี้ไม่มีสิทธิ์ admin");
+			throw new Error(i18n.global.t("auto.k_5c3241f8"));
 		}
 		adminAuthMessage.value = "Sign in สำเร็จ";
 		adminAuthMessageType.value = "success";
@@ -1891,7 +1769,7 @@ const sendAdminMagicLink = async () => {
 	adminAuthMessageType.value = "info";
 	try {
 		if (!adminAuthEmail.value) {
-			throw new Error("กรอกอีเมลก่อนส่ง magic link");
+			throw new Error(i18n.global.t("auto.k_3644f56a"));
 		}
 		await userStore.sendAdminMagicLink(adminAuthEmail.value);
 		adminAuthMessage.value = "ส่ง magic link แล้ว กรุณาเช็กอีเมลและกลับเข้ามาที่ /admin";
@@ -2060,7 +1938,7 @@ const fetchPiiAudit = async () => {
 	piiError.value = null;
 	try {
 		if (!piiPin.value.trim()) {
-			throw new Error("Missing PIN");
+			throw new Error(i18n.global.t("auto.k_62444274"));
 		}
 		const payload = await adminPiiAuditService.getDashboard(
 			{
@@ -2082,7 +1960,7 @@ const fetchPiiAudit = async () => {
 const exportPiiAudit = async () => {
 	try {
 		if (!piiPin.value.trim()) {
-			throw new Error("Missing PIN");
+			throw new Error(i18n.global.t("auto.k_62444274"));
 		}
 		const blob = await adminPiiAuditService.exportCsv(
 			{
@@ -2103,7 +1981,7 @@ const exportPiiAudit = async () => {
 const exportPiiAccessLog = async () => {
 	try {
 		if (!piiPin.value.trim()) {
-			throw new Error("Missing PIN");
+			throw new Error(i18n.global.t("auto.k_62444274"));
 		}
 		const blob = await adminPiiAuditService.exportAccessLog(
 			{
@@ -2121,7 +1999,7 @@ const exportPiiAccessLog = async () => {
 };
 
 const handleApprove = async (id) => {
-	if (!confirm("Approve this shop?")) return;
+	if (!confirm(i18n.global.t("auto.k_9730be33"))) return;
 	try {
 		await adminService.approveShop(id);
 		// Remove from list locally

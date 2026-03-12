@@ -5,6 +5,7 @@
  */
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
+import i18n from "@/i18n.js";
 import { supabase } from "../lib/supabase";
 
 // Constants
@@ -12,10 +13,8 @@ const LEVEL_THRESHOLDS = [0, 100, 300, 600, 1000, 2000, 5000];
 const DEFAULT_AVATAR = (seed) =>
 	`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}`;
 
-const DEFAULT_ADMIN_EMAILS = new Set([
-	"omchai.g44@gmail.com",
-	"nxme176@gmail.com",
-]);
+// Admin emails must be configured via VITE_ADMIN_EMAIL_ALLOWLIST env var — never hardcode
+const DEFAULT_ADMIN_EMAILS = new Set();
 
 const normalizeEmail = (value) =>
 	String(value || "")
@@ -214,7 +213,7 @@ export const useUserStore = defineStore(
 			const safeEmail = normalizeEmail(email);
 			const safePassword = String(password || "");
 			if (!safeEmail || !safePassword) {
-				throw new Error("Email และรหัสผ่านจำเป็นต้องกรอกให้ครบ");
+				throw new Error(i18n.global.t("auto.k_3a8b67ff"));
 			}
 
 			let lastError = null;
@@ -245,7 +244,7 @@ export const useUserStore = defineStore(
 
 		const sendAdminMagicLink = async (email) => {
 			const safeEmail = normalizeEmail(email);
-			if (!safeEmail) throw new Error("Email จำเป็นต้องกรอก");
+			if (!safeEmail) throw new Error(i18n.global.t("auto.k_b48f14d9"));
 			const redirectTo =
 				typeof window !== "undefined"
 					? `${window.location.origin}/admin`
@@ -261,9 +260,22 @@ export const useUserStore = defineStore(
 		};
 
 		const logout = async () => {
+			// Tear down auth listener before sign-out to prevent stale callbacks
+			if (authSubscription) {
+				authSubscription.unsubscribe();
+				authSubscription = null;
+			}
 			const { error } = await supabase.auth.signOut();
 			if (error) throw error;
 			applyAuthSnapshot(null);
+		};
+
+		/** Cleanup for beforeunload / store teardown */
+		const cleanup = () => {
+			if (authSubscription) {
+				authSubscription.unsubscribe();
+				authSubscription = null;
+			}
 		};
 
 		// ═══════════════════════════════════════════
@@ -412,6 +424,8 @@ export const useUserStore = defineStore(
 			setTheme,
 			toggleDarkMode,
 			updatePreferences,
+			// Lifecycle
+			cleanup,
 		};
 	},
 	{

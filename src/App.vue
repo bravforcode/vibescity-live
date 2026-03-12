@@ -2,6 +2,7 @@
 import { onMounted, watch } from "vue";
 import ReloadPrompt from "@/components/pwa/ReloadPrompt.vue";
 import ConsentBanner from "@/components/ui/ConsentBanner.vue";
+import ErrorBoundary from "@/components/ui/ErrorBoundary.vue";
 import StickyOfflineBanner from "@/components/ui/StickyOfflineBanner.vue";
 import VibeNotification from "@/components/ui/VibeNotification.vue";
 import { useHomeBase } from "@/composables/useHomeBase";
@@ -77,11 +78,13 @@ watch(
   <ReloadPrompt />
   <ConsentBanner />
   <main id="main-content">
-    <router-view v-slot="{ Component }">
-      <Transition name="page" mode="out-in">
-        <component :is="Component" />
-      </Transition>
-    </router-view>
+    <ErrorBoundary>
+      <router-view v-slot="{ Component }">
+        <Transition name="page" mode="out-in">
+          <component :is="Component" />
+        </Transition>
+      </router-view>
+    </ErrorBoundary>
   </main>
   <VibeNotification />
 </template>

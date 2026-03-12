@@ -3,7 +3,7 @@
     v-if="isOpen"
     class="fixed inset-0 z-[7000] flex items-center justify-center p-4"
   >
-    <div
+    <div role="button" tabindex="0"
       class="absolute inset-0 bg-black/80 backdrop-blur-md"
       @click="emit('close')"
     ></div>
@@ -19,16 +19,12 @@
           <h2
             id="merchant-register-title"
             class="text-2xl font-black text-white tracking-tight"
-          >
-            Promote Your Vibe
-          </h2>
-          <p class="text-sm text-gray-400">
-            Boost visibility with flexible pin options
-          </p>
+          > {{ $t("auto.k_5608a966") }} </h2>
+          <p class="text-sm text-gray-400"> {{ $t("auto.k_c3fd52d6") }} </p>
         </div>
         <button
           @click="emit('close')"
-          aria-label="Close promote panel"
+          :aria-label="$t('auto.k_3079324d')"
           class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition focus-ring"
         >
           ✕
@@ -39,22 +35,22 @@
         <div class="space-y-4">
           <h3
             class="text-sm font-black text-white/60 uppercase tracking-widest"
-          >
-            1. Shop Details
-          </h3>
+          > {{ $t("auto.k_b93aa0a8") }} </h3>
+          <label for="merchant-name" class="sr-only">{{ $t('auto.k_ad01b710') }}</label>
           <input
+            id="merchant-name"
             v-model="form.name"
-            placeholder="Shop Name"
-            aria-label="Shop Name"
+            :placeholder="$t('auto.k_ad01b710')"
             autocomplete="organization"
-            class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500"
+            class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:border-blue-500"
           />
+          <label for="merchant-category" class="sr-only">{{ $t('auto.k_3ea88fef') }}</label>
           <select
+            id="merchant-category"
             v-model="form.category"
-            aria-label="Shop Category"
-            class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white"
+            class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50"
           >
-            <option value="" disabled>Select Category</option>
+            <option value="" disabled>{{ $t("auto.k_b43b8beb") }}</option>
             <option value="Cafe">Cafe</option>
             <option value="Bar">Bar</option>
             <option value="Restaurant">Restaurant</option>
@@ -67,9 +63,7 @@
         <div class="space-y-4">
           <h3
             class="text-sm font-black text-white/60 uppercase tracking-widest"
-          >
-            2. Location
-          </h3>
+          > {{ $t("auto.k_1151b004") }} </h3>
           <div
             class="h-40 rounded-xl bg-zinc-800 border border-white/10 flex items-center justify-center relative overflow-hidden group"
           >
@@ -80,8 +74,7 @@
               @click="getCurrentLocation"
               class="relative z-10 px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg shadow-lg flex items-center gap-2"
             >
-              <MapPin class="w-3 h-3" /> Pin Current Location
-            </button>
+              <MapPin class="w-3 h-3" /> {{ $t("auto.k_337575bc") }} </button>
             <p
               v-if="form.lat"
               class="absolute bottom-2 left-2 text-[10px] text-green-400 font-mono bg-black/60 px-2 py-1 rounded"
@@ -95,9 +88,7 @@
           <div class="flex items-center justify-between">
             <h3
               class="text-sm font-black text-white/60 uppercase tracking-widest"
-            >
-              3. Pin Type + Package
-            </h3>
+            > {{ $t("auto.k_4f6fbf40") }} </h3>
             <span class="text-lg font-black text-green-400"
               >฿{{ totalPrice.toLocaleString() }}</span
             >
@@ -113,10 +104,8 @@
                   : 'bg-white/5 border-white/10 text-white/80',
               ]"
             >
-              <div class="text-sm font-black">📍 Normal Pin</div>
-              <div class="text-[11px] text-white/60">
-                Standard map visibility
-              </div>
+              <div class="text-sm font-black">{{ $t("auto.k_cd68ba5") }}</div>
+              <div class="text-[11px] text-white/60"> {{ $t("auto.k_9c770232") }} </div>
             </button>
             <button
               @click="form.pinType = 'giant'"
@@ -127,10 +116,8 @@
                   : 'bg-white/5 border-white/10 text-white/80',
               ]"
             >
-              <div class="text-sm font-black">🔥 Giant Pin</div>
-              <div class="text-[11px] text-white/60">
-                Premium spotlight reach
-              </div>
+              <div class="text-sm font-black">{{ $t("auto.k_b80d9081") }}</div>
+              <div class="text-[11px] text-white/60"> {{ $t("auto.k_42af1111") }} </div>
             </button>
           </div>
 
@@ -185,8 +172,7 @@
                 ]"
               >
                 <div class="text-xs font-bold">{{ addon.label }}</div>
-                <div class="text-[11px] text-white/60">
-                  +฿{{ addon.price.toLocaleString() }}
+                <div class="text-[11px] text-white/60"> {{ $t("auto.k_12cc538f") }}{{ addon.price.toLocaleString() }}
                 </div>
               </button>
             </div>
@@ -196,9 +182,7 @@
         <div class="space-y-4">
           <h3
             class="text-sm font-black text-white/60 uppercase tracking-widest"
-          >
-            4. Payment
-          </h3>
+          > {{ $t("auto.k_b1790301") }} </h3>
 
           <div class="flex bg-black/30 rounded-xl p-1 border border-white/10">
             <button
@@ -207,18 +191,14 @@
                 'flex-1 py-2 text-xs font-bold rounded-lg transition',
                 paymentTab === 'qr' ? 'bg-white text-black' : 'text-white/60',
               ]"
-            >
-              Scan QR
-            </button>
+            > {{ $t("auto.k_334aaf1b") }} </button>
             <button
               @click="paymentTab = 'bank'"
               :class="[
                 'flex-1 py-2 text-xs font-bold rounded-lg transition',
                 paymentTab === 'bank' ? 'bg-white text-black' : 'text-white/60',
               ]"
-            >
-              Bank Transfer
-            </button>
+            > {{ $t("auto.k_24cd9456") }} </button>
           </div>
 
           <div
@@ -232,11 +212,9 @@
               level="H"
               class="rounded-lg"
             />
-            <p class="text-black text-xs font-bold mt-3">
-              Scan PromptPay to pay ฿{{ totalPrice.toLocaleString() }}
+            <p class="text-black text-xs font-bold mt-3"> {{ $t("auto.k_fed45922") }}{{ totalPrice.toLocaleString() }}
             </p>
-            <p class="text-[11px] text-gray-600 mt-1">
-              PromptPay ID: {{ PROMPTPAY_ID }}
+            <p class="text-[11px] text-gray-600 mt-1"> {{ $t("auto.k_31b8251a") }} {{ PROMPTPAY_ID }}
             </p>
           </div>
 
@@ -244,10 +222,10 @@
             v-else
             class="bg-white/5 border border-white/10 rounded-xl p-4 space-y-3 text-white"
           >
-            <div class="text-xs text-white/60">Bank Name</div>
+            <div class="text-xs text-white/60">{{ $t("auto.k_e41a07b6") }}</div>
             <div class="font-bold">{{ BANK_NAME }}</div>
 
-            <div class="text-xs text-white/60">Account Number</div>
+            <div class="text-xs text-white/60">{{ $t("auto.k_a86d4ce5") }}</div>
             <button
               @click="copyAccountNumber"
               class="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/20 font-mono text-left flex items-center justify-between"
@@ -258,11 +236,13 @@
               >
             </button>
 
-            <div class="text-xs text-white/60">Account Name</div>
+            <div class="text-xs text-white/60">{{ $t("auto.k_993dc46f") }}</div>
             <div class="font-bold">{{ ACCOUNT_NAME }}</div>
           </div>
 
+          <label for="merchant-slip-upload" class="sr-only">{{ $t('auto.k_7f63018b') }}</label>
           <input
+            id="merchant-slip-upload"
             type="file"
             ref="slipInput"
             class="hidden"
@@ -271,7 +251,7 @@
           />
           <button
             @click="slipInput?.click()"
-            class="w-full py-3 rounded-xl border-dashed border-2 border-white/20 text-white/50 hover:text-white hover:border-white/50 transition flex items-center justify-center gap-2"
+            class="w-full py-3 rounded-xl border-dashed border-2 border-white/20 text-white/50 hover:text-white hover:border-white/50 transition flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50"
           >
             <Upload class="w-4 h-4" />
             {{ slipFile ? slipFile.name : "Upload Payment Slip" }}
@@ -280,9 +260,9 @@
             v-if="previewUrl"
             class="mt-3 rounded-xl overflow-hidden border border-white/10 bg-white/5"
           >
-            <img
+            <img loading="lazy"
               :src="previewUrl"
-              alt="Slip preview"
+              :alt="$t('auto.k_7f63018b')"
               class="w-full h-48 object-contain bg-black/30"
             />
           </div>
@@ -293,8 +273,7 @@
                 :style="{ width: `${uploadProgress}%` }"
               ></div>
             </div>
-            <p class="text-[11px] text-emerald-200 mt-1">
-              Uploading… {{ uploadProgress }}%
+            <p class="text-[11px] text-emerald-200 mt-1"> {{ $t("auto.k_6bb2fb6e") }} {{ uploadProgress }}%
             </p>
           </div>
         </div>
@@ -304,7 +283,7 @@
         <button
           @click="submitForm"
           :disabled="isSubmitting"
-          class="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-black text-lg shadow-lg hover:shadow-blue-500/20 active:scale-95 transition disabled:opacity-50"
+          class="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-black text-lg shadow-lg hover:shadow-blue-500/20 active:scale-95 transition disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50"
         >
           {{ isSubmitting ? "Submitting…" : "Confirm & Promote" }}
         </button>
