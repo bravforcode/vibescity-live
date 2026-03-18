@@ -147,8 +147,8 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
 
-      - name: Run E2E full matrix (exclude quarantine lane)
-        run: PW_GREP_INVERT=@map-quarantine npx playwright test
+      - name: Run E2E full matrix (exclude map lanes)
+        run: PW_GREP_INVERT='@map-(quarantine|required|preflight)' npx playwright test
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}

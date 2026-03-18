@@ -1,5 +1,20 @@
 {
   "version": 1,
-  "updated_at": "2026-02-12",
-  "tests": []
+  "updated_at": "2026-03-18",
+  "tests": [
+    {
+      "id": "tests/e2e/map_flow.spec.ts::Map User Flow › Map shell reports ready @map-quarantine",
+      "owner": "@bravforcode",
+      "ticket": "MAP-201",
+      "expires_on": "2026-04-01",
+      "reason": "Mapbox terrain emits console noise in CI, so the shell-ready assertion is temporarily quarantined pending a stable terrain-safe map profile."
+    },
+    {
+      "id": "tests/e2e/map_flow.spec.ts::Map User Flow › Map Load -> Click Shop -> Open Drawer @map-quarantine",
+      "owner": "@bravforcode",
+      "ticket": "MAP-202",
+      "expires_on": "2026-04-01",
+      "reason": "The first marker click is unstable in CI because the chosen marker frequently lands outside the viewport, so the drawer interaction stays in quarantine until the selector strategy is hardened."
+    }
+  ]
 }

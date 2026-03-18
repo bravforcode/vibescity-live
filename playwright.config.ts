@@ -110,6 +110,8 @@ export default defineConfig({
           VITE_WS_URL: e2eWsUrl,
           VITE_E2E_MAP_REQUIRED:
             process.env.E2E_MAP_REQUIRED === "1" ? "true" : "false",
+          VITE_ANALYTICS_ENABLED: "false",
+          VITE_PII_AUDIT_ENABLED: "false",
           // ✅ ใส่ flag ให้ app ปิดของหนัก ๆ ตอนเทสได้ เช่น map animation / realtime
           // คุณเอาไปใช้ในโค้ดได้: if (import.meta.env.VITE_E2E) { ... }
           VITE_DISABLE_ANIMATIONS: "true",
