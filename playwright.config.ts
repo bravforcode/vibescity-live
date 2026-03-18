@@ -10,6 +10,7 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL || "http://localhost:5417";
 const e2eWsUrl = process.env.PLAYWRIGHT_WS_URL || process.env.VITE_WS_URL || "";
 const sanitizeEnvToken = (value = "") =>
 	value.trim().replace(/^['"]|['"]$/g, "");
+const apiBaseUrl = sanitizeEnvToken(process.env.VITE_API_URL || "");
 
 const readMapboxTokenFromDotEnv = () => {
 	const envCandidates = [".env.local", ".env"];
@@ -39,6 +40,24 @@ const supabaseUrl = sanitizeEnvToken(
 const supabaseAnonKey = sanitizeEnvToken(
 	process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "",
 );
+const supabaseEdgeUrl = sanitizeEnvToken(
+	process.env.VITE_SUPABASE_EDGE_URL ||
+		(supabaseUrl ? `${supabaseUrl}/functions/v1` : ""),
+);
+
+if (!noWebServer && isCI) {
+	const missingPreviewEnv = [
+		!apiBaseUrl && "VITE_API_URL",
+		!supabaseUrl && "VITE_SUPABASE_URL",
+		!supabaseAnonKey && "VITE_SUPABASE_ANON_KEY",
+	].filter(Boolean);
+
+	if (missingPreviewEnv.length > 0) {
+		throw new Error(
+			`Missing required CI Playwright preview env: ${missingPreviewEnv.join(", ")}`,
+		);
+	}
+}
 
 if (
 	(process.env.E2E_MAP_REQUIRED === "1" ||
@@ -111,10 +130,14 @@ export default defineConfig({
 				timeout: 180_000,
 				env: {
 					VITE_E2E: "true",
+					...(apiBaseUrl ? { VITE_API_URL: apiBaseUrl } : {}),
 					VITE_WS_URL: e2eWsUrl,
 					...(supabaseUrl ? { VITE_SUPABASE_URL: supabaseUrl } : {}),
 					...(supabaseAnonKey
 						? { VITE_SUPABASE_ANON_KEY: supabaseAnonKey }
+						: {}),
+					...(supabaseEdgeUrl
+						? { VITE_SUPABASE_EDGE_URL: supabaseEdgeUrl }
 						: {}),
 					VITE_E2E_MAP_REQUIRED:
 						process.env.E2E_MAP_REQUIRED === "1" ? "true" : "false",

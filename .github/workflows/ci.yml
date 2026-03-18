@@ -107,6 +107,7 @@ jobs:
     needs: [frontend, backend-tests]
     runs-on: ubuntu-latest
     env:
+      VITE_API_URL: "https://vibecity-api.fly.dev"
       VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
     steps:
@@ -138,6 +139,7 @@ jobs:
     needs: [frontend, backend-tests]
     runs-on: ubuntu-latest
     env:
+      VITE_API_URL: "https://vibecity-api.fly.dev"
       VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
     steps:
@@ -169,6 +171,7 @@ jobs:
     needs: [frontend, backend-tests, map-quarantine-sla, e2e-map-preflight]
     runs-on: ubuntu-latest
     env:
+      VITE_API_URL: "https://vibecity-api.fly.dev"
       VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
     steps:
@@ -213,6 +216,7 @@ jobs:
     needs: [frontend, backend-tests, map-quarantine-sla]
     runs-on: ubuntu-latest
     env:
+      VITE_API_URL: "https://vibecity-api.fly.dev"
       VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
     steps:
@@ -258,6 +262,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     env:
+      VITE_API_URL: "https://vibecity-api.fly.dev"
       VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
     steps:
@@ -301,6 +306,10 @@ jobs:
     if: ${{ needs.e2e-full.result == 'failure' }}
     needs: [e2e-full]
     runs-on: ubuntu-latest
+    env:
+      VITE_API_URL: "https://vibecity-api.fly.dev"
+      VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
     steps:
       - uses: actions/checkout@v4
 
