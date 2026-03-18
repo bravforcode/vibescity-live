@@ -128,33 +128,41 @@ app.add_middleware(RequestIdMiddleware)
 
 @app.get("/health")
 async def health_check():
-    from app.services.cache.redis_client import get_redis
+    import asyncio
 
     from app.core.supabase import supabase_admin
 
     checks: dict = {}
+    strict_health = settings.ENV.lower() == "production"
     overall = "ok"
 
     # H2: Supabase — lightweight read to verify DB connectivity
     if not supabase_admin:
         checks["supabase"] = "not_configured"
-        overall = "degraded"
+        if strict_health:
+            overall = "degraded"
     else:
         try:
-            supabase_admin.table("orders").select("id").limit(1).execute()
+            await asyncio.to_thread(
+                lambda: supabase_admin.table("orders").select("id").limit(1).execute()
+            )
             checks["supabase"] = "ok"
         except Exception:
             checks["supabase"] = "degraded"
-            overall = "degraded"
+            if strict_health:
+                overall = "degraded"
 
     # H2: Redis — ping to verify cache layer
     try:
+        from app.services.cache.redis_client import get_redis
+
         redis_conn = get_redis()
-        redis_conn.ping()
+        await asyncio.to_thread(redis_conn.ping)
         checks["redis"] = "ok"
     except Exception:
         checks["redis"] = "degraded"
-        overall = "degraded"
+        if strict_health:
+            overall = "degraded"
 
     # H2: Qdrant — check via services module (optional, soft fail)
     try:
