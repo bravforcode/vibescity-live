@@ -68,7 +68,7 @@ jobs:
       - name: Post-deploy healthcheck
         env:
           POSTDEPLOY_API_BASE_URL: "https://vibecity-api.fly.dev"
-          POSTDEPLOY_EDGE_BASE_URL: "${{ vars.POSTDEPLOY_EDGE_BASE_URL || 'https://rukyitpjfmzhqjlfmbie.supabase.co/functions/v1' }}"
+          POSTDEPLOY_EDGE_BASE_URL: "${{ secrets.SUPABASE_URL && format('{0}/functions/v1', secrets.SUPABASE_URL) || vars.POSTDEPLOY_EDGE_BASE_URL || 'https://rukyitpjfmzhqjlfmbie.supabase.co/functions/v1' }}"
           POSTDEPLOY_SUPABASE_JWT: "${{ secrets.POSTDEPLOY_SUPABASE_JWT }}"
           POSTDEPLOY_CHECKOUT_VENUE_ID: "${{ vars.POSTDEPLOY_CHECKOUT_VENUE_ID || secrets.POSTDEPLOY_CHECKOUT_VENUE_ID }}"
           POSTDEPLOY_ORDER_ID: "${{ vars.POSTDEPLOY_ORDER_ID || secrets.POSTDEPLOY_ORDER_ID }}"
@@ -85,5 +85,5 @@ jobs:
             echo "- Job status: ${{ job.status }}"
             echo "- API base: https://vibecity-api.fly.dev"
             echo "- Read-only mode: disabled (deploy gate)"
-            echo "- Edge base: ${{ vars.POSTDEPLOY_EDGE_BASE_URL || 'https://rukyitpjfmzhqjlfmbie.supabase.co/functions/v1' }}"
+            echo "- Edge base: ${{ secrets.SUPABASE_URL && format('{0}/functions/v1', secrets.SUPABASE_URL) || vars.POSTDEPLOY_EDGE_BASE_URL || 'https://rukyitpjfmzhqjlfmbie.supabase.co/functions/v1' }}"
           } >> "$GITHUB_STEP_SUMMARY"
