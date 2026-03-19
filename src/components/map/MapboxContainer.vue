@@ -201,6 +201,7 @@ const { map, isMapReady, initMap, setMapStyle } = useMapCore(mapContainer);
 const mapReadyFallbackArmed = ref(false);
 const currentStyleUrl = ref(null);
 let styleApplySeq = 0;
+let pendingStyleSetupListener = false;
 
 const initMapOnce = (styleOverride = null) => {
   if (mapInitRequested.value) return;
@@ -1073,8 +1074,31 @@ const {
  * This is called once on map load or style change.
  */
 // ✅ Map Layers & Sources Setup (Refactored)
+const ensureMapStyleReadyForLayers = () => {
+  if (!map.value) return false;
+  if (
+    typeof map.value.isStyleLoaded !== "function" ||
+    map.value.isStyleLoaded()
+  ) {
+    pendingStyleSetupListener = false;
+    return true;
+  }
+
+  if (!pendingStyleSetupListener) {
+    pendingStyleSetupListener = true;
+    map.value.once("style.load", () => {
+      pendingStyleSetupListener = false;
+      if (!map.value) return;
+      setupMapLayers();
+    });
+  }
+
+  return false;
+};
+
 const setupMapLayers = () => {
   if (!map.value) return;
+  if (!ensureMapStyleReadyForLayers()) return;
 
   // 1. Core Layers from Composable
   setCyberpunkAtmosphere(); // 🟣 Base atmosphere palette
