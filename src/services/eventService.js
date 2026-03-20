@@ -8,11 +8,45 @@
  * - Facebook Events (via Graph API)
  * - Eventbrite
  */
+import { isTransientNetworkError } from "../utils/networkErrorUtils";
+import {
+	computeBackoffDelayMs,
+	shouldRetryResource,
+	waitForBackoff,
+} from "../utils/retryPolicy";
 
 const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
 let eventCache = {
 	data: [],
 	lastFetched: null,
+};
+
+const warnEventProviderFailure = (provider, error) => {
+	if (!import.meta.env.DEV || isTransientNetworkError(error)) return;
+	console.warn(
+		`[EventService] ${provider} source failed, using fallback`,
+		error,
+	);
+};
+
+const withEventProviderFallback = async (provider, run) => {
+	for (let attempt = 0; ; attempt += 1) {
+		try {
+			return await run();
+		} catch (error) {
+			if (
+				isTransientNetworkError(error) &&
+				shouldRetryResource({ resourceType: "events", attempt })
+			) {
+				await waitForBackoff(
+					computeBackoffDelayMs({ resourceType: "events", attempt }),
+				);
+				continue;
+			}
+			warnEventProviderFailure(provider, error);
+			return [];
+		}
+	}
 };
 
 /**
@@ -338,31 +372,23 @@ function getNextFullMoon(fromDate) {
  * Fetch events from Ticketmelon (Thailand's major ticketing platform)
  */
 async function fetchTicketmelonEvents() {
-	try {
+	return withEventProviderFallback("Ticketmelon", async () => {
 		// Note: This would need actual API access
 		// For now, return mock data structure
-		if (import.meta.env.DEV)
-			console.log("[EventService] Fetching from Ticketmelon...");
-
 		// In production, use:
 		// const response = await fetch('https://www.ticketmelon.com/api/events');
 		// return await response.json();
 
 		return [];
-	} catch (error) {
-		console.error("[EventService] Ticketmelon fetch error:", error);
-		return [];
-	}
+	});
 }
 
 /**
  * Fetch events from Facebook Graph API
  */
 async function fetchFacebookEvents(accessToken, _locationIds = []) {
-	try {
+	return withEventProviderFallback("Facebook", async () => {
 		if (!accessToken) {
-			if (import.meta.env.DEV)
-				console.log("[EventService] No Facebook access token provided");
 			return [];
 		}
 
@@ -372,20 +398,14 @@ async function fetchFacebookEvents(accessToken, _locationIds = []) {
 		// );
 
 		return [];
-	} catch (error) {
-		console.error("[EventService] Facebook fetch error:", error);
-		return [];
-	}
+	});
 }
 
 /**
  * Scrape ThaiTicketMajor for upcoming concerts
  */
 async function fetchThaiTicketMajorEvents() {
-	try {
-		if (import.meta.env.DEV)
-			console.log("[EventService] Fetching from ThaiTicketMajor...");
-
+	return withEventProviderFallback("ThaiTicketMajor", async () => {
 		// This would need web scraping or API access
 		// For demonstration, return sample upcoming concerts
 
@@ -401,10 +421,7 @@ async function fetchThaiTicketMajorEvents() {
 				...EVENT_CATEGORIES.concert,
 			},
 		];
-	} catch (error) {
-		console.error("[EventService] ThaiTicketMajor fetch error:", error);
-		return [];
-	}
+	});
 }
 
 function getNextWeekend() {
@@ -430,13 +447,8 @@ export async function getAllEvents(options = {}) {
 		eventCache.lastFetched &&
 		Date.now() - eventCache.lastFetched < CACHE_DURATION
 	) {
-		if (import.meta.env.DEV)
-			console.log("[EventService] Returning cached events");
 		return filterEvents(eventCache.data, province, category);
 	}
-
-	if (import.meta.env.DEV)
-		console.log("[EventService] Fetching fresh events...");
 
 	// Fetch from all sources
 	const [recurringEvents, ticketmelonEvents, thaiTicketMajorEvents] =

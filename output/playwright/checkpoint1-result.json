@@ -1,0 +1,13 @@
+{
+  "startedAt": "2026-03-03T10:32:01.016Z",
+  "endedAt": "2026-03-03T10:35:13.867Z",
+  "durationSec": 193,
+  "loops": 22,
+  "consoleErrorCount": 2,
+  "pageErrorCount": 0,
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 404 ()",
+    "Failed to load resource: the server responded with a status of 404 ()"
+  ],
+  "pageErrors": []
+}

@@ -1,4 +1,5 @@
 import { ref } from "vue";
+import i18n from "@/i18n.js";
 import { getApiBaseUrl } from "../lib/runtimeConfig";
 import { supabase } from "../lib/supabase";
 
@@ -18,7 +19,7 @@ export function useStripe() {
 			} = await supabase.auth.getSession();
 
 			if (authError || !session?.access_token) {
-				throw new Error("Please login first");
+				throw new Error(i18n.global.t("auto.k_1b323360"));
 			}
 
 			// 2. Call Backend
@@ -52,7 +53,7 @@ export function useStripe() {
 			if (data.url) {
 				window.location.href = data.url;
 			} else {
-				throw new Error("No checkout URL returned");
+				throw new Error(i18n.global.t("auto.k_ab24084e"));
 			}
 		} catch (err) {
 			if (import.meta.env.DEV) {

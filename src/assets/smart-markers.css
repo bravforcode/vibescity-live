@@ -1,0 +1,303 @@
+/* Smart Markers - Real-time Status Based Styling */
+
+/* Base smart marker styles */
+.smart-marker {
+	position: relative;
+	border-radius: 50% 50% 50% 0;
+	transform-origin: bottom center;
+	transition:
+		transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+		filter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+	pointer-events: auto;
+	cursor: pointer;
+	will-change: transform, filter;
+	min-width: 44px;
+	min-height: 44px;
+}
+
+.smart-marker:focus-visible {
+	outline: 3px solid rgba(255, 255, 255, 0.95);
+	outline-offset: 4px;
+}
+
+.smart-marker:focus:not(:focus-visible) {
+	outline: none;
+}
+
+.smart-marker::before {
+	display: none; /* Removed: was creating white blob dots behind neon signs */
+}
+
+.smart-marker::after {
+	display: none;
+}
+
+.smart-marker.highlighted {
+	transform: scale(1.3);
+	z-index: 1000;
+}
+
+/* Status-specific styles */
+.smart-marker.live {
+	background: linear-gradient(135deg, #ef4444, #dc2626);
+	border-color: #ef4444;
+	box-shadow: 0 0 30px rgba(239, 68, 68, 0.6);
+	animation: livePulse 1s ease-in-out infinite;
+}
+
+.smart-marker.open {
+	background: linear-gradient(135deg, #22c55e, #16a34a);
+	border-color: #22c55e;
+	box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
+	animation: openPulse 2s ease-in-out infinite;
+}
+
+.smart-marker.tonight {
+	background: linear-gradient(135deg, #f97316, #ea580c);
+	border-color: #f97316;
+	box-shadow: 0 0 15px rgba(249, 115, 22, 0.3);
+	animation: tonightPulse 3s ease-in-out infinite;
+}
+
+.smart-marker.closed {
+	background: linear-gradient(135deg, #6b7280, #4b5563);
+	border-color: #6b7280;
+	opacity: 0.8;
+	animation: none;
+}
+
+/* Optional CSS variables from JS (when applied via style) */
+.smart-marker {
+	filter: drop-shadow(
+		0 0 var(--marker-glow, 0px) var(--marker-color, rgba(0, 0, 0, 0))
+	);
+	opacity: var(--marker-opacity, 1);
+}
+
+/* Badge styles */
+.smart-marker-badge {
+	position: absolute;
+	top: -12px;
+	right: -12px;
+	padding: 4px 8px;
+	border-radius: 12px;
+	font-size: 10px;
+	font-weight: bold;
+	color: white;
+	text-transform: uppercase;
+	z-index: 10;
+	animation: badgeFloat 2s ease-in-out infinite;
+	backdrop-filter: blur(4px);
+	border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.smart-marker-badge.live {
+	background: linear-gradient(135deg, #ef4444, #dc2626);
+	box-shadow: 0 2px 8px rgba(239, 68, 68, 0.6);
+}
+
+.smart-marker-badge.open {
+	background: linear-gradient(135deg, #22c55e, #16a34a);
+	box-shadow: 0 2px 8px rgba(34, 197, 94, 0.4);
+}
+
+.smart-marker-badge.tonight {
+	background: linear-gradient(135deg, #f97316, #ea580c);
+	box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
+}
+
+.smart-marker-badge.closed {
+	background: linear-gradient(135deg, #6b7280, #4b5563);
+	box-shadow: 0 2px 8px rgba(107, 114, 128, 0.2);
+}
+
+/* Giant pin specific styles */
+.giant-pin-marker.smart-marker {
+	width: 54px;
+	height: 74px;
+	transform-origin: bottom center;
+}
+
+.giant-pin-marker.smart-marker.live {
+	filter: drop-shadow(0 0 20px #ef4444)
+		drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+}
+
+.giant-pin-marker.smart-marker.open {
+	filter: drop-shadow(0 0 15px #22c55e)
+		drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+}
+
+.giant-pin-marker.smart-marker.tonight {
+	filter: drop-shadow(0 0 12px #f97316)
+		drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+}
+
+.giant-pin-marker.smart-marker.closed {
+	filter: drop-shadow(0 0 8px #6b7280) drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+	opacity: 0.85;
+}
+
+/* Glow effects */
+.smart-marker-glow {
+	position: absolute;
+	inset: -12px;
+	border-radius: 50% 50% 50% 0;
+	background: inherit;
+	opacity: 0.3;
+	filter: blur(20px);
+	z-index: 0;
+	animation: glowPulse 2s ease-in-out infinite;
+}
+
+.smart-marker-glow-outer {
+	position: absolute;
+	inset: -8px;
+	border-radius: 50% 50% 50% 0;
+	background: inherit;
+	opacity: 0.2;
+	filter: blur(12px);
+	z-index: 1;
+	animation: glowPulse 2s ease-in-out infinite 0.2s;
+}
+
+/* Floating indicators */
+.live-indicators,
+.open-indicators {
+	position: absolute;
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 4;
+}
+
+.live-indicators div {
+	width: 6px;
+	height: 6px;
+	background: #ef4444;
+	border-radius: 50%;
+	animation: livePulse 1s ease-in-out infinite;
+	box-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
+}
+
+.open-indicators div {
+	width: 4px;
+	height: 4px;
+	background: #22c55e;
+	border-radius: 50%;
+	animation: openPulse 1.5s ease-in-out infinite;
+	box-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
+}
+
+/* Animations */
+@keyframes livePulse {
+	0%,
+	100% {
+		transform: scale(1);
+		opacity: 1;
+	}
+	50% {
+		transform: scale(1.2);
+		opacity: 0.8;
+	}
+}
+
+@keyframes openPulse {
+	0%,
+	100% {
+		transform: scale(1);
+		opacity: 1;
+	}
+	50% {
+		transform: scale(1.15);
+		opacity: 0.9;
+	}
+}
+
+@keyframes tonightPulse {
+	0%,
+	100% {
+		transform: scale(1);
+		opacity: 1;
+	}
+	50% {
+		transform: scale(1.1);
+		opacity: 0.85;
+	}
+}
+
+@keyframes glowPulse {
+	0%,
+	100% {
+		opacity: 0.3;
+		transform: scale(1);
+	}
+	50% {
+		opacity: 0.6;
+		transform: scale(1.05);
+	}
+}
+
+@keyframes badgeFloat {
+	0%,
+	100% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(-2px);
+	}
+}
+
+/* Performance optimizations */
+@media (prefers-reduced-motion: reduce) {
+	.smart-marker,
+	.smart-marker::before,
+	.smart-marker::after,
+	.smart-marker-badge,
+	.smart-marker-glow,
+	.smart-marker-glow-outer,
+	.live-indicators div,
+	.open-indicators div {
+		animation: none;
+		transition: none;
+	}
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+	.smart-marker-badge {
+		font-size: 9px;
+		padding: 3px 6px;
+		top: -10px;
+		right: -10px;
+	}
+
+	.giant-pin-marker.smart-marker {
+		width: 48px;
+		height: 64px;
+	}
+
+	.smart-marker-glow {
+		inset: -8px;
+	}
+
+	.smart-marker-glow-outer {
+		inset: -6px;
+	}
+}
+
+/* Battery saver optimizations */
+@media (prefers-reduced-data: reduce) {
+	.smart-marker-glow,
+	.smart-marker-glow-outer {
+		display: none;
+	}
+
+	.smart-marker::before,
+	.smart-marker::after {
+		display: none;
+	}
+
+	.smart-marker-badge {
+		animation: none;
+	}
+}

@@ -6,6 +6,7 @@ import { useHaptics } from "../../composables/useHaptics";
 import { useMotionPreference } from "../../composables/useMotionPreference";
 import { useNotifications } from "../../composables/useNotifications";
 import { useThrottledAction } from "../../composables/useThrottledAction";
+import { getOrCreateVisitorId } from "../../services/visitorIdentity";
 import { useShopStore } from "../../store/shopStore";
 import { useUserStore } from "../../store/userStore";
 
@@ -20,13 +21,14 @@ const props = defineProps({
 	},
 });
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const shopStore = useShopStore();
 const userStore = useUserStore();
 const { tapFeedback, successFeedback, microFeedback } = useHaptics();
-const { notifyError } = useNotifications();
+const { notifyError, notifySuccess } = useNotifications();
 const { createThrottledAction } = useThrottledAction({ delayMs: 1000 });
 const { shouldReduceMotion, getAnimationDuration } = useMotionPreference();
+const currentVisitorId = getOrCreateVisitorId();
 
 // Emoji reaction definitions
 const REACTIONS = [
@@ -44,6 +46,7 @@ const showSuccess = ref(false);
 const animatingEmoji = ref(null);
 const successTimer = ref(null);
 const resetTimer = ref(null);
+const pendingReviewActionIds = ref(new Set());
 
 const shopReviews = computed(() => shopStore.getShopReviews(props.shopId));
 
@@ -92,6 +95,87 @@ const topReaction = computed(() => {
 	return max[1] > 0 ? REACTIONS.find((r) => r.key === max[0]) : null;
 });
 
+const visibleReviews = computed(() =>
+	(shopReviews.value || [])
+		.filter((review) => String(review?.comment || "").trim())
+		.slice(0, 6),
+);
+
+const getReviewDisplayName = (review) =>
+	String(review?.userName || review?.user_name || "Vibe Explorer");
+
+const formatReviewBody = (review) => {
+	const raw = String(review?.comment || "").trim();
+	const reactionKey = parseReactionKey(raw);
+	if (!reactionKey) return raw;
+	const reaction = REACTIONS.find((item) => item.key === reactionKey);
+	return reaction
+		? `${reaction.emoji} ${t(reaction.label) || reactionKey}`
+		: raw.replace(/^Reaction:\s*/i, "").trim();
+};
+
+const formatReviewDate = (value) => {
+	if (!value) return "";
+	try {
+		return new Date(value).toLocaleDateString();
+	} catch {
+		return "";
+	}
+};
+
+const setPendingReviewAction = (reviewId, isPending) => {
+	const next = new Set(pendingReviewActionIds.value);
+	const key = String(reviewId || "");
+	if (!key) return;
+	if (isPending) next.add(key);
+	else next.delete(key);
+	pendingReviewActionIds.value = next;
+};
+
+const isPendingReviewAction = (reviewId) =>
+	pendingReviewActionIds.value.has(String(reviewId || ""));
+
+const canDeleteReview = (review) => {
+	const reviewUserId = String(review?.user_id || "").trim();
+	const reviewVisitorId = String(review?.visitor_id || "").trim();
+	if (reviewUserId && userStore.userId) {
+		return reviewUserId === String(userStore.userId).trim();
+	}
+	if (reviewVisitorId) {
+		return reviewVisitorId === currentVisitorId;
+	}
+	return Boolean(review?.optimistic);
+};
+
+const canReportReview = (review) =>
+	!canDeleteReview(review) && !review?.optimistic;
+
+const reviewUiText = (en, th) =>
+	String(locale?.value || "en")
+		.toLowerCase()
+		.startsWith("th")
+		? th
+		: en;
+
+const getReviewBadges = (review) => {
+	const badges = [];
+	if (review?.optimistic) {
+		badges.push({
+			key: "pending",
+			label: reviewUiText("Posting...", "กำลังโพสต์..."),
+			className: "border-sky-400/30 bg-sky-400/10 text-sky-100",
+		});
+	}
+	if (canDeleteReview(review)) {
+		badges.push({
+			key: "own",
+			label: reviewUiText("Your review", "รีวิวของคุณ"),
+			className: "border-emerald-400/30 bg-emerald-400/10 text-emerald-100",
+		});
+	}
+	return badges;
+};
+
 onMounted(() => {
 	shopStore.fetchShopReviews(props.shopId);
 });
@@ -112,12 +196,17 @@ const runSelectReaction = async (reaction) => {
 	isSubmitting.value = true;
 
 	try {
-		await shopStore.addReview(props.shopId, {
+		const result = await shopStore.addReview(props.shopId, {
 			rating: null,
 			comment: `Reaction: ${reaction.emoji} ${reaction.key}`,
-			userName: userStore.userProfile?.name || "Vibe Explorer",
+			userName:
+				userStore.profile?.displayName ||
+				userStore.profile?.username ||
+				"Vibe Explorer",
 		});
-		await shopStore.fetchShopReviews(props.shopId);
+		if (!result?.success) {
+			throw new Error(result?.error || "Unable to submit review");
+		}
 		successFeedback();
 		microFeedback();
 		showSuccess.value = true;
@@ -130,6 +219,7 @@ const runSelectReaction = async (reaction) => {
 			shouldReduceMotion.value ? 1000 : 2000,
 		);
 	} catch (error) {
+		selectedReaction.value = null;
 		if (import.meta.env.DEV) {
 			console.error("[ReviewSystem] Failed to submit reaction", error);
 		}
@@ -148,6 +238,63 @@ const runSelectReaction = async (reaction) => {
 const selectReaction = createThrottledAction((reaction) => {
 	void runSelectReaction(reaction);
 });
+
+const runReviewAction = async (action, review) => {
+	if (!review?.id || isPendingReviewAction(review.id)) return;
+
+	const confirmMessage =
+		action === "delete"
+			? reviewUiText("Remove this review?", "ลบรีวิวนี้ใช่ไหม?")
+			: reviewUiText(
+					"Report this review for moderation?",
+					"รายงานรีวิวนี้ให้ทีมตรวจสอบใช่ไหม?",
+				);
+	if (!confirm(confirmMessage)) return;
+
+	setPendingReviewAction(review.id, true);
+	try {
+		const result =
+			action === "delete"
+				? await shopStore.deleteReview(props.shopId, review.id)
+				: await shopStore.reportReview(
+						props.shopId,
+						review.id,
+						"reported_from_ui",
+					);
+		if (!result?.success) {
+			throw new Error(
+				result?.error ||
+					(action === "delete"
+						? reviewUiText("Unable to delete review", "ไม่สามารถลบรีวิวได้")
+						: reviewUiText("Unable to report review", "ไม่สามารถรายงานรีวิวได้")),
+			);
+		}
+		successFeedback();
+		microFeedback();
+		notifySuccess(
+			action === "delete"
+				? reviewUiText("Review removed.", "ลบรีวิวเรียบร้อยแล้ว")
+				: reviewUiText(
+						"Review reported for moderation.",
+						"ส่งรายงานรีวิวให้ทีมตรวจสอบแล้ว",
+					),
+		);
+	} catch (_error) {
+		notifyError(
+			action === "delete"
+				? reviewUiText(
+						"Unable to remove your review right now",
+						"ยังลบรีวิวของคุณตอนนี้ไม่ได้",
+					)
+				: reviewUiText(
+						"Unable to report this review right now",
+						"ยังรายงานรีวิวนี้ตอนนี้ไม่ได้",
+					),
+		);
+	} finally {
+		setPendingReviewAction(review.id, false);
+	}
+};
 
 onUnmounted(() => {
 	if (successTimer.value) {
@@ -287,6 +434,77 @@ onUnmounted(() => {
         {{ totalReactions }}
         {{ t("reviews.people_reacted") || "people reacted" }}
       </span>
+    </div>
+
+    <div v-if="visibleReviews.length > 0" class="space-y-2 px-1">
+      <div class="px-1">
+        <p class="text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500">
+          {{ reviewUiText("Recent activity", "กิจกรรมล่าสุด") }}
+        </p>
+      </div>
+      <article
+        v-for="review in visibleReviews"
+        :key="review.id"
+        class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-sm"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <p class="truncate text-sm font-semibold text-white">
+              {{ getReviewDisplayName(review) }}
+            </p>
+            <p class="text-[11px] text-zinc-500">
+              {{ formatReviewDate(review.created_at) || reviewUiText("Just now", "เมื่อสักครู่") }}
+            </p>
+            <div
+              v-if="getReviewBadges(review).length > 0"
+              class="mt-2 flex flex-wrap gap-1.5"
+            >
+              <span
+                v-for="badge in getReviewBadges(review)"
+                :key="`${review.id}-${badge.key}`"
+                class="rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                :class="badge.className"
+              >
+                {{ badge.label }}
+              </span>
+            </div>
+          </div>
+
+          <button
+            v-if="canDeleteReview(review)"
+            type="button"
+            class="shrink-0 rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1 text-[11px] font-semibold text-red-200 transition hover:bg-red-500/20 disabled:opacity-50"
+            :disabled="isPendingReviewAction(review.id)"
+            :aria-label="`Delete review by ${getReviewDisplayName(review)}`"
+            @click="runReviewAction('delete', review)"
+          >
+            {{ isPendingReviewAction(review.id) ? reviewUiText("Deleting...", "กำลังลบ...") : reviewUiText("Delete", "ลบ") }}
+          </button>
+          <button
+            v-else-if="canReportReview(review)"
+            type="button"
+            class="shrink-0 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[11px] font-semibold text-amber-100 transition hover:bg-amber-500/20 disabled:opacity-50"
+            :disabled="isPendingReviewAction(review.id)"
+            :aria-label="`Report review by ${getReviewDisplayName(review)}`"
+            @click="runReviewAction('report', review)"
+          >
+            {{ isPendingReviewAction(review.id) ? reviewUiText("Reporting...", "กำลังรายงาน...") : reviewUiText("Report", "รายงาน") }}
+          </button>
+        </div>
+
+        <p class="mt-2 break-words text-sm text-zinc-300">
+          {{ formatReviewBody(review) }}
+        </p>
+      </article>
+
+      <p class="px-1 text-[11px] leading-relaxed text-zinc-500">
+        {{
+          reviewUiText(
+            "You can remove your own reviews here. Reported reviews are hidden while moderators check them.",
+            "คุณสามารถลบรีวิวของตัวเองได้ที่นี่ ส่วนรีวิวที่ถูกรายงานจะถูกซ่อนระหว่างทีมกำลังตรวจสอบ",
+          )
+        }}
+      </p>
     </div>
   </div>
 </template>

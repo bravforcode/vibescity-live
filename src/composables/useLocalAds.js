@@ -1,7 +1,11 @@
-import { computed, onUnmounted, ref, watch } from "vue";
+import { computed, getCurrentInstance, onUnmounted, ref, watch } from "vue";
 import { isSupabaseSchemaCacheError } from "@/lib/supabase";
 import { localAdService } from "@/services/localAdService";
 import { useLocationStore } from "@/store/locationStore";
+import {
+	isTransientNetworkError,
+	logUnexpectedNetworkError,
+} from "@/utils/networkErrorUtils";
 
 const MOVEMENT_THRESHOLD_KM = 0.5; // re-fetch when user moves 500 m
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // also refresh every 5 min
@@ -22,6 +26,7 @@ export function useLocalAds() {
 	const error = ref(null);
 	const dismissed = ref(new Set());
 
+	let activeRequestId = 0;
 	let lastFetchCoords = null;
 	let refreshTimer = null;
 
@@ -54,28 +59,28 @@ export function useLocalAds() {
 		if (!coords.value) return;
 		const { lat, lng } = coords.value;
 		if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+		const requestId = ++activeRequestId;
 		loading.value = true;
 		error.value = null;
 		try {
 			const result = await localAdService.getByLocation(lat, lng);
+			if (requestId !== activeRequestId) return;
 			ads.value = result;
 			lastFetchCoords = { lat, lng };
 		} catch (e) {
-			if (isSupabaseSchemaCacheError(e)) {
-				if (import.meta.env.DEV) {
-					console.warn(
-						"[useLocalAds] schema cache unavailable, keeping previous ads",
-					);
-				}
+			if (requestId !== activeRequestId) return;
+			if (isSupabaseSchemaCacheError(e) || isTransientNetworkError(e)) {
 				error.value = null;
 				return;
 			}
 			if (import.meta.env.DEV) {
-				console.warn("[useLocalAds] fetch failed", e?.message || e);
+				logUnexpectedNetworkError("[useLocalAds] fetch failed", e);
 			}
 			error.value = e.message || "Failed to load ads";
 		} finally {
-			loading.value = false;
+			if (requestId === activeRequestId) {
+				loading.value = false;
+			}
 		}
 	}
 
@@ -101,13 +106,21 @@ export function useLocalAds() {
 		{ immediate: true },
 	);
 
+	const cleanup = () => {
+		activeRequestId += 1;
+		if (refreshTimer) clearInterval(refreshTimer);
+		refreshTimer = null;
+	};
+
 	if (!isE2E) {
-		refreshTimer = setInterval(fetchAds, REFRESH_INTERVAL_MS);
+		refreshTimer = setInterval(() => {
+			void fetchAds();
+		}, REFRESH_INTERVAL_MS);
 	}
 
-	onUnmounted(() => {
-		if (refreshTimer) clearInterval(refreshTimer);
-	});
+	if (getCurrentInstance()) {
+		onUnmounted(cleanup);
+	}
 
 	return {
 		ads,
@@ -116,5 +129,6 @@ export function useLocalAds() {
 		error,
 		dismissAd,
 		fetchAds,
+		cleanup,
 	};
 }

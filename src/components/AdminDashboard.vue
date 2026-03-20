@@ -148,7 +148,7 @@
             </select>
             <div class="checkbox-group">
               <label>
-                <input type="checkbox" v-model="exportConfig.anonymize"> {{ $t("auto.k_faccfdc7") }} </label>
+                <input :aria-label="$t('a11y.input_field')" type="checkbox" v-model="exportConfig.anonymize"> {{ $t("auto.k_faccfdc7") }} </label>
             </div>
             <button @click="exportData" class="export-btn" :disabled="isExporting">
               {{ isExporting ? 'Exporting...' : '📥 Export to Google Sheets' }}
@@ -161,7 +161,7 @@
           <div class="retention-controls">
             <div class="retention-input">
               <label>{{ $t("auto.k_d5208a4e") }}</label>
-              <input 
+              <input :aria-label="$t('a11y.input_field')" 
                 type="number" 
                 v-model="retentionConfig.retention_days" 
                 min="1" 
@@ -178,7 +178,7 @@
               </select>
             </div>
             <div class="retention-warning">
-              <input type="checkbox" v-model="retentionConfig.confirm_action">
+              <input :aria-label="$t('a11y.input_field')" type="checkbox" v-model="retentionConfig.confirm_action">
               <span>{{ $t("auto.k_522fc0fe") }}</span>
             </div>
             <button 
@@ -200,7 +200,7 @@
         <div class="config-form">
           <div class="form-group">
             <label>{{ $t("auto.k_4b385d44") }}</label>
-            <input 
+            <input :aria-label="$t('a11y.input_field')" 
               type="text" 
               v-model="sheetsConfig.spreadsheet_id" 
               :placeholder="$t('auto.k_6cbf65a5')"
@@ -210,7 +210,7 @@
           
           <div class="form-group">
             <label>{{ $t("auto.k_131e7dd3") }}</label>
-            <input 
+            <input :aria-label="$t('a11y.input_field')" 
               type="text" 
               v-model="sheetsConfig.sheet_name" 
               :placeholder="$t('auto.k_36157502')"
@@ -222,7 +222,7 @@
             <label>{{ $t("auto.k_eac94859") }}</label>
             <div class="toggle-group">
               <label class="toggle-switch">
-                <input type="checkbox" v-model="sheetsConfig.enable_auto_sync">
+                <input :aria-label="$t('a11y.input_field')" type="checkbox" v-model="sheetsConfig.enable_auto_sync">
                 <span class="toggle-slider"></span>
               </label>
               <span class="toggle-label">{{ sheetsConfig.enable_auto_sync ? 'Enabled' : 'Disabled' }}</span>
@@ -231,7 +231,7 @@
           
           <div class="form-group">
             <label>{{ $t("auto.k_8b8e1ed3") }}</label>
-            <input 
+            <input :aria-label="$t('a11y.input_field')" 
               type="number" 
               v-model="sheetsConfig.sync_interval_minutes" 
               min="5" 
@@ -242,7 +242,7 @@
           
           <div class="form-group">
             <label>{{ $t("auto.k_55691403") }}</label>
-            <input 
+            <input :aria-label="$t('a11y.input_field')" 
               type="number" 
               v-model="sheetsConfig.data_retention_days" 
               min="1" 
@@ -255,7 +255,7 @@
             <label>{{ $t("auto.k_302dc2d1") }}</label>
             <div class="toggle-group">
               <label class="toggle-switch">
-                <input type="checkbox" v-model="sheetsConfig.enable_anonymization">
+                <input :aria-label="$t('a11y.input_field')" type="checkbox" v-model="sheetsConfig.enable_anonymization">
                 <span class="toggle-slider"></span>
               </label>
               <span class="toggle-label">{{ sheetsConfig.enable_anonymization ? 'Enabled' : 'Disabled' }}</span>
@@ -904,7 +904,7 @@ onMounted(() => {
   border-radius: 0.375rem;
   cursor: pointer;
   font-weight: 500;
-  transition: all 0.2s;
+  transition: opacity 0.2s, background-color 0.2s, transform 0.2s;
 }
 
 .export-btn, .test-btn {

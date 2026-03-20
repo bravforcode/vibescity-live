@@ -45,7 +45,7 @@ const callEmergency = (number) => {
       >
         <h2 class="text-lg font-black text-white flex items-center gap-2">
           <Shield class="w-5 h-5 text-red-500 animate-pulse" />
-          <span>Emergency Help</span>
+          <span>{{ $t("auto.k_3ed5ffe9") }}</span>
         </h2>
         <button
           @click="emit('close')"
@@ -60,9 +60,7 @@ const callEmergency = (number) => {
         <div class="space-y-2">
           <h3
             class="text-xs font-black text-white/40 uppercase tracking-widest pl-1"
-          >
-            Emergency Numbers
-          </h3>
+          > {{ $t("auto.k_365d3440") }} </h3>
           <div class="grid grid-cols-2 gap-2">
             <button
               v-for="item in nearbyEmergency.emergencyNumbers"
@@ -99,17 +97,13 @@ const callEmergency = (number) => {
           <p class="text-xs text-blue-100/80 leading-relaxed flex gap-3">
             <span class="text-lg">💡</span>
             <span>
-              <strong>Tip:</strong> Tourist Police (1155) speaks multiple
-              languages and can help with most situations involving tourists.
-            </span>
+              <strong>{{ $t("auto.k_a4d7bb30") }}</strong> {{ $t("auto.k_d4d5aaf9") }} </span>
           </p>
         </div>
 
         <!-- Bottom Safety Note -->
         <div class="text-center pt-4 opacity-40">
-          <p class="text-[10px] text-white">
-            Your location is being monitored for safety.
-          </p>
+          <p class="text-[10px] text-white"> {{ $t("auto.k_14145cc") }} </p>
         </div>
       </div>
     </div>

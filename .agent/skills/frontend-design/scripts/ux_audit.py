@@ -109,7 +109,7 @@ class UXAuditor:
         except: return
         
         self.files_checked += 1
-        filename = os.path.basename(filepath)
+        filename = filepath
 
         # Pre-calculate common flags
         has_long_text = bool(re.search(r'<p|<div.*class=.*text|article|<span.*text', content, re.IGNORECASE))
@@ -673,11 +673,21 @@ class UXAuditor:
 
     def audit_directory(self, directory: str) -> None:
         extensions = {'.tsx', '.jsx', '.html', '.vue', '.svelte', '.css'}
-        for root, dirs, files in os.walk(directory):
-            dirs[:] = [d for d in dirs if d not in {'node_modules', '.git', 'dist', 'build', '.next'}]
-            for file in files:
-                if Path(file).suffix in extensions:
-                    self.audit_file(os.path.join(root, file))
+        
+        # Determine base paths to scan
+        if directory == '.':
+            scan_paths = [os.path.join('.', 'src')]
+        else:
+            scan_paths = [directory]
+        
+        for base_path in scan_paths:
+            if not os.path.exists(base_path):
+                continue
+            for root, dirs, files in os.walk(base_path):
+                dirs[:] = [d for d in dirs if d not in {'node_modules', '.git', 'dist', 'build', '.next', '.worktrees', '.vercel', 'tmp', 'coverage', 'demo', 'storybook-static', 'playwright-report', 'tests', '.venv', 'public', 'reports'} and not d.startswith('playwright-report')]
+                for file in files:
+                    if Path(file).suffix in extensions:
+                        self.audit_file(os.path.join(root, file))
 
     def get_report(self):
         return {

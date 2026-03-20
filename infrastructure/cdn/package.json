@@ -1,0 +1,30 @@
+{
+  "name": "vibecity-cdn",
+  "version": "1.0.0",
+  "description": "Multi-Region CDN Strategy for VibeCity",
+  "scripts": {
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy --env production",
+    "deploy": "./deploy.sh",
+    "test": "python test-cdn-performance.py --url https://vibecity.live",
+    "test:cache": "python test-cdn-performance.py --url https://vibecity.live --cache-test",
+    "purge:all": "python cache-purge-webhook.py purge --worker-url https://vibecity.live --type all",
+    "purge:static": "python cache-purge-webhook.py purge --worker-url https://vibecity.live --type static",
+    "purge:api": "python cache-purge-webhook.py purge --worker-url https://vibecity.live --type api",
+    "warm": "python cache-purge-webhook.py warm --worker-url https://vibecity.live --type critical",
+    "logs": "wrangler tail --env production",
+    "logs:staging": "wrangler tail --env staging"
+  },
+  "keywords": [
+    "cdn",
+    "cloudflare",
+    "workers",
+    "edge-computing",
+    "caching"
+  ],
+  "author": "VibeCity DevOps Team",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}

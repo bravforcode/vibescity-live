@@ -2,47 +2,32 @@
   <main class="min-h-screen bg-[#0b0b12] text-white">
     <div class="mx-auto max-w-3xl px-6 py-12">
       <header class="mb-8">
-        <h1 class="text-3xl font-black tracking-tight">Terms of Service</h1>
-        <p class="mt-2 text-sm text-white/60">
-          Last updated: {{ lastUpdated }}
+        <h1 class="text-3xl font-black tracking-tight">{{ $t("auto.k_a96add92") }}</h1>
+        <p class="mt-2 text-sm text-white/60"> {{ $t("auto.k_50ebf3c0") }} {{ lastUpdated }}
         </p>
       </header>
 
       <section class="space-y-4 text-sm leading-7 text-white/80">
-        <p>
-          By using VibeCity, you agree to follow these terms. If you do not agree,
-          please stop using the service.
-        </p>
+        <p> {{ $t("auto.k_5add91b6") }} </p>
 
-        <h2 class="pt-4 text-lg font-bold text-white">Use of the Service</h2>
+        <h2 class="pt-4 text-lg font-bold text-white">{{ $t("auto.k_2db921dd") }}</h2>
         <ul class="list-disc pl-5 space-y-2">
-          <li>Use VibeCity for lawful purposes only.</li>
-          <li>Do not attempt to disrupt or reverse engineer the platform.</li>
-          <li>Respect other users and venue operators.</li>
+          <li>{{ $t("auto.k_7b8823a2") }}</li>
+          <li>{{ $t("auto.k_5d460f6c") }}</li>
+          <li>{{ $t("auto.k_6d9a8252") }}</li>
         </ul>
 
-        <h2 class="pt-4 text-lg font-bold text-white">Content and Data</h2>
-        <p>
-          Venue information may change over time. We do our best to keep listings
-          accurate, but do not guarantee completeness or accuracy.
-        </p>
+        <h2 class="pt-4 text-lg font-bold text-white">{{ $t("auto.k_edde78dd") }}</h2>
+        <p> {{ $t("auto.k_b6e07d23") }} </p>
 
         <h2 class="pt-4 text-lg font-bold text-white">Availability</h2>
-        <p>
-          We may update, suspend, or discontinue parts of the service at any time.
-          We are not liable for interruptions beyond our control.
-        </p>
+        <p> {{ $t("auto.k_cc68d8c7") }} </p>
 
         <h2 class="pt-4 text-lg font-bold text-white">Liability</h2>
-        <p>
-          VibeCity is provided "as is." We are not responsible for losses resulting
-          from reliance on venue information, availability, or third-party services.
-        </p>
+        <p> {{ $t("auto.k_96fed72c") }} </p>
 
         <h2 class="pt-4 text-lg font-bold text-white">Contact</h2>
-        <p>
-          If you have questions about these terms, contact the VibeCity team.
-        </p>
+        <p> {{ $t("auto.k_590d86fa") }} </p>
       </section>
     </div>
   </main>

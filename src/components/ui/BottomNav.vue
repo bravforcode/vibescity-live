@@ -74,7 +74,7 @@ const getBadgeCount = (tabId) => {
         <!-- Active indicator -->
         <div
           v-if="activeTab === tab.id"
-          class="absolute -top-0.5 w-12 h-1 rounded-full bg-gradient-to-r from-purple-500 via-pink-500 to-red-500"
+          class="absolute -top-0.5 w-12 h-1 rounded-full bg-gradient-to-r from-cyan-500 via-pink-500 to-red-500"
         />
 
         <!-- Icon with animation -->
@@ -93,7 +93,7 @@ const getBadgeCount = (tabId) => {
           :class="[
             'text-[10px] font-bold mt-0.5 uppercase tracking-wide',
             activeTab === tab.id
-              ? 'text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400'
+              ? 'text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-pink-400'
               : isDarkMode
                 ? 'text-white/50'
                 : 'text-gray-500',

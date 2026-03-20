@@ -8,14 +8,14 @@
     aria-labelledby="add-shop-title"
   >
     <div
-      class="bg-gray-900 border border-purple-500/30 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl relative"
+      class="bg-gray-900 border border-cyan-500/30 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl relative"
     >
       <!-- Header -->
       <div
-        class="p-4 border-b border-white/10 flex justify-between items-center bg-gradient-to-r from-purple-900/50 to-blue-900/50"
+        class="p-4 border-b border-white/10 flex justify-between items-center bg-gradient-to-r from-cyan-900/50 to-blue-900/50"
       >
         <div class="flex items-center gap-2">
-          <component :is="MapPin" class="w-5 h-5 text-purple-400" />
+          <component :is="MapPin" class="w-5 h-5 text-cyan-400" />
           <h2 id="add-shop-title" class="text-lg font-bold text-white">{{ t("ugc.add_place") }}</h2>
         </div>
         <button
@@ -59,7 +59,7 @@
                 type="text"
                 maxlength="200"
                 :placeholder="t('ugc.place_name_placeholder')"
-                class="w-full bg-black/40 border rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:border-purple-500 focus:focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 transition"
+                class="w-full bg-black/40 border rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:border-cyan-500 focus:focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 transition"
                 :class="touched.name && errors.name ? 'border-red-500' : 'border-white/10'"
                 @blur="touch('name')"
               />
@@ -72,7 +72,7 @@
                 <label class="block text-xs font-medium text-gray-400 mb-1">{{ t("ugc.category") }}</label>
                 <select
                   v-model="form.category"
-                  class="w-full bg-black/40 border rounded-lg px-4 py-2 text-white focus:border-purple-500 focus:focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 transition"
+                  class="w-full bg-black/40 border rounded-lg px-4 py-2 text-white focus:border-cyan-500 focus:focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 transition"
                   :class="touched.category && errors.category ? 'border-red-500' : 'border-white/10'"
                   @change="touch('category')"
                   @blur="touch('category')"
@@ -95,7 +95,7 @@
                   v-model="form.province"
                   type="text"
                   :placeholder="t('ugc.province_placeholder')"
-                  class="w-full bg-black/40 border rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:border-purple-500 focus:focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 transition"
+                  class="w-full bg-black/40 border rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:border-cyan-500 focus:focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 transition"
                   :class="touched.province && errors.province ? 'border-red-500' : 'border-white/10'"
                   @blur="touch('province')"
                 />
@@ -113,7 +113,7 @@
                 <span>📍 {{ currentLocationText }}</span>
                 <button
                   @click="getCurrentLocation"
-                  class="text-purple-400 hover:text-purple-300 text-xs font-bold flex items-center gap-1"
+                  class="text-cyan-400 hover:text-cyan-300 text-xs font-bold flex items-center gap-1"
                 >
                   <component :is="Crosshair" class="w-3 h-3" /> {{ t("ugc.detect") }}
                 </button>
@@ -129,7 +129,7 @@
                 v-model="form.imageUrl"
                 type="text"
                 placeholder="https://..."
-                class="w-full bg-black/40 border rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:border-purple-500 focus:focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 transition"
+                class="w-full bg-black/40 border rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:border-cyan-500 focus:focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 transition"
                 :class="touched.imageUrl && errors.imageUrl ? 'border-red-500' : 'border-white/10'"
                 @blur="touch('imageUrl')"
               />
@@ -149,7 +149,7 @@
           <button :aria-label="$t('a11y.action')"
             @click="submit"
             :disabled="loading || !isFormValid"
-            class="flex-1 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold hover:shadow-lg hover:shadow-purple-500/20 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            class="flex-1 px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-bold hover:shadow-lg hover:shadow-cyan-500/20 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             <span v-if="loading" class="animate-spin">⏳</span>
             <span v-else>{{ t("ugc.submit") }}</span>
@@ -166,6 +166,7 @@ import { storeToRefs } from "pinia";
 import { computed, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useNotifications } from "@/composables/useNotifications";
+import { runCommitMutation } from "@/composables/useOptimisticUpdate";
 import { Z } from "@/constants/zIndex";
 import { useUserStore } from "@/store/userStore";
 import { supabase } from "../../lib/supabase";
@@ -173,7 +174,7 @@ import { supabase } from "../../lib/supabase";
 const { t } = useI18n();
 const userStore = useUserStore();
 const { isAuthenticated, userId } = storeToRefs(userStore);
-const { notifySuccess, notifyError } = useNotifications();
+const { notify, notifySuccess, notifyError } = useNotifications();
 
 const REWARD_CONFIG = { coins: 50, xp: 100 };
 
@@ -280,36 +281,44 @@ const submit = async () => {
 	loading.value = true;
 
 	try {
-		const { error } = await supabase
-			.from("user_submissions")
-			.insert([
-				{
-					user_id: userId.value,
-					shop_name: form.value.name.trim(),
-					category: form.value.category,
-					latitude: form.value.lat,
-					longitude: form.value.lng,
-					province: form.value.province.trim(),
-					image_url: form.value.imageUrl.trim() || null,
-					status: "PENDING",
-				},
-			])
-			.select();
+		await runCommitMutation({
+			commit: async () => {
+				const { error } = await supabase
+					.from("user_submissions")
+					.insert([
+						{
+							user_id: userId.value,
+							shop_name: form.value.name.trim(),
+							category: form.value.category,
+							latitude: form.value.lat,
+							longitude: form.value.lng,
+							province: form.value.province.trim(),
+							image_url: form.value.imageUrl.trim() || null,
+							status: "PENDING",
+						},
+					])
+					.select();
 
-		if (error) throw error;
-
-		notifySuccess(
-			t("ugc.submit_success", {
-				coins: REWARD_CONFIG.coins,
-				xp: REWARD_CONFIG.xp,
-			}),
-		);
-		resetForm();
-		emit("success");
-		close();
-	} catch (err) {
-		console.error(err);
-		notifyError(t("ugc.error_submit", { message: err.message }));
+				if (error) throw error;
+				return true;
+			},
+			onSuccess: () => {
+				notifySuccess(
+					t("ugc.submit_success", {
+						coins: REWARD_CONFIG.coins,
+						xp: REWARD_CONFIG.xp,
+					}),
+				);
+				resetForm();
+				emit("success");
+				close();
+			},
+			notify,
+			errorMessage: (err) =>
+				t("ugc.error_submit", {
+					message: err?.message || "Unknown error",
+				}),
+		});
 	} finally {
 		loading.value = false;
 	}

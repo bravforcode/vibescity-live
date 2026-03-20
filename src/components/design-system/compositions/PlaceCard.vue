@@ -126,7 +126,7 @@
         <div class="flex justify-between items-start mb-6">
           <div>
             <h1 class="text-2xl font-bold text-white mb-1">{{ shop.name }}</h1>
-            <p class="text-text-muted text-sm">Open 17:00 - 02:00 • $$</p>
+            <p class="text-text-muted text-sm">{{ $t("auto.k_b017cdca") }}</p>
           </div>
           <ActionBtn
             variant="primary"
@@ -148,9 +148,9 @@
           </h3>
           <div class="grid grid-cols-2 gap-3">
             <div class="p-4 rounded-xl bg-surface-test border border-white/5">
-              <div class="text-vibe-purple mb-2"><Music class="w-5 h-5" /></div>
-              <div class="text-sm font-bold text-white">Live Jazz</div>
-              <div class="text-xs text-text-muted">Tonight 9 PM</div>
+              <div class="text-vibe-cyan mb-2"><Music class="w-5 h-5" /></div>
+              <div class="text-sm font-bold text-white">{{ $t("auto.k_f80380f8") }}</div>
+              <div class="text-xs text-text-muted">{{ $t("auto.k_562ac6b0") }}</div>
             </div>
             <div class="p-4 rounded-xl bg-surface-test border border-white/5">
               <div class="text-vibe-pink mb-2"><Star class="w-5 h-5" /></div>
@@ -162,7 +162,7 @@
 
         <div class="mt-8 text-center">
           <ActionBtn variant="secondary" block @click="$emit('collapse')"
-            >Close Details</ActionBtn
+            >{{ $t("auto.k_83c2a1") }}</ActionBtn
           >
         </div>
       </div>

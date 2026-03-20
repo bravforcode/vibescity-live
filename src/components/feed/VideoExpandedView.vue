@@ -42,7 +42,7 @@ const emit = defineEmits([
       >
         <track kind="captions" />
       </video>
-      <img
+      <img loading="lazy"
         v-else-if="shop.Image_URL1"
         :src="shop.Image_URL1"
         :alt="shop.name"
@@ -50,7 +50,7 @@ const emit = defineEmits([
       />
       <div
         v-else
-        class="w-full h-full bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600"
+        class="w-full h-full bg-gradient-to-br from-blue-600 via-cyan-600 to-pink-600"
       ></div>
     </div>
 
@@ -63,7 +63,7 @@ const emit = defineEmits([
     <button
       @click="emit('close')"
       class="premium-button absolute top-28 right-4 px-4 py-2 rounded-full glass-button flex items-center gap-2 text-white z-[100] hover:scale-105 active:scale-95 transition-transform duration-300 ease-out shadow-xl font-bold text-xs uppercase tracking-widest border border-white/20 bg-black/40 backdrop-blur-md"
-      aria-label="Go back"
+      :aria-label="$t('auto.k_628e5a9e')"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -104,8 +104,7 @@ const emit = defineEmits([
           class="text-sm text-white/70 flex items-center gap-1.5 font-medium"
         >
           <MapPin class="w-4 h-4" />
-          {{ shop.distance.toFixed(1) }}km away
-        </span>
+          {{ shop.distance.toFixed(1) }}{{ $t("auto.k_915a78c1") }} </span>
       </div>
     </div>
 
@@ -150,9 +149,7 @@ const emit = defineEmits([
     >
       <h3
         class="px-4 mb-2 text-xs font-bold text-white/60 uppercase tracking-widest"
-      >
-        More Places Nearby
-      </h3>
+      > {{ $t("auto.k_198d36ab") }} </h3>
       <div
         class="flex gap-3 px-4 overflow-x-auto no-scrollbar snap-x snap-mandatory"
         style="-webkit-overflow-scrolling: touch"
@@ -170,7 +167,7 @@ const emit = defineEmits([
               : 'border-white/20 opacity-80 hover:opacity-100'
           "
         >
-          <img
+          <img loading="lazy"
             v-if="s.Image_URL1"
             :src="s.Image_URL1"
             :alt="s.name"
@@ -178,7 +175,7 @@ const emit = defineEmits([
           />
           <div
             v-else
-            class="w-full h-full bg-gradient-to-br from-purple-500/30 to-pink-500/30 flex items-center justify-center"
+            class="w-full h-full bg-gradient-to-br from-cyan-500/30 to-pink-500/30 flex items-center justify-center"
           >
             <span class="text-2xl">🏪</span>
           </div>

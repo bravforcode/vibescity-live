@@ -2,24 +2,24 @@
   <div class="admin-data-table flex flex-col gap-4 w-full">
     <!-- Controls bar -->
     <div class="flex flex-wrap items-center gap-3 w-full">
-      <input
+      <input :aria-label="$t('a11y.input_field')"
         v-if="searchable"
         v-model="searchQuery"
         type="search"
         :placeholder="searchPlaceholder"
-        class="flex-1 min-w-[200px] bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+        class="flex-1 min-w-[200px] bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
         @input="debouncedFetch"
       />
 
       <select
         v-model="currentPageSize"
-        class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+        class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
         @change="fetchData"
       >
-        <option :value="10">10 rows</option>
-        <option :value="25">25 rows</option>
-        <option :value="50">50 rows</option>
-        <option :value="100">100 rows</option>
+        <option :value="10">{{ $t("auto.k_79c008c1") }}</option>
+        <option :value="25">{{ $t("auto.k_540fba15") }}</option>
+        <option :value="50">{{ $t("auto.k_d3680715") }}</option>
+        <option :value="100">{{ $t("auto.k_7ee77d39") }}</option>
       </select>
 
       <button
@@ -42,9 +42,7 @@
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7 10 12 15 17 10" />
             <line x1="12" x2="12" y1="15" y2="3" />
-          </svg>
-          Export CSV
-        </div>
+          </svg> {{ $t("auto.k_1f58f993") }} </div>
       </button>
 
       <slot name="controls" />
@@ -82,9 +80,7 @@
           fill="currentColor"
           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
         ></path>
-      </svg>
-      Loading data...
-    </div>
+      </svg> {{ $t("auto.k_4bb0489") }} </div>
 
     <div
       v-else-if="error"
@@ -119,9 +115,7 @@
     <div
       v-else-if="rows.length === 0"
       class="flex items-center justify-center p-12 text-slate-500 bg-slate-800 rounded-xl border border-slate-700 min-h-[300px]"
-    >
-      No data found.
-    </div>
+    > {{ $t("auto.k_79e652d8") }} </div>
 
     <!-- Table -->
     <div
@@ -258,7 +252,7 @@
           class="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           :disabled="currentPage <= 1"
           @click="goPage(1)"
-          title="First Page"
+          :title="$t('auto.k_51262088')"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -279,7 +273,7 @@
           class="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           :disabled="currentPage <= 1"
           @click="goPage(currentPage - 1)"
-          title="Previous Page"
+          :title="$t('auto.k_337dd783')"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -306,7 +300,7 @@
           class="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           :disabled="currentPage >= totalPages"
           @click="goPage(currentPage + 1)"
-          title="Next Page"
+          :title="$t('auto.k_8a797c3')"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -326,7 +320,7 @@
           class="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           :disabled="currentPage >= totalPages"
           @click="goPage(totalPages)"
-          title="Last Page"
+          :title="$t('auto.k_185a210')"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"

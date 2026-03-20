@@ -144,14 +144,17 @@ const liveCount = computed(() => {
 	return props.shops.filter((s) => s.status === "LIVE").length;
 });
 
+const totalCount = computed(() => props.shops.length);
+
 defineExpose({ scrollToShop });
 </script>
 
 <template>
+  <!-- aria-label -->
   <div
     ref="panelRef"
     :class="[
-      'video-panel h-full overflow-y-auto border-l',
+      'video-panel h-full overflow-y-auto border-l scroll-smooth',
       isDarkMode
         ? 'bg-zinc-950/95 backdrop-blur-xl border-white/10'
         : 'bg-white/95 backdrop-blur-xl border-gray-200',
@@ -161,33 +164,51 @@ defineExpose({ scrollToShop });
     <!-- Header -->
     <div
       :class="[
-        'sticky z-20 border-b p-4 backdrop-blur-xl',
+        'sticky z-20 border-b px-4 py-4 backdrop-blur-xl lg:px-5',
         isDarkMode
           ? 'bg-gradient-to-r from-zinc-950/95 to-zinc-900/95 border-white/10'
           : 'bg-white/95 border-gray-200',
       ]"
       :style="{ top: `${Math.max(0, stickyTop)}px` }"
     >
-      <div class="flex min-h-[44px] items-center justify-between">
-        <h2
-          :class="[
-            'text-lg font-black tracking-tight',
-            isDarkMode ? 'text-white' : 'text-gray-900',
-          ]"
-        >
-          {{ t("nav.vibes_now") || "Vibes Now" }}
-        </h2>
-        <div class="flex items-center gap-2">
-          <div class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-          <span class="text-xs text-red-500 font-semibold">
-            {{ liveCount }} {{ t("status.live") }}
-          </span>
+      <div class="space-y-3">
+        <div class="flex min-h-[44px] items-center justify-between gap-3">
+          <div class="min-w-0">
+            <h2
+              :class="[
+                'text-lg font-black tracking-tight',
+                isDarkMode ? 'text-white' : 'text-gray-900',
+              ]"
+            >
+              {{ t("nav.vibes_now") || "Vibes Now" }}
+            </h2>
+            <p
+              :class="[
+                'mt-1 text-[11px] font-medium tracking-wide',
+                isDarkMode ? 'text-white/45' : 'text-gray-500',
+              ]"
+            >
+              {{ totalCount }}
+            </p>
+          </div>
+          <div class="flex shrink-0 items-center gap-2 rounded-full border border-red-400/20 bg-red-500/10 px-3 py-1.5">
+            <div class="h-2 w-2 rounded-full bg-red-500 animate-pulse"></div>
+            <span class="text-xs font-semibold text-red-400">
+              {{ liveCount }} {{ t("status.live") }}
+            </span>
+          </div>
         </div>
+        <span
+          :class="[
+            'block h-px w-full bg-gradient-to-r from-transparent via-current/25 to-transparent',
+            isDarkMode ? 'text-cyan-300/65' : 'text-cyan-700/70',
+          ]"
+        ></span>
       </div>
     </div>
 
     <!-- Shop Cards List -->
-    <div class="p-3 space-y-3">
+    <div class="space-y-4 p-4 lg:space-y-3 lg:p-5">
       <div
         v-for="shop in shops"
         :key="shop.id"
@@ -203,6 +224,7 @@ defineExpose({ scrollToShop });
           :isActive="activeShopId === shop.id"
           :isDarkMode="isDarkMode"
           :favorites="favorites"
+          layout-mode="desktop-rail"
           @click="emit('select-shop', shop)"
           @open-detail="emit('open-detail', shop)"
           @hover="handleCardHover"

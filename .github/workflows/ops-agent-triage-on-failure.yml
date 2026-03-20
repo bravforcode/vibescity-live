@@ -1,0 +1,116 @@
+name: Ops Agent Workflow Failure Triage
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+      - Playwright Tests (Manual)
+      - Synthetic Postdeploy Monitor
+      - Weekly Quality Trend
+      - Monthly Quality Trend
+      - Security Gates
+      - i18n Autopilot
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  triage-failure:
+    if: ${{ github.event.workflow_run.conclusion != 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile || bun install
+
+      - name: Materialize workflow_run payload
+        env:
+          WF_NAME: ${{ github.event.workflow_run.name }}
+          WF_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          WF_ID: ${{ github.event.workflow_run.id }}
+          WF_HTML_URL: ${{ github.event.workflow_run.html_url }}
+          WF_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          WF_EVENT: ${{ github.event.workflow_run.event }}
+        run: |
+          mkdir -p tmp
+          node - <<'NODE'
+          const fs = require('fs');
+          const payload = {
+            workflow_name: process.env.WF_NAME,
+            conclusion: process.env.WF_CONCLUSION,
+            run_id: process.env.WF_ID,
+            html_url: process.env.WF_HTML_URL,
+            head_branch: process.env.WF_HEAD_BRANCH,
+            event: process.env.WF_EVENT
+          };
+          fs.writeFileSync('tmp/ops-workflow-run.json', JSON.stringify(payload, null, 2));
+          NODE
+
+      - name: Triage failed workflow
+        id: triage
+        run: |
+          node scripts/agents/triage-cycle.mjs \
+            --trigger workflow_failure \
+            --workflow "${{ github.event.workflow_run.name }}" \
+            --source "workflow_run:${{ github.event.workflow_run.id }}" \
+            --conclusion "${{ github.event.workflow_run.conclusion }}" \
+            --input tmp/ops-workflow-run.json
+
+      - name: Build approval packet
+        id: approval
+        if: ${{ steps.triage.outputs.approval_required == 'true' }}
+        run: node scripts/agents/build-approval-packet.mjs --report "${{ steps.triage.outputs.report_path }}"
+
+      - name: Auto safe remediation
+        id: remediate
+        if: ${{ steps.triage.outputs.auto_remediation_eligible == 'true' }}
+        run: node scripts/agents/safe-remediate.mjs --report "${{ steps.triage.outputs.report_path }}" --execute
+
+      - name: Publish triage report
+        if: ${{ steps.triage.outputs.report_path != '' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/agents/publish-agent-report.mjs --report "${{ steps.triage.outputs.report_path }}"
+
+      - name: Publish remediation report
+        if: ${{ steps.remediate.outputs.remediation_report_path != '' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/agents/publish-agent-report.mjs --report "${{ steps.remediate.outputs.remediation_report_path }}"
+
+      - name: Publish approval packet
+        if: ${{ steps.approval.outputs.approval_packet_path != '' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/agents/publish-agent-report.mjs --report "${{ steps.approval.outputs.approval_packet_path }}"
+
+      - name: Upload agent reports
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ops-agent-triage-reports
+          path: reports/agents
+          retention-days: 14
+          if-no-files-found: ignore

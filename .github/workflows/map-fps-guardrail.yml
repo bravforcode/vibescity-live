@@ -1,0 +1,100 @@
+name: Map FPS Guardrail
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  map-fps-guardrail:
+    name: map-fps-guardrail
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright browsers (chromium + webkit)
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Build app for benchmark
+        env:
+          VITE_MAPBOX_TOKEN: ${{ secrets.MAPBOX_PUBLIC_TOKEN }}
+        run: npm run build -- --env-mode e2e
+
+      - name: Start preview server
+        env:
+          VITE_MAPBOX_TOKEN: ${{ secrets.MAPBOX_PUBLIC_TOKEN }}
+        run: |
+          npm run preview -- --env-mode e2e --host 0.0.0.0 --port 5808 &
+          echo $! > /tmp/vibecity_preview.pid
+
+      - name: Wait for preview server
+        run: |
+          echo "Waiting for http://127.0.0.1:5808 ..."
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:5808/ > /dev/null 2>&1; then
+              echo "Preview server is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Preview server did not become ready in time"
+          exit 1
+
+      - name: Run mobile FPS benchmark matrix
+        env:
+          MAP_FPS_BENCHMARK_URL: "http://127.0.0.1:5808"
+          MAP_FPS_DURATION_MS: "12000"
+          MAP_FPS_WARMUP_MS: "3500"
+          MAP_FPS_PROFILES: "android"
+          MAP_FPS_SCENARIOS: "baseline,thermal-high,network-3g"
+        run: node scripts/performance/run-mobile-fps-benchmark.mjs --output reports/performance/map-fps-benchmark.json
+
+      - name: Enforce p95 FPS guardrail (fail gate)
+        env:
+          MAP_FPS_GUARDRAIL_PROFILE: synthetic_headless
+        run: node scripts/ci/check-map-fps-guardrail.mjs --input reports/performance/map-fps-benchmark.json
+
+      - name: Enforce perf budget (changed-route hard fail compatible)
+        env:
+          PERF_MAP_PROFILE: synthetic_headless
+        run: node scripts/ci/check-perf-budget.mjs --budget perf-budget.json --map-report reports/performance/map-fps-benchmark.json
+
+      - name: Add step summary
+        if: always()
+        run: |
+          if [ -f reports/ci/map-fps-guardrail-summary.md ]; then
+            cat reports/ci/map-fps-guardrail-summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Map FPS summary was not generated." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload benchmark artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: map-fps-guardrail-${{ github.run_id }}
+          path: |
+            reports/performance/map-fps-benchmark.json
+            reports/ci/map-fps-guardrail-summary.md
+            reports/ci/map-fps-guardrail-summary.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Stop preview server
+        if: always()
+        run: |
+          if [ -f /tmp/vibecity_preview.pid ]; then
+            kill $(cat /tmp/vibecity_preview.pid) || true
+          fi

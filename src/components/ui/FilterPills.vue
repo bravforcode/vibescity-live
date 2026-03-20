@@ -27,16 +27,14 @@ const clearAll = () => emit("update:selected", []);
 </script>
 
 <template>
-  <div class="filter-pills-bar" role="toolbar" aria-label="Quick filters">
+  <div class="filter-pills-bar" role="toolbar" :aria-label="$t('auto.k_48d93d9f')">
     <div class="pills-scroll scrollbar-hide">
       <!-- Reset / All chip -->
       <button
         :class="['pill-chip', { 'pill-active': selected.length === 0 }]"
         @click="clearAll"
-        aria-label="Show all"
-      >
-        🌐 All
-      </button>
+        :aria-label="$t('auto.k_4c83daf')"
+      > {{ $t("auto.k_89bbea16") }} </button>
 
       <!-- Category chips -->
       <button
@@ -49,10 +47,10 @@ const clearAll = () => emit("update:selected", []);
         <component
           :is="cat.icon"
           class="pill-icon"
-          :class="selectedSet.has(cat.id) ? 'text-purple-300' : 'text-white/50'"
+          :class="selectedSet.has(cat.id) ? 'text-cyan-300' : 'text-white/50'"
           aria-hidden="true"
         />
-        <span>{{ cat.label }}</span>
+        <span>{{ t(cat.label) }}</span>
       </button>
     </div>
   </div>

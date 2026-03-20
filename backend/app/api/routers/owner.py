@@ -77,6 +77,16 @@ def _image_present(row: dict) -> bool:
     return bool(row.get("Image_URL1"))
 
 
+def _first_image(row: dict) -> str | None:
+    image_urls = row.get("image_urls")
+    if isinstance(image_urls, list):
+        for value in image_urls:
+            if value:
+                return str(value)
+    legacy = row.get("Image_URL1")
+    return str(legacy) if legacy else None
+
+
 def _compute_completeness(row: dict) -> dict:
     checks = {
         "category": bool(row.get("category")),
@@ -100,7 +110,7 @@ async def _fetch_owned_venues(visitor_id: str, limit: int = 200) -> list[dict]:
     query = (
         client.table("venues")
         .select(
-            'id,name,category,status,total_views,view_count,rating,pin_type,image_urls,"Image_URL1",open_time,social_links,updated_at,created_at,verified_until,glow_until,boost_until,giant_until,owner_visitor_id'
+            "id,name,category,status,total_views,view_count,rating,pin_type,image_urls,open_time,social_links,updated_at,created_at,verified_until,glow_until,boost_until,giant_until,owner_visitor_id"
         )
         .eq("owner_visitor_id", visitor_id)
         .order("updated_at", desc=True)
@@ -273,8 +283,7 @@ async def get_owner_venues(
                     row.get("total_views"), _safe_int(row.get("view_count"), 0)
                 ),
                 "pin_type": row.get("pin_type"),
-                "image": row.get("Image_URL1")
-                or ((row.get("image_urls") or [None])[0]),
+                "image": _first_image(row),
                 "updated_at": row.get("updated_at"),
                 "created_at": row.get("created_at"),
                 "verified_until": row.get("verified_until"),

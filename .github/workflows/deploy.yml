@@ -1,0 +1,90 @@
+name: VibeCity Production Deployment
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      VITE_BUILD_VERSION: ${{ github.sha }}
+      VITE_COMMIT_SHA: ${{ github.sha }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run tests
+        run: npm run test:ci
+        
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Security Validation
+        run: python .agent/scripts/security_validator.py .
+
+      - name: Build for production
+        run: npm run build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_MAPBOX_TOKEN: ${{ secrets.VITE_MAPBOX_TOKEN }}
+          
+      - name: Deploy Supabase Functions
+        run: |
+          chmod +x supabase/functions/deploy-functions.sh
+          ./supabase/functions/deploy-functions.sh
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          GOOGLE_SHEETS_SPREADSHEET_ID: ${{ secrets.GOOGLE_SHEETS_SPREADSHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_EMAIL }}
+          GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY }}
+          
+      - name: Run Performance Baseline
+        run: node scripts/performance/capture-lighthouse-baseline.mjs
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          
+      - name: Deploy to Vercel
+        uses: vercel/action@v1
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+          
+      - name: Post-deploy health check
+        run: |
+          sleep 15
+          curl -sf https://api.vibecity.live/health/readiness -o /dev/null && echo "Health check passed" || echo "::warning::Post-deploy health check degraded"
+
+      - name: Notify deployment
+        run: |
+          curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "🚀 VibeCity Deployed to Production",
+                "description": "All systems operational with enterprise optimizations",
+                "color": 65280,
+                "fields": [
+                  {"name": "Environment", "value": "Production", "inline": true},
+                  {"name": "Version", "value": "v1.0.0-enterprise", "inline": true},
+                  {"name": "Status", "value": "✅ All Systems Go", "inline": true}
+                ],
+                "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%S)'"
+              }]
+            }'

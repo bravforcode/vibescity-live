@@ -78,7 +78,7 @@ export function useMomentumTear(overscrollY, itemCount) {
 	const applyStretch = (os) => {
 		if (!os || Math.abs(os) < 2) {
 			// Release: springs return to rest
-			springIds.forEach((id, i) => {
+			springIds.forEach((id, _i) => {
 				world.setTarget(id, 0, 0);
 			});
 			return;

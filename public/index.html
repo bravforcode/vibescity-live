@@ -8,7 +8,7 @@
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <!-- PWA & Theme Color -->
-    <meta name="theme-color" content="#8B5CF6" />
+    <meta name="theme-color" content="#0d9488" />
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/images/apple-touch-icon.png" />
     <title>VibeCity - Chiang Mai Entertainment</title>
@@ -29,7 +29,7 @@
     />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="VibeCity" />
-    <meta property="og:locale" content="th_TH" />
+    <meta property="og:locale" content="en_US" />
     <meta
       property="og:image"
       content="https://vibecity.live/api/v1/seo/og/site.png"
@@ -78,7 +78,7 @@
         position: absolute;
         top: -40px;
         left: 0;
-        background: #8b5cf6;
+        background: #0d9488;
         color: white;
         padding: 8px;
         z-index: 10000;
@@ -92,11 +92,9 @@
     <!-- Preload critical assets -->
     <link rel="preconnect" href="https://api.mapbox.com" />
     <link rel="preconnect" href="https://events.mapbox.com" importance="low" />
-    <!-- Prefetch Mapbox async chunk so it's in cache when the map route loads -->
-    <link rel="prefetch" as="script" importance="low" href="/static/js/async/mapbox.js" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Non-blocking font load: preload trick eliminates render-blocking -->
+    <!-- Keep font loading CSP-safe: avoid inline handlers in production -->
     <link
       rel="preload"
       as="style"
@@ -104,8 +102,6 @@
     />
     <link
       rel="stylesheet"
-      media="print"
-      onload="this.media='all'"
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap"
     />
     <noscript>

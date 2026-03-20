@@ -1,4 +1,5 @@
 import axios from "axios";
+import { mapDebugLog } from "./mapDebug";
 
 // Chiang Mai Inner City Bounds
 // Chiang Mai Inner City Bounds (Default Fallback)
@@ -25,7 +26,7 @@ export const fetchRoadsFromOSM = async (bounds = null) => {
 	const key = `${b.south.toFixed(3)},${b.west.toFixed(3)},${b.north.toFixed(3)},${b.east.toFixed(3)}`;
 
 	if (fetchedBoundsCache.has(key)) {
-		if (import.meta.env.DEV) console.log("✅ Area already fetched:", key);
+		mapDebugLog("✅ Area already fetched:", key);
 		return []; // Return empty to indicate "nothing new" (or handle differently)
 	}
 
@@ -44,8 +45,7 @@ export const fetchRoadsFromOSM = async (bounds = null) => {
   `;
 
 	try {
-		if (import.meta.env.DEV)
-			console.log("🌐 Fetching real roads from Overpass API...", key);
+		mapDebugLog("🌐 Fetching real roads from Overpass API...", key);
 		const response = await axios.get(OVERPASS_URL, {
 			params: { data: query },
 		});
@@ -69,8 +69,7 @@ export const fetchRoadsFromOSM = async (bounds = null) => {
 			sessionStorage.setItem("vibecity_osm_roads", JSON.stringify(routes));
 		}
 
-		if (import.meta.env.DEV)
-			console.log(`✅ Fetched ${routes.length} road segments for area`);
+		mapDebugLog(`✅ Fetched ${routes.length} road segments for area`);
 		return routes;
 	} catch (error) {
 		console.error("❌ Error fetching OSM data:", error);

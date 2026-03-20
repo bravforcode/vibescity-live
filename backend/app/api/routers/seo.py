@@ -15,7 +15,7 @@ router = APIRouter()
 
 SHORT_CODE_RE = re.compile(r"^[A-Z2-7]{7}$")
 SUPPORTED_LOCALES = {"th", "en"}
-DEFAULT_LOCALE = "th"
+DEFAULT_LOCALE = "en"
 
 
 def _normalize_locale(raw: str | None) -> str | None:
@@ -27,24 +27,10 @@ def _normalize_locale(raw: str | None) -> str | None:
     return None
 
 
-def _detect_country(request: Request) -> str:
-    return (
-        request.headers.get("x-vercel-ip-country")
-        or request.headers.get("cf-ipcountry")
-        or ""
-    ).strip().upper()
-
-
 def _detect_locale(request: Request) -> str:
     cookie_locale = _normalize_locale(request.cookies.get("vibe_locale"))
     if cookie_locale:
         return cookie_locale
-
-    country = _detect_country(request)
-    if country == "TH":
-        return "th"
-    if country:
-        return "en"
     return DEFAULT_LOCALE
 
 

@@ -88,7 +88,7 @@ const iconMap = {
 
 <template>
   <Transition name="slide-up">
-    <div
+    <div role="button" tabindex="0"
       v-if="isOpen"
       class="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm"
       @click.self="close"
@@ -109,14 +109,12 @@ const iconMap = {
             >
               <Shield class="w-5 h-5 text-red-400" aria-hidden="true" />
             </div>
-            <h2 id="safety-panel-title" class="text-lg font-bold text-white">
-              Safety Center
-            </h2>
+            <h2 id="safety-panel-title" class="text-lg font-bold text-white"> {{ $t("auto.k_ca6db4e4") }} </h2>
           </div>
           <button
             @click="close"
             class="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors active:scale-95 focus-ring"
-            aria-label="Close safety panel"
+            :aria-label="$t('auto.k_e9617329')"
           >
             <X class="w-5 h-5 text-white" />
           </button>
@@ -135,7 +133,7 @@ const iconMap = {
               <Home class="w-6 h-6" />
             </div>
             <div class="text-left flex-1">
-              <div class="text-lg font-bold">Take Me Home</div>
+              <div class="text-lg font-bold">{{ $t("auto.k_e1bc393f") }}</div>
               <div class="text-sm text-white/70">{{ homeName }}</div>
             </div>
             <Navigation class="w-5 h-5" />
@@ -144,18 +142,14 @@ const iconMap = {
             v-else
             class="p-4 rounded-2xl bg-white/5 border border-dashed border-white/20 text-center text-white/50 text-sm"
           >
-            <Home class="w-6 h-6 mx-auto mb-2 opacity-50" />
-            Home location not set yet
-          </div>
+            <Home class="w-6 h-6 mx-auto mb-2 opacity-50" /> {{ $t("auto.k_997a8a46") }} </div>
         </div>
 
         <!-- Emergency Contacts -->
         <div class="px-4 pb-2">
           <h3
             class="text-sm font-semibold text-white/60 uppercase tracking-wider mb-3"
-          >
-            Emergency Hotlines
-          </h3>
+          > {{ $t("auto.k_7a05c588") }} </h3>
           <div class="grid grid-cols-2 gap-3">
             <button
               v-for="(contact, key) in EMERGENCY_CONTACTS"
@@ -181,9 +175,7 @@ const iconMap = {
         <div class="px-4 py-3">
           <h3
             class="text-sm font-semibold text-white/60 uppercase tracking-wider mb-3"
-          >
-            Nearby Hospitals
-          </h3>
+          > {{ $t("auto.k_d0ade5bd") }} </h3>
           <div class="space-y-2">
             <button
               v-for="hospital in nearbyEmergency.hospitals"
@@ -197,8 +189,7 @@ const iconMap = {
                   {{ hospital.name }}
                 </div>
                 <div class="text-white/50 text-xs">
-                  {{ hospital.distance.toFixed(1) }} km away
-                </div>
+                  {{ hospital.distance.toFixed(1) }} {{ $t("auto.k_915a78c1") }} </div>
               </div>
               <MapPin class="w-4 h-4 text-white/40" />
             </button>
@@ -209,9 +200,7 @@ const iconMap = {
         <div class="px-4 pb-6">
           <h3
             class="text-sm font-semibold text-white/60 uppercase tracking-wider mb-3"
-          >
-            Nearby Police
-          </h3>
+          > {{ $t("auto.k_91977ef4") }} </h3>
           <div class="space-y-2">
             <button
               v-for="station in nearbyEmergency.police"
@@ -225,8 +214,7 @@ const iconMap = {
                   {{ station.name }}
                 </div>
                 <div class="text-white/50 text-xs">
-                  {{ station.distance.toFixed(1) }} km away
-                </div>
+                  {{ station.distance.toFixed(1) }} {{ $t("auto.k_915a78c1") }} </div>
               </div>
               <MapPin class="w-4 h-4 text-white/40" />
             </button>

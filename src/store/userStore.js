@@ -6,7 +6,17 @@
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 import i18n from "@/i18n.js";
+import {
+	cloneOptimisticValue,
+	runOptimisticMutation,
+} from "../composables/useOptimisticUpdate";
 import { supabase } from "../lib/supabase";
+import { logUnexpectedNetworkError } from "../utils/networkErrorUtils";
+import {
+	isSoftSupabaseReadError,
+	logUnexpectedSupabaseReadError,
+	runSupabaseReadPolicy,
+} from "../utils/supabaseReadPolicy";
 
 // Constants
 const LEVEL_THRESHOLDS = [0, 100, 300, 600, 1000, 2000, 5000];
@@ -282,17 +292,37 @@ export const useUserStore = defineStore(
 		// 👤 Profile Actions
 		// ═══════════════════════════════════════════
 		const fetchProfile = async (uid) => {
+			if (!uid) return null;
 			try {
-				const { data, error } = await supabase
-					.from("user_profiles")
-					.select("*")
-					.eq("user_id", uid)
-					.single();
+				const { data } = await runSupabaseReadPolicy({
+					resourceType: "userProfileRead",
+					run: async () => {
+						const result = await supabase
+							.from("user_profiles")
+							.select("*")
+							.eq("user_id", uid)
+							.single();
 
-				if (error && error.code !== "PGRST116") throw error;
+						if (result.error && result.error.code !== "PGRST116") {
+							throw result.error;
+						}
+
+						return result;
+					},
+				});
 				if (data) Object.assign(profile.value, data);
+				return data || null;
 			} catch (e) {
-				console.error("❌ Profile fetch failed:", e);
+				if (isSoftSupabaseReadError(e)) {
+					return null;
+				}
+				if (import.meta.env.DEV) {
+					logUnexpectedSupabaseReadError(
+						"[userStore] Profile fetch failed:",
+						e,
+					);
+				}
+				return null;
 			}
 		};
 
@@ -300,23 +330,40 @@ export const useUserStore = defineStore(
 			if (!userId.value) return { success: false };
 			const { coins, xp, level, ...profileUpdates } = updates || {};
 
-			// Optimistic update
-			const oldProfile = { ...profile.value };
-			Object.assign(profile.value, profileUpdates);
+			const result = await runOptimisticMutation({
+				capture: () => cloneOptimisticValue(profile.value),
+				applyOptimistic: () => {
+					Object.assign(profile.value, profileUpdates);
+				},
+				rollback: (snapshot) => {
+					profile.value = snapshot || cloneOptimisticValue(profile.value);
+				},
+				commit: async () => {
+					const { error } = await supabase.from("user_profiles").upsert({
+						user_id: userId.value,
+						...profileUpdates,
+						updated_at: new Date().toISOString(),
+					});
+					if (error) throw error;
+					return true;
+				},
+				reportError: import.meta.env.DEV
+					? (error) => {
+							logUnexpectedNetworkError(
+								"[userStore] Failed to update profile:",
+								error,
+							);
+						}
+					: undefined,
+				errorMessage: (error) =>
+					String(error?.message || "Failed to update profile"),
+			});
 
-			try {
-				const { error } = await supabase.from("user_profiles").upsert({
-					user_id: userId.value,
-					...profileUpdates,
-					updated_at: new Date().toISOString(),
-				});
-
-				if (error) throw error;
-				return { success: true };
-			} catch (e) {
-				profile.value = oldProfile; // Rollback
-				return { success: false, error: e.message };
+			if (!result.success) {
+				return { success: false, error: result.error };
 			}
+
+			return { success: true };
 		};
 
 		const addXP = async (amount, source = "unknown") => {
@@ -328,15 +375,22 @@ export const useUserStore = defineStore(
 
 			// Sync to DB if authenticated
 			if (userId.value) {
-				await supabase
-					.from("xp_logs")
-					.insert({
+				try {
+					const { error } = await supabase.from("xp_logs").insert({
 						user_id: userId.value,
 						amount,
 						source,
 						new_total: profile.value.xp,
-					})
-					.catch(console.error);
+					});
+					if (error) throw error;
+				} catch (error) {
+					if (import.meta.env.DEV) {
+						logUnexpectedNetworkError(
+							"[userStore] Failed to persist XP log:",
+							error,
+						);
+					}
+				}
 			}
 
 			return { leveledUp, newLevel, xpGained: amount };

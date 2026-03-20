@@ -19,6 +19,7 @@ import {
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
+import { Z } from "@/constants/zIndex";
 import { useUserPreferencesStore } from "@/store/userPreferencesStore";
 
 const props = defineProps({
@@ -68,7 +69,8 @@ const confirmClearData = () => {
     <Transition name="fade">
       <div
         v-if="isOpen"
-        class="fixed inset-0 z-[7000] flex items-end sm:items-center justify-center pointer-events-auto"
+        class="fixed inset-0 flex items-end sm:items-center justify-center pointer-events-auto"
+        :style="{ zIndex: Z.SETTINGS_PANEL }"
       >
         <!-- Backdrop -->
         <div role="button" tabindex="0"
@@ -103,7 +105,7 @@ const confirmClearData = () => {
         <!-- Visual Preset -->
         <div class="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-3">
           <div class="flex items-center gap-3">
-            <Palette class="w-5 h-5 text-fuchsia-400" />
+            <Palette class="w-5 h-5 text-cyan-400" />
             <div>
               <div class="text-sm font-bold text-white">
                 {{ t("settings.presets_title") }}
@@ -205,7 +207,7 @@ const confirmClearData = () => {
           class="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5"
         >
           <div class="flex items-center gap-3">
-            <Smartphone class="w-5 h-5 text-purple-400" />
+            <Smartphone class="w-5 h-5 text-cyan-400" />
             <div>
               <div class="text-sm font-bold text-white">
                 {{ t("settings.haptics_title") }}
@@ -430,7 +432,7 @@ const confirmClearData = () => {
           class="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5"
         >
           <div class="flex items-center gap-3">
-            <Layers class="w-5 h-5 text-violet-400" />
+            <Layers class="w-5 h-5 text-cyan-400" />
             <div>
               <div class="text-sm font-bold text-white">
                 {{ t("settings.buildings_title") }}

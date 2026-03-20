@@ -1,0 +1,78 @@
+name: Ops Agent Safe Remediation
+
+on:
+  workflow_dispatch:
+    inputs:
+      report_path:
+        description: Relative path to the triage report under reports/agents
+        required: true
+        type: string
+      pr_number:
+        description: Optional PR number to comment with remediation status
+        required: false
+        type: string
+      execute:
+        description: Execute the remediation profile instead of a dry-run artifact
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  remediate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile || bun install
+
+      - name: Execute safe remediation
+        id: remediate
+        run: |
+          CMD=(node scripts/agents/safe-remediate.mjs --report "${{ inputs.report_path }}")
+          if [ "${{ inputs.execute }}" = "true" ]; then
+            CMD+=(--execute)
+          fi
+          "${CMD[@]}"
+
+      - name: Publish remediation report
+        if: ${{ steps.remediate.outputs.remediation_report_path != '' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          INPUT_PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          CMD=(node scripts/agents/publish-agent-report.mjs --report "${{ steps.remediate.outputs.remediation_report_path }}")
+          if [ -n "${INPUT_PR_NUMBER}" ]; then
+            CMD+=(--pr "${INPUT_PR_NUMBER}")
+          fi
+          "${CMD[@]}"
+
+      - name: Upload remediation artifacts
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ops-agent-safe-remediation
+          path: |
+            reports/agents
+            tmp/i18n*.json
+            src/locales
+          retention-days: 14
+          if-no-files-found: ignore

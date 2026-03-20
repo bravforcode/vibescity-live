@@ -485,9 +485,7 @@ onUnmounted(() => {
             v-if="!localSearchQuery && !isSearchFocused"
             class="search-kbd"
             aria-hidden="true"
-          >
-            ⌘K
-          </kbd>
+          > {{ $t("auto.k_b8793dc4") }} </kbd>
 
           <!-- Clear Button -->
           <Transition name="scale-fade">
@@ -532,7 +530,7 @@ onUnmounted(() => {
             </div>
 
             <!-- Result Items -->
-            <div
+            <div tabindex="0"
               v-for="(shop, index) in sortedSearchResults"
               :key="shop.id"
               data-testid="search-result"

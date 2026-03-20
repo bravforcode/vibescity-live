@@ -20,7 +20,7 @@ const featureFlagStore = useFeatureFlagStore();
 const router = useRouter();
 const route = useRoute();
 useDashboardGuard("partner", {
-	allowVisitorFallback: false,
+	allowVisitorFallback: true,
 	strictAuth: false,
 });
 
@@ -51,7 +51,10 @@ const toggleRevenueReveal = () => {
 	if (!canRevealSensitive.value) return;
 	if (!isRevenueRevealed.value && typeof window !== "undefined") {
 		const confirmed = window.confirm(
-			"Reveal sensitive financial amount on this screen?",
+			i18n.global.t(
+				"admin.reveal_sensitive_data",
+				"Reveal sensitive financial amount on this screen?",
+			),
 		);
 		if (!confirmed) return;
 	}
@@ -641,10 +644,10 @@ onMounted(() => {
               <div class="mt-4 space-y-3">
                 <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
                   {{ $t('auto.k_ce42c7ac') }}
-                  <input
+                  <input :aria-label="$t('a11y.input_field')"
                     v-model.trim="profileForm.displayName"
                     type="text"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-white/40 outline-none focus:border-emerald-400"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:border-emerald-400"
                     :placeholder="$t('auto.k_3a0663bd')"
                     :disabled="isSavingProfile || isStartingSubscription"
                   />
@@ -652,10 +655,10 @@ onMounted(() => {
 
                 <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
                   {{ $t('auto.k_8023bef5') }}
-                  <input
+                  <input :aria-label="$t('a11y.input_field')"
                     v-model.trim="profileForm.referralCode"
                     type="text"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-white/40 outline-none focus:border-emerald-400"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:border-emerald-400"
                     :placeholder="$t('auto.k_a6c1cc8d')"
                     :disabled="isSavingProfile || isStartingSubscription"
                   />
@@ -721,7 +724,7 @@ onMounted(() => {
                   {{ $t('auto.k_d9fb161b') }}
                   <select
                     v-model="bankForm.bankCode"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:border-cyan-400"
                     :disabled="isSavingBank || isStartingSubscription"
                   >
                     <option
@@ -736,39 +739,37 @@ onMounted(() => {
 
                 <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
                   {{ $t('auto.k_993dc46f') }}
-                  <input
+                  <input :aria-label="$t('a11y.input_field')"
                     v-model.trim="bankForm.accountName"
                     type="text"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:border-cyan-400"
                     :disabled="isSavingBank || isStartingSubscription"
                   />
                 </label>
 
                 <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
                   {{ $t('auto.k_a86d4ce5') }}
-                  <input
+                  <input :aria-label="$t('a11y.input_field')"
                     v-model.trim="bankForm.accountNumber"
                     type="text"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white outline-none focus:border-cyan-400"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:border-cyan-400"
                     :disabled="isSavingBank || isStartingSubscription"
                   />
                 </label>
 
                 <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
                   {{ $t('auto.k_2315e84') }}
-                  <input
+                  <input :aria-label="$t('a11y.input_field')"
                     v-model.trim="bankForm.promptpayId"
                     type="text"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white outline-none focus:border-cyan-400"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:border-cyan-400"
                     :disabled="isSavingBank || isStartingSubscription"
                   />
                 </label>
 
-                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
-                  Bank Country
-                  <select
+                <label class="block text-xs font-bold uppercase tracking-wide text-white/60"> {{ $t("auto.k_b6068981") }} <select
                     v-model="bankForm.bankCountry"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:border-cyan-400"
                     :disabled="isSavingBank || isStartingSubscription"
                   >
                     <option
@@ -785,7 +786,7 @@ onMounted(() => {
                   Currency
                   <select
                     v-model="bankForm.currency"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:border-cyan-400"
                     :disabled="isSavingBank || isStartingSubscription"
                   >
                     <option
@@ -798,11 +799,9 @@ onMounted(() => {
                   </select>
                 </label>
 
-                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
-                  Account Type
-                  <select
+                <label class="block text-xs font-bold uppercase tracking-wide text-white/60"> {{ $t("auto.k_918362dc") }} <select
                     v-model="bankForm.accountType"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:border-cyan-400"
                     :disabled="isSavingBank || isStartingSubscription"
                   >
                     <option value="savings">Savings</option>
@@ -812,53 +811,45 @@ onMounted(() => {
                   </select>
                 </label>
 
-                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
-                  Bank Name (International)
-                  <input
+                <label class="block text-xs font-bold uppercase tracking-wide text-white/60"> {{ $t("auto.k_62144e21") }} <input :aria-label="$t('a11y.input_field')"
                     v-model.trim="bankForm.bankName"
                     type="text"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-white/40 outline-none focus:border-cyan-400"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:border-cyan-400"
                     :placeholder="isThaiPayout ? 'Optional' : 'Required for foreign payouts'"
                     :disabled="isSavingBank || isStartingSubscription"
                   />
                 </label>
 
-                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
-                  Branch Name
-                  <input
+                <label class="block text-xs font-bold uppercase tracking-wide text-white/60"> {{ $t("auto.k_ca4e61bc") }} <input :aria-label="$t('a11y.input_field')"
                     v-model.trim="bankForm.branchName"
                     type="text"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:border-cyan-400"
                     :disabled="isSavingBank || isStartingSubscription"
                   />
                 </label>
 
-                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
-                  SWIFT Code
-                  <input
+                <label class="block text-xs font-bold uppercase tracking-wide text-white/60"> {{ $t("auto.k_da0e982d") }} <input :aria-label="$t('a11y.input_field')"
                     v-model.trim="bankForm.swiftCode"
                     type="text"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white outline-none focus:border-cyan-400"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:border-cyan-400"
                     :disabled="isSavingBank || isStartingSubscription"
                   />
                 </label>
 
                 <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
                   IBAN
-                  <input
+                  <input :aria-label="$t('a11y.input_field')"
                     v-model.trim="bankForm.iban"
                     type="text"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white outline-none focus:border-cyan-400"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:border-cyan-400"
                     :disabled="isSavingBank || isStartingSubscription"
                   />
                 </label>
 
-                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
-                  Routing Number
-                  <input
+                <label class="block text-xs font-bold uppercase tracking-wide text-white/60"> {{ $t("auto.k_a5e857ca") }} <input :aria-label="$t('a11y.input_field')"
                     v-model.trim="bankForm.routingNumber"
                     type="text"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white outline-none focus:border-cyan-400"
+                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:border-cyan-400"
                     :disabled="isSavingBank || isStartingSubscription"
                   />
                 </label>

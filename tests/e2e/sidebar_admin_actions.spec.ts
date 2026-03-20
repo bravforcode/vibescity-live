@@ -2,25 +2,29 @@ import { expect, test } from "@playwright/test";
 
 const openSidebar = async (page: import("@playwright/test").Page) => {
 	const menuButton = page.getByTestId("btn-menu").first();
-	const visible = await menuButton.isVisible({ timeout: 15_000 }).catch(() => false);
+	const visible = await menuButton
+		.isVisible({ timeout: 15_000 })
+		.catch(() => false);
 	if (!visible) {
 		test.skip(true, "Sidebar menu button is not visible in this environment.");
 		return false;
 	}
 	await menuButton.click();
-	await expect(page.locator('[role="dialog"][aria-modal="true"]')).toBeVisible();
+	await expect(
+		page.locator('[role="dialog"][aria-modal="true"]'),
+	).toBeVisible();
 	return true;
 };
 
 test.describe("Sidebar and Settings actions", { tag: "@smoke" }, () => {
-	test("sidebar exposes a real logout action", async ({ page }) => {
+	test("sidebar exposes a real settings action", async ({ page }) => {
 		await page.goto("/", { waitUntil: "domcontentloaded" });
 		const opened = await openSidebar(page);
 		if (!opened) return;
 
-		const logoutButton = page.getByTestId("sidebar-logout").first();
-		await expect(logoutButton).toBeVisible();
-		await expect(logoutButton).toBeEnabled();
+		const settingsButton = page.getByTestId("sidebar-open-settings").first();
+		await expect(settingsButton).toBeVisible();
+		await expect(settingsButton).toBeEnabled();
 	});
 
 	test("clear data uses in-app confirm dialog (not browser confirm)", async ({

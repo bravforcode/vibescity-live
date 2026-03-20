@@ -1,0 +1,102 @@
+name: Ops Agent High Risk Review
+
+on:
+  workflow_dispatch:
+    inputs:
+      report_path:
+        description: Relative path to the high-risk triage report under reports/agents
+        required: true
+        type: string
+      pr_number:
+        description: Optional PR number to comment with approval review status
+        required: false
+        type: string
+      approval_token:
+        description: Approval token from the generated approval packet
+        required: true
+        type: string
+      execute:
+        description: Unlock the execution path after token verification
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile || bun install
+
+      - name: Rebuild approval packet
+        id: packet
+        run: node scripts/agents/build-approval-packet.mjs --report "${{ inputs.report_path }}"
+
+      - name: Publish approval packet
+        if: ${{ steps.packet.outputs.approval_packet_path != '' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          INPUT_PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          CMD=(node scripts/agents/publish-agent-report.mjs --report "${{ steps.packet.outputs.approval_packet_path }}")
+          if [ -n "${INPUT_PR_NUMBER}" ]; then
+            CMD+=(--pr "${INPUT_PR_NUMBER}")
+          fi
+          "${CMD[@]}"
+
+      - name: Verify approval token
+        env:
+          PACKET_PATH: ${{ steps.packet.outputs.approval_packet_path }}
+          APPROVAL_TOKEN: ${{ inputs.approval_token }}
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const packetPath = process.env.PACKET_PATH;
+          const approvalToken = process.env.APPROVAL_TOKEN;
+          const packet = JSON.parse(fs.readFileSync(packetPath, 'utf8'));
+          if (packet.approval_token !== approvalToken) {
+            console.error(`Approval token mismatch for ${packet.event_id}`);
+            process.exit(1);
+          }
+          console.log(`Approval token verified for ${packet.event_id}`);
+          NODE
+
+      - name: Record approval result
+        run: |
+          {
+            echo "## Ops High-Risk Review"
+            echo "- Report: ${{ inputs.report_path }}"
+            echo "- Approval token: verified"
+            echo "- Execute flag: ${{ inputs.execute }}"
+            echo "- Outcome: execution path unlocked"
+            echo "- Note: privileged changes remain human-initiated in v1; use the approval packet as the exact action list."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload approval artifacts
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ops-agent-high-risk-review
+          path: reports/agents
+          retention-days: 14
+          if-no-files-found: ignore

@@ -44,7 +44,7 @@ export function useMapInteractions(
 		const shopData = { ...feature.properties };
 		const pulseColor =
 			shopData.pin_type === "giant"
-				? "#a855f7"
+				? "#06b6d4"
 				: shopData.boost
 					? "#ef4444"
 					: "#60a5fa";
@@ -82,6 +82,19 @@ export function useMapInteractions(
 		// Signal manual pin tap to sentient map
 		if (typeof options.onPinTap === "function") {
 			options.onPinTap();
+		}
+
+		const aggregateLevel = String(
+			feature?.properties?.aggregate_level ?? shopData?.aggregate_level ?? "",
+		).trim();
+		if (aggregateLevel && typeof options.onAggregateTap === "function") {
+			options.onAggregateTap({
+				aggregateLevel,
+				event: e,
+				feature,
+				item: resolvedShop || shopData,
+			});
+			return;
 		}
 
 		emit("select-shop", resolvedShop || shopData);

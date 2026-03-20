@@ -1,0 +1,6 @@
+# Neon Composables Directory
+
+This directory will contain Vue 3 composables for the Neon Venue Signs System:
+- useNeonColors.ts - Color management composable
+- useNeonGlow.ts - Glow effect composable
+- useNeonConfig.ts - Configuration composable

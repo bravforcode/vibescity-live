@@ -6,6 +6,11 @@
 import { defineStore } from "pinia";
 import { computed, ref, shallowRef } from "vue";
 import { supabase } from "../lib/supabase";
+import {
+	isSoftSupabaseReadError,
+	logUnexpectedSupabaseReadError,
+	runSupabaseReadPolicy,
+} from "../utils/supabaseReadPolicy";
 import { useUserStore } from "./userStore";
 
 // Presence update throttle (ms)
@@ -194,9 +199,16 @@ export const useRoomStore = defineStore("room", () => {
 	 */
 	const fetchInitialCounts = async () => {
 		try {
-			const { data } = await supabase
-				.from("venue_live_counts")
-				.select("venue_id, user_count");
+			const { data } = await runSupabaseReadPolicy({
+				resourceType: "roomCounts",
+				run: async () => {
+					const result = await supabase
+						.from("venue_live_counts")
+						.select("venue_id, user_count");
+					if (result.error) throw result.error;
+					return result;
+				},
+			});
 
 			if (data) {
 				const counts = {};
@@ -206,7 +218,15 @@ export const useRoomStore = defineStore("room", () => {
 				updateCounts(counts);
 			}
 		} catch (e) {
-			if (import.meta.env.DEV) console.error("❌ Failed to fetch counts:", e);
+			if (isSoftSupabaseReadError(e)) {
+				return;
+			}
+			if (import.meta.env.DEV) {
+				logUnexpectedSupabaseReadError(
+					"[roomStore] Failed to fetch counts:",
+					e,
+				);
+			}
 		}
 	};
 

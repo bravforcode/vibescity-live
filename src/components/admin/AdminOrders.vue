@@ -8,7 +8,7 @@
         <div class="flex items-center justify-between mb-2">
           <span
             class="text-xs font-semibold text-slate-500 uppercase tracking-wider"
-            >Total Revenue</span
+            >{{ $t("auto.k_89479fcd") }}</span
           >
           <div class="p-2 bg-emerald-500/10 rounded-lg">
             <svg
@@ -38,7 +38,7 @@
         <div class="flex items-center justify-between mb-2">
           <span
             class="text-xs font-semibold text-slate-500 uppercase tracking-wider"
-            >Paid Orders</span
+            >{{ $t("auto.k_1006084c") }}</span
           >
           <div class="p-2 bg-blue-500/10 rounded-lg">
             <svg
@@ -153,9 +153,7 @@
           class="text-blue-500"
         >
           <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-        </svg>
-        Daily Revenue Trend
-      </h3>
+        </svg> {{ $t("auto.k_5803261") }} </h3>
       <div v-if="loadingChart" class="h-64 flex items-center justify-center">
         <svg
           class="animate-spin h-6 w-6 text-blue-500"
@@ -187,9 +185,7 @@
         <div
           v-else
           class="absolute inset-0 flex items-center justify-center text-slate-500 text-sm"
-        >
-          No revenue data available
-        </div>
+        > {{ $t("auto.k_c4161005") }} </div>
       </div>
     </div>
 
@@ -215,9 +211,7 @@
           <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
           <line x1="3" x2="21" y1="9" y2="9" />
           <line x1="9" x2="9" y1="21" y2="9" />
-        </svg>
-        Order Transactions Log
-      </h3>
+        </svg> {{ $t("auto.k_432a14c2") }} </h3>
       <DataTable
         :columns="columns"
         :fetch-fn="adminDataService.getOrders"
@@ -228,14 +222,14 @@
         <template #filters>
           <select
             v-model="statusFilter"
-            class="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+            class="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm focus:focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:ring-1 focus:ring-blue-500"
             @change="updateFilters"
           >
-            <option value="">All statuses</option>
+            <option value="">{{ $t("auto.k_6c4b8a4e") }}</option>
             <option value="paid">Paid</option>
             <option value="pending">Pending</option>
             <option value="rejected">Rejected</option>
-            <option value="pending_review">Pending Review</option>
+            <option value="pending_review">{{ $t("auto.k_2f4605c8") }}</option>
           </select>
         </template>
       </DataTable>
@@ -319,12 +313,21 @@ const totalRevenue = computed(() => {
 const loadDashboardData = async () => {
 	loadingChart.value = true;
 	try {
-		const [counts, trends] = await Promise.all([
+		const results = await Promise.allSettled([
 			adminDataService.getOrderStatusBreakdown(),
 			adminDataService.getOrderRevenueTrend(),
 		]);
-		statusCounts.value = counts || {};
-		trendData.value = trends || [];
+		if (results[0].status === "fulfilled")
+			statusCounts.value = results[0].value || {};
+		if (results[1].status === "fulfilled")
+			trendData.value = results[1].value || [];
+		const failed = results.filter((r) => r.status === "rejected");
+		if (failed.length > 0 && import.meta.env.DEV) {
+			console.warn(
+				"Partial order dashboard load failure:",
+				failed.map((r) => r.reason),
+			);
+		}
 	} catch (err) {
 		console.error("Failed loading order dashboard data:", err);
 	} finally {

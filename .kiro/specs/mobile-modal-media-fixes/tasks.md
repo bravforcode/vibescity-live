@@ -1,0 +1,132 @@
+# Implementation Plan
+
+- [x] 1. Write bug condition exploration test
+  - **Property 1: Bug Condition** - Mobile Modal Display, Card Heights, CORS Errors, and Missing Neon Signs
+  - **CRITICAL**: This test MUST FAIL on unfixed code - failure confirms the bugs exist
+  - **DO NOT attempt to fix the test or the code when it fails**
+  - **NOTE**: This test encodes the expected behavior - it will validate the fix when it passes after implementation
+  - **GOAL**: Surface counterexamples that demonstrate the bugs exist
+  - **Scoped PBT Approach**: Test concrete failing cases for each bug condition
+  - Test modal display: VibeModal on mobile viewport (375px) has rounded corners instead of edge-to-edge
+  - Test card heights: ShopCard on mobile has min-height 300px instead of 250px
+  - Test real media API: getRealVenueMedia() call blocked by CORS policy
+  - Test mapbox directions: /proxy/mapbox-directions call blocked by CORS policy
+  - Test neon signs: Verify neon sign overlays are missing from map shop markers
+  - Run test on UNFIXED code
+  - **EXPECTED OUTCOME**: Test FAILS (this is correct - it proves the bugs exist)
+  - Document counterexamples found to understand root causes
+  - Mark task complete when test is written, run, and failures are documented
+  - _Requirements: 1.1, 1.2, 1.3, 1.5_
+
+- [x] 2. Write preservation property tests (BEFORE implementing fix)
+  - **Property 2: Preservation** - Desktop Modal, Card Content, API Client, Media Fallbacks, Map Features
+  - **IMPORTANT**: Follow observation-first methodology
+  - Observe desktop modal styling (rounded corners, max-width, centered) on UNFIXED code
+  - Observe modal gesture handlers (drag-to-dismiss, scroll) work on UNFIXED code
+  - Observe card content (badges, images, buttons, stats) displays correctly on UNFIXED code
+  - Observe card interactions (favorite, share, navigate, details) work on UNFIXED code
+  - Observe other API endpoints function normally on UNFIXED code
+  - Observe media fallback to placeholders when API unavailable on UNFIXED code
+  - Observe map features (tiles, markers, user location, interactions) work on UNFIXED code
+  - Write property-based tests capturing observed behavior patterns from Preservation Requirements
+  - Property-based testing generates many test cases for stronger guarantees
+  - Run tests on UNFIXED code
+  - **EXPECTED OUTCOME**: Tests PASS (this confirms baseline behavior to preserve)
+  - Mark task complete when tests are written, run, and passing on unfixed code
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10_
+
+- [x] 3. Fix for mobile modal media issues
+
+  - [x] 3.1 Fix modal white borders on mobile
+    - Open `src/components/modal/VibeModal.vue`
+    - Locate modal container element with classes `md:rounded-[2rem] rounded-t-[2rem]`
+    - Change `rounded-t-[2rem]` to `rounded-none` for edge-to-edge mobile display
+    - Verify `w-full` class is present for mobile and `md:max-w-5xl` for desktop
+    - _Bug_Condition: isBugCondition_Modal(input) where input.deviceType === 'mobile'_
+    - _Expected_Behavior: Modal fills viewport edge-to-edge with no rounded corners on mobile_
+    - _Preservation: Desktop modal styling (max-width, rounded corners, centered) unchanged_
+    - _Requirements: 1.1, 2.1, 3.1_
+
+  - [x] 3.2 Reduce card heights for better mobile UX
+    - Open `src/components/panel/ShopCard.vue`
+    - Locate card container element with classes `min-h-[300px] md:min-h-[340px]`
+    - Change to `min-h-[250px] md:min-h-[280px]` to reduce heights
+    - Verify all card content (badges, images, buttons, stats) still displays correctly
+    - _Bug_Condition: isBugCondition_CardHeight(input) where cardMinHeight excessive_
+    - _Expected_Behavior: Cards use 250px (mobile) and 280px (desktop) min-height_
+    - _Preservation: Card content, interactions, and animations unchanged_
+    - _Requirements: 1.2, 2.2, 3.3, 3.4_
+
+  - [x] 3.3 Configure backend CORS for real media API
+    - Locate backend API server configuration (FastAPI middleware)
+    - Add or update CORSMiddleware configuration with allowed origins: https://vibecity.live, http://localhost:5173, http://172.27.16.1:5173
+    - Set allow_credentials=True, allow_methods=["GET", "POST", "OPTIONS"]
+    - Set allow_headers=["Content-Type", "X-Visitor-Id", "X-Visitor-Token", "X-Admin-Secret"]
+    - Add OPTIONS handler for `/api/v1/media/{venue_id}/real` endpoint
+    - Verify preflight requests return 200 with CORS headers
+    - _Bug_Condition: isBugCondition_MediaCORS(input) where CORS headers missing_
+    - _Expected_Behavior: Real media API calls succeed with proper CORS headers_
+    - _Preservation: Other API endpoints, visitor headers, error handling unchanged_
+    - _Requirements: 1.3, 1.4, 2.3, 2.4, 2.5, 3.5, 3.6, 3.7, 3.8_
+
+  - [x] 3.4 Configure backend CORS for Mapbox directions proxy
+    - Locate `/api/v1/proxy/mapbox-directions` endpoint handler
+    - Add CORS headers to proxy responses: Access-Control-Allow-Origin, Access-Control-Allow-Methods, Access-Control-Allow-Headers
+    - Add OPTIONS handler for `/api/v1/proxy/mapbox-directions` endpoint
+    - Verify proxy correctly forwards requests to Mapbox API with CORS headers
+    - _Bug_Condition: isBugCondition_MapboxCORS(input) where CORS headers missing_
+    - _Expected_Behavior: Mapbox directions calls succeed with proper CORS headers_
+    - _Preservation: Map tiles, markers, user location, interactions unchanged_
+    - _Requirements: 1.5, 1.6, 2.6, 2.7, 3.9, 3.10_
+
+  - [x] 3.5 Investigate and restore missing neon signs on map
+    - Investigate why neon sign overlays for shops have disappeared from map
+    - Check map marker rendering logic in map composables/components
+    - Verify neon sign SVG/image assets are still available
+    - Check if neon sign layer visibility or z-index has changed
+    - Identify root cause (CSS, JavaScript, asset loading, or API data issue)
+    - Restore neon sign overlays to display correctly on shop markers
+    - Verify neon signs appear for all shops on the map
+    - _Bug_Condition: Neon sign overlays missing from map shop markers_
+    - _Expected_Behavior: Neon signs display correctly on all shop markers_
+    - _Preservation: Other map features (tiles, markers, interactions) unchanged_
+    - _Requirements: New requirement - neon signs restoration_
+
+  - [x] 3.6 Verify bug condition exploration test now passes
+    - **Property 1: Expected Behavior** - All Bugs Fixed
+    - **IMPORTANT**: Re-run the SAME test from task 1 - do NOT write a new test
+    - The test from task 1 encodes the expected behavior
+    - When this test passes, it confirms the expected behavior is satisfied
+    - Run bug condition exploration test from step 1
+    - Verify modal displays edge-to-edge on mobile
+    - Verify cards use reduced min-height values
+    - Verify real media API calls succeed without CORS errors
+    - Verify mapbox directions calls succeed without CORS errors
+    - Verify neon signs display on map shop markers
+    - **EXPECTED OUTCOME**: Test PASSES (confirms bugs are fixed)
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7_
+
+  - [x] 3.7 Verify preservation tests still pass
+    - **Property 2: Preservation** - No Regressions
+    - **IMPORTANT**: Re-run the SAME tests from task 2 - do NOT write new tests
+    - Run preservation property tests from step 2
+    - Verify desktop modal styling unchanged
+    - Verify modal gestures work correctly
+    - Verify card content and interactions unchanged
+    - Verify other API endpoints function normally
+    - Verify media fallbacks work correctly
+    - Verify map features work correctly
+    - **EXPECTED OUTCOME**: Tests PASS (confirms no regressions)
+    - Confirm all tests still pass after fix (no regressions)
+
+- [x] 4. Checkpoint - Ensure all tests pass
+  - Run full test suite to verify all tests pass
+  - Test on multiple devices (iPhone, Android, desktop)
+  - Test on multiple browsers (Chrome, Safari, Firefox)
+  - Verify modal displays correctly on mobile and desktop
+  - Verify cards have optimal heights on mobile and desktop
+  - Verify real media loads correctly in venue modals
+  - Verify mapbox directions display correctly
+  - Verify neon signs display on all shop markers
+  - Run validation: `bun run check && bun run build`
+  - Ask user if any questions or issues arise

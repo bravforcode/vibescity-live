@@ -19,7 +19,7 @@ class ShopService:
     def __init__(self):
         self.supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
 
-    def get_all_shops(self):
+    def get_all_shops(self, limit: int = 500):
         try:
             if not settings.SUPABASE_URL or "your-project" in settings.SUPABASE_URL:
                 return []
@@ -29,6 +29,7 @@ class ShopService:
                 .select(self._VENUE_COLUMNS)
                 .is_("deleted_at", "null")
                 .eq("status", "active")
+                .limit(limit)
                 .execute()
             )
             return response.data or []

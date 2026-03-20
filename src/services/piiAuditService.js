@@ -1,9 +1,10 @@
 import { v4 as uuidv4 } from "uuid";
-import { supabase } from "../lib/supabase";
+import { invokePublicEdgeFunction } from "./publicEdgeFunctionClient";
 
 const ENDPOINT = "pii-audit-ingest";
 const STORAGE_KEY_VISITOR = "vibe_visitor_id";
 const INVOKE_TIMEOUT_MS = 2500;
+const LOCALHOST_PATTERN = /^(localhost|127\.0\.0\.1)$/i;
 
 const parseEnvBool = (value) => {
 	const raw = String(value ?? "")
@@ -17,7 +18,12 @@ const parseEnvBool = (value) => {
 
 // Default: disabled in dev, enabled in prod (unless explicitly overridden).
 const piiAuditEnabled =
-	parseEnvBool(import.meta.env.VITE_PII_AUDIT_ENABLED) ?? !import.meta.env.DEV;
+	parseEnvBool(import.meta.env.VITE_PII_AUDIT_ENABLED) ??
+	(!import.meta.env.DEV &&
+		!(
+			typeof window !== "undefined" &&
+			LOCALHOST_PATTERN.test(window.location.hostname)
+		));
 
 let lastPingAt = 0;
 const MIN_PING_INTERVAL_MS = 2 * 60 * 1000;
@@ -39,6 +45,13 @@ export const piiAuditService = {
 	getVisitorId,
 
 	async ping(reason = "app_ping") {
+		// Never run in local development or localhost preview — edge CORS usually rejects these origins.
+		if (
+			import.meta.env.DEV ||
+			(typeof window !== "undefined" &&
+				LOCALHOST_PATTERN.test(window.location.hostname))
+		)
+			return;
 		if (!piiAuditEnabled) return;
 		const now = Date.now();
 		if (now - lastPingAt < MIN_PING_INTERVAL_MS) return;
@@ -46,7 +59,7 @@ export const piiAuditService = {
 
 		try {
 			// Fail-open: never block UX on audit logging.
-			await supabase.functions.invoke(ENDPOINT, {
+			await invokePublicEdgeFunction(ENDPOINT, {
 				body: {
 					visitor_id: getVisitorId(),
 					reason,

@@ -203,7 +203,7 @@ useDialogA11y({
           >
             <track kind="captions" />
           </video>
-          <img
+          <img loading="lazy"
             v-else-if="selectedGiantImage && !selectedImageBroken"
             :src="selectedGiantImage"
             :alt="selectedGiantShop?.name || selectedTitle"
@@ -243,7 +243,7 @@ useDialogA11y({
         <div class="panel-header">
           <div class="panel-header-text">
             <p class="shops-count">
-              <Sparkles class="w-3 h-3 inline mr-1 text-violet-400" />
+              <Sparkles class="w-3 h-3 inline mr-1 text-cyan-400" />
               {{ t("giant_pin.shops_inside", { count: giantPinShops.length }) }}
             </p>
           </div>
@@ -288,7 +288,7 @@ useDialogA11y({
             <!-- Vibe / visitor count -->
             <div class="vibe-card">
               <div class="vibe-label">
-                <Users class="w-3 h-3 text-violet-400" />
+                <Users class="w-3 h-3 text-cyan-400" />
                 <span>{{ t("giant_pin.current_vibe") }}</span>
               </div>
               <Suspense>
@@ -386,7 +386,7 @@ useDialogA11y({
   --border: rgba(255,255,255,0.08);
   --text-primary: #f0f0f5;
   --text-muted: rgba(255,255,255,0.5);
-  --accent: #7c3aed;
+  --accent: #06b6d4;
   --accent-glow: rgba(124,58,237,0.4);
 }
 
@@ -418,7 +418,7 @@ useDialogA11y({
   border-radius: var(--modal-radius);
   overflow: hidden;
   box-shadow:
-    0 0 0 1px rgba(255,255,255,0.07),
+    0 0 0 1px rgba(255,255,255,0.02),
     0 30px 80px -10px rgba(0,0,0,0.7),
     0 0 60px -20px var(--accent-glow);
   transform-origin: center center;
@@ -430,6 +430,9 @@ useDialogA11y({
   .giant-pin-modal {
     width: 100vw;
     height: 100svh;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
     border-radius: var(--modal-radius) var(--modal-radius) 0 0;
     margin-top: auto;
     margin-bottom: 0;
@@ -473,7 +476,8 @@ useDialogA11y({
 @media (max-width: 768px) {
   .modal-shell {
     grid-template-columns: 1fr;
-    grid-template-rows: 45svh 1fr;
+    grid-template-rows: 40svh 1fr;
+    grid-template-rows: 40dvh 1fr;
     border-radius: var(--modal-radius) var(--modal-radius) 0 0;
   }
 }
@@ -566,7 +570,7 @@ useDialogA11y({
   border-radius: 999px;
   background: rgba(124,58,237,0.25);
   border: 1px solid rgba(124,58,237,0.4);
-  color: #c4b5fd;
+  color: #67e8f9;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -587,7 +591,7 @@ useDialogA11y({
 .media-shop-category {
   font-size: 13px;
   font-weight: 600;
-  color: #a78bfa;
+  color: #22D3EE;
   letter-spacing: 0.02em;
 }
 
@@ -694,7 +698,7 @@ useDialogA11y({
 .action-btn:active { transform: scale(0.95); }
 
 .action-btn--primary {
-  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  background: linear-gradient(135deg, #06b6d4, #0891b2);
   color: #fff;
   box-shadow: 0 4px 20px rgba(124,58,237,0.35);
 }
@@ -898,7 +902,7 @@ useDialogA11y({
 .shop-card-cat {
   font-size: 11px;
   font-weight: 500;
-  color: #a78bfa;
+  color: #22D3EE;
   margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
@@ -915,7 +919,7 @@ useDialogA11y({
 
 .shop-card:hover .shop-card-arrow,
 .shop-card--active .shop-card-arrow {
-  color: #a78bfa;
+  color: #22D3EE;
   transform: translateX(2px);
 }
 

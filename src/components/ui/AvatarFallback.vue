@@ -19,14 +19,14 @@ const initials = computed(() => {
 });
 
 const PALETTE = [
-	"#8B5CF6",
+	"#22D3EE",
 	"#EC4899",
 	"#10B981",
 	"#F59E0B",
 	"#3B82F6",
 	"#EF4444",
 	"#14B8A6",
-	"#A855F7",
+	"#06B6D4",
 ];
 
 const bgColor = computed(() => {

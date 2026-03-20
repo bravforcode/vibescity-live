@@ -1,5 +1,6 @@
 import axios from "axios";
 import Papa from "papaparse";
+import i18n from "@/i18n.js";
 
 // ─── Anonymous Analytics Logger ──────────────────────────────────────────────
 // Uses VITE_GOOGLE_SHEET_URL_ORDERS / VITE_GOOGLE_SHEET_URL_STATS (Apps Script)
@@ -167,6 +168,6 @@ export const fetchShopData = async (sheetUrl) => {
 			});
 	} catch (error) {
 		console.error("Error fetching Sheets data:", error);
-		throw new Error("Unable to load data from Google Sheets");
+		throw new Error(i18n.global.t("auto.k_ebd4a03c"));
 	}
 };

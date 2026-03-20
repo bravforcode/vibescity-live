@@ -1,0 +1,37 @@
+version: 2
+updates:
+  # Maintain dependencies for npm/Bun (Frontend)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore"
+    labels:
+      - "dependencies"
+      - "frontend"
+    ignore:
+      - dependency-name: "vue" # Example: hold major Vue updates
+        versions: ["> 3.5.x"]
+
+  # Maintain dependencies for pip (Backend)
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore"
+    labels:
+      - "dependencies"
+      - "backend"
+
+  # Maintain github-actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore"
+    labels:
+      - "dependencies"
+      - "ci"

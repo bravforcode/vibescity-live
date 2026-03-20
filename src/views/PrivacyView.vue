@@ -2,86 +2,54 @@
   <main class="min-h-screen bg-[#0b0b12] text-white">
     <div class="mx-auto max-w-3xl px-6 py-12">
       <header class="mb-8">
-        <h1 class="text-3xl font-black tracking-tight">Privacy Policy</h1>
-        <p class="mt-2 text-sm text-white/60">
-          Last updated: {{ lastUpdated }}
+        <h1 class="text-3xl font-black tracking-tight">{{ $t("auto.k_2526541f") }}</h1>
+        <p class="mt-2 text-sm text-white/60"> {{ $t("auto.k_50ebf3c0") }} {{ lastUpdated }}
         </p>
       </header>
 
       <section class="space-y-4 text-sm leading-7 text-white/80">
-        <p>
-          VibeCity is built to minimize personal data collection. We use
-          anonymous analytics to understand product usage and improve the
-          experience.
-        </p>
+        <p> {{ $t("auto.k_f54da0f6") }} </p>
 
-        <h2 class="pt-4 text-lg font-bold text-white">What We Collect</h2>
+        <h2 class="pt-4 text-lg font-bold text-white">{{ $t("auto.k_17afbdef") }}</h2>
         <ul class="list-disc pl-5 space-y-2">
+          <li> {{ $t("auto.k_c0f7d53b") }}<code class="text-white/90">visitor_id</code>{{ $t("auto.k_caad9055") }} </li>
+          <li> {{ $t("auto.k_8be44d7e") }} </li>
+          <li> {{ $t("auto.k_ad0abcf2") }} </li>
+          <li> {{ $t("auto.k_854fe812") }} </li>
           <li>
-            Anonymous visitor identifier (<code class="text-white/90">visitor_id</code>)
-            stored in your browser.
-          </li>
-          <li>
-            Basic device/browser details (user agent, coarse device type).
-          </li>
-          <li>
-            Approximate location metadata (country/city) when provided by the
-            platform headers.
-          </li>
-          <li>
-            Product events (example: session_start, venue selection) without
-            raw IP storage in product analytics.
-          </li>
-          <li>
-            <strong class="text-white">Security / audit logs</strong> may store
-            raw IP addresses to protect the service and support enterprise audit
-            requirements.
-          </li>
+            <strong class="text-white">{{ $t("auto.k_f9269488") }}</strong> {{ $t("auto.k_5a2b3250") }} </li>
         </ul>
 
-        <h2 class="pt-4 text-lg font-bold text-white">What We Do Not Collect</h2>
+        <h2 class="pt-4 text-lg font-bold text-white">{{ $t("auto.k_85ee7ae1") }}</h2>
         <ul class="list-disc pl-5 space-y-2">
-          <li>We do not sell your personal data.</li>
-          <li>We do not store raw IP addresses in product analytics.</li>
+          <li>{{ $t("auto.k_2c612766") }}</li>
+          <li>{{ $t("auto.k_a26b6737") }}</li>
         </ul>
 
         <h2 class="pt-4 text-lg font-bold text-white">Consent</h2>
-        <p>
-          You can choose whether to allow anonymous analytics. This setting is
-          stored locally on your device.
-        </p>
+        <p> {{ $t("auto.k_5aeec80e") }} </p>
 
         <div class="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
             class="rounded-lg bg-white text-black px-4 py-2 text-xs font-bold hover:bg-white/90 transition-colors"
             @click="grantAnalytics"
-          >
-            Allow analytics
-          </button>
+          > {{ $t("auto.k_d629565e") }} </button>
           <button
             type="button"
             class="rounded-lg border border-white/20 px-4 py-2 text-xs font-bold text-white/80 hover:text-white hover:border-white/40 transition-colors"
             @click="denyAnalytics"
-          >
-            Disable analytics
-          </button>
-          <span class="text-xs text-white/60 self-center">
-            Current: <span class="text-white/90">{{ consentLabel }}</span>
+          > {{ $t("auto.k_df4842cf") }} </button>
+          <span class="text-xs text-white/60 self-center"> {{ $t("auto.k_51a35dc0") }} <span class="text-white/90">{{ consentLabel }}</span>
           </span>
         </div>
 
         <h2 class="pt-4 text-lg font-bold text-white">Retention</h2>
-        <p>
-          Product analytics uses a rolling retention window (raw events are kept
-          short-term and aggregated archives longer-term). Security/audit raw IP
-          logs are retained for <strong class="text-white">90 days</strong>.
+        <p> {{ $t("auto.k_8b9f8acb") }} <strong class="text-white">{{ $t("auto.k_2d8a9817") }}</strong>.
         </p>
 
         <h2 class="pt-4 text-lg font-bold text-white">Contact</h2>
-        <p>
-          If you have questions, contact the VibeCity team.
-        </p>
+        <p> {{ $t("auto.k_266e7ae7") }} </p>
       </section>
     </div>
   </main>

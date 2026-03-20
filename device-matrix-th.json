@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "country": "TH",
+  "tiers": {
+    "A": {
+      "description": "120Hz flagship devices",
+      "examples": [
+        "iPhone 15 Pro",
+        "Samsung Galaxy S24",
+        "Pixel 9 Pro"
+      ],
+      "target_fps": 120
+    },
+    "B": {
+      "description": "Mid-range Snapdragon 7xx",
+      "examples": [
+        "Samsung A55",
+        "Xiaomi Redmi Note 13 Pro",
+        "realme 12+"
+      ],
+      "target_fps": 60
+    },
+    "C": {
+      "description": "Budget Android 2GB RAM",
+      "examples": [
+        "Android Go 2GB",
+        "entry-level 4-core device"
+      ],
+      "target_fps": 30
+    }
+  },
+  "carriers": [
+    "AIS Mobile",
+    "True Mobile",
+    "DTAC Mobile",
+    "Provincial-3BB",
+    "CAT-Rural",
+    "NT-Gov"
+  ],
+  "network_lanes": {
+    "AIS Mobile": {
+      "rtt_ms": 45,
+      "bandwidth_mbps": 20,
+      "packet_loss_percent": 0.5
+    },
+    "True Mobile": {
+      "rtt_ms": 50,
+      "bandwidth_mbps": 18,
+      "packet_loss_percent": 0.8
+    },
+    "DTAC Mobile": {
+      "rtt_ms": 55,
+      "bandwidth_mbps": 15,
+      "packet_loss_percent": 1
+    },
+    "Provincial-3BB": {
+      "rtt_ms": 80,
+      "bandwidth_mbps": 30,
+      "packet_loss_percent": 1
+    },
+    "CAT-Rural": {
+      "rtt_ms": 150,
+      "bandwidth_mbps": 5,
+      "packet_loss_percent": 4
+    },
+    "NT-Gov": {
+      "rtt_ms": 120,
+      "bandwidth_mbps": 10,
+      "packet_loss_percent": 2
+    }
+  },
+  "baseline_protocol": {
+    "runs_per_lane": 3,
+    "statistics": [
+      "median",
+      "p75",
+      "p95"
+    ]
+  }
+}
+

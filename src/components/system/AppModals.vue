@@ -1,16 +1,11 @@
 <!-- src/components/system/AppModals.vue -->
 <script setup>
-import { AlertTriangle, X } from "lucide-vue-next";
 import { computed, defineAsyncComponent, ref } from "vue";
-import { useI18n } from "vue-i18n";
 import {
 	normalizeVenueCollection,
 	normalizeVenueViewModel,
 } from "@/domain/venue/viewModel";
-import InstallBanner from "../ui/InstallBanner.vue";
 import PortalLayer from "./PortalLayer.vue";
-
-const { t } = useI18n();
 
 const rideModalRef = ref(null);
 
@@ -53,11 +48,6 @@ const props = defineProps({
 	showProfileDrawer: Boolean,
 	isDarkMode: Boolean,
 	isDataLoading: Boolean,
-	isInitialLoad: {
-		type: Boolean,
-		default: false,
-	},
-	errorMessage: String,
 	showConfetti: Boolean,
 	userLocation: {
 		type: Array,
@@ -152,78 +142,7 @@ const normalizedMallShops = computed(() =>
       @toggle-language="emit('toggle-language')"
     />
 
-    <Transition
-      enter-active-class="transition duration-500 ease-out"
-      enter-from-class="opacity-0 scale-95"
-      enter-to-class="opacity-100 scale-100"
-      leave-active-class="transition duration-300 ease-in"
-      leave-from-class="opacity-100 scale-100"
-      leave-to-class="opacity-0 scale-105"
-    >
-      <div
-        v-if="props.isInitialLoad"
-        role="status"
-        aria-live="polite"
-        aria-busy="true"
-        class="fixed inset-0 z-[6000] flex flex-col items-center justify-center bg-[#09090b]"
-      >
-        <div class="relative w-24 h-24">
-          <div
-            class="absolute inset-0 rounded-full border-4 border-white/5"
-          ></div>
-          <div
-            class="absolute inset-0 rounded-full border-4 border-pink-500 border-t-transparent animate-spin"
-          ></div>
-          <div
-            class="absolute inset-4 rounded-full border-4 border-blue-500 border-b-transparent animate-spin-slow"
-          ></div>
-        </div>
-        <h2
-          class="mt-8 text-xl font-black text-white tracking-[0.2em] animate-pulse"
-        >
-          {{ t("app.brand") }}
-        </h2>
-        <p
-          class="mt-2 text-zinc-500 text-xs uppercase tracking-widest font-bold"
-        >
-          {{ t("app.syncing") }}
-        </p>
-      </div>
-    </Transition>
-
-    <transition name="toast">
-      <div
-        v-if="props.errorMessage"
-        class="fixed top-20 left-1/2 -translate-x-1/2 z-[6100] w-[90%] max-w-md pt-safe"
-      >
-        <div class="toast-notification flex items-center gap-4">
-          <div
-            class="w-10 h-10 rounded-xl bg-red-500 flex items-center justify-center shrink-0"
-            aria-hidden="true"
-          >
-            <AlertTriangle class="w-5 h-5 text-white" />
-          </div>
-          <div class="flex-1">
-            <h4 class="text-white font-bold text-sm">
-              {{ t("app.system_alert") }}
-            </h4>
-            <p class="text-white/60 text-xs">{{ props.errorMessage }}</p>
-          </div>
-          <button
-            @click="emit('clear-error')"
-            :aria-label="t('common.close')"
-            class="w-11 h-11 rounded-full hover:bg-white/10 flex items-center justify-center text-white/40"
-          >
-            <X class="w-4 h-4" aria-hidden="true" />
-          </button>
-          <!-- Auto-dismiss progress bar -->
-          <div class="toast-progress" style="--toast-duration: 6s"></div>
-        </div>
-      </div>
-    </transition>
-
     <ConfettiEffect v-if="props.showConfetti" />
-    <InstallBanner />
   </PortalLayer>
 </template>
 

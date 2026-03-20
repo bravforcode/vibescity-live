@@ -1,5 +1,10 @@
 <script setup>
+import { defineAsyncComponent } from "vue";
 import coinAnimation from "@/assets/animations/coin.json";
+
+const Vue3Lottie = defineAsyncComponent(() =>
+	import("vue3-lottie").then((mod) => mod.Vue3Lottie),
+);
 
 defineProps({
 	size: { type: Number, default: 40 },

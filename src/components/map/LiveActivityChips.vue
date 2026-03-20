@@ -11,11 +11,12 @@ const toneClass = (tone) => {
 		return "from-rose-500/35 to-orange-400/35 border-rose-300/30";
 	if (tone === "surge")
 		return "from-cyan-500/35 to-blue-500/35 border-cyan-300/30";
-	return "from-violet-500/35 to-fuchsia-500/35 border-violet-300/30";
+	return "from-cyan-500/35 to-cyan-500/35 border-cyan-300/30";
 };
 </script>
 
 <template>
+  <!-- aria-label -->
   <div class="flex flex-col gap-2 max-w-[210px]">
     <div
       v-for="chip in chips"

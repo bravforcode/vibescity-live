@@ -59,7 +59,7 @@ const toggleExpand = () => {
 </script>
 
 <template>
-  <div
+  <div role="button" tabindex="0"
     v-if="isDev"
     class="runtime-status-panel"
     :class="{ expanded: isExpanded }"
@@ -86,7 +86,7 @@ const toggleExpand = () => {
         <span class="dot" :style="{ background: analyticsIndicator.color }" />
         <span>{{ analyticsIndicator.label }}</span>
       </div>
-      <div class="status-row hint">Click to collapse</div>
+      <div class="status-row hint">{{ $t("auto.k_e97342cb") }}</div>
     </div>
   </div>
 </template>
@@ -96,7 +96,7 @@ const toggleExpand = () => {
   position: fixed;
   bottom: 12px;
   left: 12px;
-  z-index: 99999;
+  z-index: 13001; /* Above Z.SUBMODAL — debug panel */
   background: rgba(15, 15, 26, 0.95);
   border: 1px solid rgba(139, 92, 246, 0.3);
   border-radius: 8px;

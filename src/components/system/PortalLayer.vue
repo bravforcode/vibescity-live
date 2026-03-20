@@ -1,6 +1,8 @@
 <!-- src/components/system/PortalLayer.vue --> 
 
-<script setup></script>
+<script setup>
+defineOptions({ inheritAttrs: false });
+</script>
 
 <template>
   <Teleport to="body">

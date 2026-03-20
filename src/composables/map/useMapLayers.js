@@ -1,5 +1,12 @@
 import { onUnmounted } from "vue";
 import coinAnimation from "@/assets/animations/coin.json";
+import { MAP_LAYERS } from "@/constants/mapLayerIds";
+import i18n from "@/i18n.js";
+import {
+	HIGH_ZOOM_NEON_MIN_ZOOM,
+	NEON_FULL_SLOT_OFFSETS,
+} from "../../utils/neonLayoutEngine";
+import { useNeonSignSpriteCache } from "./useNeonSignSpriteCache";
 
 const pendingMapImages = new Set();
 const TRAFFIC_SOURCE_ID = "traffic-roads-local";
@@ -13,6 +20,33 @@ for (let i = 0; i < 20; i++) {
 	FLOW_DASH_FRAMES.push([0, step, 2, 4 - step]);
 }
 
+const FULL_NEON_OFFSET_EXPRESSION = [
+	"match",
+	["coalesce", ["get", "neon_slot_full"], "center"],
+	...Object.entries(NEON_FULL_SLOT_OFFSETS).flatMap(([slotName, offset]) => [
+		slotName,
+		["literal", offset],
+	]),
+	["literal", NEON_FULL_SLOT_OFFSETS.center],
+];
+
+const buildVisibleNeonSignature = (features = [], lod) =>
+	features
+		.map((feature) => {
+			const props = feature?.properties || {};
+			if (!props.neon_key) return "";
+			return [
+				props.id ?? "",
+				props.neon_signature_v2 ?? props.neon_key ?? "",
+				props.neon_slot_full ?? "",
+				props.neon_scale_full ?? "",
+				lod,
+			].join(":");
+		})
+		.filter(Boolean)
+		.sort()
+		.join("|");
+
 export function useMapLayers(map, options = {}) {
 	const resolveEffectsMode = () =>
 		typeof options.effectsMode === "function"
@@ -25,6 +59,10 @@ export function useMapLayers(map, options = {}) {
 		: 12.5;
 
 	const canRunEffects = () => resolveEffectsMode() !== "off";
+
+	// Initialize neon sign sprite cache
+	const neonSignCache = useNeonSignSpriteCache();
+	let lastActiveNeonSignature = "";
 	const trafficDebugEnabled =
 		import.meta.env.DEV ||
 		import.meta.env.VITE_E2E === "true" ||
@@ -63,7 +101,7 @@ export function useMapLayers(map, options = {}) {
 			fullRoadsPromise = fetch(TRAFFIC_ROADS_DATA_URL, { cache: "force-cache" })
 				.then((response) => {
 					if (!response.ok) {
-						throw new Error(`traffic-roads-http-${response.status}`);
+						throw new Error(i18n.global.t("auto.k_8f4c0aab"));
 					}
 					return response.json();
 				})
@@ -194,33 +232,52 @@ export function useMapLayers(map, options = {}) {
 			{ name: "pin-grey", url: "/images/pins/pin-gray.png" },
 			{ name: "pin-red", url: "/images/pins/pin-red.png" },
 			{ name: "pin-blue", url: "/images/pins/pin-blue.png" }, // ✅ Event Pin
-			{ name: "pin-purple", url: "/images/pins/pin-purple.png" },
 			// Aliases used by MapboxContainer
 			{ name: "pin-normal", url: "/images/pins/pin-gray.png" },
 			{ name: "pin-boost", url: "/images/pins/pin-red.png" },
-			{ name: "pin-giant", url: "/images/pins/pin-purple.png" },
+			{ name: "pin-giant", url: "/images/pins/pin-blue.png" },
 		];
 
-		images.forEach((img) => {
-			if (!mapInstance || mapInstance.hasImage(img.name)) return;
-			if (pendingMapImages.has(img.name)) return;
+		// Dedup by name and create promises for loading
+		const uniqueImages = Array.from(
+			new Map(images.map((img) => [img.name, img])).values(),
+		);
 
-			pendingMapImages.add(img.name);
-			mapInstance.loadImage(img.url, (error, image) => {
-				pendingMapImages.delete(img.name);
-				if (error || !image) {
-					console.warn(`Could not load image: ${img.name}`);
+		const loadPromises = uniqueImages.map((img) => {
+			return new Promise((resolve) => {
+				if (!mapInstance || mapInstance.hasImage(img.name)) {
+					resolve();
 					return;
 				}
-				// Style reloads are async; double-check before addImage to prevent duplicate-name errors.
-				if (mapInstance.hasImage(img.name)) return;
-				try {
-					mapInstance.addImage(img.name, image);
-				} catch {
-					// Ignore race-condition duplicates during rapid style switches.
+				if (pendingMapImages.has(img.name)) {
+					resolve();
+					return;
 				}
+
+				pendingMapImages.add(img.name);
+				mapInstance.loadImage(img.url, (error, image) => {
+					pendingMapImages.delete(img.name);
+					if (error || !image) {
+						console.warn(`Could not load image: ${img.name}`);
+						resolve();
+						return;
+					}
+					// Style reloads are async; double-check before addImage to prevent duplicate-name errors.
+					if (mapInstance.hasImage(img.name)) {
+						resolve();
+						return;
+					}
+					try {
+						mapInstance.addImage(img.name, image);
+					} catch {
+						// Ignore race-condition duplicates during rapid style switches.
+					}
+					resolve();
+				});
 			});
 		});
+
+		return Promise.all(loadPromises);
 	};
 
 	// ✅ High-Performance Coin Animation (Canvas -> Mapbox Image)
@@ -675,7 +732,7 @@ export function useMapLayers(map, options = {}) {
 						"text-field": ["get", "point_count_abbreviated"],
 						"text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
 						"text-size": 13,
-						"text-allow-overlap": true,
+						"text-allow-overlap": false,
 					},
 					paint: {
 						"text-color": "#ffffff",
@@ -694,7 +751,7 @@ export function useMapLayers(map, options = {}) {
 						"icon-image": [
 							"case",
 							["get", "is_giant"],
-							"pin-purple", // Giant (Priority 1)
+							"pin-blue", // Giant (Priority 1)
 							["get", "is_event"],
 							"pin-blue", // Events (Priority 2)
 							["==", ["get", "status"], "LIVE"],
@@ -712,8 +769,8 @@ export function useMapLayers(map, options = {}) {
 							20,
 							1.0,
 						],
-						"icon-allow-overlap": true,
-						"icon-ignore-placement": true,
+						"icon-allow-overlap": false,
+						"icon-ignore-placement": false,
 						"icon-anchor": "bottom",
 						"text-field": ["get", "name"],
 						"text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
@@ -721,7 +778,7 @@ export function useMapLayers(map, options = {}) {
 						"text-anchor": "top",
 						"text-size": 11,
 						"text-max-width": 8,
-						"text-allow-overlap": true,
+						"text-allow-overlap": false,
 					},
 					paint: {
 						"text-color": "#ffffff",
@@ -766,12 +823,213 @@ export function useMapLayers(map, options = {}) {
 		}
 	};
 
+	// ✨ Neon Sign Layers - Overlay neon signs on shop markers
+	const addNeonSignLayers = (sourceId, sourceData) => {
+		if (!map.value || !map.value.isStyleLoaded?.() || !canRunEffects()) {
+			return;
+		}
+
+		if (!map.value.getSource?.(sourceId)) {
+			return;
+		}
+
+		try {
+			const features = Array.isArray(sourceData?.features)
+				? sourceData.features
+				: [];
+			const zoom = Number(map.value.getZoom?.() ?? 0);
+			const activeLods =
+				zoom >= HIGH_ZOOM_NEON_MIN_ZOOM
+					? [
+							{
+								lod: "full",
+								targetProperty: "neon_sprite_full",
+								deadlineMs: 72,
+							},
+						]
+					: zoom >= 11
+						? [
+								{
+									lod: "compact",
+									targetProperty: "neon_sprite_compact",
+									deadlineMs: 44,
+								},
+							]
+						: zoom >= 8
+							? [
+									{
+										lod: "mini",
+										targetProperty: "neon_sprite_mini",
+										deadlineMs: 36,
+									},
+								]
+							: [];
+
+			const activeSignature =
+				activeLods.length > 0
+					? buildVisibleNeonSignature(
+							features,
+							activeLods.map((entry) => entry.lod).join(","),
+						)
+					: "";
+			const signatureChanged = activeSignature !== lastActiveNeonSignature;
+			lastActiveNeonSignature = activeSignature;
+
+			if (features.length > 0 && activeLods.length > 0) {
+				const refreshNeonSource = () => {
+					if (!map.value?.isStyleLoaded?.()) return;
+					if (!map.value.getSource?.(sourceId)) return;
+					if (scheduler) {
+						scheduler(sourceId, sourceData);
+					} else {
+						const src = map.value?.getSource?.(sourceId);
+						if (src?.setData) src.setData(sourceData);
+					}
+				};
+
+				const results = activeLods.map((entry) =>
+					neonSignCache.ensureSpritesForFeatures(
+						map.value,
+						features,
+						entry.lod,
+						{
+							targetProperty: entry.targetProperty,
+							reducedMotion: false,
+							highContrast: false,
+							priority: 0,
+							deadlineMs: signatureChanged ? entry.deadlineMs : 24,
+							onDeferredBatch: () => refreshNeonSource(),
+						},
+					),
+				);
+
+				if (results.some((entry) => Number(entry?.mutatedCount || 0) > 0)) {
+					refreshNeonSource();
+				}
+			}
+
+			// Add neon sign layers if they don't exist
+			// Full detail neon signs (zoom 13+)
+			if (!map.value.getLayer(MAP_LAYERS.NEON_FULL)) {
+				map.value.addLayer({
+					id: MAP_LAYERS.NEON_FULL,
+					type: "symbol",
+					source: sourceId,
+					minzoom: HIGH_ZOOM_NEON_MIN_ZOOM,
+					filter: [
+						"all",
+						["!", ["has", "point_count"]],
+						["has", "neon_sprite_full"],
+					],
+					layout: {
+						"icon-image": ["get", "neon_sprite_full"],
+						"icon-size": [
+							"coalesce",
+							["to-number", ["get", "neon_scale_full"]],
+							0.84,
+						],
+						"icon-anchor": "bottom",
+						"icon-offset": FULL_NEON_OFFSET_EXPRESSION,
+						"icon-allow-overlap": true,
+						"icon-ignore-placement": true,
+						"symbol-sort-key": [
+							"coalesce",
+							["to-number", ["get", "neon_sort_key"]],
+							0,
+						],
+						visibility: "visible",
+					},
+					paint: {
+						"icon-opacity": 0.96,
+					},
+				});
+			}
+
+			// Compact neon signs (zoom 11-13)
+			if (!map.value.getLayer(MAP_LAYERS.NEON_COMPACT)) {
+				map.value.addLayer({
+					id: MAP_LAYERS.NEON_COMPACT,
+					type: "symbol",
+					source: sourceId,
+					minzoom: 11,
+					maxzoom: 13,
+					filter: [
+						"all",
+						["!", ["has", "point_count"]],
+						["has", "neon_sprite_compact"],
+					],
+					layout: {
+						"icon-image": ["get", "neon_sprite_compact"],
+						"icon-size": 0.82,
+						"icon-anchor": "bottom",
+						"icon-offset": [0, -24],
+						"icon-allow-overlap": true,
+						"icon-ignore-placement": true,
+						visibility: "visible",
+					},
+					paint: {
+						"icon-opacity": 0.9,
+					},
+				});
+			}
+
+			// Mini neon signs (zoom 8-11)
+			if (!map.value.getLayer(MAP_LAYERS.NEON_MINI)) {
+				map.value.addLayer({
+					id: MAP_LAYERS.NEON_MINI,
+					type: "symbol",
+					source: sourceId,
+					minzoom: 8,
+					maxzoom: 11,
+					filter: [
+						"all",
+						["!", ["has", "point_count"]],
+						["has", "neon_sprite_mini"],
+					],
+					layout: {
+						"icon-image": ["get", "neon_sprite_mini"],
+						"icon-size": 0.74,
+						"icon-anchor": "bottom",
+						"icon-offset": [0, -18],
+						"icon-allow-overlap": true,
+						"icon-ignore-placement": true,
+						visibility: "visible",
+					},
+					paint: {
+						"icon-opacity": 0.85,
+					},
+				});
+			}
+		} catch (err) {
+			console.error("❌ [useMapLayers] addNeonSignLayers error:", err);
+		}
+	};
+
+	// Remove neon sign layers
+	const removeNeonSignLayers = () => {
+		if (!map.value) return;
+		const layerIds = [
+			MAP_LAYERS.NEON_FULL,
+			MAP_LAYERS.NEON_COMPACT,
+			MAP_LAYERS.NEON_MINI,
+		];
+		layerIds.forEach((layerId) => {
+			if (map.value.getLayer(layerId)) {
+				try {
+					map.value.removeLayer(layerId);
+				} catch {
+					// Ignore layer removal errors during style transitions
+				}
+			}
+		});
+	};
+
 	// 🎨 CYBERPUNK PASTEL PALETTE
 	const CYBER_PALETTE = {
 		deepBg: "#0b0321", // Deep Space
-		water: "#181236", // Mystic Purple Water
+		water: "#181236", // Mystic cyan Water
 		neonPink: "#ff7eb6", // Pastel Pink
-		neonPurple: "#bd93f9", // Lavender
+		neoncyan: "#06b6d4", // Lavender
 		neonBlue: "#8be9fd", // Cyber Blue
 		roadDim: "#2d2b55", // Dimmed Roads
 		skyHigh: "#6272a4", // Sky Gradient
@@ -837,7 +1095,7 @@ export function useMapLayers(map, options = {}) {
 							0,
 							CYBER_PALETTE.deepBg,
 							20,
-							CYBER_PALETTE.neonPurple,
+							CYBER_PALETTE.neoncyan,
 							60,
 							CYBER_PALETTE.neonPink,
 							150,
@@ -858,7 +1116,7 @@ export function useMapLayers(map, options = {}) {
 	};
 
 	// --- Local Traffic Cars (1km around user) ---
-	const CAR_LAYER_IDS = ["road-cars", "road-cars-w", "road-cars-r"];
+	const CAR_LAYER_IDS = []; // car symbol layers removed — flow lines only
 	const FLOW_LAYER_IDS = ["road-flow-glow", "road-flow-core"];
 	const NEON_ROAD_SOURCE_ID = "neon-roads";
 	const GLOBAL_ROAD_SOURCE_ID = "composite";
@@ -1000,9 +1258,9 @@ export function useMapLayers(map, options = {}) {
 				...(flowFilter ? { filter: flowFilter } : {}),
 				paint: {
 					"line-color": "#22d3ee",
-					"line-opacity": 0.2,
-					"line-width": ["interpolate", ["linear"], ["zoom"], 10, 1.4, 16, 3.8],
-					"line-blur": 1.1,
+					"line-opacity": 0.32,
+					"line-width": ["interpolate", ["linear"], ["zoom"], 10, 1.4, 16, 5.0],
+					"line-blur": 1.8,
 					"line-dasharray": FLOW_DASH_FRAMES[0],
 				},
 				minzoom: 10,
@@ -1017,8 +1275,8 @@ export function useMapLayers(map, options = {}) {
 				...(flowFilter ? { filter: flowFilter } : {}),
 				paint: {
 					"line-color": "#facc15",
-					"line-opacity": 0.7,
-					"line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.7, 16, 2.4],
+					"line-opacity": 0.85,
+					"line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.7, 16, 3.2],
 					"line-dasharray": FLOW_DASH_FRAMES[0],
 				},
 				minzoom: 10,
@@ -1026,81 +1284,7 @@ export function useMapLayers(map, options = {}) {
 		}
 	};
 
-	const drawRoundedRect = (ctx, x, y, width, height, radius) => {
-		if (!ctx) return;
-		if (typeof ctx.roundRect === "function") {
-			ctx.roundRect(x, y, width, height, radius);
-			return;
-		}
-		const r = Math.max(0, Math.min(radius, width / 2, height / 2));
-		ctx.moveTo(x + r, y);
-		ctx.arcTo(x + width, y, x + width, y + height, r);
-		ctx.arcTo(x + width, y + height, x, y + height, r);
-		ctx.arcTo(x, y + height, x, y, r);
-		ctx.arcTo(x, y, x + width, y, r);
-	};
-
-	const ensureCarIcons = (m) => {
-		const makeCarIcon = (bodyColor, sz = 18) => {
-			const c = document.createElement("canvas");
-			c.width = sz;
-			c.height = sz;
-			const x = c.getContext("2d");
-			if (!x) return null;
-			x.shadowColor = bodyColor;
-			x.shadowBlur = 3;
-			x.fillStyle = bodyColor;
-			x.beginPath();
-			drawRoundedRect(x, 2, 4, 14, 9, 3);
-			x.fill();
-			x.shadowBlur = 0;
-			x.fillStyle = "rgba(255,255,255,0.3)";
-			x.beginPath();
-			drawRoundedRect(x, 6, 5, 5, 3, 1);
-			x.fill();
-			x.fillStyle = "#ffffcc";
-			x.beginPath();
-			x.arc(14, 6.5, 1.8, 0, Math.PI * 2);
-			x.arc(14, 10.5, 1.8, 0, Math.PI * 2);
-			x.fill();
-			x.fillStyle = "#ff4444";
-			x.beginPath();
-			x.arc(3, 6.5, 1.2, 0, Math.PI * 2);
-			x.arc(3, 10.5, 1.2, 0, Math.PI * 2);
-			x.fill();
-			return x.getImageData(0, 0, sz, sz).data;
-		};
-
-		const size = 18;
-		if (!m.hasImage("car-icon")) {
-			const data = makeCarIcon("#facc15", size);
-			if (!data) return false;
-			m.addImage("car-icon", {
-				width: size,
-				height: size,
-				data,
-			});
-		}
-		if (!m.hasImage("car-icon-w")) {
-			const data = makeCarIcon("#e2e8f0", size);
-			if (!data) return false;
-			m.addImage("car-icon-w", {
-				width: size,
-				height: size,
-				data,
-			});
-		}
-		if (!m.hasImage("car-icon-r")) {
-			const data = makeCarIcon("#f87171", size);
-			if (!data) return false;
-			m.addImage("car-icon-r", {
-				width: size,
-				height: size,
-				data,
-			});
-		}
-		return true;
-	};
+	// Canvas car icons removed — using throttled flow-line animation instead.
 
 	const addCarAnimation = ({ sourceId = TRAFFIC_SOURCE_ID } = {}) => {
 		const m = map.value;
@@ -1132,215 +1316,81 @@ export function useMapLayers(map, options = {}) {
 			removeCarLayers();
 			activeCarSourceKey = sourceConfig.key;
 		}
-		if (m.getLayer("road-cars")) {
-			if (!carAnimFrame && !prefersReduceMotion) {
-				removeCarLayers();
-			} else {
-				resetCarRetry();
-				updateTrafficDebug({
-					stage: "skip:already-mounted",
-					sourceId: sourceConfig.sourceId,
-					sourceLayer: sourceConfig.sourceLayer || null,
-				});
-				return;
-			}
-		}
-		try {
-			const iconsReady = ensureCarIcons(m);
-			if (!iconsReady) {
-				updateTrafficDebug({ stage: "skip:icons-not-ready" });
-				scheduleCarAnimationRetry(sourceId);
-				return;
-			}
-			ensureRoadFlowLayers(m, sourceConfig);
-			const sourceDef = sourceConfig.sourceLayer
-				? {
-						source: sourceConfig.sourceId,
-						"source-layer": sourceConfig.sourceLayer,
-					}
-				: { source: sourceConfig.sourceId };
-			const lineFilter = sourceConfig.filter
-				? ["all", sourceConfig.filter]
-				: undefined;
 
-			m.addLayer({
-				id: "road-cars",
-				type: "symbol",
-				...sourceDef,
-				...(lineFilter ? { filter: lineFilter } : {}),
-				layout: {
-					"symbol-placement": "line",
-					"symbol-spacing": 220,
-					"icon-image": "car-icon",
-					"icon-size": 1.3,
-					"icon-offset": [0, 0],
-					"icon-allow-overlap": true,
-					"icon-rotation-alignment": "map",
-				},
-				paint: { "icon-opacity": prefersReduceMotion ? 0.75 : 0.95 },
-				minzoom: 10,
-			});
-			m.addLayer({
-				id: "road-cars-w",
-				type: "symbol",
-				...sourceDef,
-				...(lineFilter ? { filter: lineFilter } : {}),
-				layout: {
-					"symbol-placement": "line",
-					"symbol-spacing": 320,
-					"icon-image": "car-icon-w",
-					"icon-size": 1.05,
-					"icon-offset": [0, 0],
-					"icon-allow-overlap": true,
-					"icon-rotation-alignment": "map",
-				},
-				paint: { "icon-opacity": prefersReduceMotion ? 0.62 : 0.86 },
-				minzoom: 10,
-			});
-			m.addLayer({
-				id: "road-cars-r",
-				type: "symbol",
-				...sourceDef,
-				...(lineFilter ? { filter: lineFilter } : {}),
-				layout: {
-					"symbol-placement": "line",
-					"symbol-spacing": 430,
-					"icon-image": "car-icon-r",
-					"icon-size": 1.1,
-					"icon-offset": [0, 0],
-					"icon-allow-overlap": true,
-					"icon-rotation-alignment": "map",
-				},
-				paint: { "icon-opacity": prefersReduceMotion ? 0.68 : 0.9 },
-				minzoom: 10,
-			});
+		// Already running — skip
+		if (carAnimFrame) {
+			resetCarRetry();
+			updateTrafficDebug({ stage: "skip:already-mounted" });
+			return;
+		}
+
+		try {
+			ensureRoadFlowLayers(m, sourceConfig);
 
 			if (prefersReduceMotion) {
 				resetCarRetry();
-				updateTrafficDebug({
-					stage: "mounted:static",
-					sourceId: sourceConfig.sourceId,
-					sourceLayer: sourceConfig.sourceLayer || null,
-				});
+				updateTrafficDebug({ stage: "mounted:static-flow" });
 				try {
-					if (m.getLayer("road-flow-core")) {
+					if (m.getLayer("road-flow-core"))
 						m.setPaintProperty("road-flow-core", "line-opacity", 0.58);
-					}
-					if (m.getLayer("road-flow-glow")) {
+					if (m.getLayer("road-flow-glow"))
 						m.setPaintProperty("road-flow-glow", "line-opacity", 0.16);
-					}
 				} catch {
-					// Ignore layer races on style updates.
+					/* style race */
 				}
 				return;
 			}
+
 			resetCarRetry();
-			updateTrafficDebug({
-				stage: "mounted:animated",
-				sourceId: sourceConfig.sourceId,
-				sourceLayer: sourceConfig.sourceLayer || null,
-			});
+			updateTrafficDebug({ stage: "mounted:flow-animated" });
 
-			let phase = 0;
-			let lastTs = performance.now();
+			// Throttled flow animation — 150ms interval (~7fps) vs rAF (~60fps)
+			// setPaintProperty only — no setLayoutProperty (much cheaper)
+			let flowPhase = 0;
 			let dashFrameIndex = 0;
-			let lastDashUpdateAt = 0;
-			let carOffset = 0;
 
-			const animate = (ts = performance.now()) => {
-				if (!m || !m.getLayer("road-cars")) {
+			const flowTick = () => {
+				if (typeof document !== "undefined" && document.hidden) return;
+				if (!m.getLayer("road-flow-core")) {
+					clearInterval(carAnimFrame);
 					carAnimFrame = null;
 					return;
 				}
-				if (typeof document !== "undefined" && document.hidden) {
-					carAnimFrame = null;
-					return;
-				}
-				const dt = Math.max(0, ts - lastTs);
-				lastTs = ts;
-				phase = (phase + dt * 0.0048) % (Math.PI * 2);
-
-				// Continuous flowing cars based on their symbol-spacing (220, 320, 430)
-				carOffset += dt * 0.04;
-				const offset1 = carOffset % 220;
-				const offset2 = (carOffset * 0.8) % 320;
-				const offset3 = (carOffset * 1.15) % 430;
-
+				flowPhase = (flowPhase + 0.72) % (Math.PI * 2);
+				dashFrameIndex = (dashFrameIndex + 1) % FLOW_DASH_FRAMES.length;
+				const dash = FLOW_DASH_FRAMES[dashFrameIndex];
 				try {
-					m.setLayoutProperty("road-cars", "icon-offset", [-offset1, 0]);
-					m.setLayoutProperty("road-cars-w", "icon-offset", [offset2, 0]);
-					m.setLayoutProperty("road-cars-r", "icon-offset", [-offset3, 0]);
-					if (ts - lastDashUpdateAt >= 140) {
-						lastDashUpdateAt = ts;
-						dashFrameIndex = (dashFrameIndex + 1) % FLOW_DASH_FRAMES.length;
-						const nextDash = FLOW_DASH_FRAMES[dashFrameIndex];
-						if (m.getLayer("road-flow-core")) {
-							m.setPaintProperty("road-flow-core", "line-dasharray", nextDash);
-							m.setPaintProperty(
-								"road-flow-core",
-								"line-opacity",
-								0.62 + Math.abs(Math.sin(phase)) * 0.24,
-							);
-						}
-						if (m.getLayer("road-flow-glow")) {
-							m.setPaintProperty("road-flow-glow", "line-dasharray", nextDash);
-							m.setPaintProperty(
-								"road-flow-glow",
-								"line-opacity",
-								0.18 + Math.abs(Math.sin(phase)) * 0.18,
-							);
-						}
-					}
+					m.setPaintProperty("road-flow-core", "line-dasharray", dash);
+					m.setPaintProperty(
+						"road-flow-core",
+						"line-opacity",
+						0.62 + Math.abs(Math.sin(flowPhase)) * 0.24,
+					);
+					m.setPaintProperty("road-flow-glow", "line-dasharray", dash);
+					m.setPaintProperty(
+						"road-flow-glow",
+						"line-opacity",
+						0.18 + Math.abs(Math.sin(flowPhase)) * 0.18,
+					);
 				} catch {
-					// Ignore layer updates during style transitions.
+					/* style transitions */
 				}
-				carAnimFrame = requestAnimationFrame(animate);
 			};
 
-			const startCarLoop = () => {
-				if (carAnimFrame) return;
-				lastTs = performance.now();
-				carAnimFrame = requestAnimationFrame(animate);
-			};
-			const stopCarLoop = () => {
-				if (!carAnimFrame) return;
-				cancelAnimationFrame(carAnimFrame);
-				carAnimFrame = null;
-			};
-			startCarLoop();
+			carAnimFrame = setInterval(flowTick, 150);
 
 			if (!carVisibilityListener) {
 				carVisibilityListener = () => {
-					if (!m.getLayer("road-cars")) return;
 					const hidden =
 						typeof document !== "undefined" ? document.hidden : false;
-					try {
-						m.setPaintProperty("road-cars", "icon-opacity", hidden ? 0 : 0.9);
-						m.setPaintProperty(
-							"road-cars-w",
-							"icon-opacity",
-							hidden ? 0 : 0.74,
-						);
-						m.setPaintProperty("road-cars-r", "icon-opacity", hidden ? 0 : 0.8);
-						if (m.getLayer("road-flow-core")) {
-							m.setPaintProperty(
-								"road-flow-core",
-								"line-opacity",
-								hidden ? 0 : 0.7,
-							);
+					if (hidden) {
+						if (carAnimFrame) {
+							clearInterval(carAnimFrame);
+							carAnimFrame = null;
 						}
-						if (m.getLayer("road-flow-glow")) {
-							m.setPaintProperty(
-								"road-flow-glow",
-								"line-opacity",
-								hidden ? 0 : 0.2,
-							);
-						}
-					} catch {
-						// Ignore layer races on teardown.
+					} else if (!carAnimFrame) {
+						carAnimFrame = setInterval(flowTick, 150);
 					}
-					if (hidden) stopCarLoop();
-					else startCarLoop();
 				};
 				if (typeof document !== "undefined") {
 					document.addEventListener("visibilitychange", carVisibilityListener, {
@@ -1350,11 +1400,10 @@ export function useMapLayers(map, options = {}) {
 			}
 		} catch (e) {
 			updateTrafficDebug({
-				stage: "error:add-car-animation",
+				stage: "error:add-flow-animation",
 				message: String(e?.message || e),
 			});
 			scheduleCarAnimationRetry(sourceId);
-			console.warn("Car animation setup failed:", e);
 		}
 	};
 
@@ -1412,7 +1461,7 @@ export function useMapLayers(map, options = {}) {
 
 	const stopCarAnimation = () => {
 		if (carAnimFrame) {
-			cancelAnimationFrame(carAnimFrame);
+			clearInterval(carAnimFrame);
 			carAnimFrame = null;
 		}
 		if (carVisibilityListener) {
@@ -1487,7 +1536,7 @@ export function useMapLayers(map, options = {}) {
 						"icon-image": [
 							"case",
 							["==", ["get", "pin_state"], "event"],
-							"pin-purple",
+							"pin-blue",
 							["==", ["get", "pin_state"], "live"],
 							"pin-red",
 							"pin-grey",
@@ -1592,6 +1641,8 @@ export function useMapLayers(map, options = {}) {
 	return {
 		addNeonRoads,
 		addClusters,
+		addNeonSignLayers,
+		removeNeonSignLayers,
 		loadMapImages,
 		setCyberpunkAtmosphere,
 		addCyberpunkBuildings,
@@ -1605,5 +1656,7 @@ export function useMapLayers(map, options = {}) {
 		// Wave 2: split layer API
 		addCriticalLayers,
 		addDeferredLayers,
+		// Neon sign sprite cache for debugging
+		neonSignCache,
 	};
 }

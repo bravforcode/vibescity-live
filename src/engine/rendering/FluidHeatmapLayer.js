@@ -101,7 +101,7 @@ export class FluidHeatmapLayer {
 		this._divergence = this._makeSingle(gl, gl.R16F, gl.RED, gl.HALF_FLOAT);
 	}
 
-	render(gl, matrix) {
+	render(gl, _matrix) {
 		if (!this._gl || !this._vao) return;
 
 		const t0 = performance.now();
@@ -134,7 +134,7 @@ export class FluidHeatmapLayer {
 		}
 	}
 
-	onRemove(map, gl) {
+	onRemove(_map, gl) {
 		if (!this._gl) return;
 		Object.values(this._programs).forEach((p) => {
 			gl.deleteProgram(p);
@@ -246,7 +246,7 @@ export class FluidHeatmapLayer {
 		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 		gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
 
-		const prog = this._programs["render"];
+		const prog = this._programs.render;
 		gl.useProgram(prog);
 		gl.bindVertexArray(this._vao);
 

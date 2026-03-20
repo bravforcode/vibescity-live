@@ -50,13 +50,10 @@ const getBarHeight = (val) => `${(val / maxVal.value) * 100}%`;
           'text-sm font-bold uppercase tracking-wider',
           isDarkMode ? 'text-white' : 'text-gray-900',
         ]"
-      >
-        Store Insights
-      </h3>
+      > {{ $t("auto.k_d84d47e7") }} </h3>
       <div class="flex items-center gap-1 text-[10px] font-bold text-green-400">
         <TrendingUp class="w-3 h-3" />
-        +{{ stats.growth }}% this week
-      </div>
+        +{{ stats.growth }}{{ $t("auto.k_7dcb4110") }} </div>
     </div>
 
     <!-- Chart Grid -->
@@ -86,12 +83,12 @@ const getBarHeight = (val) => `${(val / maxVal.value) * 100}%`;
           :class="isDarkMode ? 'bg-zinc-800/50' : 'bg-gray-200/50'"
         >
           <div
-            class="w-full bg-purple-500/80 group-hover:bg-purple-400 transition duration-500 ease-out delay-75"
+            class="w-full bg-cyan-500/80 group-hover:bg-cyan-400 transition duration-500 ease-out delay-75"
             :style="{ height: getBarHeight(stats.videoPlays) }"
           ></div>
         </div>
         <div
-          class="text-[10px] font-bold text-purple-400 flex items-center gap-1"
+          class="text-[10px] font-bold text-cyan-400 flex items-center gap-1"
         >
           <Play class="w-3 h-3" /> {{ stats.videoPlays }}
         </div>
@@ -124,8 +121,6 @@ const getBarHeight = (val) => `${(val / maxVal.value) * 100}%`;
           ? 'bg-zinc-800 hover:bg-zinc-700 text-white/50 border-white/5'
           : 'bg-gray-100 hover:bg-gray-200 text-gray-500 border-gray-200'
       ]"
-    >
-      Upgrade to Pro for detailed analytics
-    </button>
+    > {{ $t("auto.k_b0b2cab0") }} </button>
   </div>
 </template>

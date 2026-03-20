@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import time
 
 from fastapi import Depends, HTTPException, status
@@ -7,6 +8,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.core.config import get_settings
 from app.core.supabase import supabase
 
+logger = logging.getLogger("app.auth")
 security = HTTPBearer()
 security_optional = HTTPBearer(auto_error=False)
 settings = get_settings()
@@ -111,6 +113,10 @@ async def verify_admin(user = Depends(verify_user)):
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin privileges required"
         )
+
+    if is_allowlisted and not has_admin_role:
+        logger.warning("admin_access_via_allowlist", extra={"email": email})
+
     return user
 
 

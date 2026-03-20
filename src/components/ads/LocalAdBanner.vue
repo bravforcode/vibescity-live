@@ -1,11 +1,11 @@
 <template>
   <Transition name="ad-slide">
-    <div v-if="ad" class="local-ad-banner" @click="handleClick">
+    <div role="button" tabindex="0" v-if="ad" class="local-ad-banner" @click="handleClick">
       <!-- dismiss -->
       <button
         class="ad-dismiss"
         @click.stop="$emit('dismiss', ad.id)"
-        aria-label="Dismiss ad"
+        :aria-label="$t('auto.k_ba3a9474')"
       >
         ✕
       </button>
@@ -17,12 +17,11 @@
 
       <!-- body -->
       <div class="ad-body">
-        <span class="ad-badge">📍 Nearby</span>
+        <span class="ad-badge">{{ $t("auto.k_586ea292") }}</span>
         <h4 class="ad-title">{{ ad.title }}</h4>
         <p v-if="ad.description" class="ad-desc">{{ ad.description }}</p>
         <span v-if="ad.distance_km != null" class="ad-distance">
-          {{ ad.distance_km }} km away
-        </span>
+          {{ ad.distance_km }} {{ $t("auto.k_915a78c1") }} </span>
       </div>
     </div>
   </Transition>

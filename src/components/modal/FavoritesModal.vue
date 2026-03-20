@@ -13,6 +13,7 @@ import {
 	X,
 } from "lucide-vue-next";
 import { computed, defineAsyncComponent, ref } from "vue";
+import { useFocusTrap } from "../../composables/useFocusTrap";
 import { useHaptics } from "../../composables/useHaptics";
 import { useFavoritesStore } from "../../store/favoritesStore";
 import { useShopStore } from "../../store/shopStore";
@@ -33,6 +34,10 @@ const favoritesStore = useFavoritesStore();
 const shopStore = useShopStore();
 
 const searchQuery = ref("");
+const modalContainer = ref(null);
+
+// ✅ A11y: Focus trap within modal
+useFocusTrap(modalContainer);
 
 const normalizeId = (id) => String(id ?? "").trim();
 
@@ -80,7 +85,7 @@ const close = () => {
 
 <template>
   <Transition name="fm-overlay">
-    <div
+    <div tabindex="0"
       v-if="isOpen"
       class="fm-backdrop"
       data-testid="favorites-modal"
@@ -89,7 +94,7 @@ const close = () => {
       aria-labelledby="fm-title"
       @click.self="close"
     >
-      <div class="fm-sheet" data-testid="favorites-modal-sheet">
+      <div class="fm-sheet" ref="modalContainer" data-testid="favorites-modal-sheet">
         <div class="fm-handle" aria-hidden="true">
           <div class="fm-handle-bar" />
         </div>
@@ -100,13 +105,13 @@ const close = () => {
               <Heart class="w-5 h-5 text-rose-400 fill-rose-400" />
             </span>
             <div>
-              <h2 id="fm-title" class="fm-title">Saved Vibes</h2>
+              <h2 id="fm-title" class="fm-title">{{ $t("auto.k_336ef889") }}</h2>
               <p class="fm-subtitle">{{ favoritesStore.count }} places</p>
             </div>
           </div>
           <button
             class="fm-close-btn"
-            aria-label="Close favorites"
+            :aria-label="$t('auto.k_e786934e')"
             @click="close"
           >
             <X class="w-5 h-5" />
@@ -118,9 +123,9 @@ const close = () => {
           <input
             v-model="searchQuery"
             type="search"
-            placeholder="Search saved places..."
+            :placeholder="$t('auto.k_ae6c10b8')"
             class="fm-search"
-            aria-label="Search favorites"
+            :aria-label="$t('auto.k_e0f93880')"
           />
         </div>
 
@@ -129,15 +134,13 @@ const close = () => {
             <div class="fm-empty-icon" aria-hidden="true">
               <Heart class="w-10 h-10 text-rose-500/40" />
             </div>
-            <p class="fm-empty-title">No saved places yet</p>
-            <p class="fm-empty-hint">
-              Double-tap any venue card to save it here
-            </p>
+            <p class="fm-empty-title">{{ $t("auto.k_d55817dd") }}</p>
+            <p class="fm-empty-hint"> {{ $t("auto.k_a21bba2e") }} </p>
           </div>
 
           <div v-else-if="favoriteShops.length === 0" class="fm-empty">
-            <p class="fm-empty-title">No results</p>
-            <p class="fm-empty-hint">Try a different search term</p>
+            <p class="fm-empty-title">{{ $t("auto.k_dd4785bc") }}</p>
+            <p class="fm-empty-hint">{{ $t("auto.k_e858af32") }}</p>
           </div>
 
           <TransitionGroup
@@ -167,7 +170,7 @@ const close = () => {
                   <span
                     v-if="shop.status === 'LIVE'"
                     class="fm-live-dot"
-                    aria-label="Live now"
+                    :aria-label="$t('auto.k_aca9d81f')"
                   />
                 </div>
 

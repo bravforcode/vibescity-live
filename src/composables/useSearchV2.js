@@ -1,5 +1,9 @@
 import { onUnmounted, ref } from "vue";
 import { supabase } from "../lib/supabase";
+import {
+	isExpectedAbortError,
+	logUnexpectedNetworkError,
+} from "../utils/networkErrorUtils";
 
 /**
  * 🔍 VibeCity Core Engine V2 - Search Composable
@@ -35,7 +39,8 @@ export function useSearchV2() {
 
 		const requestId = ++activeRequestId;
 		abortController?.abort?.();
-		abortController = new AbortController();
+		const controller = new AbortController();
+		abortController = controller;
 		isLoading.value = true;
 		error.value = null;
 
@@ -48,13 +53,13 @@ export function useSearchV2() {
 				p_offset: offset,
 			});
 			if (typeof request?.abortSignal === "function") {
-				request = request.abortSignal(abortController.signal);
+				request = request.abortSignal(controller.signal);
 			}
 
 			const { data, error: err } = await request;
 
 			if (err) throw err;
-			if (requestId !== activeRequestId) return;
+			if (requestId !== activeRequestId || controller.signal.aborted) return;
 
 			const seen = new Set();
 			results.value = (data || []).filter((item) => {
@@ -66,12 +71,21 @@ export function useSearchV2() {
 				return true;
 			});
 		} catch (e) {
-			if (e?.name === "AbortError") return;
 			if (requestId !== activeRequestId) return;
-			console.error("❌ [useSearchV2] Search failed:", e);
+			if (
+				isExpectedAbortError(e, { signal: controller.signal }) ||
+				!logUnexpectedNetworkError("❌ [useSearchV2] Search failed:", e, {
+					signal: controller.signal,
+				})
+			) {
+				return;
+			}
 			error.value = e;
 			results.value = [];
 		} finally {
+			if (abortController === controller) {
+				abortController = null;
+			}
 			if (requestId === activeRequestId) {
 				isLoading.value = false;
 			}

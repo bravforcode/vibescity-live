@@ -4,7 +4,7 @@
     <div class="analytics-header">
       <h1>{{ $t("auto.k_da2e030f") }}</h1>
       <div class="header-controls">
-        <select v-model="selectedTimeRange" @change="refreshAnalytics">
+        <select id="anonTimeRange" v-model="selectedTimeRange" @change="refreshAnalytics" :aria-label="$t('auto.k_time_range')">
           <option value="1h">{{ $t("auto.k_b465e4d5") }}</option>
           <option value="24h">{{ $t("auto.k_6f094336") }}</option>
           <option value="7d">{{ $t("auto.k_b58d8d6f") }}</option>
@@ -180,7 +180,7 @@
     <section class="sessions-section">
       <h2>{{ $t("auto.k_2f84824a") }}</h2>
       <div class="sessions-controls">
-        <select v-model="sessionFilter">
+        <select id="sessionFilter" v-model="sessionFilter" :aria-label="$t('auto.k_session_filter')">
           <option value="all">{{ $t("auto.k_861017c1") }}</option>
           <option value="active">{{ $t("auto.k_6250d94f") }}</option>
           <option value="conversions">{{ $t("auto.k_b561368") }}</option>

@@ -86,9 +86,7 @@ const getRankIcon = (rank) => {
           'text-lg font-black',
           isDarkMode ? 'text-white' : 'text-gray-900',
         ]"
-      >
-        🏆 Top Collectors
-      </h3>
+      > {{ $t("auto.k_b0cb97a8") }} </h3>
       <span
         :class="[
           'text-xs font-bold px-2 py-1 rounded-full',
@@ -96,9 +94,7 @@ const getRankIcon = (rank) => {
             ? 'bg-zinc-800 text-white/50'
             : 'bg-gray-100 text-gray-500',
         ]"
-      >
-        This Week
-      </span>
+      > {{ $t("auto.k_3eb2ad93") }} </span>
     </div>
 
     <!-- Top 3 podium -->
@@ -193,11 +189,11 @@ const getRankIcon = (rank) => {
     <!-- Current user -->
     <div
       :class="[
-        'mt-4 p-3 rounded-xl border border-neon-purple bg-surface-elevated shadow-neon-purple shadow-sm',
+        'mt-4 p-3 rounded-xl border border-neon-cyan bg-surface-elevated shadow-neon-cyan shadow-sm',
       ]"
     >
       <div class="flex items-center gap-3">
-        <span :class="['w-6 text-center font-bold', 'text-purple-400']">
+        <span :class="['w-6 text-center font-bold', 'text-cyan-400']">
           #{{ currentUser.rank }}
         </span>
         <span class="text-xl">😎</span>
@@ -207,9 +203,8 @@ const getRankIcon = (rank) => {
             isDarkMode ? 'text-white' : 'text-gray-900',
           ]"
         >
-          {{ currentUser.name }} (You)
-        </span>
-        <span class="font-mono font-bold text-purple-400">
+          {{ currentUser.name }} {{ $t("auto.k_b978ae75") }} </span>
+        <span class="font-mono font-bold text-cyan-400">
           🪙 {{ currentUser.coins }}
         </span>
       </div>

@@ -1,4 +1,5 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { runCommitMutation } from "@/composables/useOptimisticUpdate";
 import i18n from "@/i18n.js";
 import vibeService from "../services/vibeService";
 
@@ -40,7 +41,12 @@ export function useVibeSystem() {
 	});
 
 	// Methods
-	const claimPlaceVibe = async (placeId) => {
+	const runClaimVibe = async ({
+		placeId = null,
+		zoneId = null,
+		analyticsAction,
+		successMessage,
+	}) => {
 		if (!canClaimVibe.value) {
 			throw new Error(i18n.global.t("auto.k_53a492d5"));
 		}
@@ -49,69 +55,48 @@ export function useVibeSystem() {
 		lastError.value = null;
 
 		try {
-			const result = await vibeService.claimVibe(placeId, null, getUserId());
-
-			// Update state
-			claimCooldown.value = new Date(result.next_claim_time).getTime();
-
-			// Track analytics
-			vibeService.trackVibeInteraction("claim_place", placeId, null);
-
-			// Emit real-time update
-			vibeService.emitVibeUpdate(placeId, null, {
-				action: "claimed",
-				points: result.vibe_points,
-				timestamp: new Date().toISOString(),
+			const result = await runCommitMutation({
+				commit: () => vibeService.claimVibe(placeId, zoneId, getUserId()),
+				onSuccess: (data) => {
+					claimCooldown.value = new Date(data.next_claim_time).getTime();
+					vibeService.trackVibeInteraction(analyticsAction, placeId, zoneId);
+					vibeService.emitVibeUpdate(placeId, zoneId, {
+						action: "claimed",
+						points: data.vibe_points,
+						timestamp: new Date().toISOString(),
+					});
+					showVibeSuccess(successMessage(data));
+				},
+				onError: (error) => {
+					lastError.value = String(error?.message || "Failed to claim vibe");
+					showVibeError(lastError.value);
+				},
+				errorMessage: (error) =>
+					String(error?.message || "Failed to claim vibe"),
 			});
-
-			// Show success feedback
-			showVibeSuccess(`Claimed ${result.vibe_points} vibe points!`);
-
-			return result;
-		} catch (error) {
-			lastError.value = error.message;
-			showVibeError(error.message);
-			throw error;
+			if (!result.success) {
+				throw result.cause ?? new Error(result.error);
+			}
+			return result.data;
 		} finally {
 			isClaiming.value = false;
 		}
 	};
 
+	const claimPlaceVibe = async (placeId) =>
+		runClaimVibe({
+			placeId,
+			analyticsAction: "claim_place",
+			successMessage: (result) => `Claimed ${result.vibe_points} vibe points!`,
+		});
+
 	const claimZoneVibe = async (zoneId) => {
-		if (!canClaimVibe.value) {
-			throw new Error(i18n.global.t("auto.k_53a492d5"));
-		}
-
-		isClaiming.value = true;
-		lastError.value = null;
-
-		try {
-			const result = await vibeService.claimVibe(null, zoneId, getUserId());
-
-			// Update state
-			claimCooldown.value = new Date(result.next_claim_time).getTime();
-
-			// Track analytics
-			vibeService.trackVibeInteraction("claim_zone", null, zoneId);
-
-			// Emit real-time update
-			vibeService.emitVibeUpdate(null, zoneId, {
-				action: "claimed",
-				points: result.vibe_points,
-				timestamp: new Date().toISOString(),
-			});
-
-			// Show success feedback
-			showVibeSuccess(`Claimed ${result.vibe_points} zone vibe points!`);
-
-			return result;
-		} catch (error) {
-			lastError.value = error.message;
-			showVibeError(error.message);
-			throw error;
-		} finally {
-			isClaiming.value = false;
-		}
+		return runClaimVibe({
+			zoneId,
+			analyticsAction: "claim_zone",
+			successMessage: (result) =>
+				`Claimed ${result.vibe_points} zone vibe points!`,
+		});
 	};
 
 	const loadZoneVibes = async () => {

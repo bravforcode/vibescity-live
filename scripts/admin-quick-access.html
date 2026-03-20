@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VibeCity Admin Quick Access</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        .card {
+            background: #2a2a2a;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            border: 1px solid #3a3a3a;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            margin: 8px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.2s;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #2563eb;
+        }
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #4b5563;
+        }
+        .input-group {
+            margin: 16px 0;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #3a3a3a;
+            border-radius: 8px;
+            background: #1a1a1a;
+            color: white;
+            font-size: 14px;
+        }
+        .env-warning {
+            background: #dc2626;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 12px 0;
+            font-size: 14px;
+        }
+        .success {
+            background: #16a34a;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 12px 0;
+            font-size: 14px;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <a href="#main-content" class="btn btn-secondary" style="position:absolute;left:16px;top:16px;">Skip to main content</a>
+    <main id="main-content">
+    <div class="card">
+        <h1>🔐 VibeCity Admin Quick Access</h1>
+        <p>เครื่องมือช่วยเข้าหน้า Admin แบบง่ายๆ</p>
+        
+        <div class="env-warning" id="envWarning">
+            ⚠️ กรุณาตั้งค่า Environment ก่อนใช้
+        </div>
+        
+        <div class="input-group">
+            <label>🌐 Environment:</label>
+            <select id="environment" onchange="updateEnvironment()">
+                <option value="local">Local Development</option>
+                <option value="staging">Staging</option>
+                <option value="production">Production</option>
+            </select>
+        </div>
+        
+        <div class="input-group">
+            <label>📧 Admin Email:</label>
+            <input type="email" id="adminEmail" placeholder="admin@example.com" value="">
+        </div>
+        
+        <div class="input-group">
+            <label>🔗 Domain:</label>
+            <input type="text" id="domain" placeholder="http://localhost:5173" value="">
+        </div>
+        
+        <h3>🚀 Quick Actions:</h3>
+        
+        <button id="generateMagicLinkBtn" class="btn btn-primary" type="button">
+            ✨ Generate Magic Link
+        </button>
+        
+        <button id="openAdminPageBtn" class="btn btn-secondary" type="button">
+            📂 Open Admin Page
+        </button>
+        
+        <button id="grantAdminAccessBtn" class="btn btn-secondary" type="button">
+            👑 Grant Admin Access
+        </button>
+        
+        <div id="result" class="hidden"></div>
+    </div>
+    
+    <div class="card">
+        <h3>📋 Instructions:</h3>
+        <ol>
+            <li>เลือก Environment (Local/Staging/Production)</li>
+            <li>ใส่ Admin Email ที่ต้องการ</li>
+            <li>Domain จะถูกตั้งค่าอัตโนมัติ</li>
+            <li>กด "Generate Magic Link" เพื่อรับ Link สำหรับ Sign-in</li>
+            <li>กด "Open Admin Page" เพื่อเปิดหน้า Admin โดยตรง</li>
+        </ol>
+        
+        <h3>🔧 Manual Commands:</h3>
+        <div style="background: #1a1a1a; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 12px;">
+            # Generate Magic Link<br>
+            node scripts/generate-admin-magic-link.cjs admin@example.com DOMAIN/admin<br><br>
+            
+            # Grant Admin Access<br>
+            node scripts/grant_admin.js admin@example.com<br><br>
+            
+            # Bootstrap Admin Users<br>
+            node scripts/bootstrap-admin-users.cjs
+        </div>
+    </div>
+    </main>
+
+    <script>
+        const environments = {
+            local: {
+                domain: 'http://localhost:5173',
+                warning: false
+            },
+            staging: {
+                domain: 'https://staging.vibecity.live',
+                warning: true
+            },
+            production: {
+                domain: 'https://vibecity.live',
+                warning: true
+            }
+        };
+
+        function updateEnvironment() {
+            const env = document.getElementById('environment').value;
+            const config = environments[env];
+            
+            document.getElementById('domain').value = config.domain;
+            document.getElementById('envWarning').style.display = config.warning ? 'block' : 'none';
+            document.getElementById('envWarning').textContent = config.warning ? 
+                `⚠️ คุณกำลังจะเข้า ${env.toUpperCase()} environment - กรุณาระมัดระวัง` : '';
+        }
+
+        function generateMagicLink() {
+            const email = document.getElementById('adminEmail').value;
+            const domain = document.getElementById('domain').value;
+            
+            if (!email) {
+                alert('กรุณาใส่ Admin Email');
+                return;
+            }
+            
+            const command = `node scripts/generate-admin-magic-link.cjs ${email} ${domain}/admin`;
+            
+            navigator.clipboard.writeText(command).then(() => {
+                showResult('✅ คัดลอกคำสั่งแล้ว! ไปรันใน Terminal', 'success');
+            });
+        }
+
+        function openAdminPage() {
+            const domain = document.getElementById('domain').value;
+            window.open(`${domain}/admin`, '_blank');
+        }
+
+        function grantAdminAccess() {
+            const email = document.getElementById('adminEmail').value;
+            
+            if (!email) {
+                alert('กรุณาใส่ Admin Email');
+                return;
+            }
+            
+            const command = `node scripts/grant_admin.js ${email}`;
+            
+            navigator.clipboard.writeText(command).then(() => {
+                showResult('✅ คัดลอกคำสั่ง Grant Admin แล้ว! ไปรันใน Terminal', 'success');
+            });
+        }
+
+        function showResult(message, type) {
+            const result = document.getElementById('result');
+            result.textContent = message;
+            result.className = type === 'success' ? 'success' : 'env-warning';
+            result.classList.remove('hidden');
+            
+            setTimeout(() => {
+                result.classList.add('hidden');
+            }, 5000);
+        }
+
+        // Initialize
+        updateEnvironment();
+        document
+            .getElementById('generateMagicLinkBtn')
+            .addEventListener('click', generateMagicLink);
+        document
+            .getElementById('openAdminPageBtn')
+            .addEventListener('click', openAdminPage);
+        document
+            .getElementById('grantAdminAccessBtn')
+            .addEventListener('click', grantAdminAccess);
+        
+        // Load saved email
+        const savedEmail = localStorage.getItem('admin-email');
+        if (savedEmail) {
+            document.getElementById('adminEmail').value = savedEmail;
+        }
+        
+        // Save email on change
+        document.getElementById('adminEmail').addEventListener('change', (e) => {
+            localStorage.setItem('admin-email', e.target.value);
+        });
+    </script>
+</body>
+</html>

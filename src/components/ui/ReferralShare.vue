@@ -90,12 +90,8 @@ const shareToApp = (app) => {
           'text-xl font-black',
           isDarkMode ? 'text-white' : 'text-gray-900',
         ]"
-      >
-        Invite Friends, Get Coins!
-      </h3>
-      <p :class="['text-sm', isDarkMode ? 'text-white/50' : 'text-gray-500']">
-        Earn 50 coins for each friend who joins
-      </p>
+      > {{ $t("auto.k_1edc2444") }} </h3>
+      <p :class="['text-sm', isDarkMode ? 'text-white/50' : 'text-gray-500']"> {{ $t("auto.k_ce6ff487") }} </p>
     </div>
 
     <!-- Referral code -->
@@ -111,9 +107,7 @@ const shareToApp = (app) => {
             'text-xs font-medium mb-1',
             isDarkMode ? 'text-white/40' : 'text-gray-400',
           ]"
-        >
-          Your referral code
-        </div>
+        > {{ $t("auto.k_e07fc69c") }} </div>
         <div
           :class="[
             'text-lg font-mono font-black tracking-wider',
@@ -129,7 +123,7 @@ const shareToApp = (app) => {
           'px-4 py-2 rounded-lg font-bold text-sm transition',
           isCopied
             ? 'bg-green-500 text-white'
-            : 'bg-purple-500 text-white hover:bg-purple-600',
+            : 'bg-cyan-500 text-white hover:bg-cyan-600',
         ]"
       >
         {{ isCopied ? "✓ Copied!" : "Copy" }}
@@ -138,7 +132,7 @@ const shareToApp = (app) => {
 
     <!-- Share buttons -->
     <div class="grid grid-cols-4 gap-2 mb-4">
-      <button
+      <button :aria-label="$t('a11y.action')"
         @click="shareToApp('line')"
         class="flex flex-col items-center gap-1 p-3 rounded-xl bg-green-500 text-white hover:bg-green-600 transition-colors"
       >
@@ -146,7 +140,7 @@ const shareToApp = (app) => {
         <span class="text-[10px] font-bold">LINE</span>
       </button>
 
-      <button
+      <button :aria-label="$t('a11y.action')"
         @click="shareToApp('facebook')"
         class="flex flex-col items-center gap-1 p-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors"
       >
@@ -154,7 +148,7 @@ const shareToApp = (app) => {
         <span class="text-[10px] font-bold">Facebook</span>
       </button>
 
-      <button
+      <button :aria-label="$t('a11y.action')"
         @click="shareToApp('twitter')"
         class="flex flex-col items-center gap-1 p-3 rounded-xl bg-sky-500 text-white hover:bg-sky-600 transition-colors"
       >
@@ -162,7 +156,7 @@ const shareToApp = (app) => {
         <span class="text-[10px] font-bold">Twitter</span>
       </button>
 
-      <button
+      <button :aria-label="$t('a11y.action')"
         @click="shareNative"
         :class="[
           'flex flex-col items-center gap-1 p-3 rounded-xl transition-colors',
@@ -180,20 +174,18 @@ const shareToApp = (app) => {
     <div
       :class="[
         'text-center p-3 rounded-xl',
-        isDarkMode ? 'bg-purple-500/10' : 'bg-purple-50',
+        isDarkMode ? 'bg-cyan-500/10' : 'bg-cyan-50',
       ]"
     >
       <div
         :class="[
           'text-2xl font-black',
-          'text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400',
+          'text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-pink-400',
         ]"
       >
         {{ referralCount }}
       </div>
-      <div :class="['text-xs', isDarkMode ? 'text-white/50' : 'text-gray-500']">
-        Friends invited • {{ referralCount * 50 }} coins earned
-      </div>
+      <div :class="['text-xs', isDarkMode ? 'text-white/50' : 'text-gray-500']"> {{ $t("auto.k_63545e13") }} {{ referralCount * 50 }} {{ $t("auto.k_2ae73c28") }} </div>
     </div>
   </div>
 </template>

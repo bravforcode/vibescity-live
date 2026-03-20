@@ -11,8 +11,7 @@ if (typeof performance !== "undefined" && performance.mark) {
 }
 
 import maplibregl from "maplibre-gl";
-import { DEFAULT_CITY } from "@/config/cityConfig";
-import "maplibre-gl/dist/maplibre-gl.css";
+// maplibre-gl CSS is imported eagerly in main.js — do NOT re-import here (causes ERR_INSUFFICIENT_RESOURCES in lazy chunks)
 import {
 	computed,
 	nextTick,
@@ -23,24 +22,30 @@ import {
 	watch,
 } from "vue";
 import { useI18n } from "vue-i18n";
+import { DEFAULT_CITY } from "@/config/cityConfig";
+import { MAP_CONFIG } from "@/config/mapConfig";
 import "../../assets/map-atmosphere.css";
+import "../../assets/css/map-markers.css";
 import { useMapAtmosphere } from "../../composables/map/useMapAtmosphere";
 import { useMapCore } from "../../composables/map/useMapCore";
 // useMapHeatmap deferred — loaded after map idle (non-blocking)
 import { useMapIdleFeatures } from "../../composables/map/useMapIdleFeatures";
-import {
-	prefetchCriticalPins,
-	useMapImagePrefetch,
-} from "../../composables/map/useMapImagePrefetch";
+import { useMapImagePrefetch } from "../../composables/map/useMapImagePrefetch";
 import { useMapInteractions } from "../../composables/map/useMapInteractions";
 import { useMapLayers } from "../../composables/map/useMapLayers";
 import { useMapMarkers } from "../../composables/map/useMapMarkers";
 import { useMapPopups } from "../../composables/map/useMapPopups";
 import { useMapRealtime } from "../../composables/map/useMapRealtime";
 import { useMapRenderScheduler } from "../../composables/map/useMapRenderScheduler";
-// useSentientMap deferred — loaded after map idle (non-blocking)
+import { useNeonPinsLayer } from "../../composables/map/useNeonPinsLayer";
+import { useNeonSignTheme } from "../../composables/map/useNeonSignTheme";
 import { useAudioSystem } from "../../composables/useAudioSystem";
 import { useHaptics } from "../../composables/useHaptics";
+import {
+	getLocalDevMapRendererMode,
+	isFrontendOnlyDevMode,
+	persistLocalDevMapRendererMode,
+} from "../../lib/runtimeConfig";
 // useWeather deferred — loaded after map idle (non-blocking)
 import { apiFetch } from "../../services/apiClient";
 import { frontendObservabilityService } from "../../services/frontendObservabilityService";
@@ -50,22 +55,30 @@ import { useShopStore } from "../../store/shopStore";
 import { useUserPreferencesStore } from "../../store/userPreferencesStore";
 import "../../styles/map-atmosphere.css";
 import { openExternal } from "../../utils/browserUtils";
+import {
+	isMapDebugLoggingEnabled,
+	mapDebugLog,
+	mapDebugWarn,
+} from "../../utils/mapDebug";
+import { buildMapPinPresentation } from "../../utils/mapPinHierarchy";
 import { createPopupHTML } from "../../utils/mapRenderer";
+import { applyOrderedNeonLayout } from "../../utils/neonLayoutEngine";
+import { isExpectedAbortError } from "../../utils/networkErrorUtils";
 import { calculateDistance, calculateShopStatus } from "../../utils/shopUtils";
 import LiveActivityChips from "./LiveActivityChips.vue";
 import MapLoadingSkeleton from "./MapLoadingSkeleton.vue";
 
-// MapLibre GL does not use mapbox:// style URLs — use env-driven or public fallback
+// MapLibre GL does not use mapbox:// style URLs — use env-driven or local neon fallback
+const NEON_STYLE_URL = isFrontendOnlyDevMode()
+	? "/map-styles/vibecity-dev.json"
+	: "/map-styles/vibecity-neon.json";
 const PRIMARY_STYLE_URL =
 	import.meta.env.VITE_MAP_STYLE_URL ||
 	import.meta.env.VITE_MAP_STYLE_FALLBACK_URL ||
-	"https://demotiles.maplibre.org/style.json";
-const NEON_STYLE_URL = "/src/assets/map-styles/vibecity-neon.json";
+	NEON_STYLE_URL;
 const DARK_STYLE = PRIMARY_STYLE_URL;
 const LIGHT_STYLE = PRIMARY_STYLE_URL;
-const STRICT_E2E_STYLE =
-	import.meta.env.VITE_MAP_STYLE_URL ||
-	"https://demotiles.maplibre.org/style.json";
+const STRICT_E2E_STYLE = import.meta.env.VITE_MAP_STYLE_URL || NEON_STYLE_URL;
 const PIN_SOURCE_ID = "pins_source";
 const PIN_LAYER_ID = "unclustered-pins";
 const PIN_HITBOX_LAYER_ID = "unclustered-pins-hitbox";
@@ -73,6 +86,18 @@ const SELECTED_PIN_LAYER_ID = "selected-pin-marker";
 const CLUSTER_LAYER_ID = "clusters";
 const CLUSTER_COUNT_LAYER_ID = "cluster-count";
 const DISTANCE_LINE_SOURCE_ID = "distance-line";
+const THAILAND_AGGREGATE_LEVEL = "country";
+const COUNTRY_AGGREGATE_MAX_ZOOM = 6.2;
+const PROVINCE_AGGREGATE_MAX_ZOOM = 7.8;
+const ZONE_AGGREGATE_MAX_ZOOM = Number(
+	MAP_CONFIG?.zoom?.giantPin?.aggregate?.max ?? 14.9,
+);
+const COUNTRY_DRILLDOWN_ZOOM = 6.9;
+const PROVINCE_DRILLDOWN_ZOOM = 8.9;
+const ZONE_DRILLDOWN_ZOOM = Math.max(
+	Number(MAP_CONFIG?.zoom?.lod?.full?.min ?? 15),
+	ZONE_AGGREGATE_MAX_ZOOM + 0.1,
+);
 const IS_E2E = import.meta.env.VITE_E2E === "true";
 const IS_STRICT_MAP_E2E = import.meta.env.VITE_E2E_MAP_REQUIRED === "true";
 const ENABLE_DOM_OVERLAY_MARKERS = IS_E2E || IS_STRICT_MAP_E2E;
@@ -89,9 +114,26 @@ const HOT_ROADS_LOW_POWER_INTERVAL_MS = 60000;
 const HOT_ROADS_MAX_INTERVAL_MS = 120000;
 const HOT_ROADS_REQUEST_TIMEOUT_MS = 8000;
 const HOT_ROADS_MIN_ZOOM = 8;
+const SHOULD_FETCH_ROUTE_PROXY =
+	!import.meta.env.DEV ||
+	import.meta.env.VITE_API_PROXY_DEV === "true" ||
+	import.meta.env.VITE_DIRECTIONS_DEV === "true";
 
 const { t, te, locale } = useI18n();
+const IS_FRONTEND_ONLY_DEV_MAP_MODE = isFrontendOnlyDevMode();
+const DEV_SAFE_MAP_RENDERER_PREVIEW = "preview";
 const tt = (key, fallback) => (te(key) ? t(key) : fallback);
+const queueMapIdleTask = (task, timeout = 2500) => {
+	if (typeof window === "undefined") return;
+	const run = () => {
+		void Promise.resolve(task()).catch(() => {});
+	};
+	if (typeof requestIdleCallback === "function") {
+		requestIdleCallback(run, { timeout });
+		return;
+	}
+	setTimeout(run, 32);
+};
 
 const shopStore = useShopStore();
 const prefs = useUserPreferencesStore();
@@ -104,6 +146,14 @@ const enableMapEffectsPipelineV2 = computed(() =>
 );
 const enablePerfGuardrailsV2 = computed(() =>
 	featureFlagStore.isEnabled("enable_perf_guardrails_v2"),
+);
+const shouldBootGodTierLayers = computed(
+	() =>
+		enableMapEffectsPipelineV2.value &&
+		!isPerfRestricted.value &&
+		!IS_FRONTEND_ONLY_DEV_MAP_MODE &&
+		!IS_E2E &&
+		!IS_STRICT_MAP_E2E,
 );
 const styleUrlForTheme = (_isDarkMode) => {
 	if (IS_STRICT_MAP_E2E) return STRICT_E2E_STYLE;
@@ -124,8 +174,8 @@ const styleUrlForTheme = (_isDarkMode) => {
 		window.__mapMetrics.setupStart = _setupStartTime;
 		window.__mapMetrics.setupEnd = _setupEndTime;
 	}
-	if (import.meta.env.DEV && _parseOverhead > 0) {
-		console.log(
+	if (_parseOverhead > 0) {
+		mapDebugLog(
 			`[MapboxContainer] Parse + setup: ${_parseOverhead.toFixed(1)}ms`,
 		);
 	}
@@ -134,8 +184,6 @@ const styleUrlForTheme = (_isDarkMode) => {
 // useDollyZoom deferred — loaded after map idle (non-blocking) [Wave 3: Task 3.1]
 // useFluidOverlay deferred — dynamic import in onMounted (preserves Vue lifecycle) [Wave 3: Task 3.2]
 // useSDFClusters deferred — dynamic import in onMounted (preserves Vue lifecycle) [Wave 3: Task 3.3]
-// useVibeEffects deferred — loaded after map idle (non-blocking)
-import { logCaps } from "../../engine/capabilities.js";
 import { socketService } from "../../services/socketService";
 
 // Deferred useVibeEffects — initialized after map idle
@@ -236,6 +284,73 @@ const props = defineProps({
 	flySkipInternal: { type: Boolean, default: false },
 });
 
+const clampPercent = (value, min, max) => Math.min(max, Math.max(min, value));
+const localDevMapRendererMode = ref(
+	IS_FRONTEND_ONLY_DEV_MAP_MODE ? getLocalDevMapRendererMode() : "webgl",
+);
+const syncLocalDevMapRendererMode = () => {
+	localDevMapRendererMode.value = IS_FRONTEND_ONLY_DEV_MAP_MODE
+		? getLocalDevMapRendererMode()
+		: "webgl";
+};
+const devSafeMapPreviewMode = computed(
+	() =>
+		IS_FRONTEND_ONLY_DEV_MAP_MODE &&
+		localDevMapRendererMode.value === DEV_SAFE_MAP_RENDERER_PREVIEW,
+);
+const devSafePreviewPins = computed(() => {
+	const source = Array.isArray(props.shops) ? props.shops : [];
+	const candidates = source
+		.filter((shop) => {
+			const lat = Number(shop?.lat ?? shop?.latitude);
+			const lng = Number(shop?.lng ?? shop?.longitude);
+			return Number.isFinite(lat) && Number.isFinite(lng);
+		})
+		.slice(0, 18);
+
+	if (!candidates.length) return [];
+
+	const latitudes = candidates.map((shop) => Number(shop.lat ?? shop.latitude));
+	const longitudes = candidates.map((shop) =>
+		Number(shop.lng ?? shop.longitude),
+	);
+	const minLat = Math.min(...latitudes);
+	const maxLat = Math.max(...latitudes);
+	const minLng = Math.min(...longitudes);
+	const maxLng = Math.max(...longitudes);
+	const latSpan = Math.max(maxLat - minLat, 0.01);
+	const lngSpan = Math.max(maxLng - minLng, 0.01);
+	const highlightedId =
+		props.highlightedShopId !== null && props.highlightedShopId !== undefined
+			? String(props.highlightedShopId)
+			: "";
+
+	return candidates.map((shop, index) => {
+		const lat = Number(shop.lat ?? shop.latitude);
+		const lng = Number(shop.lng ?? shop.longitude);
+		const x = lngSpan > 0 ? (lng - minLng) / lngSpan : 0.5;
+		const y = latSpan > 0 ? 1 - (lat - minLat) / latSpan : 0.5;
+		const jitterX = ((index % 3) - 1) * 2.4;
+		const jitterY = ((Math.floor(index / 3) % 3) - 1) * 2.8;
+		return {
+			id: shop.id ?? `preview-${index}`,
+			shop,
+			name: shop.name || shop.title || `Venue ${index + 1}`,
+			isHighlighted: highlightedId !== "" && String(shop.id) === highlightedId,
+			top: `${clampPercent(14 + y * 70 + jitterY, 12, 88)}%`,
+			left: `${clampPercent(10 + x * 80 + jitterX, 8, 92)}%`,
+		};
+	});
+});
+const isMapUiReady = computed(
+	() => devSafeMapPreviewMode.value || isMapReady.value,
+);
+const getMapLifecycleMode = () => {
+	if (devSafeMapPreviewMode.value) return "preview";
+	if (maplessMode.value) return "mapless";
+	return "map";
+};
+
 const prefersReducedMotion = ref(false);
 let motionMediaQuery = null;
 const isPerfRestricted = computed(
@@ -319,7 +434,7 @@ const reportMapLifecycle = (eventType, metadata = {}) => {
 	if (IS_E2E || IS_STRICT_MAP_E2E) return;
 	void frontendObservabilityService.reportMapLifecycle(eventType, {
 		...metadata,
-		mode: maplessMode.value ? "mapless" : "map",
+		mode: getMapLifecycleMode(),
 		isDarkMode: Boolean(props.isDarkMode),
 	});
 };
@@ -334,7 +449,141 @@ const emit = defineEmits([
 ]);
 
 const mapContainer = ref(null);
-const { map, isMapReady, initMap, setMapStyle } = useMapCore(mapContainer);
+const mapContextRecovering = ref(false);
+const webglRecoveryAttempts = ref(0);
+const MAX_WEBGL_RECOVERY_ATTEMPTS = 2;
+let webglRecoveryTimer = null;
+let webglRestoreGraceTimer = null;
+const isMapOperational = () => {
+	const mapInstance = map.value;
+	if (!mapInstance || !isMapReady.value || mapContextRecovering.value) {
+		return false;
+	}
+	try {
+		return Boolean(mapInstance.isStyleLoaded?.() || mapInstance.loaded?.());
+	} catch {
+		return false;
+	}
+};
+const getWebglRestoreGraceMs = () => {
+	if (!isMapReady.value) {
+		return IS_FRONTEND_ONLY_DEV_MAP_MODE ? 1600 : 1200;
+	}
+	return IS_FRONTEND_ONLY_DEV_MAP_MODE ? 320 : 900;
+};
+const scheduleWebglRecovery = (
+	reason = "webgl_context_lost",
+	delayMs = IS_FRONTEND_ONLY_DEV_MAP_MODE ? 24 : 180,
+) => {
+	if (maplessMode.value) return;
+	if (webglRecoveryTimer) return;
+	if (webglRecoveryAttempts.value >= MAX_WEBGL_RECOVERY_ATTEMPTS) {
+		showMapRecoveryHint.value = true;
+		mapLoadTimeoutReached.value = true;
+		reportMapLifecycle("webgl_recovery_exhausted", {
+			reason,
+			attempts: webglRecoveryAttempts.value,
+		});
+		return;
+	}
+
+	webglRecoveryAttempts.value += 1;
+	reportMapLifecycle("webgl_recovery_scheduled", {
+		reason,
+		attempt: webglRecoveryAttempts.value,
+	});
+	webglRecoveryTimer = window.setTimeout(() => {
+		webglRecoveryTimer = null;
+		teardownMap();
+		mapInitRequested.value = false;
+		sentientDisposed = false;
+		initMapOnce(currentStyleUrl.value);
+	}, delayMs);
+};
+const waitForWebglRestore = (reason = "webgl_context_lost") => {
+	if (maplessMode.value) return;
+	if (webglRecoveryTimer || webglRestoreGraceTimer) return;
+	webglRestoreGraceTimer = window.setTimeout(() => {
+		webglRestoreGraceTimer = null;
+		const mapInstance = map.value;
+		const stillHealthy =
+			Boolean(mapInstance) &&
+			(isMapReady.value ||
+				mapInstance?.loaded?.() ||
+				mapInstance?.isStyleLoaded?.());
+		if (stillHealthy) {
+			showMapRecoveryHint.value = false;
+			mapLoadTimeoutReached.value = false;
+			return;
+		}
+		showMapRecoveryHint.value = true;
+		scheduleWebglRecovery(reason);
+	}, getWebglRestoreGraceMs());
+};
+const handleWebglContextLost = () => {
+	mapContextRecovering.value = true;
+	isMapReady.value = false;
+	mapReadyReported.value = false;
+	reportMapLifecycle("webgl_context_lost", {
+		attempt: webglRecoveryAttempts.value + 1,
+	});
+	waitForWebglRestore("webgl_context_lost");
+};
+const settleMapAfterContextRestore = (reason = "webgl_context_restored") => {
+	let attempts = 0;
+	const maxAttempts = IS_FRONTEND_ONLY_DEV_MAP_MODE ? 180 : 120;
+	const settle = () => {
+		const mapInstance = map.value;
+		if (!mapInstance) return;
+		let healthy = false;
+		try {
+			healthy = Boolean(
+				mapInstance.isStyleLoaded?.() || mapInstance.loaded?.(),
+			);
+		} catch {
+			healthy = false;
+		}
+		if (healthy) {
+			mapContextRecovering.value = false;
+			showMapRecoveryHint.value = false;
+			mapLoadTimeoutReached.value = false;
+			webglRecoveryAttempts.value = 0;
+			isMapReady.value = true;
+			queueMapResize(true);
+			scheduleMapRefresh({ force: true, allowSameViewport: true });
+			return;
+		}
+		if (attempts >= maxAttempts) {
+			scheduleWebglRecovery(`${reason}_stalled`);
+			return;
+		}
+		attempts += 1;
+		requestAnimationFrame(settle);
+	};
+	requestAnimationFrame(settle);
+};
+const handleWebglContextRestored = () => {
+	if (webglRestoreGraceTimer) {
+		clearTimeout(webglRestoreGraceTimer);
+		webglRestoreGraceTimer = null;
+	}
+	if (webglRecoveryTimer) {
+		clearTimeout(webglRecoveryTimer);
+		webglRecoveryTimer = null;
+	}
+	showMapRecoveryHint.value = false;
+	mapLoadTimeoutReached.value = false;
+	reportMapLifecycle("webgl_context_restored", {
+		attempt: webglRecoveryAttempts.value,
+	});
+	if (map.value) {
+		settleMapAfterContextRestore("webgl_context_restored");
+	}
+};
+const { map, isMapReady, initMap, setMapStyle } = useMapCore(mapContainer, {
+	onContextLost: handleWebglContextLost,
+	onContextRestored: handleWebglContextRestored,
+});
 
 // ✅ P1: Spatial image prefetcher (v2) — center-priority, adaptive batch, session cache.
 // `warmShop` pre-warms a specific shop on hover so tapping it shows images instantly.
@@ -342,16 +591,17 @@ const { warmShop } = useMapImagePrefetch(
 	map,
 	computed(() => props.shops ?? []),
 );
-// Wave 3: Task 3.5 — Pre-decode critical pin images in parallel with map initialization.
-// Start immediately (setup scope) so pin sprites are in browser decode cache before idle.
-// prefetchCriticalPins() is non-blocking: uses Image.decode() API, never stalls main thread.
-void prefetchCriticalPins();
+// Load non-critical pin sprite prefetching after first paint so map init wins the main thread.
+queueMapIdleTask(async () => {
+	const mod = await import("../../composables/map/prefetchCriticalPins");
+	await mod.prefetchCriticalPins();
+}, 3000);
 const { scheduleSourceUpdate, frameBudgetMissCount, longTaskCount } =
 	useMapRenderScheduler(map, {
 		trackLongTasks: true,
 	});
 const applySourceData = (sourceId, data) => {
-	if (!map.value || !sourceId || !data) return;
+	if (!isMapOperational() || !sourceId || !data) return;
 	if (enableMapRenderSchedulerV2.value) {
 		scheduleSourceUpdate(sourceId, data);
 		return;
@@ -377,6 +627,13 @@ const EMPTY_SELECTED_PIN_FILTER = ["==", ["get", "id"], "__none__"];
 const initMapOnce = (styleOverride = null) => {
 	if (mapInitRequested.value) return;
 	if (!mapContainer.value) return;
+	if (IS_FRONTEND_ONLY_DEV_MAP_MODE) {
+		syncLocalDevMapRendererMode();
+		if (devSafeMapPreviewMode.value) {
+			activateDevSafeMapPreview();
+			return;
+		}
+	}
 
 	mapInitRequested.value = true;
 	mapInitStartedAt.value = Date.now();
@@ -399,8 +656,10 @@ const initMapOnce = (styleOverride = null) => {
 	center.value = initialCenter;
 	mapUserInteracted.value = false;
 	hasAutoCenteredOnUser.value = false;
+	mapContextRecovering.value = false;
 	currentStyleUrl.value = initialStyleUrl;
 	mapTeardownDone = false;
+	sentientDisposed = false;
 	initMap(initialCenter, zoom.value, initialStyleUrl);
 	armStrictStyleGate();
 };
@@ -424,6 +683,41 @@ const updateSelectedPinLayerFilter = (highlightedId) => {
 const maplessMode = ref(false); // User chose to continue without map
 let mapTeardownDone = false;
 
+const activateDevSafeMapPreview = (
+	reason = "chromium_frontend_only_dev_default",
+) => {
+	if (!IS_FRONTEND_ONLY_DEV_MAP_MODE) return;
+	maplessMode.value = false;
+	showMapRecoveryHint.value = false;
+	mapLoadTimeoutReached.value = false;
+	mapReadyReported.value = false;
+	mapContextRecovering.value = false;
+	mapInitRequested.value = false;
+	if (map.value) {
+		teardownMap();
+	}
+	reportMapLifecycle("dev_safe_preview_enabled", { reason });
+};
+
+const enableFullMapForCurrentSession = () => {
+	if (!IS_FRONTEND_ONLY_DEV_MAP_MODE) return;
+	persistLocalDevMapRendererMode("webgl");
+	syncLocalDevMapRendererMode();
+	showMapRecoveryHint.value = false;
+	mapLoadTimeoutReached.value = false;
+	maplessMode.value = false;
+	mapInitRequested.value = false;
+	reportMapLifecycle("dev_safe_preview_disabled", {
+		reason: "manual_opt_in",
+	});
+	initMapOnce(currentStyleUrl.value);
+};
+
+const handleDevSafePreviewPinClick = (shop) => {
+	if (!shop) return;
+	emit("select-shop", shop);
+};
+
 const teardownMap = () => {
 	if (mapTeardownDone) return;
 	mapTeardownDone = true;
@@ -432,11 +726,14 @@ const teardownMap = () => {
 
 	// Cleanup sentient map
 	if (sentient) {
-		sentient.destroy();
+		sentient.dispose?.();
 		sentient = null;
 	}
+	sentientDisposed = true;
 
 	// Cleanup god-tier engine layers
+	_sdfClusters?.dispose?.();
+	_fluidOverlay?.dispose?.();
 	_sdfClusters = null;
 	_fluidOverlay = null;
 
@@ -507,6 +804,7 @@ const armMapRecoveryTimeout = () => {
 		mapRecoveryTimeoutId = null;
 	}
 	if (IS_E2E) return;
+	if (devSafeMapPreviewMode.value) return;
 	if (maplessMode.value) return;
 	if (!mapInitRequested.value || isMapReady.value) return;
 	mapRecoveryTimeoutId = window.setTimeout(() => {
@@ -539,6 +837,10 @@ const handleMapRecovery = () => {
 };
 
 const continueWithoutMap = () => {
+	if (IS_FRONTEND_ONLY_DEV_MAP_MODE) {
+		persistLocalDevMapRendererMode("auto");
+		syncLocalDevMapRendererMode();
+	}
 	maplessMode.value = true;
 	showMapRecoveryHint.value = false;
 	mapLoadTimeoutReached.value = false;
@@ -602,11 +904,21 @@ const {
 	// Wave 2: Task 2.3 — split layer API
 	addCriticalLayers,
 	addDeferredLayers,
+	addNeonSignLayers,
+	neonSignCache,
 } = useMapLayers(map, {
 	effectsMode: () => "full",
 	scheduler: (sourceId, data) => applySourceData(sourceId, data),
 	coinMinZoom: 0,
 });
+
+// Setup neon sign debug helper in development without shipping it in production.
+if (import.meta.env.DEV) {
+	onMounted(async () => {
+		const module = await import("../../utils/neonSignDebug");
+		module.setupNeonSignDebug(map, neonSignCache);
+	});
+}
 
 const {
 	markersMap,
@@ -616,9 +928,15 @@ const {
 	updateEventMarkers: updateEventMarkersCore,
 } = useMapMarkers(map);
 
-import { getMapPins } from "../../services/shopService";
+// Initialize neon sign theme composable
+const { toNeonFeatureProperties } = useNeonSignTheme();
 
-const zoom = ref(16.5);
+import {
+	getMapPins,
+	getMapProvinceAggregates,
+} from "../../services/shopService";
+
+const zoom = ref(17.5);
 const center = ref([DEFAULT_CITY.lng, DEFAULT_CITY.lat]);
 
 const mapInitRequested = ref(false);
@@ -673,7 +991,7 @@ watch(
 			});
 			hasAutoCenteredOnUser.value = true;
 		} catch (e) {
-			console.warn("Mapbox flyTo failed on location update:", e);
+			mapDebugWarn("Mapbox flyTo failed on location update:", e);
 		}
 	},
 	{ immediate: true, deep: false },
@@ -749,7 +1067,7 @@ watch(weatherCondition, (newVal) => {
 // useSDFClusters / useFluidOverlay call onUnmounted internally, which
 // must be registered from setup/onMounted context, NOT from a watcher cb)
 onMounted(() => {
-	initGodTierLayers();
+	ensureGodTierLayersScheduled();
 });
 watch(soundEnabled, (enabled) => {
 	if (enabled && !IS_E2E) {
@@ -899,10 +1217,6 @@ const {
 	shouldRunAtmosphere,
 });
 
-// Vibe Zones for special areas
-const { zonesSourceLoaded, activeZone, addZonesLayers, removeZonesLayers } =
-	useVibeZones(map, isMapReady);
-
 // Wave 2: Task 2.5 — Idle task queue for deferred map work
 const { scheduleIdleTask, executeIdleTasksOnce } = useMapIdleFeatures();
 
@@ -1036,6 +1350,12 @@ const scheduleHotRoadPoll = ({ immediate = false } = {}) => {
 };
 
 const pollHotRoads = async () => {
+	// ปิดการเรียก hot-roads API ใน dev mode เพื่อหลีกเลี่ยง CORS error
+	if (import.meta.env.DEV) {
+		scheduleHotRoadPoll();
+		return;
+	}
+
 	if (!map.value || !isMapReady.value) {
 		scheduleHotRoadPoll();
 		return;
@@ -1090,14 +1410,17 @@ const pollHotRoads = async () => {
 			});
 		}
 	} catch (error) {
-		hotRoadPollFailures.value = Math.min(3, hotRoadPollFailures.value + 1);
-		void frontendObservabilityService.reportFrontendGuardrail(
-			"hot_roads_poll_error",
-			{
-				failures: hotRoadPollFailures.value,
-				reason: String(error?.message || "unknown").slice(0, 80),
-			},
-		);
+		// Fail silently ใน dev mode
+		if (!import.meta.env.DEV) {
+			hotRoadPollFailures.value = Math.min(3, hotRoadPollFailures.value + 1);
+			void frontendObservabilityService.reportFrontendGuardrail(
+				"hot_roads_poll_error",
+				{
+					failures: hotRoadPollFailures.value,
+					reason: String(error?.message || "unknown").slice(0, 80),
+				},
+			);
+		}
 	}
 
 	scheduleHotRoadPoll();
@@ -1267,6 +1590,7 @@ let lastMapRefreshAt = 0;
 let lastForcedMapRefreshAt = 0;
 let lastViewportKey = "";
 let lastGoodPinFeatures = [];
+let lastGoodProvinceAggregateFeatures = [];
 let pinsAbortController = null; // AbortController to cancel stale getMapPins requests
 let mapPinsRpcDisabledUntil = 0;
 let isPinsRefreshInFlight = false;
@@ -1300,7 +1624,7 @@ const scheduleMapRefresh = (options = null) => {
 		"allowSameViewport" in options &&
 		Boolean(options.allowSameViewport);
 
-	if (!map.value || !isMapReady.value) return;
+	if (!isMapOperational()) return;
 	if (props.isGiantPinView) return;
 	if (refreshDebounceTimer) {
 		clearTimeout(refreshDebounceTimer);
@@ -1308,7 +1632,7 @@ const scheduleMapRefresh = (options = null) => {
 
 	refreshDebounceTimer = setTimeout(() => {
 		refreshDebounceTimer = null;
-		if (!map.value || !isMapReady.value) return;
+		if (!isMapOperational()) return;
 
 		const now = Date.now();
 		const viewportKey = getViewportKey();
@@ -1364,7 +1688,7 @@ const scheduleMapRefresh = (options = null) => {
 };
 
 const refreshPins = async () => {
-	if (!map.value || !isMapReady.value) return;
+	if (!isMapOperational()) return;
 	if (props.isGiantPinView) return;
 
 	const seq = ++pinsRefreshSeq;
@@ -1410,6 +1734,11 @@ const refreshPins = async () => {
 		is_event,
 		status,
 	}) => {
+		const aggregateStates = new Set([
+			THAILAND_AGGREGATE_LEVEL,
+			"province",
+			"zone",
+		]);
 		const pinStateRaw = String(pin_state || "")
 			.trim()
 			.toLowerCase();
@@ -1419,6 +1748,7 @@ const refreshPins = async () => {
 		const statusRaw = String(status || "")
 			.trim()
 			.toLowerCase();
+		if (aggregateStates.has(pinStateRaw)) return pinStateRaw;
 		const eventLike =
 			Boolean(is_event) ||
 			pinStateRaw === "event" ||
@@ -1485,6 +1815,16 @@ const refreshPins = async () => {
 		status,
 		is_event,
 		is_live,
+		shop, // Full shop object for neon sign generation
+		province,
+		district,
+		aggregate_level,
+		aggregate_shop_count,
+		aggregate_dominant_count,
+		promotion_score,
+		sign_scale,
+		pin_metadata,
+		extraProperties = {},
 	}) => {
 		const latNum = Number(lat);
 		const lngNum = Number(lng);
@@ -1505,6 +1845,16 @@ const refreshPins = async () => {
 			String(pin_type || "")
 				.trim()
 				.toLowerCase() || "normal";
+
+		// Generate neon sign properties if shop object is provided
+		const neonProps = shop
+			? toNeonFeatureProperties(shop, {
+					selectedShopId: props.highlightedShopId,
+					experimentId: "stable",
+					signatureVersion: "2-stable",
+					clientVersion: import.meta.env.VITE_APP_VERSION || "unknown",
+				})
+			: {};
 
 		return {
 			type: "Feature",
@@ -1528,6 +1878,9 @@ const refreshPins = async () => {
 						.trim()
 						.toUpperCase() ||
 					{
+						country: "COUNTRY",
+						province: "PROVINCE",
+						zone: "ZONE",
 						live: "LIVE",
 						open: "ACTIVE",
 						tonight: "TONIGHT",
@@ -1535,6 +1888,17 @@ const refreshPins = async () => {
 					"OFF",
 				vibe_score: Number(visibility_score ?? 0) || 0,
 				image: image || null,
+				province: province ?? shop?.province ?? shop?.Province ?? null,
+				district: district ?? shop?.district ?? shop?.Zone ?? null,
+				aggregate_level: aggregate_level || null,
+				aggregate_shop_count: Number(aggregate_shop_count ?? 0) || 0,
+				aggregate_dominant_count: Number(aggregate_dominant_count ?? 0) || 0,
+				promotion_score: Number(promotion_score ?? 0) || 0,
+				sign_scale: Number(sign_scale ?? 1) || 1,
+				pin_metadata: pin_metadata ?? null,
+				// Add neon sign properties
+				...neonProps,
+				...extraProperties,
 			},
 		};
 	};
@@ -1567,6 +1931,9 @@ const refreshPins = async () => {
 			status: scheduleStatus,
 			is_event: isGiant || Boolean(shop.is_event),
 			is_live: scheduleStatus === "LIVE",
+			shop, // Pass full shop object for neon sign generation
+			province: shop.province ?? shop.Province,
+			district: shop.district ?? shop.Zone,
 		});
 	};
 
@@ -1589,6 +1956,15 @@ const refreshPins = async () => {
 			status: p.status,
 			is_event: p.isEvent || p.is_event,
 			is_live: p.isLive || p.is_live,
+			province: p.province,
+			district: p.district ?? p.zone,
+			aggregate_level: p.aggregateLevel || p.aggregate_level,
+			aggregate_shop_count: p.aggregateShopCount ?? p.aggregate_shop_count,
+			aggregate_dominant_count:
+				p.aggregateDominantCount ?? p.aggregate_dominant_count,
+			promotion_score: p.promotionScore ?? p.promotion_score,
+			sign_scale: p.signScale ?? p.sign_scale,
+			pin_metadata: p.pinMetadata ?? p.pin_metadata,
 		});
 	};
 
@@ -1642,6 +2018,139 @@ const refreshPins = async () => {
 			});
 		}
 		return Array.from(merged.values());
+	};
+
+	const maybeEnsureHighlightedShop = (features = []) =>
+		currentZoom >= ZONE_AGGREGATE_MAX_ZOOM
+			? ensureHighlightedShop(features)
+			: features;
+
+	const projectMapCoordinate = (coordinates) => {
+		if (!map.value || !Array.isArray(coordinates) || coordinates.length < 2) {
+			return null;
+		}
+		try {
+			return map.value.project(coordinates);
+		} catch {
+			return null;
+		}
+	};
+
+	const decorateAggregateFeatures = (features = [], fallbackLevel = "zone") =>
+		features.map((feature) => {
+			const aggregateLevel = String(
+				feature?.properties?.aggregate_level || fallbackLevel,
+			)
+				.trim()
+				.toLowerCase();
+			const defaultScale =
+				aggregateLevel === THAILAND_AGGREGATE_LEVEL
+					? 2.45
+					: aggregateLevel === "province"
+						? 1.9
+						: 1.24;
+			return {
+				...feature,
+				properties: {
+					...(feature?.properties || {}),
+					pin_type: "giant",
+					pin_state: aggregateLevel,
+					aggregate_level: aggregateLevel,
+					is_event: true,
+					sign_scale:
+						Number(feature?.properties?.sign_scale ?? defaultScale) ||
+						defaultScale,
+				},
+			};
+		});
+
+	const buildProvinceFallbackFeatures = (features = []) => {
+		if (!Array.isArray(features) || features.length === 0) return [];
+		return decorateAggregateFeatures(
+			buildMapPinPresentation({
+				features,
+				projector: projectMapCoordinate,
+				zoom: 0,
+			}).features,
+			"province",
+		);
+	};
+
+	const buildViewportAggregateFeatures = (features = []) => {
+		if (!Array.isArray(features) || features.length === 0) return [];
+		return decorateAggregateFeatures(
+			buildMapPinPresentation({
+				features,
+				projector: projectMapCoordinate,
+				zoom: currentZoom,
+			}).features,
+			"zone",
+		);
+	};
+
+	const buildThailandAggregateFeatures = (features = []) => {
+		if (!Array.isArray(features) || features.length === 0) return [];
+		let weightedLatSum = 0;
+		let weightedLngSum = 0;
+		let weightSum = 0;
+		let shopCount = 0;
+		let dominantCount = 0;
+		let visibilityScore = 0;
+		let hasLive = false;
+
+		for (const feature of features) {
+			const lng = Number(feature?.geometry?.coordinates?.[0]);
+			const lat = Number(feature?.geometry?.coordinates?.[1]);
+			if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+			const bucketWeight =
+				Number(feature?.properties?.aggregate_shop_count ?? 1) || 1;
+			weightedLatSum += lat * bucketWeight;
+			weightedLngSum += lng * bucketWeight;
+			weightSum += bucketWeight;
+			shopCount += bucketWeight;
+			dominantCount +=
+				Number(feature?.properties?.aggregate_dominant_count ?? 0) || 0;
+			visibilityScore +=
+				Number(feature?.properties?.visibility_score ?? 0) || 0;
+			hasLive =
+				hasLive ||
+				String(feature?.properties?.pin_state || "")
+					.trim()
+					.toLowerCase() === "live";
+		}
+
+		if (!weightSum) return [];
+		const label = locale.value === "th" ? "ประเทศไทย" : "Thailand";
+		const formattedCount = shopCount.toLocaleString(
+			locale.value === "th" ? "th-TH" : "en-US",
+		);
+		const feature = toPinFeature({
+			id: "country:thailand",
+			name: label,
+			lat: weightedLatSum / weightSum,
+			lng: weightedLngSum / weightSum,
+			pin_type: "giant",
+			pin_state: THAILAND_AGGREGATE_LEVEL,
+			status: hasLive ? "LIVE" : "COUNTRY",
+			is_event: true,
+			visibility_score: visibilityScore,
+			aggregate_level: THAILAND_AGGREGATE_LEVEL,
+			aggregate_shop_count: shopCount,
+			aggregate_dominant_count: dominantCount,
+			sign_scale: 2.45,
+			pin_metadata: {
+				aggregate: true,
+				aggregate_level: THAILAND_AGGREGATE_LEVEL,
+			},
+			extraProperties: {
+				neon_line1: label,
+				neon_line2: `${formattedCount} venues`,
+				neon_subline: `${formattedCount} venues`,
+			},
+		});
+		return feature
+			? decorateAggregateFeatures([feature], THAILAND_AGGREGATE_LEVEL)
+			: [];
 	};
 
 	const reconcileFeatureStatesWithShops = (features = []) =>
@@ -1709,28 +2218,116 @@ const refreshPins = async () => {
 		if (seq !== pinsRefreshSeq) return;
 		if (!map.value) return;
 		const reconciled = reconcileFeatureStatesWithShops(features);
-		applySourceData(PIN_SOURCE_ID, {
+		const laidOut = applyOrderedNeonLayout(reconciled, map.value);
+		const sourceData = {
 			type: "FeatureCollection",
-			features: reconciled,
-		});
+			features: laidOut,
+		};
+
+		// Debug: Log feature application
+		if (isMapDebugLoggingEnabled()) {
+			const featuresWithNeon = laidOut.filter((f) => f?.properties?.neon_key);
+			mapDebugLog(
+				`[NeonDebug] applyFeatures called with ${laidOut.length} features, ${featuresWithNeon.length} have neon_key`,
+			);
+			if (featuresWithNeon.length > 0) {
+				mapDebugLog(
+					"[NeonDebug] Sample feature with neon:",
+					featuresWithNeon[0]?.properties,
+				);
+			}
+		}
+
+		applySourceData(PIN_SOURCE_ID, sourceData);
+
+		// Add neon sign layers after source data is applied
+		if (map.value.isStyleLoaded?.()) {
+			addNeonSignLayers(PIN_SOURCE_ID, sourceData);
+		}
+
 		refreshSmartPulseTargets();
 	};
 
 	if (IS_E2E) {
-		const fallback = ensureHighlightedShop(
+		const fallback = maybeEnsureHighlightedShop(
 			buildFallbackFeaturesFromShopsInBounds(),
 		);
 		applyFeatures(fallback);
 		return;
 	}
 
+	// Cancel any in-flight pin request before starting the next render pass.
+	if (pinsAbortController) pinsAbortController.abort();
+	pinsAbortController = new AbortController();
+	const { signal } = pinsAbortController;
+
+	const buildProvinceModeFallback = () => {
+		const cachedProvinceFeatures =
+			lastGoodProvinceAggregateFeatures.length > 0
+				? lastGoodProvinceAggregateFeatures
+				: buildProvinceFallbackFeatures(
+						lastGoodPinFeatures.length > 0
+							? lastGoodPinFeatures
+							: buildFallbackFeaturesFromShopsInBounds(),
+					);
+		return currentZoom < COUNTRY_AGGREGATE_MAX_ZOOM
+			? buildThailandAggregateFeatures(cachedProvinceFeatures)
+			: cachedProvinceFeatures;
+	};
+
+	if (currentZoom < PROVINCE_AGGREGATE_MAX_ZOOM) {
+		const immediateProvinceFallback = buildProvinceModeFallback();
+		if (immediateProvinceFallback.length > 0) {
+			applyFeatures(immediateProvinceFallback);
+		}
+
+		try {
+			const provincePins = await getMapProvinceAggregates({ signal });
+			if (seq !== pinsRefreshSeq) return;
+
+			const provinceFeatures = decorateAggregateFeatures(
+				(provincePins || []).map(pinFeatureFromRpc).filter(Boolean),
+				"province",
+			);
+			if (provinceFeatures.length > 0) {
+				lastGoodProvinceAggregateFeatures = provinceFeatures;
+			}
+
+			const lowZoomFeatures =
+				currentZoom < COUNTRY_AGGREGATE_MAX_ZOOM
+					? buildThailandAggregateFeatures(
+							provinceFeatures.length > 0
+								? provinceFeatures
+								: lastGoodProvinceAggregateFeatures,
+						)
+					: provinceFeatures.length > 0
+						? provinceFeatures
+						: lastGoodProvinceAggregateFeatures;
+			applyFeatures(lowZoomFeatures);
+		} catch (err) {
+			if (isExpectedAbortError(err, { signal })) return;
+			mapDebugWarn(
+				"Province aggregate RPC failed, using cached aggregate fallback:",
+				err?.message || err,
+			);
+			const fallback = buildProvinceModeFallback();
+			applyFeatures(fallback);
+		}
+		return;
+	}
+
+	const buildViewportDisplayFeatures = (features = []) => {
+		if (!Array.isArray(features) || features.length === 0) return [];
+		return currentZoom < ZONE_AGGREGATE_MAX_ZOOM
+			? buildViewportAggregateFeatures(features)
+			: maybeEnsureHighlightedShop(features);
+	};
+
 	if (Date.now() < mapPinsRpcDisabledUntil) {
-		const localFallback = ensureHighlightedShop(
-			buildFallbackFeaturesFromShopsInBounds(),
-		);
+		const localFallback = buildFallbackFeaturesFromShopsInBounds();
 		const fallback = localFallback.length
-			? localFallback
-			: ensureHighlightedShop(lastGoodPinFeatures);
+			? buildViewportDisplayFeatures(localFallback)
+			: buildViewportDisplayFeatures(lastGoodPinFeatures);
 		applyFeatures(fallback);
 		return;
 	}
@@ -1738,19 +2335,22 @@ const refreshPins = async () => {
 	// ★ Instant-pins: show fallback data immediately so the map is never empty
 	// while waiting for the RPC. If we have cached RPC data, use it; otherwise
 	// build from the shops prop. RPC data will upgrade these when it arrives.
-	const immediateFallback = ensureHighlightedShop(
+	const localFallbackFeatures = buildFallbackFeaturesFromShopsInBounds();
+	const immediateFallback = buildViewportDisplayFeatures(
 		lastGoodPinFeatures.length > 0
 			? lastGoodPinFeatures
-			: buildFallbackFeaturesFromShopsInBounds(),
+			: localFallbackFeatures,
 	);
 	if (immediateFallback.length > 0) {
 		applyFeatures(immediateFallback);
 	}
 
-	// Cancel any in-flight getMapPins before starting a new one
-	if (pinsAbortController) pinsAbortController.abort();
-	pinsAbortController = new AbortController();
-	const { signal } = pinsAbortController;
+	if (isFrontendOnlyDevMode()) {
+		if (localFallbackFeatures.length > 0) {
+			lastGoodPinFeatures = localFallbackFeatures;
+		}
+		return;
+	}
 
 	try {
 		const pins = await getMapPins({
@@ -1768,19 +2368,21 @@ const refreshPins = async () => {
 			.filter((p) => isAllowedId(p?.id))
 			.map(pinFeatureFromRpc)
 			.filter(Boolean);
-		const fallbackFeatures = buildFallbackFeaturesFromShopsInBounds();
-		const mergedFeatures = mergeFeaturesById(fallbackFeatures, rpcFeatures);
+		const mergedFeatures = mergeFeaturesById(
+			localFallbackFeatures,
+			rpcFeatures,
+		);
 		if (mergedFeatures.length > 0) {
 			lastGoodPinFeatures = mergedFeatures;
 		}
 
-		let features = ensureHighlightedShop(mergedFeatures);
+		let features = buildViewportDisplayFeatures(mergedFeatures);
 		if (!features.length && lastGoodPinFeatures.length) {
-			features = ensureHighlightedShop(lastGoodPinFeatures);
+			features = buildViewportDisplayFeatures(lastGoodPinFeatures);
 		}
 		applyFeatures(features);
 	} catch (err) {
-		if (err?.name === "AbortError" || signal?.aborted) return;
+		if (isExpectedAbortError(err, { signal })) return;
 		const statusCode = Number(err?.status || err?.code || 0);
 		const isServerError =
 			(statusCode >= 500 && statusCode < 600) ||
@@ -1789,19 +2391,15 @@ const refreshPins = async () => {
 			mapPinsRpcDisabledUntil = Date.now() + 60_000;
 		}
 		// On failure, fallback data is already displayed — only log the error
-		if (import.meta.env.DEV) {
-			console.warn(
-				"Map pins RPC failed, using displayed fallback:",
-				err?.message || err,
-			);
-		}
-		// Re-apply with latest fallback to ensure consistency
-		const localFallback = ensureHighlightedShop(
-			buildFallbackFeaturesFromShopsInBounds(),
+		mapDebugWarn(
+			"Map pins RPC failed, using displayed fallback:",
+			err?.message || err,
 		);
+		// Re-apply with latest fallback to ensure consistency
+		const localFallback = buildFallbackFeaturesFromShopsInBounds();
 		const fallback = localFallback.length
-			? localFallback
-			: ensureHighlightedShop(lastGoodPinFeatures);
+			? buildViewportDisplayFeatures(localFallback)
+			: buildViewportDisplayFeatures(lastGoodPinFeatures);
 		applyFeatures(fallback);
 	}
 };
@@ -1812,7 +2410,7 @@ const markMapUserInteraction = () => {
 
 // Bind events
 watch(isMapReady, (ready) => {
-	if (ready && map.value) {
+	if (ready && map.value && isMapOperational()) {
 		if (SHOULD_EXPOSE_MAP_DEBUG && typeof window !== "undefined") {
 			window.__vibecityMapDebug = map.value;
 		}
@@ -1885,14 +2483,6 @@ watch(
 
 const roadDistance = ref(null);
 const roadDuration = ref(null);
-const isAbortLikeError = (err) => {
-	const name = String(err?.name || "").toLowerCase();
-	if (name === "aborterror") return true;
-	const causeName = String(err?.cause?.name || "").toLowerCase();
-	if (causeName === "aborterror") return true;
-	const message = String(err?.message || "").toLowerCase();
-	return message.includes("signal is aborted");
-};
 
 // ✅ Fetch Road-based Directions
 // ✅ Update Popup UI with new distance
@@ -1919,6 +2509,18 @@ const updateRoadDirections = async () => {
 		!props.selectedShopCoords ||
 		props.selectedShopCoords.length < 2
 	) {
+		roadDistance.value = null;
+		roadDuration.value = null;
+		hasActiveRoute.value = false;
+		stopRouteTrailAnimation();
+		applySourceData(DISTANCE_LINE_SOURCE_ID, {
+			type: "FeatureCollection",
+			features: [],
+		});
+		return;
+	}
+
+	if (!SHOULD_FETCH_ROUTE_PROXY) {
 		roadDistance.value = null;
 		roadDuration.value = null;
 		hasActiveRoute.value = false;
@@ -1972,7 +2574,15 @@ const updateRoadDirections = async () => {
 		);
 
 		if (!res.ok) {
-			if (!IS_E2E) console.warn("Route proxy request failed:", res.status);
+			if (!IS_E2E) mapDebugWarn("Route proxy request failed:", res.status);
+			roadDistance.value = null;
+			roadDuration.value = null;
+			hasActiveRoute.value = false;
+			stopRouteTrailAnimation();
+			applySourceData(DISTANCE_LINE_SOURCE_ID, {
+				type: "FeatureCollection",
+				features: [],
+			});
 			return;
 		}
 
@@ -2002,12 +2612,20 @@ const updateRoadDirections = async () => {
 			stopRouteTrailAnimation();
 		}
 	} catch (err) {
-		if (isAbortLikeError(err)) return;
-		if (!IS_E2E) {
-			console.warn("Route fetch failed", err);
+		if (isExpectedAbortError(err, { signal: routeAbortController?.signal })) {
+			return;
 		}
+		if (!IS_E2E) {
+			mapDebugWarn("Route fetch failed", err);
+		}
+		roadDistance.value = null;
+		roadDuration.value = null;
 		hasActiveRoute.value = false;
 		stopRouteTrailAnimation();
+		applySourceData(DISTANCE_LINE_SOURCE_ID, {
+			type: "FeatureCollection",
+			features: [],
+		});
 	}
 };
 
@@ -2150,7 +2768,6 @@ watch(
 		if (!shouldHide) {
 			nextTick(() => {
 				queueMapResize(true);
-				window.setTimeout(() => queueMapResize(true), 120);
 			});
 		}
 	},
@@ -2208,9 +2825,9 @@ const attachCoinLayerWithFallback = ({ allowRetry = true } = {}) => {
  * Setup static map layers (sources and layers).
  * This is called once on map load or style change.
  */
-const setupMapLayers = () => {
+const setupMapLayers = async () => {
 	if (!map.value) return;
-	loadMapImages(map.value);
+	await loadMapImages(map.value);
 	try {
 		map.value.setTerrain?.(null);
 	} catch {
@@ -2251,8 +2868,14 @@ const setupMapLayers = () => {
 				"icon-image": [
 					"match",
 					["get", "pin_state"],
+					THAILAND_AGGREGATE_LEVEL,
+					"pin-blue",
+					"province",
+					"pin-blue",
+					"zone",
+					"pin-blue",
 					"event",
-					"pin-purple",
+					"pin-blue",
 					"live",
 					"pin-red",
 					"open",
@@ -2261,14 +2884,34 @@ const setupMapLayers = () => {
 					"pin-blue",
 					"pin-grey",
 				],
-				"icon-size": ["case", ["==", ["get", "pin_type"], "giant"], 0.27, 0.2],
+				"icon-size": [
+					"case",
+					["==", ["get", "aggregate_level"], THAILAND_AGGREGATE_LEVEL],
+					0.44,
+					["==", ["get", "aggregate_level"], "province"],
+					0.35,
+					["==", ["get", "aggregate_level"], "zone"],
+					0.3,
+					["==", ["get", "pin_type"], "giant"],
+					0.27,
+					0.2,
+				],
 				"icon-allow-overlap": true,
 				"icon-anchor": "bottom",
 				"text-field": ["get", "name"], // Show name for ALL pins
 				"text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
 				"text-offset": [0, 1.2],
 				"text-anchor": "top",
-				"text-size": 12,
+				"text-size": [
+					"case",
+					["==", ["get", "aggregate_level"], THAILAND_AGGREGATE_LEVEL],
+					17,
+					["==", ["get", "aggregate_level"], "province"],
+					14,
+					["==", ["get", "aggregate_level"], "zone"],
+					12,
+					12,
+				],
 				"text-optional": true,
 			},
 			paint: {
@@ -2290,8 +2933,14 @@ const setupMapLayers = () => {
 				"icon-image": [
 					"match",
 					["get", "pin_state"],
+					THAILAND_AGGREGATE_LEVEL,
+					"pin-blue",
+					"province",
+					"pin-blue",
+					"zone",
+					"pin-blue",
 					"event",
-					"pin-purple",
+					"pin-blue",
 					"live",
 					"pin-red",
 					"open",
@@ -2300,7 +2949,18 @@ const setupMapLayers = () => {
 					"pin-blue",
 					"pin-grey",
 				],
-				"icon-size": ["case", ["==", ["get", "pin_type"], "giant"], 0.32, 0.24],
+				"icon-size": [
+					"case",
+					["==", ["get", "aggregate_level"], THAILAND_AGGREGATE_LEVEL],
+					0.5,
+					["==", ["get", "aggregate_level"], "province"],
+					0.39,
+					["==", ["get", "aggregate_level"], "zone"],
+					0.34,
+					["==", ["get", "pin_type"], "giant"],
+					0.32,
+					0.24,
+				],
 				"icon-allow-overlap": true,
 				"icon-ignore-placement": true,
 				"icon-anchor": "bottom",
@@ -2338,7 +2998,7 @@ const setupMapLayers = () => {
 						["==", ["get", "pin_state"], "live"],
 						"#ef4444",
 						["==", ["get", "pin_state"], "event"],
-						"#a855f7",
+						"#06b6d4",
 						"#60a5fa",
 					],
 					"circle-opacity": [
@@ -2367,6 +3027,12 @@ const setupMapLayers = () => {
 				paint: {
 					"circle-radius": [
 						"case",
+						["==", ["get", "aggregate_level"], THAILAND_AGGREGATE_LEVEL],
+						24,
+						["==", ["get", "aggregate_level"], "province"],
+						20,
+						["==", ["get", "aggregate_level"], "zone"],
+						17,
 						["==", ["get", "pin_type"], "giant"],
 						16,
 						["==", ["get", "boost"], true],
@@ -2462,11 +3128,18 @@ const setupMapLayers = () => {
 			},
 		});
 	}
+
+	// 7. Initialize neon sign layers (will be populated when shop data is loaded)
+	// The layers are created here but sprites are generated on-demand in applyFeatures
+	if (map.value.isStyleLoaded?.()) {
+		// Neon sign layers will be added when shop data is first applied
+		// This ensures the PIN_SOURCE_ID exists before adding neon layers
+	}
 };
 
 // Update GeoJSON sources
 const updateMapSources = () => {
-	if (!map.value || !isMapReady.value) return;
+	if (!isMapOperational()) return;
 
 	// 1. Update user location
 	if (map.value.getSource("user-location") && props.userLocation) {
@@ -2540,40 +3213,17 @@ const ensureMapboxLoaded = () => {
 // ✅ WebGL Support Detection - More robust check
 const checkWebGLSupport = () => {
 	try {
-		const canvas = document.createElement("canvas");
-		// Try WebGL2 first, then WebGL1
-		const gl =
-			canvas.getContext("webgl2") ||
-			canvas.getContext("webgl") ||
-			canvas.getContext("experimental-webgl");
+		const hasWebGLApi =
+			typeof window !== "undefined" &&
+			(typeof window.WebGL2RenderingContext !== "undefined" ||
+				typeof window.WebGLRenderingContext !== "undefined");
 
-		if (!gl) {
-			console.error("❌ WebGL context could not be created");
+		if (!hasWebGLApi) {
+			console.error("❌ WebGL API is not available");
 			reportMapLifecycle("webgl_unsupported", {
-				reason: "context_unavailable",
+				reason: "api_unavailable",
 			});
 			return false;
-		}
-
-		// Check for required extensions
-		const debugInfo = gl.getExtension("WEBGL_debug_renderer_info");
-		if (debugInfo) {
-			const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
-			const vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
-			if (import.meta.env.DEV) {
-				console.log("🎮 GPU:", vendor, renderer);
-			}
-
-			// Some software renderers may cause issues
-			if (renderer?.toLowerCase().includes("swiftshader")) {
-				if (import.meta.env.DEV) {
-					console.warn("⚠️ Software WebGL renderer detected, map may be slow");
-				}
-			}
-		}
-
-		if (import.meta.env.DEV) {
-			console.log("✅ WebGL is supported");
 		}
 		return true;
 	} catch (e) {
@@ -2590,9 +3240,10 @@ const webGLSupported = ref(true);
 const shouldShowMapLoadingSkeleton = computed(
 	() =>
 		mapInitRequested.value &&
-		!isMapReady.value &&
+		!isMapUiReady.value &&
 		!isTokenInvalid.value &&
 		webGLSupported.value &&
+		!devSafeMapPreviewMode.value &&
 		!maplessMode.value,
 );
 const mapA11yLabel = computed(() => {
@@ -2600,6 +3251,9 @@ const mapA11yLabel = computed(() => {
 		return tt("map.token_error.title", "Map unavailable");
 	if (!webGLSupported.value && !maplessMode.value) {
 		return tt("map.webgl_error.title", "Map unavailable");
+	}
+	if (devSafeMapPreviewMode.value) {
+		return tt("map.dev_preview.title", "Stable local preview mode");
 	}
 	if (maplessMode.value) return tt("map.mapless.unavailable", "List mode");
 	if (shouldShowMapLoadingSkeleton.value || showMapRecoveryHint.value) {
@@ -2610,6 +3264,7 @@ const mapA11yLabel = computed(() => {
 
 const queueMapResize = (force = false) => {
 	if (!map.value) return;
+	if (mapContextRecovering.value) return;
 	const now = performance.now();
 	if (!force && resizeRaf && now - lastResizeAt < RESIZE_DEBOUNCE_MS) {
 		return;
@@ -2632,8 +3287,11 @@ const queueMapResize = (force = false) => {
 // ✅ Map Initialization (Composables)
 let resizeObserver = null;
 onMounted(() => {
-	if (import.meta.env.DEV) {
-		console.log("🗺️ Initializing Mapbox Core...");
+	mapDebugLog("🗺️ Initializing Mapbox Core...");
+	syncLocalDevMapRendererMode();
+	if (devSafeMapPreviewMode.value) {
+		activateDevSafeMapPreview();
+		return;
 	}
 	initMapOnce();
 	if (!trafficRefreshInterval) {
@@ -2653,12 +3311,10 @@ onMounted(() => {
 });
 
 // ✅ Watch for Map Ready
-watch(isMapReady, (ready) => {
+watch(isMapReady, async (ready) => {
 	if (ready && map.value) {
-		if (import.meta.env.DEV) {
-			console.log("✅ Map Core Ready - Setting up Layers");
-		}
-		setupMapLayers();
+		mapDebugLog("✅ Map Core Ready - Setting up Layers");
+		await setupMapLayers();
 		updateMapSources();
 		refreshSmartPulseTargets();
 		requestUpdateMarkers();
@@ -2733,7 +3389,7 @@ const showPopup = (item, { force = false, remember = true } = {}) => {
 
 	// Guard: Ensure both map and maplibregl are ready
 	if (!map.value || !maplibregl) {
-		console.warn("⚠️ Map or maplibregl not ready for popup");
+		mapDebugWarn("⚠️ Map or maplibregl not ready for popup");
 		return false;
 	}
 
@@ -2878,6 +3534,37 @@ const resolveFeatureItem = (shopData = {}, feature = null) => {
 	return { ...shopData, id };
 };
 
+const handleAggregatePinTap = ({ aggregateLevel, feature }) => {
+	if (!map.value) return;
+	const coordinates = feature?.geometry?.coordinates;
+	if (!Array.isArray(coordinates) || coordinates.length < 2) return;
+
+	let targetZoom = ZONE_DRILLDOWN_ZOOM;
+	switch (
+		String(aggregateLevel || "")
+			.trim()
+			.toLowerCase()
+	) {
+		case THAILAND_AGGREGATE_LEVEL:
+			targetZoom = COUNTRY_DRILLDOWN_ZOOM;
+			break;
+		case "province":
+			targetZoom = PROVINCE_DRILLDOWN_ZOOM;
+			break;
+		default:
+			targetZoom = ZONE_DRILLDOWN_ZOOM;
+			break;
+	}
+
+	mapUserInteracted.value = true;
+	map.value.easeTo({
+		center: coordinates,
+		zoom: Math.max(Number(map.value.getZoom?.() ?? 0), targetZoom),
+		duration: 800,
+		essential: true,
+	});
+};
+
 // ✅ Map Interactions moved to useMapInteractions
 const {
 	handlePointClick,
@@ -2898,10 +3585,39 @@ const {
 	clusterLayerId: CLUSTER_LAYER_ID,
 	pinSourceId: PIN_SOURCE_ID,
 	onPinTap: () => sentient?.onManualPinTap?.(),
+	onAggregateTap: handleAggregatePinTap,
 });
 
 // ✅ Sentient Map — Predictive intent detection with anti-flicker stability
 let sentient = null;
+let sentientModulePromise = null;
+let sentientDisposed = false;
+const preloadSentientMap = () => {
+	sentientModulePromise ||= import("../../composables/map/useSentientMap");
+	return sentientModulePromise;
+};
+const initSentientMap = async () => {
+	if (sentient || sentientDisposed) return sentient;
+	const mod = await preloadSentientMap();
+	if (sentient || sentientDisposed) return sentient;
+	sentient = mod.createSentientMapController(
+		map,
+		isMapReady,
+		mapContainer,
+		computed(() => props.shops || []),
+		computed(() => props.highlightedShopId),
+		emit,
+		{
+			pinSourceId: PIN_SOURCE_ID,
+			pinLayerId: PIN_LAYER_ID,
+			prefetchFn: prefetchVenueDetails,
+		},
+	);
+	sentient.attach();
+	return sentient;
+};
+queueMapIdleTask(preloadSentientMap, 1200);
+queueMapIdleTask(initSentientMap, 2200);
 
 // ── God-Tier Engine Layers ────────────────────────────────────
 // Wave 3: Task 3.1 — useDollyZoom async-loaded via idle queue (no onUnmounted = safe)
@@ -2915,26 +3631,42 @@ let sentient = null;
 // the chunks in setup scope, then call composables synchronously in onMounted once
 // the modules are ready. If not ready in time, initGodTierLayers is a no-op and
 // the next call from the retry will succeed (modules cached after first fetch).
-logCaps();
+if (isMapDebugLoggingEnabled()) {
+	void import("../../engine/capabilities.js")
+		.then(({ logCaps }) => {
+			logCaps();
+		})
+		.catch(() => {});
+}
 let _sdfClusters = null;
 let _fluidOverlay = null;
+let _sdfChunkPromise = null;
+let _fluidChunkPromise = null;
+let _godTierModulesPrefetched = false;
+let _godTierInitScheduled = false;
 
 // Dolly zoom deferred instance (set after idle queue fires)
 let _dollyZoomInstance = null;
 
-// Pre-warm: start downloading the async chunks immediately in setup scope
-// (parallel with map initialization, before onMounted fires).
-// These are module-level promises; the actual composables are called synchronously
-// inside onMounted to preserve Vue lifecycle context for onUnmounted registration.
-const _sdfChunkPromise = import(
-	"../../composables/engine/useSDFClusters.js"
-).catch(() => null);
-const _fluidChunkPromise = import(
-	"../../composables/engine/useFluidOverlay.js"
-).catch(() => null);
+const loadGodTierModules = () => {
+	if (!shouldBootGodTierLayers.value) {
+		return Promise.resolve([null, null]);
+	}
+	_sdfChunkPromise ||= import(
+		"../../composables/engine/useSDFClusters.js"
+	).catch(() => null);
+	_fluidChunkPromise ||= import(
+		"../../composables/engine/useFluidOverlay.js"
+	).catch(() => null);
+	return Promise.all([_sdfChunkPromise, _fluidChunkPromise]);
+};
 
 let _godTierInit = false;
 const initGodTierLayers = () => {
+	if (!shouldBootGodTierLayers.value) {
+		_godTierInit = false;
+		return;
+	}
 	if (_godTierInit) return; // only init once
 	_godTierInit = true;
 	const m = map.value;
@@ -2949,31 +3681,57 @@ const initGodTierLayers = () => {
 	// synchronous portion of onMounted, so async .then() callbacks cannot register it.
 	// As a result, cleanup is handled by teardownMap() (sets _sdfClusters/_fluidOverlay = null).
 	// The composables' internal onUnmounted handlers are a bonus but not the only safety net.
-	Promise.all([_sdfChunkPromise, _fluidChunkPromise])
+	loadGodTierModules()
 		.then(([sdfMod, fluidMod]) => {
-			if (!map.value) return; // component unmounted while loading
+			if (!map.value || !shouldBootGodTierLayers.value) {
+				_godTierInit = false;
+				return;
+			}
 			try {
 				if (sdfMod) _sdfClusters = sdfMod.useSDFClusters(map.value);
 			} catch (err) {
-				if (import.meta.env.DEV)
-					console.warn("[MapboxContainer] SDF clusters failed:", err);
+				mapDebugWarn("[MapboxContainer] SDF clusters failed:", err);
 			}
 			try {
 				if (fluidMod) _fluidOverlay = fluidMod.useFluidOverlay(map.value);
 			} catch (err) {
-				if (import.meta.env.DEV)
-					console.warn("[MapboxContainer] Fluid overlay failed:", err);
+				mapDebugWarn("[MapboxContainer] Fluid overlay failed:", err);
 			}
 		})
 		.catch((err) => {
-			if (import.meta.env.DEV) {
-				console.warn(
-					"[MapboxContainer] God-tier engine layers failed to load:",
-					err,
-				);
-			}
+			_godTierInit = false;
+			mapDebugWarn(
+				"[MapboxContainer] God-tier engine layers failed to load:",
+				err,
+			);
 		});
 };
+const ensureGodTierLayersScheduled = () => {
+	if (!shouldBootGodTierLayers.value) return;
+	if (!_godTierModulesPrefetched) {
+		_godTierModulesPrefetched = true;
+		queueMapIdleTask(() => loadGodTierModules(), 3500);
+	}
+	if (_godTierInitScheduled) return;
+	_godTierInitScheduled = true;
+	queueMapIdleTask(() => initGodTierLayers(), 5000);
+};
+watch(
+	shouldBootGodTierLayers,
+	(enabled) => {
+		if (enabled) {
+			ensureGodTierLayersScheduled();
+			return;
+		}
+		_sdfClusters?.dispose?.();
+		_fluidOverlay?.dispose?.();
+		_sdfClusters = null;
+		_fluidOverlay = null;
+		_godTierInit = false;
+		_godTierInitScheduled = false;
+	},
+	{ immediate: true },
+);
 
 // Wave 3: Task 3.1 — dolly zoom async init via idle queue (queued at setup time)
 const initDollyZoom = async () => {
@@ -2981,13 +3739,9 @@ const initDollyZoom = async () => {
 	try {
 		const mod = await import("../../composables/engine/useDollyZoom.js");
 		_dollyZoomInstance = mod.useDollyZoom(map.value);
-		if (import.meta.env.DEV) {
-			console.log("[MapboxContainer] Dolly zoom initialized after idle");
-		}
+		mapDebugLog("[MapboxContainer] Dolly zoom initialized after idle");
 	} catch (err) {
-		if (import.meta.env.DEV) {
-			console.warn("[MapboxContainer] Dolly zoom failed to load:", err);
-		}
+		mapDebugWarn("[MapboxContainer] Dolly zoom failed to load:", err);
 	}
 };
 
@@ -3026,32 +3780,20 @@ const prefetchVenueDetails = async (venueId, signal) => {
 	}
 };
 
-// Deferred sentient map init — loads after map idle (non-blocking)
-let _sentientInitialized = false;
-const initSentientMap = async () => {
-	if (_sentientInitialized || sentient) return;
-	_sentientInitialized = true;
-	try {
-		const mod = await import("../../composables/map/useSentientMap");
-		const { useSentientMap: initFn } = mod;
-		sentient = initFn(
-			map,
-			isMapReady,
-			mapContainer,
-			computed(() => props.shops || []),
-			computed(() => props.highlightedShopId),
-			emit,
-			{
-				pinSourceId: PIN_SOURCE_ID,
-				pinLayerId: PIN_LAYER_ID,
-				prefetchFn: prefetchVenueDetails,
-			},
-		);
-	} catch (err) {
-		console.warn("Sentient map failed to load:", err);
-		_sentientInitialized = false;
-	}
-};
+// Initialize neon pin DOM overlay signs
+// highlightedShopId keeps the carousel-center shop always visible (priority bypass)
+useNeonPinsLayer(
+	map,
+	computed(() => props.shops || []),
+	mapContainer,
+	{
+		onPinClick: (shop) => {
+			sentient?.onManualPinTap?.();
+			handleMarkerClick(shop);
+		},
+		highlightedShopId: computed(() => props.highlightedShopId),
+	},
+);
 
 // Deferred feature init — loads heatmap, weather, vibe effects after map idle
 let _deferredFeaturesInitialized = false;
@@ -3064,7 +3806,7 @@ const initDeferredFeatures = async () => {
 			const mod = await import("../../composables/map/useMapHeatmap");
 			_heatmapInstance = mod.useMapHeatmap(map, allowHeatmap, shopsByIdRef);
 		} catch (err) {
-			console.warn("Heatmap failed:", err);
+			mapDebugWarn("Heatmap failed:", err);
 		}
 	}
 
@@ -3091,7 +3833,7 @@ const initDeferredFeatures = async () => {
 				{ immediate: true },
 			);
 		} catch (err) {
-			console.warn("Weather failed:", err);
+			mapDebugWarn("Weather failed:", err);
 		}
 	}
 
@@ -3108,7 +3850,7 @@ const initDeferredFeatures = async () => {
 				{ immediate: true },
 			);
 		} catch (err) {
-			console.warn("Vibe effects failed:", err);
+			mapDebugWarn("Vibe effects failed:", err);
 		}
 	}
 };
@@ -3117,15 +3859,15 @@ const initDeferredFeatures = async () => {
 // Previously: 4 raw requestIdleCallback() calls in the first-idle handler + executeIdleTasksOnce.
 // Now: all tasks pre-registered here; first-idle handler calls only executeIdleTasksOnce.
 // Priority order (lower timeout = higher priority, runs first in queue):
-scheduleIdleTask(initSentientMap, { timeout: 3000 }); // HIGH: interaction prediction
+// NOTE: sentient map now initialized synchronously during setup (lifecycle hooks require sync context)
+// Its internal watch defers actual setup() call until map is ready.
 scheduleIdleTask(initDeferredFeatures, { timeout: 5000 }); // HIGH: heatmap/weather/vibe
 scheduleIdleTask(
 	() => {
 		try {
 			addDeferredLayers({ mapInstance: map.value });
 		} catch (err) {
-			if (import.meta.env.DEV)
-				console.warn("Deferred layer setup failed:", err);
+			mapDebugWarn("Deferred layer setup failed:", err);
 		}
 	},
 	{ timeout: 2000 }, // MEDIUM: visual layers
@@ -3135,8 +3877,7 @@ scheduleIdleTask(
 		try {
 			await applyTerrainAndAtmosphere();
 		} catch (err) {
-			if (import.meta.env.DEV)
-				console.warn("Deferred terrain setup failed:", err);
+			mapDebugWarn("Deferred terrain setup failed:", err);
 		}
 	},
 	{ timeout: 3000 }, // MEDIUM: terrain re-enable
@@ -3154,17 +3895,18 @@ const handleMarkerClick = (item) => {
 };
 
 // ✅ Setup Map Interactions & Watch for Ready (Performance Fix)
-watch(isMapReady, (ready) => {
-	emit("map-ready-change", !!ready);
-	if (ready && !mapReadyReported.value) {
+watch([isMapReady, devSafeMapPreviewMode], ([ready, previewReady]) => {
+	emit("map-ready-change", Boolean(ready || previewReady));
+	if (ready && !mapContextRecovering.value && !mapReadyReported.value) {
 		mapReadyReported.value = true;
+		webglRecoveryAttempts.value = 0;
 		reportMapLifecycle("ready", {
 			elapsedMs: mapInitStartedAt.value
 				? Date.now() - mapInitStartedAt.value
 				: 0,
 		});
 	}
-	if (!ready || !map.value) return;
+	if (!ready || !map.value || !isMapOperational()) return;
 	queueMapResize(true);
 	setupMapInteractions();
 	refreshSmartPulseTargets();
@@ -3178,11 +3920,7 @@ watch(isMapReady, (ready) => {
 					"navigationStart",
 					"mapbox-interactive",
 				);
-				if (import.meta.env.DEV) {
-					console.log(
-						`Map interactive time: ${perfEntry.duration.toFixed(0)}ms`,
-					);
-				}
+				mapDebugLog(`Map interactive time: ${perfEntry.duration.toFixed(0)}ms`);
 				reportMapLifecycle("map_load_performance", {
 					duration: Math.round(perfEntry.duration),
 				});
@@ -3203,26 +3941,25 @@ watch(isMapReady, (ready) => {
 		// Wave 4: Task 4.6 — Report map performance metrics to observability service.
 		// Uses requestIdleCallback so it doesn't compete with deferred feature init.
 		const _reportPerfMetrics = () => {
-			try {
-				const fcpEntry = performance.getEntriesByName(
-					"first-contentful-paint",
-				)[0];
-				const lcpEntries = performance.getEntriesByType(
-					"largest-contentful-paint",
-				);
-				frontendObservabilityService.trackMapPerformance({
-					fcp: fcpEntry?.startTime,
-					lcp: lcpEntries.length
-						? lcpEntries[lcpEntries.length - 1].renderTime
-						: undefined,
-					mapInteractive: window.__mapMetrics?.interactiveAt,
-					parseOverhead: window.__mapMetrics?.parseOverhead,
-					sentientLoadTime: window.__mapMetrics?.sentientLoadTime,
-					heatmapLoadTime: window.__mapMetrics?.heatmapLoadTime,
+			webVitalsModulePromise ??= import("../../services/webVitalsService");
+			void webVitalsModulePromise
+				.then(({ webVitalsService }) => {
+					const fcpEntry = performance.getEntriesByName(
+						"first-contentful-paint",
+					)[0];
+					const latestVitals = webVitalsService.getLatestVitals?.() || {};
+					frontendObservabilityService.trackMapPerformance({
+						fcp: latestVitals.fcp ?? fcpEntry?.startTime,
+						lcp: latestVitals.lcp ?? undefined,
+						mapInteractive: window.__mapMetrics?.interactiveAt,
+						parseOverhead: window.__mapMetrics?.parseOverhead,
+						sentientLoadTime: window.__mapMetrics?.sentientLoadTime,
+						heatmapLoadTime: window.__mapMetrics?.heatmapLoadTime,
+					});
+				})
+				.catch(() => {
+					// fail-open: never block map for observability
 				});
-			} catch {
-				// fail-open: never block map for observability
-			}
 		};
 		if (typeof requestIdleCallback !== "undefined") {
 			requestIdleCallback(_reportPerfMetrics, { timeout: 5000 });
@@ -3236,7 +3973,7 @@ watch(isMapReady, (ready) => {
 
 // ✅ Update User Location
 const updateUserLocation = () => {
-	if (!map.value || !isMapReady.value) return;
+	if (!isMapOperational()) return;
 	if (!map.value.getSource("user-location")) return;
 
 	if (props.userLocation && props.userLocation.length >= 2) {
@@ -3366,10 +4103,10 @@ const applyStyleIfNeeded = (isDarkMode) => {
 		return;
 	}
 
-	map.value.once("style.load", () => {
+	map.value.once("style.load", async () => {
 		if (!map.value) return;
 		if (seq !== styleApplySeq) return;
-		setupMapLayers();
+		await setupMapLayers();
 		setupMapInteractions();
 		updateMapSources();
 		updateMarkers();
@@ -3402,9 +4139,9 @@ watch(
 		allowWeatherFx,
 		enableMapEffectsPipelineV2,
 	],
-	() => {
+	async () => {
 		if (!map.value || !isMapReady.value) return;
-		setupMapLayers();
+		await setupMapLayers();
 		if (hasActiveRoute.value) {
 			if (allowNeonPulse.value && !isPerfRestricted.value) {
 				startRouteTrailAnimation();
@@ -3717,7 +4454,7 @@ watch(
 onMounted(async () => {
 	// ⚡ SKIP HEAVY MAP INIT IN E2E
 	if (IS_E2E && !IS_STRICT_MAP_E2E) {
-		console.log("E2E Mode: Skipping MapLibre Initialization");
+		mapDebugLog("E2E Mode: Skipping MapLibre Initialization");
 		isMapReady.value = true;
 		return;
 	}
@@ -3745,6 +4482,14 @@ onUnmounted(() => {
 	if (mapRecoveryTimeoutId) {
 		clearTimeout(mapRecoveryTimeoutId);
 		mapRecoveryTimeoutId = null;
+	}
+	if (webglRecoveryTimer) {
+		clearTimeout(webglRecoveryTimer);
+		webglRecoveryTimer = null;
+	}
+	if (webglRestoreGraceTimer) {
+		clearTimeout(webglRestoreGraceTimer);
+		webglRestoreGraceTimer = null;
 	}
 	clearCoinLayerRetryTimer();
 	coinLayerRetryAttempt = 0;
@@ -3834,7 +4579,7 @@ defineExpose({
 	webGLSupported,
 	maplessMode,
 	initMapOnce,
-	resize: () => map.value?.resize(),
+	resize: () => queueMapResize(true),
 	// Handles (options) object or (coords, zoom) legacy signatures.
 	flyTo: flyToCore,
 });
@@ -3843,7 +4588,7 @@ defineExpose({
 <template>
   <div
     data-testid="map-shell"
-    :data-map-ready="isMapReady ? 'true' : 'false'"
+    :data-map-ready="isMapUiReady ? 'true' : 'false'"
     :data-map-init-requested="mapInitRequested ? 'true' : 'false'"
     :data-map-token-invalid="isTokenInvalid ? 'true' : 'false'"
     :aria-label="mapA11yLabel"
@@ -3875,8 +4620,82 @@ defineExpose({
     />
 
     <div
+      v-if="devSafeMapPreviewMode"
+      class="absolute inset-0 z-[1050] overflow-hidden bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.16),transparent_42%),linear-gradient(180deg,rgba(9,9,11,0.96),rgba(2,6,23,0.98))]"
+      role="status"
+      aria-live="polite"
+    >
+      <div class="absolute inset-0 dev-safe-preview-grid" aria-hidden="true"></div>
+      <div class="absolute inset-0 dev-safe-preview-sheen" aria-hidden="true"></div>
+
+      <button
+        v-for="pin in devSafePreviewPins"
+        :key="pin.id"
+        type="button"
+        data-testid="dev-preview-pin"
+        class="absolute z-[2] -translate-x-1/2 -translate-y-1/2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 rounded-full"
+        :class="pin.isHighlighted ? 'scale-110' : ''"
+        :style="{ top: pin.top, left: pin.left }"
+        :aria-label="pin.name"
+        @click="handleDevSafePreviewPinClick(pin.shop)"
+      >
+        <span
+          class="dev-safe-preview-pin"
+          :class="{ 'dev-safe-preview-pin--highlighted': pin.isHighlighted }"
+        ></span>
+      </button>
+
+      <div
+        class="absolute inset-x-4 bottom-4 z-[3] md:inset-x-auto md:left-6 md:max-w-md rounded-3xl border border-cyan-400/15 bg-slate-950/82 px-4 py-4 text-white shadow-2xl shadow-cyan-950/30 backdrop-blur-xl"
+      >
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-300/80">
+              {{ tt("map.dev_preview.badge", "Stable local preview") }}
+            </p>
+            <h2 class="mt-2 text-lg font-black leading-tight">
+              {{ tt("map.dev_preview.title", "Chromium local dev now skips WebGL by default") }}
+            </h2>
+            <p class="mt-2 text-sm leading-relaxed text-slate-300">
+              {{ tt("map.dev_preview.desc", "This preview keeps localhost fast and console-clean. Production, E2E, and explicit WebGL opt-in still use the full MapLibre renderer.") }}
+            </p>
+          </div>
+          <div class="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-right">
+            <div class="text-[10px] uppercase tracking-[0.2em] text-white/45">
+              {{ tt("map.dev_preview.visible", "Visible pins") }}
+            </div>
+            <div class="text-2xl font-black text-cyan-200">
+              {{ devSafePreviewPins.length }}
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-if="!devSafePreviewPins.length"
+          class="mt-4 rounded-2xl border border-dashed border-white/10 bg-white/5 px-4 py-3 text-sm text-white/60"
+        >
+          {{ tt("map.dev_preview.empty", "No venue coordinates are available yet, so the local preview stays in placeholder mode.") }}
+        </div>
+
+        <div class="mt-4 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            data-testid="dev-preview-open-webgl"
+            class="rounded-2xl bg-cyan-400 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200"
+            @click="enableFullMapForCurrentSession"
+          >
+            {{ tt("map.dev_preview.open_webgl", "Open full WebGL map") }}
+          </button>
+          <span class="text-xs text-white/45">
+            {{ tt("map.dev_preview.note", "Use this only when you need to inspect real WebGL behavior in this browser session.") }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div
       v-if="isOffline"
-      class="absolute top-4 right-4 z-[2300] px-3 py-2 rounded-lg bg-amber-500/85 text-black text-xs font-semibold"
+      class="absolute top-16 right-4 z-[2300] px-3 py-2 rounded-lg bg-amber-500/85 text-black text-xs font-semibold"
       role="status"
       aria-live="polite"
     >
@@ -3912,7 +4731,7 @@ defineExpose({
     </div>
 
     <div
-      v-if="allowViewportGlow"
+      v-if="allowViewportGlow && !devSafeMapPreviewMode && !maplessMode"
       class="absolute inset-0 z-[2] pointer-events-none viewport-focus-glow"
       :style="{ opacity: viewportGlowOpacity }"
     ></div>
@@ -3921,7 +4740,7 @@ defineExpose({
 
     <!-- ✅ WebGL Not Supported Fallback - HIGH Z-INDEX to cover all UI -->
     <div
-      v-if="!webGLSupported && !maplessMode"
+      v-if="!webGLSupported && !maplessMode && !devSafeMapPreviewMode"
       class="fixed inset-0 z-[6000] flex items-center justify-center bg-gradient-to-br from-zinc-900 via-zinc-800 to-black"
       role="alertdialog"
       aria-modal="true"
@@ -3996,7 +4815,7 @@ defineExpose({
           class="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl"
         ></div>
         <div
-          class="absolute bottom-1/4 right-1/4 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl"
+          class="absolute bottom-1/4 right-1/4 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl"
         ></div>
       </div>
       <div
@@ -4012,10 +4831,14 @@ defineExpose({
 
     <!-- ✅ Entertainment Atmosphere Effects (simplified) -->
     <div
+      v-if="!devSafeMapPreviewMode && !maplessMode"
       class="absolute inset-0 z-[1] pointer-events-none transition-colors duration-500"
     ></div>
 
-    <div class="absolute inset-0 z-[1] pointer-events-none overflow-hidden">
+    <div
+      v-if="!devSafeMapPreviewMode && !maplessMode"
+      class="absolute inset-0 z-[1] pointer-events-none overflow-hidden"
+    >
       <!-- Fireflies -->
       <div v-if="allowAmbientFx" class="firefly-container">
         <div
@@ -4029,30 +4852,6 @@ defineExpose({
             animationDuration: ff.duration,
           }"
         ></div>
-      </div>
-    </div>
-
-    <div
-      class="building-info-popup"
-      :class="{
-        'is-visible': buildingPopupVisible,
-        'scanline-enabled': showPopupScanline,
-      }"
-      :style="{
-        left: `${buildingPopupX}px`,
-        transform: `translate(-50%, ${buildingPopupY}px)`,
-      }"
-      aria-live="polite"
-    >
-      <div class="building-info-popup__row">
-        <span class="building-info-popup__icon">{{
-          buildingPopupCategoryIcon
-        }}</span>
-        <span class="building-info-popup__title">{{ buildingPopupName }}</span>
-      </div>
-      <div class="building-info-popup__meta">
-        <span>{{ $t("map.building.live_visitors") }}</span>
-        <strong>{{ buildingPopupVisitors }}</strong>
       </div>
     </div>
 
@@ -4114,13 +4913,15 @@ defineExpose({
 </template>
 
 <style>
-/* Mapbox Popup Overrides */
-.mapboxgl-popup {
+/* Mapbox/MapLibre Popup Overrides */
+.mapboxgl-popup,
+.maplibregl-popup {
   position: relative;
   z-index: 3000 !important;
 }
 
-.mapboxgl-popup-content {
+.mapboxgl-popup-content,
+.maplibregl-popup-content {
   padding: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
@@ -4128,12 +4929,17 @@ defineExpose({
   pointer-events: auto !important;
 }
 
-.mapboxgl-popup-tip {
+/* Hide popup tip for all popups except vibe-mapbox-popup (which has neon styling) */
+.mapboxgl-popup:not(.vibe-mapbox-popup) .mapboxgl-popup-tip,
+.maplibregl-popup:not(.vibe-mapbox-popup) .maplibregl-popup-tip {
   display: none !important;
 }
 
-.vibe-mapbox-popup .mapboxgl-popup-content {
+.vibe-mapbox-popup .mapboxgl-popup-content,
+.vibe-mapbox-popup .maplibregl-popup-content {
   overflow: visible;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 .viewport-focus-glow {
@@ -4144,6 +4950,45 @@ defineExpose({
     rgba(2, 6, 23, 0.42) 100%
   );
   transition: opacity 220ms ease;
+}
+
+.dev-safe-preview-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(125deg, rgba(34, 211, 238, 0.12), transparent 48%);
+  background-size:
+    72px 72px,
+    72px 72px,
+    100% 100%;
+  opacity: 0.42;
+}
+
+.dev-safe-preview-sheen {
+  background:
+    radial-gradient(circle at 18% 24%, rgba(56, 189, 248, 0.18), transparent 28%),
+    radial-gradient(circle at 78% 68%, rgba(16, 185, 129, 0.12), transparent 24%);
+  mix-blend-mode: screen;
+  opacity: 0.85;
+}
+
+.dev-safe-preview-pin {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  border: 2px solid rgba(255, 255, 255, 0.88);
+  background: linear-gradient(180deg, #22d3ee 0%, #2563eb 100%);
+  box-shadow:
+    0 0 0 8px rgba(34, 211, 238, 0.12),
+    0 12px 28px rgba(8, 145, 178, 0.32);
+}
+
+.dev-safe-preview-pin--highlighted {
+  background: linear-gradient(180deg, #fde047 0%, #f97316 100%);
+  box-shadow:
+    0 0 0 10px rgba(251, 191, 36, 0.16),
+    0 12px 28px rgba(249, 115, 22, 0.34);
 }
 
 /* Coin badge with bounce animation - canonical definition */

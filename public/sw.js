@@ -1,45 +1,57 @@
 // Service Worker for VibeCity.live (Workbox + Rsbuild inject manifest)
-importScripts("https://storage.googleapis.com/workbox-cdn/releases/6.4.1/workbox-sw.js");
+const WORKBOX_CDN_URL =
+	"https://storage.googleapis.com/workbox-cdn/releases/7.4.0/workbox-sw.js";
+
+try {
+	importScripts(WORKBOX_CDN_URL);
+} catch (error) {
+	console.error("[SW] Workbox bootstrap failed", error);
+}
 
 const CACHE_PREFIX = String(self.VIBE_SW_CACHE_PREFIX || "vibecity");
 const API_TIMEOUT_SECONDS = Number(self.VIBE_SW_API_TIMEOUT_SECONDS || 3);
+const wb = self.workbox;
 
-if (workbox) {
+if (wb) {
 	console.log("[SW] Workbox loaded");
 
-	workbox.core.skipWaiting();
-	workbox.core.clientsClaim();
-	workbox.precaching.cleanupOutdatedCaches();
-	workbox.precaching.precacheAndRoute(self.__WB_MANIFEST || []);
+	// Use explicit lifecycle events instead of workbox.core helpers to avoid
+	// InvalidStateError: clients.claim() can only be called by the active worker.
+	self.addEventListener("install", () => self.skipWaiting());
+	self.addEventListener("activate", (event) =>
+		event.waitUntil(self.clients.claim()),
+	);
+	wb.precaching.cleanupOutdatedCaches();
+	wb.precaching.precacheAndRoute(self.__WB_MANIFEST || []);
 
 	// Only cache genuine 200 OK responses — never opaque (status 0) ones.
-	const cacheable200 = new workbox.cacheableResponse.CacheableResponsePlugin({
+	const cacheable200 = new wb.cacheableResponse.CacheableResponsePlugin({
 		statuses: [200],
 	});
 
 	// Separate plugin for Supabase images: must be a proper 200, no opaque.
-	const cacheableImg = new workbox.cacheableResponse.CacheableResponsePlugin({
+	const cacheableImg = new wb.cacheableResponse.CacheableResponsePlugin({
 		statuses: [200],
 	});
 
-	const expShort = new workbox.expiration.ExpirationPlugin({
+	const expShort = new wb.expiration.ExpirationPlugin({
 		maxEntries: 80,
 		maxAgeSeconds: 24 * 60 * 60,
 	});
 
-	const expLong = new workbox.expiration.ExpirationPlugin({
+	const expLong = new wb.expiration.ExpirationPlugin({
 		maxEntries: 300,
 		maxAgeSeconds: 30 * 24 * 60 * 60,
 	});
 
 	// 1) API routes: NetworkFirst with 3s timeout fallback.
-	workbox.routing.registerRoute(
+	wb.routing.registerRoute(
 		({ url }) =>
 			url.pathname.startsWith("/api/") ||
 			(url.origin.includes("supabase.co") &&
 				(url.pathname.includes("/rest/v1/") ||
 					url.pathname.includes("/functions/v1/"))),
-		new workbox.strategies.NetworkFirst({
+		new wb.strategies.NetworkFirst({
 			cacheName: `${CACHE_PREFIX}-api-v1`,
 			networkTimeoutSeconds: API_TIMEOUT_SECONDS,
 			plugins: [cacheable200, expShort],
@@ -47,35 +59,35 @@ if (workbox) {
 	);
 
 	// 2) Mapbox sprites/glyphs: CacheFirst.
-	workbox.routing.registerRoute(
+	wb.routing.registerRoute(
 		({ url }) =>
 			url.origin === "https://api.mapbox.com" &&
 			(/\/styles\/v1\/.+\/sprite/.test(url.pathname) ||
 				/\/fonts\/v1\//.test(url.pathname)),
-		new workbox.strategies.CacheFirst({
+		new wb.strategies.CacheFirst({
 			cacheName: `${CACHE_PREFIX}-mapbox-sprites-v1`,
 			plugins: [cacheable200, expLong],
 		}),
 	);
 
 	// 3) Fonts: CacheFirst.
-	workbox.routing.registerRoute(
+	wb.routing.registerRoute(
 		({ request, url }) =>
 			request.destination === "font" ||
 			url.origin === "https://fonts.gstatic.com" ||
 			url.origin === "https://fonts.googleapis.com",
-		new workbox.strategies.CacheFirst({
+		new wb.strategies.CacheFirst({
 			cacheName: `${CACHE_PREFIX}-fonts-v1`,
 			plugins: [cacheable200, expLong],
 		}),
 	);
 
 	// 4) Core JS/CSS: CacheFirst.
-	workbox.routing.registerRoute(
+	wb.routing.registerRoute(
 		({ request, url }) =>
 			url.origin === self.location.origin &&
 			(request.destination === "script" || request.destination === "style"),
-		new workbox.strategies.CacheFirst({
+		new wb.strategies.CacheFirst({
 			cacheName: `${CACHE_PREFIX}-core-assets-v1`,
 			plugins: [cacheable200, expLong],
 		}),
@@ -84,12 +96,12 @@ if (workbox) {
 	// 5) Non-video public images from Supabase storage: stale-while-revalidate.
 	// IMPORTANT: fetchOptions.mode = 'cors' prevents opaque responses (status 0)
 	// that would otherwise cause 'ERR_FAILED / opaque response' browser errors.
-	workbox.routing.registerRoute(
+	wb.routing.registerRoute(
 		({ url }) =>
 			url.origin.includes("supabase.co") &&
 			url.pathname.includes("/storage/v1/object/public/") &&
 			!/\.(mp4|webm|mov|avi|mkv|m4v)$/i.test(url.pathname),
-		new workbox.strategies.StaleWhileRevalidate({
+		new wb.strategies.StaleWhileRevalidate({
 			cacheName: `${CACHE_PREFIX}-supabase-images-v2`,
 			fetchOptions: { mode: "cors", credentials: "omit" },
 			plugins: [cacheableImg, expLong],
@@ -97,9 +109,9 @@ if (workbox) {
 	);
 
 	// 6) Navigations: NetworkFirst to prefer fresh shell.
-	workbox.routing.registerRoute(
+	wb.routing.registerRoute(
 		({ request }) => request.mode === "navigate",
-		new workbox.strategies.NetworkFirst({
+		new wb.strategies.NetworkFirst({
 			cacheName: `${CACHE_PREFIX}-nav-v1`,
 			networkTimeoutSeconds: API_TIMEOUT_SECONDS,
 			plugins: [cacheable200, expShort],

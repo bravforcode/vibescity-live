@@ -13,6 +13,12 @@ const PartnerDashboard = () => import("../views/PartnerDashboard.vue");
 const routes = [
 	// Locale-aware public routes
 	{
+		path: "/:locale(th|en)/merchant",
+		name: "MerchantLocale",
+		component: MerchantDashboard,
+		meta: { title: "Merchant Portal - VibeCity" },
+	},
+	{
 		path: "/:locale(th|en)",
 		name: "HomeLocale",
 		component: HomeView,
@@ -166,7 +172,7 @@ const getPreferredLocale = () => {
 		const stored = localStorage.getItem("locale") || readCookie(LOCALE_COOKIE);
 		if (SUPPORTED_LOCALES.has(stored)) return stored;
 	}
-	return "th";
+	return "en";
 };
 
 const localeFromPath = (path) => {
@@ -306,8 +312,20 @@ const focusRouteLandmark = () => {
 	});
 };
 
-router.afterEach(() => {
+router.afterEach((to) => {
 	focusRouteLandmark();
+
+	// ✅ Fire-and-forget analytics pageview tracking
+	import("../services/analyticsService")
+		.then(({ analyticsService }) => {
+			analyticsService.trackEvent("pageview", {
+				route: to.name,
+				path: to.path,
+			});
+		})
+		.catch(() => {
+			// Silently fail — analytics should never block navigation
+		});
 });
 
 export default router;

@@ -1,0 +1,54 @@
+{
+	"zones": [
+		{
+			"id": "nimman-chill-zone",
+			"name": "Nimman Chill Zone",
+			"type": "special_zone",
+			"geometry": {
+				"type": "Polygon",
+				"coordinates": [
+					[
+						[98.98, 18.785],
+						[98.99, 18.785],
+						[98.99, 18.795],
+						[98.98, 18.795],
+						[98.98, 18.785]
+					]
+				]
+			},
+			"properties": {
+				"name": "Nimman Chill Zone",
+				"description": "Simulated Beach Area",
+				"vibe_level": 0.8,
+				"category": "chill_zone",
+				"color": "#ec4899",
+				"glow_color": "#ec489940"
+			}
+		},
+		{
+			"id": "ping-river",
+			"name": "Ping River",
+			"type": "special_zone",
+			"geometry": {
+				"type": "Polygon",
+				"coordinates": [
+					[
+						[98.97, 18.78],
+						[98.995, 18.78],
+						[98.995, 18.8],
+						[98.97, 18.8],
+						[98.97, 18.78]
+					]
+				]
+			},
+			"properties": {
+				"name": "Ping River",
+				"description": "Conceptual River Area",
+				"vibe_level": 0.6,
+				"category": "nature",
+				"color": "#3b82f6",
+				"glow_color": "#3b82f640"
+			}
+		}
+	]
+}

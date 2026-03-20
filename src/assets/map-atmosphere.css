@@ -182,7 +182,7 @@
 	animation-delay: -5s;
 	background: radial-gradient(
 		ellipse at bottom,
-		rgba(147, 51, 234, 0.1) 0%,
+		rgba(6, 182, 212, 0.1) 0%,
 		transparent 70%
 	);
 }
@@ -332,7 +332,7 @@
 		ellipse at center,
 		transparent 40%,
 		rgba(99, 102, 241, 0.08) 70%,
-		rgba(147, 51, 234, 0.12) 100%
+		rgba(6, 182, 212, 0.12) 100%
 	);
 	animation: vignetteBreathe 30s ease-in-out infinite;
 }
@@ -366,8 +366,8 @@
 		stroke: #ec4899;
 	} /* Pink */
 	66% {
-		stroke: #8b5cf6;
-	} /* Violet */
+		stroke: #06b6d4;
+	} /* Cyan */
 	100% {
 		stroke: #3b82f6;
 	} /* Back to Blue */

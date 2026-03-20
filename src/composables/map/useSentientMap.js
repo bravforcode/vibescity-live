@@ -1,4 +1,5 @@
-import { onUnmounted, watch } from "vue";
+import { getCurrentScope, onScopeDispose, watch } from "vue";
+import { isFrontendOnlyDevMode } from "../../lib/runtimeConfig";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // RUNTIME CONFIG — Hard Defaults (Remote Override + Local > Hard Fallback)
@@ -50,7 +51,7 @@ const HARD_DEFAULTS = {
 	},
 	persistence: {
 		keyPrefix: "vcsentient_v1_",
-		standardTtlMs: 86_400_000, // 24 hours
+		standardTtlMs: 7_200_000, // 2 hours
 	},
 };
 
@@ -184,7 +185,7 @@ function createSeenDb(persistCfg) {
  *   @param {string} options.pinSourceId — Mapbox source ID; default "pins_source"
  *   @param {string} options.pinLayerId — Mapbox layer ID; default "unclustered-pins"
  */
-export function useSentientMap(
+export function createSentientMapController(
 	mapRef,
 	isMapReadyRef,
 	mapContainerRef,
@@ -196,6 +197,7 @@ export function useSentientMap(
 	// ─── CONFIG ──────────────────────────────────────────────────────────────
 	let cfg = mergeDeep(HARD_DEFAULTS, options.config ?? {});
 	const PIN_SOURCE_ID = options.pinSourceId ?? "pins_source";
+	const PIN_LAYER_ID = options.pinLayerId ?? "unclustered-pins";
 
 	// ─── KILL SWITCH CHECK ───────────────────────────────────────────────────
 	const isEnabled = () => cfg.enabled && !cfg.killSwitch;
@@ -222,6 +224,17 @@ export function useSentientMap(
 	let rafHandle = null;
 	let lastRadarRunAt = 0;
 	const RADAR_INTERVAL_MS = 100; // 10 Hz
+	const RADAR_IDLE_THRESHOLD = 150;
+	const VISIBLE_QUERY_CACHE_TTL_MS = 250;
+	let indexedShopsSource = null;
+	let indexedShops = new Map();
+	let visibleQueryCacheKey = "";
+	let visibleQueryCacheAt = 0;
+	let visibleQueryCacheSource = null;
+	let visibleQueryCacheResult = [];
+	let radarRevision = 1;
+	let lastProcessedRadarRevision = 0;
+	let scoringScheduled = false;
 
 	// ─── SESSION STATE ───────────────────────────────────────────────────────
 	let hasManualTapInSession = false;
@@ -249,6 +262,206 @@ export function useSentientMap(
 			window.__sentientMap ??= {};
 			window.__sentientMap.lastEvent = { event, data, state, ts: Date.now() };
 		}
+	};
+
+	const getVenueId = (value) => {
+		const rawId =
+			value?.id ??
+			value?.properties?.id ??
+			value?.properties?.shopId ??
+			value?.properties?.venue_id;
+		if (rawId === null || rawId === undefined) return "";
+		return String(rawId).trim();
+	};
+
+	const getIndexedShops = (candidates) => {
+		if (indexedShopsSource === candidates) {
+			return indexedShops;
+		}
+
+		indexedShopsSource = candidates;
+		indexedShops = new Map();
+
+		for (const shop of candidates || []) {
+			const venueId = getVenueId(shop);
+			if (venueId) {
+				indexedShops.set(venueId, shop);
+			}
+		}
+
+		return indexedShops;
+	};
+
+	const markRadarDirty = () => {
+		radarRevision += 1;
+	};
+
+	const resetVisibleQueryCache = () => {
+		visibleQueryCacheKey = "";
+		visibleQueryCacheAt = 0;
+		visibleQueryCacheSource = null;
+		visibleQueryCacheResult = [];
+	};
+
+	const getVisibleQueryFallback = (candidates) =>
+		candidates.length > 250 ? [] : candidates;
+
+	const getViewportCandidateSubset = (candidates) => {
+		if (!mapRef.value?.getBounds) {
+			return getVisibleQueryFallback(candidates);
+		}
+
+		try {
+			const bounds = mapRef.value.getBounds();
+			const north = Number(bounds?.getNorth?.());
+			const south = Number(bounds?.getSouth?.());
+			const east = Number(bounds?.getEast?.());
+			const west = Number(bounds?.getWest?.());
+			if (
+				![north, south, east, west].every((value) => Number.isFinite(value))
+			) {
+				return getVisibleQueryFallback(candidates);
+			}
+
+			const latPadding = Math.max(Math.abs(north - south) * 0.12, 0.004);
+			const lngPadding = Math.max(Math.abs(east - west) * 0.12, 0.004);
+			const minLat = south - latPadding;
+			const maxLat = north + latPadding;
+			const minLng = west - lngPadding;
+			const maxLng = east + lngPadding;
+			const nearby = [];
+
+			for (const shop of candidates || []) {
+				const lng = Number(shop?.lng ?? shop?.longitude ?? 0);
+				const lat = Number(shop?.lat ?? shop?.latitude ?? 0);
+				if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+				if (lat < minLat || lat > maxLat || lng < minLng || lng > maxLng) {
+					continue;
+				}
+				nearby.push(shop);
+			}
+
+			return nearby.length ? nearby : getVisibleQueryFallback(candidates);
+		} catch {
+			return getVisibleQueryFallback(candidates);
+		}
+	};
+
+	const getVisibleQueryCacheKey = (evalCx, evalCy, dynamicRadiusPx) => {
+		const zoom = Number(mapRef.value?.getZoom?.() ?? 0);
+		return [
+			Math.round(evalCx / 8),
+			Math.round(evalCy / 8),
+			Math.round(dynamicRadiusPx / 8),
+			Math.round(zoom * 10),
+		].join(":");
+	};
+
+	const reuseVisibleQueryCache = (candidates, cacheKey, fallbackCandidates) => {
+		if (
+			visibleQueryCacheSource !== candidates ||
+			visibleQueryCacheKey !== cacheKey ||
+			performance.now() - visibleQueryCacheAt > VISIBLE_QUERY_CACHE_TTL_MS
+		) {
+			return null;
+		}
+
+		return visibleQueryCacheResult.length
+			? visibleQueryCacheResult
+			: fallbackCandidates;
+	};
+
+	const updateVisibleQueryCache = (candidates, cacheKey, result) => {
+		visibleQueryCacheSource = candidates;
+		visibleQueryCacheKey = cacheKey;
+		visibleQueryCacheAt = performance.now();
+		visibleQueryCacheResult = Array.isArray(result) ? result : [];
+	};
+
+	const shouldDeferVisibleQuery = () => {
+		if (!mapRef.value) return false;
+		if (isDragging) return true;
+		if (currentVelocity > cfg.velocity.lowThreshold) return true;
+		return typeof mapRef.value.isMoving === "function"
+			? mapRef.value.isMoving()
+			: false;
+	};
+
+	const resolveVisibleCandidates = (
+		candidates,
+		evalCx,
+		evalCy,
+		dynamicRadiusPx,
+	) => {
+		if (!mapRef.value?.queryRenderedFeatures) {
+			return candidates;
+		}
+
+		const fallbackCandidates = getViewportCandidateSubset(candidates);
+		if (isFrontendOnlyDevMode()) {
+			return fallbackCandidates;
+		}
+		const hasPinLayer = mapRef.value.getLayer?.(PIN_LAYER_ID);
+		if (!hasPinLayer) {
+			return fallbackCandidates;
+		}
+
+		const padding = Math.max(dynamicRadiusPx * 0.35, 24);
+		const queryBox = [
+			[evalCx - dynamicRadiusPx - padding, evalCy - dynamicRadiusPx - padding],
+			[evalCx + dynamicRadiusPx + padding, evalCy + dynamicRadiusPx + padding],
+		];
+		const cacheKey = getVisibleQueryCacheKey(evalCx, evalCy, dynamicRadiusPx);
+		const cachedVisibleCandidates = reuseVisibleQueryCache(
+			candidates,
+			cacheKey,
+			fallbackCandidates,
+		);
+		if (cachedVisibleCandidates) {
+			return cachedVisibleCandidates;
+		}
+
+		if (shouldDeferVisibleQuery()) {
+			return visibleQueryCacheSource === candidates &&
+				visibleQueryCacheResult.length
+				? visibleQueryCacheResult
+				: fallbackCandidates;
+		}
+
+		try {
+			const features = mapRef.value.queryRenderedFeatures(queryBox, {
+				layers: [PIN_LAYER_ID],
+			});
+
+			if (!features?.length) {
+				updateVisibleQueryCache(candidates, cacheKey, fallbackCandidates);
+				return fallbackCandidates;
+			}
+
+			const shopIndex = getIndexedShops(candidates);
+			const nearby = [];
+			const seen = new Set();
+
+			for (const feature of features) {
+				const venueId = getVenueId(feature);
+				if (!venueId || seen.has(venueId)) continue;
+				seen.add(venueId);
+				const shop = shopIndex.get(venueId);
+				if (shop) {
+					nearby.push(shop);
+				}
+			}
+
+			if (nearby.length) {
+				updateVisibleQueryCache(candidates, cacheKey, nearby);
+				return nearby;
+			}
+		} catch {
+			// Fall through to the existing candidate list.
+		}
+
+		updateVisibleQueryCache(candidates, cacheKey, fallbackCandidates);
+		return fallbackCandidates;
 	};
 
 	// ══════════════════════════════════════════════════════════════════════════════
@@ -314,13 +527,24 @@ export function useSentientMap(
 		const predictedPx = cfg.mode === "ultra" ? predictFutureCenter(300) : null;
 		const evalCx = predictedPx ? (sweepCx + predictedPx.x) / 2 : sweepCx;
 		const evalCy = predictedPx ? (sweepCy + predictedPx.y) / 2 : sweepCy;
+		const visibleCandidates = resolveVisibleCandidates(
+			candidates,
+			evalCx,
+			evalCy,
+			dynamicRadiusPx,
+		);
+
+		if (!visibleCandidates.length) {
+			predictedNextIds = [];
+			return null;
+		}
 
 		let best = null;
 		let bestScore = -Infinity;
 
 		const scored = [];
 
-		for (const shop of candidates) {
+		for (const shop of visibleCandidates) {
 			const lng = Number(shop?.lng ?? shop?.longitude ?? 0);
 			const lat = Number(shop?.lat ?? shop?.latitude ?? 0);
 			if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
@@ -440,6 +664,8 @@ export function useSentientMap(
 
 	const setPinFeatureState = (venueId, stateObj) => {
 		if (!mapRef.value || venueId == null) return;
+		if (!mapRef.value.isStyleLoaded?.()) return;
+		if (!mapRef.value.getSource?.(PIN_SOURCE_ID)) return;
 		const rawId = String(venueId);
 		const featureId = /^\d+$/.test(rawId) ? Number(rawId) : rawId;
 
@@ -591,7 +817,10 @@ export function useSentientMap(
 			dbg("snap_completed", { venueId: candidate.id });
 
 			// Haptic feedback on snap complete
-			if (typeof navigator?.vibrate === "function") {
+			if (
+				typeof navigator?.vibrate === "function" &&
+				(navigator.userActivation?.hasBeenActive ?? true)
+			) {
 				try {
 					navigator.vibrate(cfg.snap.hapticMs);
 				} catch {}
@@ -745,6 +974,11 @@ export function useSentientMap(
 			return;
 		}
 
+		if (typeof document !== "undefined" && document.hidden) {
+			rafHandle = requestAnimationFrame(runRadar);
+			return;
+		}
+
 		// Not ready
 		if (!isMapReadyRef?.value || !mapRef?.value) {
 			rafHandle = requestAnimationFrame(runRadar);
@@ -782,16 +1016,28 @@ export function useSentientMap(
 			return;
 		}
 
+		if (radarRevision === lastProcessedRadarRevision || scoringScheduled) {
+			rafHandle = requestAnimationFrame(runRadar);
+			return;
+		}
+
 		// Run scoring — use idle scheduling for >500 pins
+		const scheduledRevision = radarRevision;
 		const runScoring = () => {
+			scoringScheduled = false;
 			const center = mapRef.value?.getCenter?.();
 			if (!center) return;
 			const radius = getDynamicRadius();
 			const newTop = scoreCandidates(shops, center, radius);
 			processRadarResult(newTop, now);
+			lastProcessedRadarRevision = scheduledRevision;
 		};
 
-		if (shops.length > 500 && typeof requestIdleCallback === "function") {
+		scoringScheduled = true;
+		if (
+			shops.length > RADAR_IDLE_THRESHOLD &&
+			typeof requestIdleCallback === "function"
+		) {
 			requestIdleCallback(runScoring, { timeout: 50 });
 		} else {
 			runScoring();
@@ -985,6 +1231,7 @@ export function useSentientMap(
 		const center = mapRef.value?.getCenter?.();
 		if (center) updateVelocity(center);
 		isDragging = e?.originalEvent != null; // null on programmatic moves
+		markRadarDirty();
 	};
 
 	const onMapMoveEnd = () => {
@@ -995,6 +1242,7 @@ export function useSentientMap(
 		}, 50);
 
 		isDragging = false;
+		markRadarDirty();
 	};
 
 	// ══════════════════════════════════════════════════════════════════════════════
@@ -1115,6 +1363,10 @@ export function useSentientMap(
 
 		abortAllPrefetch();
 		unlockMapGestures();
+		resetVisibleQueryCache();
+		radarRevision = 1;
+		lastProcessedRadarRevision = 0;
+		scoringScheduled = false;
 
 		if (mapRef.value && isSetup) {
 			try {
@@ -1131,37 +1383,60 @@ export function useSentientMap(
 	// WATCHERS: Auto-setup on map ready + detect drawer state changes
 	// ──────────────────────────────────────────────────────────────────────────────
 
-	const stopWatch = watch(
-		isMapReadyRef,
-		(ready) => {
-			if (ready && mapRef.value && !isSetup) {
-				// Defer one tick to ensure map is stable
-				requestAnimationFrame(setup);
-			}
-			if (!ready && isSetup) {
-				destroy();
-			}
-		},
-		{ immediate: true },
-	);
+	let stopWatch = null;
+	let stopHighlightWatch = null;
+	let stopShopsWatch = null;
 
-	// Watch highlightedShopId: detect when drawer is actually closed (id goes null)
-	const stopHighlightWatch = watch(highlightedShopIdRef, (newId, oldId) => {
-		if (oldId != null && newId == null) {
-			// Drawer was closed
-			onDrawerClosed(oldId);
-		}
-		if (newId != null && oldId == null) {
-			// Drawer opened (may be from manual tap or auto)
-			onDrawerOpened(newId);
-		}
-	});
+	const attach = () => {
+		if (stopWatch || stopHighlightWatch || stopShopsWatch) return;
+		stopWatch = watch(
+			isMapReadyRef,
+			(ready) => {
+				if (ready && mapRef.value && !isSetup) {
+					// Defer one tick to ensure map is stable
+					requestAnimationFrame(setup);
+					markRadarDirty();
+				}
+				if (!ready && isSetup) {
+					destroy();
+				}
+			},
+			{ immediate: true },
+		);
 
-	onUnmounted(() => {
-		stopWatch();
-		stopHighlightWatch();
+		// Watch highlightedShopId: detect when drawer is actually closed (id goes null)
+		stopHighlightWatch = watch(highlightedShopIdRef, (newId, oldId) => {
+			if (oldId != null && newId == null) {
+				// Drawer was closed
+				onDrawerClosed(oldId);
+			}
+			if (newId != null && oldId == null) {
+				// Drawer opened (may be from manual tap or auto)
+				onDrawerOpened(newId);
+			}
+			markRadarDirty();
+		});
+
+		stopShopsWatch = watch(
+			() => shopsRef.value,
+			(newShops, oldShops) => {
+				if (newShops === oldShops) return;
+				indexedShopsSource = null;
+				resetVisibleQueryCache();
+				markRadarDirty();
+			},
+		);
+	};
+
+	const dispose = () => {
+		stopWatch?.();
+		stopHighlightWatch?.();
+		stopShopsWatch?.();
+		stopWatch = null;
+		stopHighlightWatch = null;
+		stopShopsWatch = null;
 		destroy();
-	});
+	};
 
 	// ══════════════════════════════════════════════════════════════════════════════
 	// HOT UPDATE CONFIG (remote flags)
@@ -1170,6 +1445,8 @@ export function useSentientMap(
 	const updateConfig = (remoteCfg) => {
 		if (!remoteCfg || typeof remoteCfg !== "object") return;
 		cfg = mergeDeep(cfg, remoteCfg);
+		resetVisibleQueryCache();
+		markRadarDirty();
 		dbg("config_updated", cfg);
 	};
 
@@ -1187,7 +1464,36 @@ export function useSentientMap(
 		onManualPinTap,
 		onDrawerClosed,
 		onDrawerOpened,
+		attach,
+		dispose,
 		destroy,
 		updateConfig,
 	};
+}
+
+export function useSentientMap(
+	mapRef,
+	isMapReadyRef,
+	mapContainerRef,
+	shopsRef,
+	highlightedShopIdRef,
+	emitFn,
+	options = {},
+) {
+	const sentient = createSentientMapController(
+		mapRef,
+		isMapReadyRef,
+		mapContainerRef,
+		shopsRef,
+		highlightedShopIdRef,
+		emitFn,
+		options,
+	);
+	sentient.attach();
+	if (getCurrentScope()) {
+		onScopeDispose(() => {
+			sentient.dispose();
+		});
+	}
+	return sentient;
 }

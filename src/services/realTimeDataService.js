@@ -9,12 +9,21 @@
  * - Ticketmelon / ThaiTicketMajor
  */
 
-import { supabase } from "./supabase";
+import { supabase } from "../lib/supabase";
+import { logUnexpectedNetworkError } from "../utils/networkErrorUtils";
+import {
+	logUnexpectedNetworkReadError,
+	runNetworkReadPolicy,
+} from "../utils/networkReadPolicy";
+import {
+	logUnexpectedSupabaseReadError,
+	runSupabaseReadPolicy,
+} from "../utils/supabaseReadPolicy";
 
 // ==========================================
 // CONFIGURATION
 // ==========================================
-const CONFIG = {
+export const CONFIG = {
 	OVERPASS_API: "https://overpass-api.de/api/interpreter",
 	NOMINATIM_API: "https://nominatim.openstreetmap.org",
 	CACHE_DURATION: 30 * 60 * 1000, // 30 minutes
@@ -67,9 +76,12 @@ const OSM_CATEGORIES = {
 // ==========================================
 const cache = new Map();
 
-function getCachedData(key) {
+function getCachedData(key, { allowStale = false } = {}) {
 	const cached = cache.get(key);
-	if (cached && Date.now() - cached.timestamp < CONFIG.CACHE_DURATION) {
+	if (
+		cached &&
+		(allowStale || Date.now() - cached.timestamp < CONFIG.CACHE_DURATION)
+	) {
 		return cached.data;
 	}
 	return null;
@@ -104,6 +116,7 @@ export async function fetchOSMPlaces(province, options = {}) {
 			console.log(`[RealTimeData] Returning cached OSM data for ${province}`);
 		return filterByCategory(cached, categories);
 	}
+	const staleCached = getCachedData(cacheKey, { allowStale: true });
 
 	const query = `
     [out:json][timeout:25];
@@ -121,13 +134,26 @@ export async function fetchOSMPlaces(province, options = {}) {
 		if (import.meta.env.DEV)
 			console.log(`[RealTimeData] Fetching OSM data for ${province}...`);
 
-		const response = await fetch(CONFIG.OVERPASS_API, {
-			method: "POST",
-			body: `data=${encodeURIComponent(query)}`,
-			headers: { "Content-Type": "application/x-www-form-urlencoded" },
+		const data = await runNetworkReadPolicy({
+			resourceType: "osmDiscovery",
+			run: async () => {
+				const response = await fetch(CONFIG.OVERPASS_API, {
+					method: "POST",
+					body: `data=${encodeURIComponent(query)}`,
+					headers: {
+						"Content-Type": "application/x-www-form-urlencoded",
+					},
+				});
+				if (!response.ok) {
+					const fetchError = new Error(
+						`Overpass request failed (${response.status})`,
+					);
+					fetchError.status = response.status;
+					throw fetchError;
+				}
+				return await response.json();
+			},
 		});
-
-		const data = await response.json();
 		const places = data.elements
 			.map(transformOSMPlace)
 			.filter((p) => p !== null);
@@ -140,7 +166,12 @@ export async function fetchOSMPlaces(province, options = {}) {
 
 		return filterByCategory(places, categories);
 	} catch (error) {
-		console.error("[RealTimeData] OSM fetch error:", error);
+		if (staleCached) {
+			return filterByCategory(staleCached, categories);
+		}
+		if (import.meta.env.DEV) {
+			logUnexpectedNetworkReadError("[RealTimeData] OSM fetch error:", error);
+		}
 		return [];
 	}
 }
@@ -216,7 +247,7 @@ export async function syncPlacesToDatabase(places, province) {
 	if (!places.length) return { inserted: 0, updated: 0 };
 
 	try {
-		const { data, error } = await supabase.from("venues").upsert(
+		const { error } = await supabase.from("venues").upsert(
 			places.map((p) => ({
 				name: p.name,
 				category: p.category,
@@ -243,7 +274,9 @@ export async function syncPlacesToDatabase(places, province) {
 			console.log(`[RealTimeData] Synced ${places.length} places to database`);
 		return { synced: places.length };
 	} catch (error) {
-		console.error("[RealTimeData] Database sync error:", error);
+		if (import.meta.env.DEV) {
+			logUnexpectedNetworkError("[RealTimeData] Database sync error:", error);
+		}
 		return { error: error.message };
 	}
 }
@@ -359,14 +392,27 @@ export async function getProvinceData(province, options = {}) {
 	const { includeOSM = true, syncToDb = false } = options;
 
 	// Get from database first
-	const { data: dbShops, error } = await supabase
-		.from("venues")
-		.select("*")
-		.eq("province", province)
-		.limit(500);
-
-	if (error) {
-		console.error("[RealTimeData] Database error:", error);
+	let dbShops = [];
+	try {
+		dbShops = await runSupabaseReadPolicy({
+			resourceType: "venueDiscovery",
+			run: async () => {
+				const result = await supabase
+					.from("venues")
+					.select("*")
+					.eq("province", province)
+					.limit(500);
+				if (result.error) throw result.error;
+				return result.data || [];
+			},
+		});
+	} catch (error) {
+		if (import.meta.env.DEV) {
+			logUnexpectedSupabaseReadError(
+				"[RealTimeData] Province database read failed:",
+				error,
+			);
+		}
 	}
 
 	let allShops = dbShops || [];
@@ -413,33 +459,49 @@ export async function getNearbyShops(lat, lng, radius = 5000) {
 	// V6 Script created 'search_venues' which handles proximity
 	// But let's check if we made a specific 'get_nearby_venues' RPC?
 	// In v3/v4 script I recall 'get_nearby_venues'. Let's assume it exists or use search_venues.
-	const { data, error } = await supabase.rpc("search_venues", {
-		p_query: "", // Empty for "all nearby"
-		p_lat: lat,
-		p_lng: lng,
-		p_radius_km: radius / 1000,
-	});
-
-	if (error) {
-		console.error("[RealTimeData] Nearby search error:", error);
-
-		// Fallback: simple bounding box query
-		const latDelta = radius / 111000;
-		const lngDelta = radius / (111000 * Math.cos((lat * Math.PI) / 180));
-
-		const { data: fallbackData } = await supabase
-			.from("venues")
-			.select("*")
-			// Note: latitude/longitude columns might not exist if fully migrated to PostGIS 'location'
-			// But the v5 script kept the insert logic converting lat/lng to location.
-			// If the table doesn't have lat/lng columns anymore, this fallback query will fail.
-			// Optimistic approach: Use the RPC primarily.
-			.limit(100);
-
-		return fallbackData || [];
+	try {
+		const data = await runSupabaseReadPolicy({
+			resourceType: "nearbyDiscovery",
+			run: async () => {
+				const result = await supabase.rpc("search_venues", {
+					p_query: "", // Empty for "all nearby"
+					p_lat: lat,
+					p_lng: lng,
+					p_radius_km: radius / 1000,
+				});
+				if (result.error) throw result.error;
+				return result.data || [];
+			},
+		});
+		return data || [];
+	} catch (error) {
+		if (import.meta.env.DEV) {
+			logUnexpectedSupabaseReadError(
+				"[RealTimeData] Nearby search error:",
+				error,
+			);
+		}
 	}
 
-	return data || [];
+	try {
+		const fallbackData = await runSupabaseReadPolicy({
+			resourceType: "nearbyDiscovery",
+			run: async () => {
+				const result = await supabase.from("venues").select("*").limit(100);
+				if (result.error) throw result.error;
+				return result.data || [];
+			},
+		});
+		return fallbackData || [];
+	} catch (fallbackError) {
+		if (import.meta.env.DEV) {
+			logUnexpectedSupabaseReadError(
+				"[RealTimeData] Nearby fallback error:",
+				fallbackError,
+			);
+		}
+		return [];
+	}
 }
 
 /**

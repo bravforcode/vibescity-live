@@ -1,0 +1,4 @@
+# Neon Stores Directory
+
+This directory will contain Pinia stores for the Neon Venue Signs System:
+- neonStore.ts - Main neon state management store

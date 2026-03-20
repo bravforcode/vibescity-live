@@ -1,0 +1,4 @@
+npx lint-staged
+
+# Check for hardcoded i18n violations (non-strict, just warning)
+node scripts/ci/check-source-i18n-hardcoded.mjs

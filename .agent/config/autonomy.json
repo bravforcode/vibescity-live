@@ -1,0 +1,194 @@
+{
+  "version": 1,
+  "mode": "auto-max",
+  "model": {
+    "provider": "anthropic",
+    "name": "claude-3-5-sonnet-latest",
+    "max_tokens": 1200,
+    "temperature": 0
+  },
+  "allow_write_paths": [
+    "reports/agents/**",
+    "reports/ci/**",
+    "tmp/**",
+    "src/locales/**",
+    "docs/**",
+    ".claude/commands/**",
+    ".claude/agents/**",
+    ".agent/config/**"
+  ],
+  "deny_write_paths": [
+    "supabase/migrations/**",
+    "**/*payment*",
+    "**/*stripe*",
+    "**/*auth*",
+    "**/*session*",
+    "**/*token*",
+    "**/*rls*",
+    "**/*schema*",
+    "scripts/**/*.sql",
+    "scripts/**/seed-*.sql",
+    "scripts/**/fix-rls*.sql",
+    "scripts/**/master-data-recovery.sql"
+  ],
+  "high_risk_rules": [
+    {
+      "id": "payment",
+      "keywords": ["payment", "stripe", "checkout", "refund", "billing"],
+      "paths": ["**/*payment*", "**/*stripe*", "**/*checkout*"],
+      "reason": "Payment flow changes require human approval."
+    },
+    {
+      "id": "auth",
+      "keywords": ["auth", "login", "session", "token", "oauth", "jwt"],
+      "paths": ["**/*auth*", "**/*session*", "**/*token*"],
+      "reason": "Authentication and session changes require human approval."
+    },
+    {
+      "id": "rls",
+      "keywords": ["rls", "policy", "row level security"],
+      "paths": ["**/*rls*", "supabase/**"],
+      "reason": "RLS and policy changes require human approval."
+    },
+    {
+      "id": "schema",
+      "keywords": ["schema", "migration", "ddl", "sql"],
+      "paths": ["supabase/migrations/**", "**/*schema*", "scripts/**/*.sql"],
+      "reason": "Schema and migration changes require human approval."
+    },
+    {
+      "id": "destructive",
+      "keywords": ["delete all", "truncate", "drop table", "destroy", "recovery"],
+      "paths": [
+        "scripts/**/seed-*.sql",
+        "scripts/**/master-data-recovery.sql"
+      ],
+      "reason": "Destructive data operations require human approval."
+    }
+  ],
+  "cooldown_minutes": 60,
+  "automation": {
+    "auto_remediation": {
+      "enabled": true,
+      "execute_safe_profiles": true,
+      "skip_if_deduped": true,
+      "eligible_statuses": ["triaged"],
+      "profiles": [
+        "i18n-autopilot",
+        "performance-recheck",
+        "route-slo-recheck",
+        "healthcheck-rerun",
+        "playwright-smoke-rerun",
+        "map-preflight-rerun",
+        "map-required-rerun",
+        "diagnostic-checklist"
+      ]
+    },
+    "auto_recovery": {
+      "enabled": true,
+      "lookback_days": 14
+    }
+  },
+  "report_sinks": {
+    "json_dir": "reports/agents",
+    "markdown_dir": "reports/agents",
+    "github_summary": true,
+    "github_output": true,
+    "issues": {
+      "enabled": true,
+      "labels": ["agent:ops", "triage"],
+      "create_for_risk_levels": ["high", "critical"],
+      "create_for_approval_required": true
+    },
+    "pull_requests": {
+      "enabled": true,
+      "comment_for_risk_levels": ["medium", "high", "critical"],
+      "comment_for_statuses": ["resolved", "remediated", "remediation-failed", "pending-approval"],
+      "comment_for_approval_required": true
+    }
+  },
+  "trigger_matrix": {
+    "scheduled_advisor": {
+      "default_inputs": [
+        "reports/ci/weekly-quality-trend.json",
+        "reports/ci/monthly-quality-trend.json",
+        "reports/ci/metrics-export-log.json",
+        "reports/ci/incident-manager-log.json"
+      ],
+      "rerun_commands": ["python .agent/scripts/checklist.py ."]
+    },
+    "workflow_failure": {
+      "default_inputs": [],
+      "rerun_commands": ["python .agent/scripts/checklist.py ."]
+    },
+    "smoke": {
+      "default_inputs": ["reports/e2e/junit.xml"],
+      "rerun_commands": ["npm run test:e2e:smoke"]
+    },
+    "map-preflight": {
+      "default_inputs": [
+        "reports/e2e/junit.xml",
+        "test-results-mapprobe-preflight/.last-run.json"
+      ],
+      "rerun_commands": ["npm run test:e2e:map-preflight"]
+    },
+    "map-required": {
+      "default_inputs": ["reports/e2e/junit.xml"],
+      "rerun_commands": ["npm run test:e2e:map-required"]
+    },
+    "route-slo": {
+      "default_inputs": [
+        "reports/ci/route-slo-evaluation.json",
+        "reports/ci/postdeploy-route-health.json"
+      ],
+      "rerun_commands": ["node scripts/ci/evaluate-route-slo.mjs"]
+    },
+    "perf-budget": {
+      "default_inputs": [
+        "reports/ci/perf-budget-summary.json",
+        "reports/ci/weekly-lighthouse-summary.json",
+        "reports/performance/map-fps-benchmark.json"
+      ],
+      "rerun_commands": [
+        "node scripts/ci/check-perf-budget.mjs --budget perf-budget.json"
+      ]
+    },
+    "i18n": {
+      "default_inputs": [
+        "tmp/i18n-autopilot-report.json",
+        "tmp/i18n-sync-report.json",
+        "tmp/i18n-orphan-report.json"
+      ],
+      "rerun_commands": ["bun run i18n:autopilot", "bun run i18n:sync"]
+    },
+    "healthcheck": {
+      "default_inputs": ["reports/ci/postdeploy-route-health.json"],
+      "rerun_commands": ["npm run healthcheck:postdeploy"]
+    },
+    "security": {
+      "default_inputs": ["reports/ci/pii-access-anomaly-log.json"],
+      "rerun_commands": [
+        "python .agent/scripts/checklist.py .",
+        "npm run ci:secret-scan"
+      ]
+    }
+  },
+  "operational_agents": [
+    {
+      "name": "ops-orchestrator",
+      "responsibility": "Routes operational events into triage, remediation, or approval workflows."
+    },
+    {
+      "name": "signal-triager",
+      "responsibility": "Normalizes CI, test, perf, incident, i18n, and health signals."
+    },
+    {
+      "name": "safe-remediator",
+      "responsibility": "Executes allowlisted remediation profiles and writes remediation artifacts."
+    },
+    {
+      "name": "high-risk-gatekeeper",
+      "responsibility": "Builds approval packets and blocks privileged or destructive paths."
+    }
+  ]
+}

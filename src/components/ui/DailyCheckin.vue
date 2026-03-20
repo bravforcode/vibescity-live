@@ -6,6 +6,7 @@
 
 import { computed, nextTick, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { runCommitMutation } from "@/composables/useOptimisticUpdate";
 import { gamificationService } from "@/services/gamificationService";
 
 const { t } = useI18n();
@@ -95,28 +96,34 @@ const claim = async () => {
 	errorMessage.value = "";
 
 	try {
-		const result = await gamificationService.claimDailyCheckin();
+		await runCommitMutation({
+			commit: () => gamificationService.claimDailyCheckin(),
+			onSuccess: (result) => {
+				applyStatus({
+					streak: result.streak,
+					total_days: result.total_days,
+					last_checkin_at: result.claimed_at,
+					balance: result.balance,
+					can_claim_today: false,
+				});
 
-		applyStatus({
-			streak: result.streak,
-			total_days: result.total_days,
-			last_checkin_at: result.claimed_at,
-			balance: result.balance,
-			can_claim_today: false,
+				claimedCoins.value = Number(
+					result.reward_coins || currentDayReward.value.coins,
+				);
+				justClaimed.value = !result.already_claimed;
+
+				emit("claim", {
+					coins: claimedCoins.value,
+					streak: Number(result.streak || 0),
+					balance: Number(result.balance || 0),
+				});
+			},
+			onError: (error) => {
+				errorMessage.value = error?.message || "Failed to claim daily reward.";
+			},
+			errorMessage: (error) =>
+				error?.message || "Failed to claim daily reward.",
 		});
-
-		claimedCoins.value = Number(
-			result.reward_coins || currentDayReward.value.coins,
-		);
-		justClaimed.value = !result.already_claimed;
-
-		emit("claim", {
-			coins: claimedCoins.value,
-			streak: Number(result.streak || 0),
-			balance: Number(result.balance || 0),
-		});
-	} catch (error) {
-		errorMessage.value = error?.message || "Failed to claim daily reward.";
 	} finally {
 		isLoading.value = false;
 	}
@@ -154,14 +161,14 @@ defineExpose({ show, hide });
         @keydown.esc="hide"
       >
         <div class="dc-modal">
-          <button type="button" class="dc-close" aria-label="Close check-in" @click="hide">
+          <button type="button" class="dc-close" :aria-label="$t('auto.k_b951989d')" @click="hide">
             <span aria-hidden="true">✕</span>
           </button>
 
           <Transition name="dc-celebrate">
             <div v-if="justClaimed" class="dc-celebrate-banner" aria-live="polite">
               <span class="dc-celebrate-emoji" aria-hidden="true">🎉</span>
-              <span class="dc-celebrate-text">+{{ claimedCoins }} coins!</span>
+              <span class="dc-celebrate-text">+{{ claimedCoins }} {{ $t("auto.k_bcadfc24") }}</span>
             </div>
           </Transition>
 
@@ -174,7 +181,7 @@ defineExpose({ show, hide });
             <p class="dc-streak">{{ streakDisplay }}</p>
           </div>
 
-          <div class="dc-grid" role="list" aria-label="7-day reward schedule">
+          <div class="dc-grid" role="list" :aria-label="$t('auto.k_c196fb09')">
             <div
               v-for="(reward, i) in rewards"
               :key="reward.day"
@@ -201,7 +208,7 @@ defineExpose({ show, hide });
             </div>
             <div class="dc-balance-divider" aria-hidden="true" />
             <div class="dc-balance-item">
-              <span class="dc-balance-label">Total Days</span>
+              <span class="dc-balance-label">{{ $t("auto.k_905c21f0") }}</span>
               <span class="dc-balance-value">{{ checkinData.totalDays }}</span>
             </div>
           </div>
@@ -487,7 +494,7 @@ defineExpose({ show, hide });
 }
 
 .dc-cta--active {
-  background: linear-gradient(100deg, #7c3aed, #db2777, #dc2626);
+  background: linear-gradient(100deg, #06b6d4, #db2777, #dc2626);
   color: #fff;
   box-shadow: 0 8px 24px rgba(139 92 246 / 0.45);
 }

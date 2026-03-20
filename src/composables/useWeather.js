@@ -1,4 +1,5 @@
-import { onMounted, onUnmounted, ref, watch } from "vue";
+import { getCurrentInstance, onMounted, onUnmounted, ref, watch } from "vue";
+import { isExpectedAbortError } from "../utils/networkErrorUtils";
 
 const IS_E2E = import.meta.env.VITE_E2E === "true";
 const TTL_MS = 15 * 60 * 1000;
@@ -86,6 +87,7 @@ export function useWeather(options = {}) {
 	const getMapCenter = options.getMapCenter;
 
 	let abortController = null;
+	let activeRequestId = 0;
 	let disposed = false;
 
 	const resolveCenter = () => {
@@ -137,9 +139,11 @@ export function useWeather(options = {}) {
 		if (!cacheExpired || movedKm <= 2) return;
 
 		const rounded = { lat: round2(center.lat), lng: round2(center.lng) };
+		const requestId = ++activeRequestId;
 
 		if (abortController) abortController.abort();
-		abortController = new AbortController();
+		const controller = new AbortController();
+		abortController = controller;
 
 		try {
 			const url = new URL("https://api.openweathermap.org/data/2.5/weather");
@@ -149,8 +153,15 @@ export function useWeather(options = {}) {
 			url.searchParams.set("units", "metric");
 
 			const res = await fetch(url.toString(), {
-				signal: abortController.signal,
+				signal: controller.signal,
 			});
+			if (
+				disposed ||
+				requestId !== activeRequestId ||
+				controller.signal.aborted
+			) {
+				return;
+			}
 			if (!res.ok) {
 				writeCache({
 					ok: false,
@@ -166,6 +177,13 @@ export function useWeather(options = {}) {
 			}
 
 			const data = await res.json();
+			if (
+				disposed ||
+				requestId !== activeRequestId ||
+				controller.signal.aborted
+			) {
+				return;
+			}
 			const condition = mapCondition(data?.weather?.[0]?.main);
 			const dt = Number(data?.dt);
 			const sunrise = Number(data?.sys?.sunrise);
@@ -190,7 +208,12 @@ export function useWeather(options = {}) {
 			weatherCondition.value = condition;
 			isNight.value = night;
 		} catch (err) {
-			if (err?.name === "AbortError") return;
+			if (
+				requestId !== activeRequestId ||
+				isExpectedAbortError(err, { signal: controller.signal })
+			) {
+				return;
+			}
 			writeCache({
 				ok: false,
 				fetchedAt: now,
@@ -200,6 +223,10 @@ export function useWeather(options = {}) {
 			});
 			weatherCondition.value = "clear";
 			isNight.value = false;
+		} finally {
+			if (abortController === controller) {
+				abortController = null;
+			}
 		}
 	};
 
@@ -207,10 +234,10 @@ export function useWeather(options = {}) {
 		void maybeFetch();
 	};
 
-	onMounted(() => {
+	const initialize = () => {
 		applyFromCache(readCache());
 		void maybeFetch();
-	});
+	};
 
 	if (centerRef && typeof centerRef === "object" && "value" in centerRef) {
 		watch(
@@ -222,11 +249,19 @@ export function useWeather(options = {}) {
 		);
 	}
 
-	onUnmounted(() => {
+	const cleanup = () => {
 		disposed = true;
+		activeRequestId += 1;
 		if (abortController) abortController.abort();
 		abortController = null;
-	});
+	};
+
+	if (getCurrentInstance()) {
+		onMounted(initialize);
+		onUnmounted(cleanup);
+	} else {
+		initialize();
+	}
 
 	return { weatherCondition, isNight, refresh };
 }

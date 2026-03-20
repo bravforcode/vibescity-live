@@ -1,0 +1,177 @@
+name: Performance Thresholds Check
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  performance-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v1
+      with:
+        bun-version: latest
+        
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+        
+    - name: Install dependencies
+      run: |
+        bun install
+        pip install -r backend/requirements.txt
+        
+    - name: Run Metrics Collection
+      run: |
+        python .agent/scripts/metrics_collector.py .
+        
+    - name: Performance Threshold Checks
+      run: |
+        # Frontend thresholds
+        echo "🔍 Checking frontend performance thresholds..."
+        
+        # Lighthouse Performance Score >= 90
+        LH_PERF=$(bun run lighthouse:ci --json | jq '.categories.performance.score * 100')
+        if (( $(echo "$LH_PERF < 90" | bc -l) )); then
+          echo "❌ Lighthouse Performance score $LH_PERF is below threshold 90"
+          exit 1
+        fi
+        echo "✅ Lighthouse Performance: $LH_PERF"
+        
+        # Bundle size <= 500KB
+        BUNDLE_SIZE=$(bun run build:analyze | jq '.totalSize')
+        if (( BUNDLE_SIZE > 512000 )); then
+          echo "❌ Bundle size $BUNDLE_SIZE bytes exceeds threshold 500KB"
+          exit 1
+        fi
+        echo "✅ Bundle size: $((BUNDLE_SIZE/1024))KB"
+        
+        # First Contentful Paint <= 1.5s
+        FCP=$(bun run lighthouse:ci --json | jq '.audits."first-contentful-paint".numericValue / 1000')
+        if (( $(echo "$FCP > 1.5" | bc -l) )); then
+          echo "❌ FCP $FCP seconds exceeds threshold 1.5s"
+          exit 1
+        fi
+        echo "✅ FCP: ${FCP}s"
+        
+        # Largest Contentful Paint <= 2.5s
+        LCP=$(bun run lighthouse:ci --json | jq '.audits."largest-contentful-paint".numericValue / 1000')
+        if (( $(echo "$LCP > 2.5" | bc -l) )); then
+          echo "❌ LCP $LCP seconds exceeds threshold 2.5s"
+          exit 1
+        fi
+        echo "✅ LCP: ${LCP}s"
+        
+        # CLS <= 0.1
+        CLS=$(bun run lighthouse:ci --json | jq '.audits."cumulative-layout-shift".numericValue')
+        if (( $(echo "$CLS > 0.1" | bc -l) )); then
+          echo "❌ CLS $CLS exceeds threshold 0.1"
+          exit 1
+        fi
+        echo "✅ CLS: $CLS"
+        
+    - name: Backend Performance Checks
+      run: |
+        cd backend
+        
+        # API response time <= 200ms (95th percentile)
+        API_PERF=$(python -c "
+import requests
+import time
+import statistics
+times = []
+for _ in range(20):
+    start = time.time()
+    try:
+        requests.get('http://localhost:8001/health', timeout=1)
+        times.append((time.time() - start) * 1000)
+    except:
+        pass
+if times:
+    p95 = statistics.quantile(times, 0.95)
+    print(p95)
+else:
+    print(0)
+")
+        if (( $(echo "$API_PERF > 200" | bc -l) )); then
+          echo "❌ API 95th percentile response time ${API_PERF}ms exceeds threshold 200ms"
+          exit 1
+        fi
+        echo "✅ API 95th percentile: ${API_PERF}ms"
+        
+        # Database query time <= 100ms average
+        DB_PERF=$(python -c "
+import asyncio
+from sqlalchemy import create_engine
+import time
+engine = create_engine('postgresql://localhost/vibecity')
+times = []
+for _ in range(10):
+    start = time.time()
+    try:
+        engine.execute('SELECT COUNT(*) FROM venues LIMIT 1')
+        times.append((time.time() - start) * 1000)
+    except:
+        pass
+if times:
+    avg = sum(times) / len(times)
+    print(avg)
+else:
+    print(0)
+")
+        if (( $(echo "$DB_PERF > 100" | bc -l) )); then
+          echo "❌ DB average query time ${DB_PERF}ms exceeds threshold 100ms"
+          exit 1
+        fi
+        echo "✅ DB average query: ${DB_PERF}ms"
+        
+    - name: Security Scan
+      run: |
+        echo "🔒 Running security scans..."
+        
+        # Frontend security audit
+        bun run audit:security || exit 1
+        
+        # Backend security scan
+        cd backend
+        python -m bandit -r . -f json || exit 1
+        python -m safety check --json || exit 1
+        
+        # Dependency vulnerability scan
+        bun audit || exit 1
+        pip-audit || exit 1
+        
+        echo "✅ Security scans passed"
+        
+    - name: Generate Performance Report
+      run: |
+        python .agent/scripts/generate_performance_report.py > performance_report.md
+        
+    - name: Upload Performance Report
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-report
+        path: performance_report.md
+        
+    - name: Comment PR with Results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const report = fs.readFileSync('performance_report.md', 'utf8');
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `## 📊 Performance & Security Report\n\n${report}`
+          });

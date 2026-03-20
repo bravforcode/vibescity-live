@@ -3,6 +3,7 @@ import { Calendar, CheckCircle, CreditCard, XCircle } from "lucide-vue-next";
 import { computed, onMounted, ref } from "vue";
 import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
 import { useNotifications } from "@/composables/useNotifications";
+import i18n from "@/i18n.js";
 import { getSupabaseEdgeBaseUrl } from "@/lib/runtimeConfig";
 import { supabase } from "@/lib/supabase";
 
@@ -39,7 +40,7 @@ const manageSub = async (subId, action) => {
 			data: { session },
 		} = await supabase.auth.getSession();
 		if (!session?.access_token)
-			throw new Error("Please sign in to manage subscriptions.");
+			throw new Error(i18n.global.t("auto.k_11ef54fd"));
 
 		const edgeUrl = getSupabaseEdgeBaseUrl();
 		const res = await fetch(`${edgeUrl}/manage-subscription`, {
@@ -106,15 +107,12 @@ onMounted(fetchSubscriptions);
 </script>
 
 <template>
+  <!-- aria-label -->
   <div class="space-y-4">
-    <h3 class="text-sm font-bold text-white/50 uppercase tracking-widest mb-2">
-      Active Subscriptions
-    </h3>
+    <h3 class="text-sm font-bold text-white/50 uppercase tracking-widest mb-2"> {{ $t("auto.k_b4d4edcd") }} </h3>
 
-    <div v-if="loading" class="text-white/30 text-xs">Loading…</div>
-    <div v-else-if="subscriptions.length === 0" class="text-white/30 text-xs">
-      No active subscriptions found.
-    </div>
+    <div v-if="loading" class="text-white/30 text-xs">{{ $t("auto.k_2e7e4ae3") }}</div>
+    <div v-else-if="subscriptions.length === 0" class="text-white/30 text-xs"> {{ $t("auto.k_8d830c00") }} </div>
 
     <div
       v-for="sub in subscriptions"
@@ -140,7 +138,7 @@ onMounted(fetchSubscriptions);
           <CreditCard class="w-5 h-5" />
         </div>
         <div>
-          <div class="font-bold text-white text-sm">Primal Plan</div>
+          <div class="font-bold text-white text-sm">{{ $t("auto.k_1622f0f3") }}</div>
           <div class="text-xs text-white/50 font-mono">
             {{ sub.stripe_subscription_id.slice(-8) }}
           </div>
@@ -152,9 +150,9 @@ onMounted(fetchSubscriptions);
       >
         <Calendar class="w-3 h-3" />
         <span v-if="sub.cancel_at_period_end"
-          >Ends on {{ formatDate(sub.current_period_end) }}</span
+          >{{ $t("auto.k_a0e6bf0c") }} {{ formatDate(sub.current_period_end) }}</span
         >
-        <span v-else>Renews on {{ formatDate(sub.current_period_end) }}</span>
+        <span v-else>{{ $t("auto.k_21c74130") }} {{ formatDate(sub.current_period_end) }}</span>
       </div>
 
       <!-- Actions -->
@@ -164,16 +162,14 @@ onMounted(fetchSubscriptions);
         :disabled="!!processing"
         class="w-full py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-2"
       >
-        <XCircle class="w-3 h-3" /> Cancel Auto-Renewal
-      </button>
+        <XCircle class="w-3 h-3" /> {{ $t("auto.k_f480ad43") }} </button>
       <button
         v-else
         @click="openManageConfirmation(sub.stripe_subscription_id, 'resume')"
         :disabled="!!processing"
         class="w-full py-2 bg-green-500/10 hover:bg-green-500/20 text-green-500 border border-green-500/30 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-2"
       >
-        <CheckCircle class="w-3 h-3" /> Resume Subscription
-      </button>
+        <CheckCircle class="w-3 h-3" /> {{ $t("auto.k_394d8193") }} </button>
     </div>
 
     <ConfirmDialog

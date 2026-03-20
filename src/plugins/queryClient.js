@@ -1,4 +1,5 @@
 import { QueryClient } from "@tanstack/vue-query";
+import { isRetriableApiError } from "@/services/apiClient";
 
 const queryClient = new QueryClient({
 	defaultOptions: {
@@ -6,7 +7,10 @@ const queryClient = new QueryClient({
 			staleTime: 1000 * 60 * 5, // 5 minutes
 			gcTime: 1000 * 60 * 10, // 10 minutes
 			refetchOnWindowFocus: true,
-			retry: 1,
+			retry: (failureCount, error) => {
+				if (failureCount >= 3) return false;
+				return isRetriableApiError(error);
+			},
 		},
 	},
 });

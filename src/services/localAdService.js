@@ -1,25 +1,11 @@
 import { getSupabaseEdgeBaseUrl } from "@/lib/runtimeConfig";
 import { supabase } from "@/lib/supabase";
-
-const TRANSIENT_ERROR_PATTERNS = [
-	"schema cache",
-	"upstream request timeout",
-	"service unavailable",
-	"temporarily unavailable",
-	"network error",
-	"failed to fetch",
-	"gateway timeout",
-];
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const isTransientStatus = (status) =>
-	status === 429 || status === 408 || status === 425 || status >= 500;
-
-const isTransientMessage = (message) => {
-	const lower = String(message || "").toLowerCase();
-	return TRANSIENT_ERROR_PATTERNS.some((pattern) => lower.includes(pattern));
-};
+import { isTransientNetworkError } from "@/utils/networkErrorUtils";
+import {
+	computeBackoffDelayMs,
+	shouldRetryResource,
+	waitForBackoff,
+} from "@/utils/retryPolicy";
 
 const extractErrorMessage = (payload, fallback) => {
 	if (typeof payload === "string" && payload.trim()) return payload.trim();
@@ -52,23 +38,20 @@ const parseJsonSafe = async (res) => {
 	}
 };
 
-const requestWithRetry = async (
-	run,
-	{ maxAttempts = 3, baseDelayMs = 350 } = {},
-) => {
+const requestWithRetry = async (resourceType, run) => {
 	let lastError;
-	for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+	for (let attempt = 0; ; attempt += 1) {
 		try {
 			return await run();
 		} catch (error) {
 			lastError = error;
-			const status = Number(error?.status) || 0;
-			const message = String(error?.message || error || "");
-			const shouldRetry =
-				attempt < maxAttempts &&
-				(isTransientStatus(status) || isTransientMessage(message));
-			if (!shouldRetry) break;
-			await sleep(baseDelayMs * attempt);
+			if (
+				!isTransientNetworkError(error) ||
+				!shouldRetryResource({ resourceType, attempt })
+			) {
+				break;
+			}
+			await waitForBackoff(computeBackoffDelayMs({ resourceType, attempt }));
 		}
 	}
 	throw lastError;
@@ -93,7 +76,7 @@ class LocalAdService {
 		const edgeUrl = getSupabaseEdgeBaseUrl();
 		const headers = await this._authHeaders();
 
-		return await requestWithRetry(async () => {
+		return await requestWithRetry("localAds", async () => {
 			const res = await fetch(`${edgeUrl}/admin-local-ads${path}`, {
 				...options,
 				headers: {

@@ -134,9 +134,9 @@ useDialogA11y({
         <div
           class="w-12 h-12 rounded-xl bg-pink-500/20 shrink-0 flex items-center justify-center p-2 mt-0.5"
         >
-          <img
+          <img loading="lazy"
             src="/pwa-192x192.png"
-            alt="VibeCity App Icon"
+            :alt="$t('auto.k_c0e316ea')"
             class="w-full h-full object-contain drop-shadow"
           />
         </div>
@@ -147,9 +147,7 @@ useDialogA11y({
           </h3>
 
           <template v-if="isIOS">
-            <p class="text-zinc-400 text-xs leading-relaxed">
-              Tap the
-              <span
+            <p class="text-zinc-400 text-xs leading-relaxed"> {{ $t("auto.k_b7d278cd") }} <span
                 class="inline-block mx-1 w-6 h-6 bg-zinc-800 rounded flex items-center justify-center"
                 ><svg
                   width="12"
@@ -164,9 +162,7 @@ useDialogA11y({
                     d="M7 1v10M3 4l4-3 4 3M1 11v2a2 2 0 002 2h8a2 2 0 002-2v-2"
                   /></svg
               ></span>
-              <strong>Share</strong> button and select
-              <strong>"Add to Home Screen"</strong> for the best experience.
-            </p>
+              <strong>Share</strong> {{ $t("auto.k_24c33304") }} <strong>{{ $t("auto.k_66bfd95e") }}</strong> {{ $t("auto.k_545de501") }} </p>
           </template>
 
           <template v-else>
@@ -180,7 +176,7 @@ useDialogA11y({
             </p>
             <button
               @click="handleInstall"
-              class="w-full py-2 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400 text-white rounded-lg font-bold text-sm transition-all active:scale-[0.98]"
+              class="w-full py-2 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400 text-white rounded-lg font-bold text-sm transition active:scale-[0.98]"
             >
               {{ t("app.install_btn", "Install App") }}
             </button>

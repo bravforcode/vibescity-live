@@ -1,0 +1,70 @@
+name: Ops Agent Recovery On Success
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+      - Playwright Tests (Manual)
+      - Synthetic Postdeploy Monitor
+      - Weekly Quality Trend
+      - Monthly Quality Trend
+      - Security Gates
+      - i18n Autopilot
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  resolve-recovery:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile || bun install
+
+      - name: Resolve recovered reports
+        id: resolve
+        run: node scripts/agents/resolve-recovery.mjs --workflow "${{ github.event.workflow_run.name }}"
+
+      - name: Publish resolved reports
+        if: ${{ steps.resolve.outputs.resolved_count != '0' && steps.resolve.outputs.resolved_report_paths != '' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RESOLVED_REPORT_PATHS: ${{ steps.resolve.outputs.resolved_report_paths }}
+        run: |
+          IFS=',' read -ra REPORTS <<< "${RESOLVED_REPORT_PATHS}"
+          for report in "${REPORTS[@]}"; do
+            if [ -n "${report}" ]; then
+              node scripts/agents/publish-agent-report.mjs --report "${report}"
+            fi
+          done
+
+      - name: Upload recovery reports
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ops-agent-recovery-reports
+          path: reports/agents
+          retention-days: 14
+          if-no-files-found: ignore

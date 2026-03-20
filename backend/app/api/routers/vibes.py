@@ -336,6 +336,15 @@ async def vibe_stream(websocket: WebSocket):
 					continue
 
 				last_msg_time = now
+
+				# Guard against oversized payloads (DoS prevention)
+				if len(data) > 4096:
+					await manager._safe_send(
+						websocket,
+						{"type": "error", "content": "Payload too large."},
+					)
+					continue
+
 				result = await manager.process_message(websocket, data)
 				if result:
 					await manager.broadcast_payload(result)

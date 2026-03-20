@@ -24,9 +24,7 @@
             <circle cx="12" cy="12" r="10" />
             <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
             <path d="M2 12h20" />
-          </svg>
-          Visitors by Country
-        </h3>
+          </svg> {{ $t("auto.k_d00caa65") }} </h3>
 
         <div v-if="loadingCharts" class="h-64 flex items-center justify-center">
           <svg
@@ -55,9 +53,7 @@
           <div
             v-else
             class="absolute inset-0 flex items-center justify-center text-slate-500 text-sm"
-          >
-            No location data available
-          </div>
+          > {{ $t("auto.k_bf583558") }} </div>
         </div>
       </div>
 
@@ -82,9 +78,7 @@
           >
             <rect width="14" height="20" x="5" y="2" rx="2" ry="2" />
             <path d="M12 18h.01" />
-          </svg>
-          Device Types
-        </h3>
+          </svg> {{ $t("auto.k_fe090736") }} </h3>
 
         <div v-if="loadingCharts" class="h-64 flex items-center justify-center">
           <svg
@@ -117,9 +111,7 @@
           <div
             v-else
             class="absolute inset-0 flex items-center justify-center text-slate-500 text-sm"
-          >
-            No device data available
-          </div>
+          > {{ $t("auto.k_f7cdbfb3") }} </div>
         </div>
       </div>
     </div>
@@ -145,9 +137,7 @@
           <circle cx="9" cy="7" r="4" />
           <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
           <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-        </svg>
-        Visitor Sessions Log
-      </h3>
+        </svg> {{ $t("auto.k_a03db5d4") }} </h3>
       <DataTable
         :columns="columns"
         :fetch-fn="adminDataService.getVisitorSessions"
@@ -213,12 +203,19 @@ const columns = [
 const fetchChartData = async () => {
 	loadingCharts.value = true;
 	try {
-		const [geo, dev] = await Promise.all([
+		const results = await Promise.allSettled([
 			adminDataService.getVisitorGeoDistribution(),
 			adminDataService.getVisitorDeviceDistribution(),
 		]);
-		geoData.value = geo;
-		deviceData.value = dev;
+		if (results[0].status === "fulfilled") geoData.value = results[0].value;
+		if (results[1].status === "fulfilled") deviceData.value = results[1].value;
+		const failed = results.filter((r) => r.status === "rejected");
+		if (failed.length > 0 && import.meta.env.DEV) {
+			console.warn(
+				"Partial visitor chart load failure:",
+				failed.map((r) => r.reason),
+			);
+		}
 	} catch (err) {
 		console.error("Failed to load visitor charts", err);
 	} finally {

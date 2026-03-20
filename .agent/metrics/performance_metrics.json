@@ -1,0 +1,21 @@
+[
+  {
+    "timestamp": "2026-03-13T02:28:58.893311",
+    "frontend": {
+      "bundle_analysis": {
+        "status": "failed",
+        "output": ""
+      }
+    },
+    "backend": {
+      "api_performance": {
+        "status": "failed",
+        "output": ""
+      },
+      "db_performance": {
+        "status": "failed",
+        "output": ""
+      }
+    }
+  }
+]

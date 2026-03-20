@@ -7,7 +7,7 @@
       class="absolute -top-20 -left-20 w-64 h-64 bg-blue-500/20 rounded-full blur-[100px]"
     ></div>
     <div
-      class="absolute -bottom-20 -right-20 w-64 h-64 bg-purple-500/20 rounded-full blur-[100px]"
+      class="absolute -bottom-20 -right-20 w-64 h-64 bg-cyan-500/20 rounded-full blur-[100px]"
     ></div>
 
     <!-- Header -->
@@ -18,18 +18,16 @@
         <h2 class="text-3xl font-black text-white flex items-center gap-3">
           <span class="text-4xl animate-bounce-in">💎</span>
           <span
-            class="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent"
-            >Power Up Your Vibe</span
+            class="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent"
+            >{{ $t("auto.k_5a20631a") }}</span
           >
         </h2>
-        <p class="text-gray-400 text-sm mt-1 font-medium">
-          Unlock exclusive features to stand out on the map
-        </p>
+        <p class="text-gray-400 text-sm mt-1 font-medium"> {{ $t("auto.k_67ad4bf3") }} </p>
       </div>
 
       <div class="flex items-center gap-3">
         <!-- Currency Toggle -->
-        <button
+        <button :aria-label="$t('a11y.action')"
           @click="currencyStore.toggleCurrency()"
           class="bg-black/40 hover:bg-black/60 text-white px-3 py-1.5 rounded-lg text-xs font-bold border border-white/10 transition flex items-center gap-2"
         >
@@ -43,7 +41,7 @@
         <div
           class="flex bg-black/40 rounded-xl p-1 border border-white/10 backdrop-blur-md"
         >
-          <button
+          <button :aria-label="$t('a11y.action')"
             v-for="method in paymentMethods"
             :key="method"
             @click="paymentMethod = method"
@@ -54,9 +52,9 @@
             "
             class="px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 capitalize"
           >
-            <span v-if="method === 'stripe'">💳 Stripe TH+Global</span>
-            <span v-else-if="method === 'paypal'">🅿️ PayPal</span>
-            <span v-else>🏦 Thai / Intl Wire</span>
+            <span v-if="method === 'stripe'">{{ $t("auto.k_46005f30") }}</span>
+            <span v-else-if="method === 'paypal'">{{ $t("auto.k_983ee4e4") }}</span>
+            <span v-else>{{ $t("auto.k_7529a34e") }}</span>
           </button>
         </div>
       </div>
@@ -68,22 +66,18 @@
       <label
         for="partner-ref-code"
         class="mb-1 block text-[11px] font-bold uppercase tracking-wide text-white/70"
-      >
-        Referral Code (Optional)
-      </label>
+      > {{ $t("auto.k_5528130") }} </label>
       <input
         id="partner-ref-code"
         v-model.trim="partnerReferralCode"
         type="text"
         inputmode="text"
         autocomplete="off"
-        placeholder="Enter partner referral code"
-        class="w-full rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/35 outline-none focus:border-cyan-400"
+        :placeholder="$t('auto.k_d36c6d11')"
+        class="w-full rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:border-cyan-400"
         @blur="persistPartnerCode"
       />
-      <p class="mt-1 text-[11px] text-white/45">
-        Referral code has higher priority than shared link attribution.
-      </p>
+      <p class="mt-1 text-[11px] text-white/45"> {{ $t("auto.k_3dd1c1d9") }} </p>
     </div>
 
     <!-- Tier Tabs (Desktop Only) -->
@@ -158,7 +152,7 @@
           <div v-if="pkg.options" class="mb-4">
             <select
               v-model="pkg.selectedOption"
-              class="w-full bg-black/40 text-white text-xs border border-white/10 rounded-lg p-2 outline-none focus:border-blue-500 transition-colors"
+              class="w-full bg-black/40 text-white text-xs border border-white/10 rounded-lg p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:border-blue-500 transition-colors"
             >
               <option v-for="opt in pkg.options" :key="opt.sku" :value="opt">
                 {{ opt.label }}
@@ -205,9 +199,7 @@
               <p
                 v-if="getPurchaseMode(pkg) === 'subscription'"
                 class="mt-1 text-[10px] text-emerald-300"
-              >
-                Cancel anytime
-              </p>
+              > {{ $t("auto.k_ab0381e0") }} </p>
             </div>
 
             <div class="flex items-end gap-1 mb-3">
@@ -273,14 +265,12 @@
           <div
             class="bg-white/5 p-4 border-b border-white/5 flex justify-between items-center"
           >
-            <h3 id="manual-transfer-title" class="font-bold text-white flex items-center gap-2">
-              🏦 Bank Transfer
-            </h3>
+            <h3 id="manual-transfer-title" class="font-bold text-white flex items-center gap-2"> {{ $t("auto.k_6359f96") }} </h3>
             <button
               ref="manualCloseBtnRef"
               type="button"
               @click="closeManualModal"
-              aria-label="Close transfer panel"
+              :aria-label="$t('auto.k_42d281cc')"
               class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition"
             >
               ✕
@@ -338,19 +328,16 @@
                   level="H"
                 />
               </div>
-              <p class="text-gray-400 text-xs mt-3">
-                Scan with Thai banking apps (PromptPay) or use account/wire tab
-                for international transfer
-              </p>
+              <p class="text-gray-400 text-xs mt-3"> {{ $t("auto.k_c141c64f") }} </p>
             </div>
 
             <!-- Bank Account -->
             <div v-else class="space-y-4 animate-fade-in-up">
               <div class="bg-white/5 p-4 rounded-xl border border-white/10">
-                <p class="text-gray-400 text-xs mb-2">Transfer Profile</p>
+                <p class="text-gray-400 text-xs mb-2">{{ $t("auto.k_d00bd28f") }}</p>
                 <select
                   v-model="selectedTransferProfileId"
-                  class="w-full bg-black/40 text-white text-xs border border-white/10 rounded-lg p-2 outline-none focus:border-cyan-400 transition-colors"
+                  class="w-full bg-black/40 text-white text-xs border border-white/10 rounded-lg p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:border-cyan-400 transition-colors"
                 >
                   <option
                     v-for="profile in manualTransferProfiles"
@@ -371,7 +358,7 @@
                   🏦
                 </div>
                 <div>
-                  <p class="text-gray-400 text-xs">Receiving Bank</p>
+                  <p class="text-gray-400 text-xs">{{ $t("auto.k_3975328d") }}</p>
                   <p class="text-white font-bold">
                     {{
                       selectedTransferProfile.bankName ||
@@ -395,7 +382,7 @@
                 :aria-label="`Copy account number ending ${maskedAccountNumber.slice(-4)}`"
                 class="w-full text-left bg-white/5 p-4 rounded-xl border border-white/5 cursor-pointer hover:bg-white/10 transition group"
               >
-                <p class="text-gray-400 text-xs mb-1">Account Number</p>
+                <p class="text-gray-400 text-xs mb-1">{{ $t("auto.k_a86d4ce5") }}</p>
                 <div class="flex items-center justify-between">
                   <span
                     class="text-white font-mono text-lg font-bold tracking-wider"
@@ -412,7 +399,7 @@
                 v-if="selectedTransferProfile.accountName"
                 class="bg-white/5 p-4 rounded-xl border border-white/5"
               >
-                <p class="text-gray-400 text-xs">Account Name</p>
+                <p class="text-gray-400 text-xs">{{ $t("auto.k_993dc46f") }}</p>
                 <p class="text-white font-bold">
                   {{ selectedTransferProfile.accountName }}
                 </p>
@@ -426,31 +413,25 @@
                 "
                 class="bg-white/5 p-4 rounded-xl border border-white/5 space-y-2"
               >
-                <p class="text-gray-400 text-xs">International Wire Details</p>
+                <p class="text-gray-400 text-xs">{{ $t("auto.k_165ef042") }}</p>
                 <p
                   v-if="selectedTransferProfile.swiftCode"
                   class="text-white text-sm"
-                >
-                  SWIFT:
-                  <span class="font-bold">{{
+                > {{ $t("auto.k_d753c026") }} <span class="font-bold">{{
                     selectedTransferProfile.swiftCode
                   }}</span>
                 </p>
                 <p
                   v-if="selectedTransferProfile.iban"
                   class="text-white text-sm"
-                >
-                  IBAN:
-                  <span class="font-bold">{{
+                > {{ $t("auto.k_9eb0d78d") }} <span class="font-bold">{{
                     selectedTransferProfile.iban
                   }}</span>
                 </p>
                 <p
                   v-if="selectedTransferProfile.routingNumber"
                   class="text-white text-sm"
-                >
-                  Routing:
-                  <span class="font-bold">{{
+                > {{ $t("auto.k_b1439949") }} <span class="font-bold">{{
                     selectedTransferProfile.routingNumber
                   }}</span>
                 </p>
@@ -461,9 +442,7 @@
               >
                 <p
                   class="text-cyan-200 text-xs font-bold uppercase tracking-wide mb-2"
-                >
-                  Supported Thai Banks
-                </p>
+                > {{ $t("auto.k_7ba265d6") }} </p>
                 <div class="flex flex-wrap gap-2">
                   <span
                     v-for="bank in supportedThaiBanks"
@@ -489,15 +468,15 @@
               :aria-busy="uploading"
               @submit.prevent="confirmManualPaymentThrottled"
             >
-              <h4 class="text-white font-bold text-sm">Verify Payment</h4>
+              <h4 class="text-white font-bold text-sm">{{ $t("auto.k_41e2dd2") }}</h4>
 
               <div class="grid grid-cols-2 gap-3">
                 <input
                   v-model="buyerProfile.full_name"
                   type="text"
                   autocomplete="name"
-                  aria-label="Full name"
-                  placeholder="Full Name"
+                  :aria-label="$t('auto.k_9010932f')"
+                  :placeholder="$t('auto.k_fe2b40f')"
                   class="input-dark"
                   @blur="markFieldTouched('full_name')"
                 />
@@ -506,7 +485,7 @@
                   type="tel"
                   inputmode="numeric"
                   autocomplete="tel"
-                  aria-label="Phone number"
+                  :aria-label="$t('auto.k_3ade6bf8')"
                   placeholder="081-xxx-xxxx"
                   class="input-dark"
                   @input="formatPhoneInput"
@@ -525,8 +504,8 @@
                   v-model="buyerProfile.address_line1"
                   type="text"
                   autocomplete="address-line1"
-                  aria-label="Address line 1"
-                  placeholder="Address Line 1"
+                  :aria-label="$t('auto.k_13b9eec8')"
+                  :placeholder="$t('auto.k_265eb1a8')"
                   class="input-dark"
                   @blur="markFieldTouched('address_line1')"
                 />
@@ -562,8 +541,8 @@
                   type="text"
                   inputmode="numeric"
                   autocomplete="postal-code"
-                  aria-label="Postal code"
-                  placeholder="Postal Code"
+                  :aria-label="$t('auto.k_8602f9f3')"
+                  :placeholder="$t('auto.k_5d6add3')"
                   class="input-dark"
                   @blur="markFieldTouched('postal_code')"
                 />
@@ -576,8 +555,7 @@
               >
                 {{ firstValidationError }}
               </p>
-              <p v-if="maskedPhonePreview" class="text-[11px] text-white/60">
-                Phone preview: {{ maskedPhonePreview }}
+              <p v-if="maskedPhonePreview" class="text-[11px] text-white/60"> {{ $t("auto.k_a6859f4f") }} {{ maskedPhonePreview }}
               </p>
 
               <div class="relative">
@@ -591,20 +569,19 @@
                 />
                 <label
                   for="slip-upload"
-                  aria-label="Upload payment slip"
+                  :aria-label="$t('auto.k_100dff08')"
                   class="flex items-center justify-center w-full h-32 border-2 border-dashed border-white/20 rounded-xl cursor-pointer hover:border-green-500/50 hover:bg-green-500/5 transition text-gray-400 flex-col gap-2"
                 >
                   <div v-if="previewUrl" class="w-full h-full p-2">
-                    <img
+                    <img alt="" loading="lazy"
                       :src="previewUrl"
                       class="w-full h-full object-contain rounded-lg"
                     />
                   </div>
                   <span v-else class="text-2xl">📸</span>
-                  <span v-if="!previewUrl" class="text-xs">Tap to upload slip</span>
+                  <span v-if="!previewUrl" class="text-xs">{{ $t("auto.k_50b8c44e") }}</span>
                 </label>
-                <p v-if="maskedSlipUrl" class="mt-2 text-[11px] text-white/60">
-                  Slip URL: {{ maskedSlipUrl }}
+                <p v-if="maskedSlipUrl" class="mt-2 text-[11px] text-white/60"> {{ $t("auto.k_55f99d48") }} {{ maskedSlipUrl }}
                 </p>
               </div>
 
@@ -1002,7 +979,7 @@ const tiers = [
 		icon: "🔴",
 		grad: "from-red-500 to-pink-500",
 	},
-	{ id: "vip", name: "VIP", icon: "💎", grad: "from-purple-600 to-indigo-600" },
+	{ id: "vip", name: "VIP", icon: "💎", grad: "from-cyan-600 to-indigo-600" },
 ];
 
 const packages = reactive<PinPackage[]>([
@@ -1102,8 +1079,8 @@ const packages = reactive<PinPackage[]>([
 		isPremium: true,
 		cta: "Go Giant",
 		badge: "PREMIUM",
-		badgeColor: "bg-purple-600",
-		btnClass: "bg-gradient-to-r from-purple-600 to-pink-600 text-white",
+		badgeColor: "bg-cyan-600",
+		btnClass: "bg-gradient-to-r from-cyan-600 to-pink-600 text-white",
 	},
 	{
 		name: "Video Pin",
@@ -1441,7 +1418,7 @@ onUnmounted(() => {
 
 <style scoped>
 .input-dark {
-  @apply w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-green-500 transition-colors;
+  @apply w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus:border-green-500 transition-colors;
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;

@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Query, HTTPException
+import hashlib
+import json
+from datetime import UTC, datetime
+
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
-from typing import Optional
-from datetime import datetime, timezone
-import hashlib, json
 
 router = APIRouter(tags=["map-core"])
 
@@ -33,13 +34,13 @@ class VenuePin(BaseModel):
     lat: float
     lng: float
     category: str
-    rating: Optional[float] = None
+    rating: float | None = None
     is_live: bool = False
 
 
 class VenuesResponse(BaseModel):
     schema_version: int = Field(1, description="Bump on breaking schema change")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     total: int = Field(..., description="Total venues in bbox before limit clamp")
     venues: list[VenuePin]
 
@@ -54,7 +55,7 @@ class HotRoadSegment(BaseModel):
 class HotRoadsResponse(BaseModel):
     schema_version: int = Field(1)
     snapshot_id: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     unchanged: bool = Field(False, description="True when since= matches current snapshot_id")
     segments: list[HotRoadSegment]
 
@@ -115,7 +116,7 @@ async def get_venues(
 @router.get("/hot-roads", response_model=HotRoadsResponse)
 async def get_hot_roads(
     bbox: str = Query(..., description="minLng,minLat,maxLng,maxLat"),
-    since: Optional[str] = Query(None, description="snapshot_id from previous response"),
+    since: str | None = Query(None, description="snapshot_id from previous response"),
 ):
     mn_lng, mn_lat, mx_lng, mx_lat = _parse_bbox(bbox)
 

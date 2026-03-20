@@ -1,7 +1,9 @@
-import { getApiV1BaseUrl } from "../lib/runtimeConfig";
+import { getApiV1BaseUrl, getDirectApiBaseUrl } from "../lib/runtimeConfig";
 
 const VISITOR_ID_KEY = "vibe_visitor_id";
 const VISITOR_TOKEN_KEY = "vibe_visitor_token";
+const VISITOR_BOOTSTRAP_DEV_ENABLED =
+	import.meta.env.VITE_VISITOR_BOOTSTRAP_DEV === "true";
 const UUID_V4_PATTERN =
 	/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -121,7 +123,7 @@ export const bootstrapVisitor = async ({ forceRefresh = false } = {}) => {
 		import.meta.env.VITE_E2E === "true" ||
 		import.meta.env.VITE_E2E_MAP_REQUIRED === "true" ||
 		import.meta.env.MODE === "e2e";
-	if (isE2E) {
+	if (isE2E || (import.meta.env.DEV && !VISITOR_BOOTSTRAP_DEV_ENABLED)) {
 		const fallback = createFallbackToken(visitorId, 24 * 3600);
 		setVisitorToken(fallback.token);
 		return {
@@ -136,7 +138,27 @@ export const bootstrapVisitor = async ({ forceRefresh = false } = {}) => {
 	const legacyBase = v1Base.endsWith("/api/v1")
 		? `${v1Base.slice(0, -3)}`
 		: v1Base.replace("/v1", "");
-	const baseCandidates = [...new Set([legacyBase, v1Base])];
+	let directBase = "";
+	try {
+		directBase = getDirectApiBaseUrl();
+	} catch {
+		directBase = "";
+	}
+	const directV1Base = directBase
+		? directBase.endsWith("/api/v1")
+			? directBase
+			: directBase.endsWith("/api")
+				? `${directBase}/v1`
+				: `${directBase}/api/v1`
+		: "";
+	const directLegacyBase = directV1Base.endsWith("/api/v1")
+		? `${directV1Base.slice(0, -3)}`
+		: directV1Base.replace("/v1", "");
+	const baseCandidates = [
+		...new Set(
+			[legacyBase, v1Base, directLegacyBase, directV1Base].filter(Boolean),
+		),
+	];
 	let lastError = null;
 	let payload = null;
 

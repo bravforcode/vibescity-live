@@ -7,7 +7,7 @@ const CATEGORY_GRADIENTS: Record<string, string> = {
 	// Food & Drink
 	restaurant: "linear-gradient(135deg,#f97316,#ea580c)",
 	cafe: "linear-gradient(135deg,#a16207,#78350f)",
-	bar: "linear-gradient(135deg,#7c3aed,#4c1d95)",
+	bar: "linear-gradient(135deg,#06b6d4,#4c1d95)",
 	bakery: "linear-gradient(135deg,#f59e0b,#92400e)",
 	coffee: "linear-gradient(135deg,#78350f,#451a03)",
 
@@ -35,7 +35,7 @@ const CATEGORY_GRADIENTS: Record<string, string> = {
 	hostel: "linear-gradient(135deg,#f59e0b,#78350f)",
 
 	// Default
-	default: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+	default: "linear-gradient(135deg,#6366f1,#22d3ee)",
 };
 
 const CATEGORY_ICONS: Record<string, string> = {

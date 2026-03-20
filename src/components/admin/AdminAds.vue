@@ -20,9 +20,7 @@
           <path
             d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
           />
-        </svg>
-        Local Ad Campaigns
-      </h3>
+        </svg> {{ $t("auto.k_84006c8e") }} </h3>
       <DataTable
         :columns="adColumns"
         :fetch-fn="adminDataService.getLocalAds"
@@ -53,9 +51,7 @@
           >
             <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
             <circle cx="12" cy="12" r="3" />
-          </svg>
-          Ad Impressions
-        </h3>
+          </svg> {{ $t("auto.k_e4bee4e") }} </h3>
         <DataTable
           :columns="impressionColumns"
           :fetch-fn="adminDataService.getAdImpressions"
@@ -90,9 +86,7 @@
             <path d="m21 3-6 5" />
             <path d="m9 12 .33.33a2 2 0 0 0 2.83 0L13 11" />
             <path d="m3 3 18 18" />
-          </svg>
-          Ad Clicks
-        </h3>
+          </svg> {{ $t("auto.k_e9998ec9") }} </h3>
         <DataTable
           :columns="clickColumns"
           :fetch-fn="adminDataService.getAdClicks"

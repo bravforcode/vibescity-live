@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
+import * as turf from "@turf/turf";
 import { createClient } from "@supabase/supabase-js";
 
 const root = process.cwd();
@@ -18,32 +20,120 @@ const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
 if (!url || !key) throw new Error("Missing SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY");
 
+const require = createRequire(import.meta.url);
 const args = Object.fromEntries(process.argv.slice(2).map((a) => {
   const i = a.indexOf("=");
   return i > 0 ? [a.slice(0, i).replace(/^--/, ""), a.slice(i + 1)] : [a.replace(/^--/, ""), "1"];
 }));
 const mode = args.mode || "run"; // backfill | report | run
-const sourceLike = args.source || "osm";
+const sourceLike = Object.prototype.hasOwnProperty.call(args, "source")
+  ? args.source
+  : "osm";
 const batch = Number(args.batch || 3000);
 const parallel = Number(args.parallel || 24);
 const updateChunk = Number(args.chunk || 400);
 const maxRows = Number(args.max || 0);
 const outFile = args.out ? path.resolve(args.out) : path.resolve("scripts/reports/th-admin-coverage.json");
+const provinceAccuracy = Math.min(2, Math.max(1, Number(args.provinceAccuracy || args.province_accuracy || 1)));
+const amphoeAccuracy = Math.min(2, Math.max(1, Number(args.amphoeAccuracy || args.amphoe_accuracy || 1)));
+const tambonAccuracy = Math.min(2, Math.max(1, Number(args.tambonAccuracy || args.tambon_accuracy || 2)));
+const onlyMissingAdmin =
+  String(args.onlyMissingAdmin || args.only_missing_admin || "1") !== "0";
+const geocodeAccuracy = {
+  province: provinceAccuracy,
+  amphoe: amphoeAccuracy,
+  tambon: tambonAccuracy,
+};
 
-let findTambon;
+let thaiGeoAssetsRoot;
 try {
-  ({ findTambon } = await import("thai-geolocate"));
+  const thaiGeoPackagePath = require.resolve("thai-geolocate/package.json");
+  thaiGeoAssetsRoot = path.join(path.dirname(thaiGeoPackagePath), "assets");
 } catch {
   throw new Error("Missing package 'thai-geolocate'. Run: bun add --no-save thai-geolocate");
 }
 const supabase = createClient(url, key);
+const datasetCache = new Map();
+const bboxCache = new WeakMap();
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function getFeatureBbox(feature) {
+  let bbox = bboxCache.get(feature);
+  if (!bbox) {
+    bbox = turf.bbox(feature);
+    bboxCache.set(feature, bbox);
+  }
+  return bbox;
+}
+
+function loadFeaturesCached(relativePath) {
+  const absolutePath = path.join(thaiGeoAssetsRoot, relativePath);
+  if (datasetCache.has(absolutePath)) {
+    return datasetCache.get(absolutePath);
+  }
+  if (!fs.existsSync(absolutePath)) {
+    datasetCache.set(absolutePath, null);
+    return null;
+  }
+  const parsed = JSON.parse(fs.readFileSync(absolutePath, "utf8"));
+  const features = Array.isArray(parsed?.features) ? parsed.features : [];
+  datasetCache.set(absolutePath, features);
+  return features;
+}
+
+function matchFeature(point, lat, lng, features, admLevel) {
+  if (!Array.isArray(features) || features.length === 0) return null;
+  for (const feature of features) {
+    const [minLng, minLat, maxLng, maxLat] = getFeatureBbox(feature);
+    if (lng < minLng || lng > maxLng || lat < minLat || lat > maxLat) continue;
+    if (!turf.booleanPointInPolygon(point, feature)) continue;
+    const suffix = `ADM${admLevel}`;
+    return {
+      nameEN: feature.properties?.[`${suffix}_EN`] || null,
+      nameTH: feature.properties?.[`${suffix}_TH`] || null,
+      pcode: feature.properties?.[`${suffix}_PCODE`] || null,
+      admLevel: suffix,
+    };
+  }
+  return null;
+}
+
+async function findTambonCached(lat, lng, accuracyLevel = geocodeAccuracy) {
+  const point = turf.point([lng, lat]);
+  const provinceFeatures = loadFeaturesCached(
+    `accuracy_level_${accuracyLevel.province}/province.json`,
+  );
+  const province = matchFeature(point, lat, lng, provinceFeatures, 1);
+  if (!province?.pcode) {
+    return { province: null, amphoe: null, tambon: null };
+  }
+
+  const amphoeFeatures = loadFeaturesCached(
+    `accuracy_level_${accuracyLevel.amphoe}/amphoe/province_${province.pcode}.json`,
+  );
+  const amphoe = matchFeature(point, lat, lng, amphoeFeatures, 2);
+  if (!amphoe?.pcode) {
+    return { province, amphoe: null, tambon: null };
+  }
+
+  const tambonFeatures = loadFeaturesCached(
+    `accuracy_level_${accuracyLevel.tambon}/tambon/amphoe_${amphoe.pcode}.json`,
+  );
+  const tambon = matchFeature(point, lat, lng, tambonFeatures, 3);
+  return { province, amphoe, tambon };
+}
 
 function isRetryableSupabaseError(error) {
   const code = String(error?.code || "");
   const message = String(error?.message || "").toLowerCase();
-  return code === "PGRST002" || message.includes("schema cache") || message.includes("timed out");
+  return (
+    code === "PGRST002" ||
+    code === "57014" ||
+    message.includes("schema cache") ||
+    message.includes("timed out") ||
+    message.includes("statement timeout")
+  );
 }
 
 async function withRetry(fn, label, attempts = 5) {
@@ -114,8 +204,17 @@ async function fetchPage(lastId) {
       .from("venues")
       .select("id,category,province,latitude,longitude")
       .order("id", { ascending: true })
-      .limit(batch)
-      .ilike("source", `${sourceLike}%`);
+      .limit(batch);
+    if (sourceLike != null) {
+      q = q.ilike("source", `${sourceLike}%`);
+    }
+    if (onlyMissingAdmin) {
+      q = q.or([
+        "province_en.is.null",
+        "district_en.is.null",
+        "subdistrict_en.is.null",
+      ].join(","));
+    }
     if (lastId) q = q.gt("id", lastId);
     const { data, error } = await q;
     if (error) throw error;
@@ -124,15 +223,35 @@ async function fetchPage(lastId) {
 }
 
 async function bulkUpdate(rows) {
+  const applyBulkUpdateSlice = async (slice) => {
+    try {
+      const { data, error } = await withRetry(
+        () => supabase.rpc("bulk_update_venue_admin", { p_rows: slice }),
+        "bulk_update_venue_admin",
+      );
+      if (error) throw error;
+      return Number(data || 0);
+    } catch (error) {
+      const message = String(error?.message || "").toLowerCase();
+      const isStatementTimeout =
+        String(error?.code || "") === "57014" ||
+        message.includes("statement timeout") ||
+        message.includes("timed out");
+      if (isStatementTimeout && slice.length > 40) {
+        const midpoint = Math.ceil(slice.length / 2);
+        return (
+          await applyBulkUpdateSlice(slice.slice(0, midpoint)) +
+          await applyBulkUpdateSlice(slice.slice(midpoint))
+        );
+      }
+      throw error;
+    }
+  };
+
   let changed = 0;
   for (let i = 0; i < rows.length; i += updateChunk) {
     const slice = rows.slice(i, i + updateChunk);
-    const { data, error } = await withRetry(
-      () => supabase.rpc("bulk_update_venue_admin", { p_rows: slice }),
-      "bulk_update_venue_admin",
-    );
-    if (error) throw error;
-    changed += Number(data || 0);
+    changed += await applyBulkUpdateSlice(slice);
   }
   return changed;
 }
@@ -248,7 +367,11 @@ async function processAll({ doUpdate, doReport }) {
     const resolvedRows = await mapPool(rows, parallel, async (r) => {
       if (r.latitude == null || r.longitude == null) return { row: r, hit: null, update: null };
       try {
-        const hit = await findTambon(Number(r.latitude), Number(r.longitude), { province: 1, amphoe: 1, tambon: 2 });
+        const hit = await findTambonCached(
+          Number(r.latitude),
+          Number(r.longitude),
+          geocodeAccuracy,
+        );
         const update = asUpdate(r, hit);
         return { row: r, hit, update };
       } catch {
@@ -320,6 +443,8 @@ async function runMode() {
     mode,
     batch,
     parallel,
+    accuracy: geocodeAccuracy,
+    only_missing_admin: onlyMissingAdmin,
     scanned: out.scanned,
     resolved_from_coords: out.resolved,
     updated_rows: out.updated,

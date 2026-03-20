@@ -29,13 +29,13 @@ module.exports = {
 				},
 				vibe: {
 					blue: "#2563eb",
-					purple: "#7c3aed",
+					cyan: "#06b6d4",
 					pink: "#db2777",
 				},
 			},
 			backgroundImage: {
 				"vibe-gradient":
-					"linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #db2777 100%)",
+					"linear-gradient(135deg, #2563eb 0%, #06b6d4 50%, #db2777 100%)",
 				"neon-gradient":
 					"linear-gradient(135deg, #00f0ff 0%, #bc13fe 50%, #ff00aa 100%)",
 				"glass-noise": "url('/assets/noise.png')",

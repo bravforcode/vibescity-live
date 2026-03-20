@@ -5,16 +5,15 @@ Combines admin dashboard, anonymous session tracking, and Google Sheets integrat
 
 import json
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
-from dataclasses import dataclass, asdict
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, Depends, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from ...core.auth import verify_admin, get_optional_user
+from ...core.auth import verify_admin
 from ...core.config import get_settings
-from ...core.supabase import supabase_admin
 from ...services.cache.redis_client import get_redis
 
 router = APIRouter()
@@ -29,11 +28,11 @@ class SessionCreateRequest(BaseModel):
     """Create anonymous session"""
 
     user_agent: str = Field(..., description="Browser user agent")
-    referrer: Optional[str] = Field(None, description="Page referrer")
+    referrer: str | None = Field(None, description="Page referrer")
     entry_point: str = Field(..., description="Initial page")
-    timezone: Optional[str] = Field("UTC", description="User timezone")
-    screen_resolution: Optional[str] = Field(None, description="Screen resolution")
-    language: Optional[str] = Field("en", description="Browser language")
+    timezone: str | None = Field("UTC", description="User timezone")
+    screen_resolution: str | None = Field(None, description="Screen resolution")
+    language: str | None = Field("en", description="Browser language")
 
 
 class SessionUpdateRequest(BaseModel):
@@ -43,15 +42,15 @@ class SessionUpdateRequest(BaseModel):
     page_title: str = Field(..., description="Page title")
     time_on_page: int = Field(..., description="Time on page (seconds)")
     scroll_depth: float = Field(0.0, description="Scroll depth %")
-    interactions: List[Dict[str, Any]] = Field(default_factory=list, description="User interactions")
-    performance_metrics: Optional[Dict[str, Any]] = Field(None, description="Performance data")
+    interactions: list[dict[str, Any]] = Field(default_factory=list, description="User interactions")
+    performance_metrics: dict[str, Any] | None = Field(None, description="Performance data")
 
 
 class DataExportRequest(BaseModel):
     """Request data export"""
 
     data_type: str = Field(..., description="sessions | analytics | geo | summary")
-    date_range: Optional[str] = Field(None, description="24h | 7d | 30d")
+    date_range: str | None = Field(None, description="24h | 7d | 30d")
     format: str = Field("json", description="json | csv | xlsx")
     anonymize: bool = Field(True, description="Anonymize PII")
     include_headers: bool = Field(True, description="Include headers")
@@ -149,7 +148,7 @@ class SheetsService:
         except Exception as e:
             logger.error(f"Failed to setup headers: {e}")
 
-    async def export_session_data(self, session_data: Dict[str, Any]) -> bool:
+    async def export_session_data(self, session_data: dict[str, Any]) -> bool:
         """Export single session to Google Sheets"""
         try:
             row_data = [
@@ -178,7 +177,7 @@ class SheetsService:
             logger.error(f"Failed to export session: {e}")
             return False
 
-    async def export_analytics_summary(self, analytics_data: Dict[str, Any]) -> bool:
+    async def export_analytics_summary(self, analytics_data: dict[str, Any]) -> bool:
         """Export analytics summary"""
         try:
             # Get or create summary worksheet
@@ -225,7 +224,7 @@ class SheetsService:
             logger.error(f"Failed to export analytics: {e}")
             return False
 
-    async def sync_batch_data(self, batch_data: List[Dict[str, Any]]) -> bool:
+    async def sync_batch_data(self, batch_data: list[dict[str, Any]]) -> bool:
         """Batch export sessions"""
         try:
             if not batch_data:
@@ -260,7 +259,7 @@ class SheetsService:
             logger.error(f"Failed to batch export: {e}")
             return False
 
-    async def get_sheet_data(self, worksheet_name: Optional[str] = None, limit: int = 100) -> List[Dict[str, Any]]:
+    async def get_sheet_data(self, worksheet_name: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
         """Get data from worksheet"""
         try:
             target_ws = self.worksheet
@@ -288,7 +287,7 @@ class SheetsService:
             logger.error(f"Failed to get sheet data: {e}")
             return []
 
-    async def clear_old_data(self, retention_days: Optional[int] = None) -> bool:
+    async def clear_old_data(self, retention_days: int | None = None) -> bool:
         """Clear old data (GDPR compliance)"""
         try:
             retention_period = retention_days or self.config.data_retention_days
@@ -458,7 +457,7 @@ async def update_session(
 async def track_event(
     session_id: str,
     request: Request,
-    event_data: Dict[str, Any],
+    event_data: dict[str, Any],
     redis_client=Depends(get_redis),
 ):
     """Track conversion/event"""

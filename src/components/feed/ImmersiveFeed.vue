@@ -138,7 +138,7 @@ const getDistance = (shop) => {
       <!-- Transition for smooth background switching -->
       <transition name="fade-slow" mode="out-in">
         <div :key="activeShop?.id" class="w-full h-full relative">
-          <img
+          <img loading="lazy"
             :src="
               activeShop?.Image_URL1 ||
               IMMERSIVE_FALLBACK_IMAGE
@@ -167,7 +167,7 @@ const getDistance = (shop) => {
     <!-- 3. Back Button (Custom for Immersive) -->
     <button
       @click="handleBack"
-      aria-label="Exit immersive mode"
+      :aria-label="$t('auto.k_2d3d7215')"
       class="fixed top-4 left-4 z-[7000] w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center text-white active:scale-90 transition-transform shadow-lg"
     >
       <ArrowLeft class="w-5 h-5" />
@@ -181,7 +181,7 @@ const getDistance = (shop) => {
       <div class="flex flex-col items-center gap-1">
         <button
           @click.stop="handleFavorite(activeShop?.id)"
-          aria-label="Like this venue"
+          :aria-label="$t('auto.k_55b96365')"
           class="w-12 h-12 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center active:scale-95 transition-transform transition-colors"
         >
           <Heart
@@ -203,7 +203,7 @@ const getDistance = (shop) => {
       <div class="flex flex-col items-center gap-1">
         <button
           @click.stop="handleShare(activeShop)"
-          aria-label="Share this venue"
+          :aria-label="$t('auto.k_1512029f')"
           class="w-12 h-12 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center active:scale-95 transition-transform transition-colors"
         >
           <Share2 class="w-6 h-6 text-white" />
@@ -217,7 +217,7 @@ const getDistance = (shop) => {
       <!-- Profile/More -->
       <div class="flex flex-col items-center gap-1">
         <button
-          aria-label="Open venue profile"
+          :aria-label="$t('auto.k_b9c173f')"
           class="w-12 h-12 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center active:scale-95 transition-transform transition-colors"
         >
           <User class="w-6 h-6 text-white" />

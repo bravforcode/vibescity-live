@@ -1,0 +1,78 @@
+# Cloudflare Workers Configuration
+# Documentation: https://developers.cloudflare.com/workers/wrangler/configuration/
+
+name = "vibecity-cdn-worker"
+main = "cloudflare-worker.js"
+compatibility_date = "2024-01-01"
+
+# Account details (replace with your values)
+account_id = "YOUR_ACCOUNT_ID"
+workers_dev = true
+
+# Routes - configure after deployment
+# routes = [
+#   { pattern = "vibecity.live/*", zone_name = "vibecity.live" },
+#   { pattern = "www.vibecity.live/*", zone_name = "vibecity.live" }
+# ]
+
+# Environment variables
+[env.production]
+name = "vibecity-cdn-worker-production"
+vars = { ENVIRONMENT = "production" }
+
+[env.production.vars]
+ORIGIN_PRIMARY = "https://api.vibecity.live"
+ORIGIN_ASIA = "https://asia.api.vibecity.live"
+ORIGIN_EU = "https://eu.api.vibecity.live"
+ORIGIN_US = "https://us.api.vibecity.live"
+
+# Secrets (set via: wrangler secret put <KEY>)
+# CACHE_PURGE_SECRET
+# CACHE_WARM_SECRET
+
+[env.staging]
+name = "vibecity-cdn-worker-staging"
+vars = { ENVIRONMENT = "staging" }
+
+[env.staging.vars]
+ORIGIN_PRIMARY = "https://staging-api.vibecity.live"
+
+# Limits and performance
+[limits]
+cpu_ms = 50
+
+# KV Namespaces (optional - for advanced caching)
+# [[kv_namespaces]]
+# binding = "CACHE_METADATA"
+# id = "YOUR_KV_NAMESPACE_ID"
+
+# Durable Objects (optional - for distributed cache coordination)
+# [[durable_objects.bindings]]
+# name = "CACHE_COORDINATOR"
+# class_name = "CacheCoordinator"
+# script_name = "cache-coordinator"
+
+# Analytics Engine (optional - for cache analytics)
+# [[analytics_engine_datasets]]
+# binding = "CACHE_ANALYTICS"
+
+# Observability
+[observability]
+enabled = true
+head_sampling_rate = 1.0
+
+# Build configuration
+[build]
+command = ""
+cwd = ""
+watch_dirs = []
+
+# Compatibility flags
+compatibility_flags = []
+
+# Usage model
+usage_model = "bundled"
+
+# Triggers (for cache warming)
+# [triggers]
+# crons = ["0 */6 * * *"]  # Warm cache every 6 hours

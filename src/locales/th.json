@@ -23,6 +23,49 @@
 		"retry": "ลองอีกครั้ง",
 		"no_results": "ไม่พบผลลัพธ์"
 	},
+	"ownerDashboard": {
+		"load_failed": "โหลดแดชบอร์ดร้านค้าไม่สำเร็จ",
+		"promotion_cockpit": "ศูนย์ควบคุมโปรโมต",
+		"generic_venue": "ร้าน",
+		"your_next_venue": "ร้านถัดไปของคุณ",
+		"top_traffic_badge": "ทราฟฟิกสูงสุด {name}",
+		"next_expiry_badge": "หมดอายุถัดไป {feature}",
+		"best_next_push": "ร้านที่ควรดันต่อ",
+		"no_venue_yet": "ยังไม่มีร้าน",
+		"best_next_push_summary": "คุณภาพ {quality}% | ยอดดู {views}",
+		"first_venue_unlock": "สร้างร้านแรกเพื่อปลดล็อกเครื่องมือโปรโมต",
+		"needs_attention": "ต้องรีบดู",
+		"profile_readiness_hint": "ร้านที่โปรไฟล์พร้อมใช้งานต่ำกว่า 60%",
+		"next_expiry": "หมดอายุถัดไป",
+		"nothing_urgent": "ยังไม่มีเรื่องด่วน",
+		"next_expiry_summary": "{feature} | {date}",
+		"promotion_slots_clear": "ตอนนี้ยังไม่มีโปรโมชันที่ใกล้หมดอายุ",
+		"promote_named_venue": "โปรโมต {name}",
+		"tune_listing": "ปรับหน้าร้าน",
+		"refresh": "รีเฟรช",
+		"promote_shop_system": "ระบบโปรโมตร้าน",
+		"push_into_discovery": "ดัน {name} ให้คนเห็นมากขึ้น",
+		"build_first_listing": "ทำร้านแรกให้พร้อมสำหรับการโปรโมต",
+		"workflow_copy": "ใช้โฟลว์เดียวกับหน้าซื้อพิน: เก็บรายละเอียดร้านให้ครบ ดันการมองเห็น และปิดจุดอ่อนของโปรไฟล์ก่อนลงงบเพิ่ม",
+		"empty_workflow_copy": "ถ้ายังไม่มีร้าน เมื่อมีร้านที่เปิดใช้งานแล้ว แผงนี้จะกลายเป็นทางลัดสำหรับโปรโมต แก้คุณภาพข้อมูล และจัดการวันหมดอายุ",
+		"views": "ยอดดู",
+		"rating": "เรตติ้ง",
+		"profile_quality": "คุณภาพโปรไฟล์",
+		"open_promote_flow": "เปิดโฟลว์โปรโมต",
+		"fix_listing_now": "แก้หน้าร้านตอนนี้",
+		"expiry_watch": "เฝ้าดูวันหมดอายุ",
+		"all_clear": "ยังปกติ",
+		"expiry_watch_summary": "{feature} หมดอายุ {date}",
+		"no_expiry_scheduled": "ตอนนี้ยังไม่มีรายการโปรโมชันที่ใกล้หมดอายุ",
+		"top_performer": "ผลงานดีที่สุด",
+		"no_top_venue": "ยังไม่มีร้านเด่น",
+		"top_performer_summary": "ยอดดู {views} | เรตติ้ง {rating}",
+		"top_performer_empty": "เมื่อข้อมูลพอร์ตโหลดแล้ว ส่วนนี้จะแสดงร้านที่ทราฟฟิกดีที่สุด",
+		"quality_pressure": "แรงกดดันด้านคุณภาพ",
+		"quality_pressure_hint": "ยังมีร้านที่ต้องเก็บข้อมูลให้ครบก่อนลงงบโปรโมตเพิ่ม",
+		"supabase_fallback_notice": "กำลังทำงานด้วย Supabase สำรองสำหรับ:",
+		"local_fallback_notice": "กำลังทำงานด้วย local fallback สำหรับ:"
+	},
 	"nav": {
 		"home": "หน้าแรก",
 		"explore": "สำรวจ",
@@ -307,6 +350,7 @@
 		"skip_to_content": "ข้ามไปยังเนื้อหาหลัก",
 		"add_favorite": "เพิ่มในรายการโปรด",
 		"remove_favorite": "ลบจากรายการโปรด",
+		"input_field": "ช่องกรอกข้อมูล",
 		"collapse_details": "ย่อรายละเอียด",
 		"mute_video": "ปิดเสียงวิดีโอ",
 		"unmute_video": "เปิดเสียงวิดีโอ"
@@ -349,6 +393,15 @@
 		},
 		"mapless": {
 			"unavailable": "อุปกรณ์นี้ไม่รองรับแผนที่"
+		},
+		"dev_preview": {
+			"badge": "โหมดพรีวิวโลคอลที่นิ่งกว่า",
+			"title": "Chromium บน local dev จะข้าม WebGL โดยอัตโนมัติ",
+			"desc": "โหมดพรีวิวนี้ทำให้ localhost โหลดไวขึ้นและคอนโซลเงียบขึ้น ส่วน production, E2E และการเปิด WebGL แบบ opt-in ยังใช้ MapLibre เต็มรูปแบบตามเดิม",
+			"visible": "พินที่แสดง",
+			"empty": "ยังไม่มีพิกัดสถานที่ที่พร้อมใช้งาน จึงแสดงพรีวิว placeholder ไปก่อน",
+			"open_webgl": "เปิดแผนที่ WebGL เต็มรูปแบบ",
+			"note": "ใช้เมื่อจำเป็นต้องตรวจพฤติกรรม WebGL จริงใน browser session นี้เท่านั้น"
 		},
 		"token_error": {
 			"title": "โทเคนแผนที่ผิดพลาด",
@@ -407,7 +460,9 @@
 		"bank_thai": "ธนาคารไทย (ทุกธนาคาร)",
 		"bank_international": "ชื่อธนาคาร (ต่างประเทศ)",
 		"subscription_info": "โปรแกรมพาร์ทเนอร์ · 899 บาท/เดือน",
-		"period_end": "สิ้นสุดรอบปัจจุบัน"
+		"period_end": "สิ้นสุดรอบปัจจุบัน",
+		"error_payout_events_visitor_required": "ต้องมีข้อมูลผู้เยี่ยมชมก่อนจึงจะสมัครรับเหตุการณ์การจ่ายเงินได้",
+		"error_payout_events_unsupported": "ยังไม่รองรับเวอร์ชันของเหตุการณ์การจ่ายเงินนี้"
 	},
 	"merchant": {
 		"title": "ลงทะเบียนร้านค้า",
@@ -1114,6 +1169,7 @@
 		"k_57e39f9": "VIBE:",
 		"k_2be7575a": "เคลมบรรยากาศของคุณ",
 		"k_ff8907c2": "พาฉันไปที่นั่น",
+		"k_live_now": "กำลัง LIVE",
 		"k_b1e1a2d9": "บรรยากาศโซน:",
 		"k_1ccc1cf2": "ตำแหน่งของฉัน",
 		"k_d260a26f": "สำรวจรอบๆ",

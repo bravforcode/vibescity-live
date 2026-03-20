@@ -33,6 +33,10 @@ const getObserver = () => {
 					} else {
 						// If not ready, set preload and add listener to play once loaded
 						video.preload = "auto";
+						if (video.dataset.vibeVideoLoadRequested !== "true") {
+							video.dataset.vibeVideoLoadRequested = "true";
+							video.load();
+						}
 
 						// ✅ Add one-time listener to play when ready
 						const playWhenReady = () => {
@@ -48,6 +52,7 @@ const getObserver = () => {
 				} else {
 					// Stop immediately when out of view
 					video.pause();
+					video.preload = "none";
 					// Optional: Reset time? TikTok does this often, or keeps it.
 					// video.currentTime = 0;
 				}
@@ -73,6 +78,7 @@ export function useSmartVideo() {
 
 		videoRef.value = el;
 		if (el) {
+			delete el.dataset.vibeVideoLoadRequested;
 			getObserver().observe(el);
 			observedElements.set(el, true);
 		}

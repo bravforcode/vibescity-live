@@ -56,10 +56,10 @@ const { t } = useI18n();
     <!-- Center loader -->
     <div class="relative z-10 flex flex-col items-center gap-3">
       <div
-        class="skeleton-center-icon w-12 h-12 rounded-full bg-purple-500/20 flex items-center justify-center animate-pulse"
+        class="skeleton-center-icon w-12 h-12 rounded-full bg-cyan-500/20 flex items-center justify-center animate-pulse"
         aria-hidden="true"
       >
-        <MapIcon class="w-6 h-6 text-purple-400/70" />
+        <MapIcon class="w-6 h-6 text-cyan-400/70" />
       </div>
       <div class="text-xs text-white/40 font-medium tracking-wider uppercase" aria-hidden="true">
         {{ t('map.loading') }}

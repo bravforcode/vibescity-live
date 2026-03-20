@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "runtime": {
+    "inp_p75_ms_max": 200,
+    "fcp_ms_max": 1000,
+    "tti_ms_max": 2500,
+    "first_tile_load_ms_max": 1200,
+    "frame_drop_events_per_10s_max": 3,
+    "gpu_memory_idle_mb_max": 150
+  },
+  "map_fps": {
+    "default_profile": "synthetic_headless",
+    "profiles": {
+      "synthetic_headless": {
+        "tier_b": {
+          "median_fps_min": 5
+        },
+        "tier_c": {
+          "p95_fps_min": 8
+        }
+      },
+      "real_device": {
+        "tier_b": {
+          "median_fps_min": 55
+        },
+        "tier_c": {
+          "p95_fps_min": 45
+        }
+      }
+    }
+  },
+  "touch": {
+    "touch_to_scroll_start_p75_ms_max": 24
+  },
+  "backend_sla": {
+    "endpoints": {
+      "GET /venues": {
+        "p50_ms_max": 80,
+        "p95_ms_max": 200,
+        "p99_ms_max": 500
+      },
+      "POST /checkin": {
+        "p50_ms_max": 150,
+        "p95_ms_max": 400
+      },
+      "GET /venues/:id": {
+        "p50_ms_max": 50,
+        "p95_ms_max": 150
+      },
+      "POST /coins/mutate": {
+        "p50_ms_max": 200,
+        "p95_ms_max": 600
+      },
+      "POST /auth/refresh": {
+        "p50_ms_max": 100,
+        "p95_ms_max": 300
+      }
+    },
+    "error_rate": {
+      "five_xx_max_percent": 0.1,
+      "four_xx_max_percent": 5
+    }
+  },
+  "field_sla": {
+    "source_of_truth": "rum_p75",
+    "loaf_sampling": {
+      "production_rate": 0.1,
+      "staging_rate": 1
+    }
+  }
+}

@@ -5,22 +5,18 @@ import {
 	defineAsyncComponent,
 	nextTick,
 	onMounted,
+	onUnmounted,
 	provide,
 	ref,
 	watch,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
-import BottomFeed from "../components/feed/BottomFeed.vue";
 import SmartHeader from "../components/layout/SmartHeader.vue";
-import MapboxContainerSync from "../components/map/MapboxContainer.vue";
-import AppModals from "../components/system/AppModals.vue";
 import EmptyState from "../components/ui/EmptyState.vue";
 import ErrorBoundary from "../components/ui/ErrorBoundary.vue"; // C4: prevents blank-screen on render crash
-import FilterMenuSync from "../components/ui/FilterMenu.vue";
 // FilterPills removed — FilterMenu modal handles category selection
 import MapErrorFallback from "../components/ui/MapErrorFallback.vue";
-import SidebarDrawer from "../components/ui/SidebarDrawer.vue";
 import { useMapPadding } from "../composables/map/useMapPadding";
 import { useAppLogic } from "../composables/useAppLogic";
 import { useLocalAds } from "../composables/useLocalAds";
@@ -29,19 +25,38 @@ import { getSiteOrigin } from "../lib/runtimeConfig";
 import { useFeatureFlagStore } from "../store/featureFlagStore";
 import { useUserStore } from "../store/userStore";
 import { defineResilientAsync } from "../utils/asyncComponentFactory";
+import { isAppDebugLoggingEnabled } from "../utils/debugFlags";
 
 const IS_STRICT_MAP_E2E = import.meta.env.VITE_E2E_MAP_REQUIRED === "true";
-const MapContainer = IS_STRICT_MAP_E2E
-	? MapboxContainerSync
-	: defineAsyncComponent(
-			import.meta.env.DEV
-				? () => Promise.resolve(MapboxContainerSync)
-				: () => import("../components/map/MapboxContainer.vue"),
-		);
+const loadMapContainer = () => import("../components/map/MapboxContainer.vue");
+const MapContainer = defineResilientAsync(loadMapContainer, {
+	delay: IS_STRICT_MAP_E2E ? 0 : 120,
+	timeout: 30000,
+});
+const BottomFeed = defineResilientAsync(
+	() => import("../components/feed/BottomFeed.vue"),
+	{
+		delay: 0,
+		timeout: 20000,
+	},
+);
+const AppModals = defineResilientAsync(
+	() => import("../components/system/AppModals.vue"),
+	{
+		delay: 0,
+		timeout: 20000,
+	},
+);
 const VideoPanel = defineResilientAsync(
 	() => import("../components/panel/VideoPanel.vue"),
 );
-// SidebarDrawer moved to sync above
+const SidebarDrawer = defineResilientAsync(
+	() => import("../components/ui/SidebarDrawer.vue"),
+	{
+		delay: 0,
+		timeout: 15000,
+	},
+);
 const VibeError = defineResilientAsync(
 	() => import("../components/ui/VibeError.vue"),
 );
@@ -66,6 +81,13 @@ const DailyCheckin = defineResilientAsync(
 const LuckyWheel = defineResilientAsync(
 	() => import("../components/ui/LuckyWheel.vue"),
 );
+const InstallBanner = defineResilientAsync(
+	() => import("../components/ui/InstallBanner.vue"),
+	{
+		delay: 0,
+		timeout: 15000,
+	},
+);
 const LocalAdBanner = defineResilientAsync(
 	() => import("../components/ads/LocalAdBanner.vue"),
 );
@@ -76,9 +98,13 @@ const showAddShopModal = ref(false);
 const { visibleAds, dismissAd } = useLocalAds();
 const currentAd = computed(() => visibleAds.value?.[0] ?? null);
 
-const FilterMenu = IS_STRICT_MAP_E2E
-	? FilterMenuSync
-	: defineResilientAsync(() => import("../components/ui/FilterMenu.vue"));
+const FilterMenu = defineResilientAsync(
+	() => import("../components/ui/FilterMenu.vue"),
+	{
+		delay: 0,
+		timeout: 15000,
+	},
+);
 const RelatedShopsDrawer = defineResilientAsync(
 	() => import("../components/ui/RelatedShopsDrawer.vue"),
 );
@@ -91,12 +117,62 @@ const FavoritesModal = defineResilientAsync(
 const showFilterMenu = ref(false);
 const showRelatedDrawer = ref(false); // Stack View Logic
 const mapReadySignal = ref(false);
+const shouldMountMap = ref(IS_STRICT_MAP_E2E);
+const shouldLoadInstallBanner = ref(false);
 const route = useRoute();
 const router = useRouter();
 const { t } = useI18n();
 const featureFlagStore = useFeatureFlagStore();
 const userStore = useUserStore();
 const SITE_ORIGIN = getSiteOrigin({ allowDevWindowFallback: true });
+let mapMountTimer = null;
+let installBannerTimer = null;
+
+const hasPriorityMapRoute = () =>
+	Boolean(route.params?.id || route.params?.slug || route.params?.category);
+const mountMapNow = () => {
+	if (!shouldMountMap.value) {
+		shouldMountMap.value = true;
+	}
+};
+const queueMapMount = () => {
+	if (shouldMountMap.value) return;
+	if (hasPriorityMapRoute()) {
+		void loadMapContainer().catch(() => {});
+		mountMapNow();
+		return;
+	}
+	if (typeof window === "undefined") {
+		mountMapNow();
+		return;
+	}
+	const activate = () => {
+		void loadMapContainer().catch(() => {});
+		mountMapNow();
+	};
+	if (typeof requestIdleCallback === "function") {
+		requestIdleCallback(activate, { timeout: 360 });
+		return;
+	}
+	if (mapMountTimer) {
+		window.clearTimeout(mapMountTimer);
+	}
+	mapMountTimer = window.setTimeout(activate, 180);
+};
+const queueInstallBannerLoad = () => {
+	if (shouldLoadInstallBanner.value || typeof window === "undefined") return;
+	const activate = () => {
+		shouldLoadInstallBanner.value = true;
+	};
+	if (typeof requestIdleCallback === "function") {
+		requestIdleCallback(activate, { timeout: 1200 });
+		return;
+	}
+	if (installBannerTimer) {
+		window.clearTimeout(installBannerTimer);
+	}
+	installBannerTimer = window.setTimeout(activate, 900);
+};
 
 import { useHead } from "@unhead/vue";
 
@@ -278,6 +354,18 @@ const {
 	handleEnterGiantView,
 	handleExitGiantView,
 } = useAppLogic();
+const shouldRenderBottomFeed = computed(
+	() => isUiVisible.value && !isImmersive.value,
+);
+const shouldRenderAppModals = computed(() =>
+	Boolean(
+		selectedShop.value ||
+			rideModalShop.value ||
+			showMallDrawer.value ||
+			showProfileDrawer.value ||
+			showConfetti.value,
+	),
+);
 
 // --- Cinematic Spatial Physics: Dynamic Map Padding ---
 const mapInstanceRef = computed(() => mapRef.value?.map);
@@ -322,8 +410,13 @@ const handleMapReadyChange = (ready) => {
 watch(isImmersive, (immersive) => {
 	if (immersive) return;
 	nextTick(() => {
+		if (typeof window !== "undefined") {
+			window.requestAnimationFrame(() => {
+				mapRef.value?.resize?.();
+			});
+			return;
+		}
 		mapRef.value?.resize?.();
-		window.setTimeout(() => mapRef.value?.resize?.(), 120);
 	});
 });
 
@@ -808,10 +901,36 @@ const syncRewards = async () => {
 onMounted(() => {
 	if (import.meta.env.VITE_E2E === "true") return;
 	void featureFlagStore.refreshFlags().catch(() => {});
+	queueMapMount();
+	queueInstallBannerLoad();
 });
 
-// Avoid noisy logs in production (keeps CI + monitoring clean).
-if (import.meta.env.DEV) {
+watch(
+	() => [route.params?.id, route.params?.slug, route.params?.category],
+	() => {
+		if (hasPriorityMapRoute()) {
+			mountMapNow();
+			return;
+		}
+		queueMapMount();
+	},
+	{ immediate: true },
+);
+
+onUnmounted(() => {
+	if (typeof window === "undefined") return;
+	if (mapMountTimer) {
+		window.clearTimeout(mapMountTimer);
+		mapMountTimer = null;
+	}
+	if (installBannerTimer) {
+		window.clearTimeout(installBannerTimer);
+		installBannerTimer = null;
+	}
+});
+
+// Keep verbose route-level logs opt-in so default dev console stays clean.
+if (isAppDebugLoggingEnabled()) {
 	onMounted(() => {
 		console.log("🔍 [HomeView] Mounted");
 		console.log("🔍 [HomeView] isMobileView:", isMobileView.value);
@@ -868,6 +987,7 @@ const hasFilteredResults = computed(() => {
       <!-- ✅ Sidebar Drawer -->
       <div data-testid="drawer-shell">
         <SidebarDrawer
+          v-if="showSidebar"
           :is-open="showSidebar"
           :show-partner-program="isPartnerProgramEnabled"
           :user-stats="{
@@ -1001,10 +1121,13 @@ const hasFilteredResults = computed(() => {
         <!-- Desktop Layout: Map + Panel -->
         <div
           v-if="isDesktopView"
-          class="grid h-full grid-cols-[68%_32%] 2xl:grid-cols-[70%_30%]"
+          class="grid h-full grid-cols-[minmax(0,_1.55fr)_minmax(380px,_0.95fr)] 2xl:grid-cols-[minmax(0,_1.7fr)_minmax(430px,_0.9fr)]"
         >
           <!-- Map Container -->
-          <div data-testid="map-shell-wrapper" class="relative">
+          <div
+            data-testid="map-shell-wrapper"
+            class="relative overflow-hidden border-r border-white/10"
+          >
             <div
               data-testid="map-shell"
               :data-map-ready="mapReadySignal ? 'true' : 'false'"
@@ -1021,6 +1144,7 @@ const hasFilteredResults = computed(() => {
                 />
               </template>
               <MapContainer
+                v-if="shouldMountMap"
                 ref="mapRef"
                 :uiTopOffset="mapUiTopOffset"
                 :uiBottomOffset="mapUiBottomOffset"
@@ -1044,6 +1168,15 @@ const hasFilteredResults = computed(() => {
                 @exit-indoor="handleCloseFloorSelector"
                 @open-building="handleBuildingOpen"
               />
+              <div
+                v-else
+                class="absolute inset-0 overflow-hidden bg-gradient-to-b from-[#06080f] via-[#0b1020] to-[#101827]"
+                aria-hidden="true"
+              >
+                <div class="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.12),transparent_55%)]" />
+                <div class="absolute left-4 right-4 top-5 h-14 rounded-2xl bg-white/5 animate-pulse" />
+                <div class="absolute left-4 right-4 bottom-8 h-40 rounded-[2rem] bg-white/5" />
+              </div>
             </ErrorBoundary>
 
             <!-- Navigation Legend (Desktop) -->
@@ -1105,7 +1238,7 @@ const hasFilteredResults = computed(() => {
           <!-- Video Panel -->
           <div
             data-testid="bottom-feed"
-            class="relative pt-[118px] h-full min-h-0 bg-gradient-to-b from-[#0b1020] via-zinc-950 to-zinc-900"
+            class="relative h-full min-h-0 overflow-hidden border-l border-white/10 bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.12),transparent_30%),linear-gradient(180deg,#0b1020_0%,#090c16_34%,#05070d_100%)] pt-[118px]"
           >
             <div
               v-if="!filteredShops?.length"
@@ -1159,6 +1292,7 @@ const hasFilteredResults = computed(() => {
                 />
               </template>
               <MapContainer
+                v-if="shouldMountMap"
                 ref="mapRef"
                 :uiTopOffset="mapUiTopOffset"
                 :uiBottomOffset="0"
@@ -1183,6 +1317,15 @@ const hasFilteredResults = computed(() => {
                 @open-building="handleBuildingOpen"
                 class="w-full h-full"
               />
+              <div
+                v-else
+                class="absolute inset-0 overflow-hidden bg-gradient-to-b from-[#06080f] via-[#0b1020] to-[#101827]"
+                aria-hidden="true"
+              >
+                <div class="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.12),transparent_55%)]" />
+                <div class="absolute left-4 right-4 top-5 h-14 rounded-2xl bg-white/5 animate-pulse" />
+                <div class="absolute left-4 right-4 bottom-8 h-32 rounded-[2rem] bg-white/5" />
+              </div>
             </ErrorBoundary>
           </div>
 
@@ -1238,6 +1381,7 @@ const hasFilteredResults = computed(() => {
                 />
               </template>
               <MapContainer
+                v-if="shouldMountMap"
                 ref="mapRef"
                 :uiTopOffset="mapUiTopOffset"
                 :uiBottomOffset="mapUiBottomOffset"
@@ -1262,6 +1406,15 @@ const hasFilteredResults = computed(() => {
                 @open-building="handleBuildingOpen"
                 class="w-full h-full"
               />
+              <div
+                v-else
+                class="absolute inset-0 overflow-hidden bg-gradient-to-b from-[#06080f] via-[#0b1020] to-[#101827]"
+                aria-hidden="true"
+              >
+                <div class="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.12),transparent_55%)]" />
+                <div class="absolute left-4 right-4 top-5 h-14 rounded-2xl bg-white/5 animate-pulse" />
+                <div class="absolute left-4 right-4 bottom-24 h-48 rounded-[2rem] bg-white/5" />
+              </div>
             </ErrorBoundary>
           </div>
 
@@ -1303,7 +1456,7 @@ const hasFilteredResults = computed(() => {
               </template>
               <!-- Empty State when filters return 0 results -->
               <EmptyState
-                v-if="!hasFilteredResults"
+                v-if="!hasFilteredResults && !isDataLoading"
                 icon="🔍"
                 :title="t('empty.no_results', 'No venues found')"
                 :message="t('empty.try_reset', 'Try adjusting your filters')"
@@ -1312,7 +1465,7 @@ const hasFilteredResults = computed(() => {
                 @cta="handleResetFilters"
               />
               <BottomFeed
-                v-else
+                v-else-if="shouldRenderBottomFeed"
                 :is-data-loading="isDataLoading"
                 :is-refreshing="isRefreshing"
                 :is-immersive="isImmersive"
@@ -1390,6 +1543,7 @@ const hasFilteredResults = computed(() => {
 
       <!-- ✅ Common Modals & Overlays -->
       <AppModals
+        v-if="shouldRenderAppModals"
         :selectedShop="selectedShop"
         :rideModalShop="rideModalShop"
         :showMallDrawer="showMallDrawer"
@@ -1400,8 +1554,6 @@ const hasFilteredResults = computed(() => {
         :showProfileDrawer="showProfileDrawer"
         :isDarkMode="isDarkMode"
         :isDataLoading="isDataLoading"
-        :isInitialLoad="isInitialLoad"
-        :errorMessage="errorMessage"
         :showConfetti="showConfetti"
         :userLocation="userLocation"
         @close-vibe-modal="closeDetailSheet({ syncRoute: true, replace: true })"
@@ -1413,9 +1565,10 @@ const hasFilteredResults = computed(() => {
         @open-ride-modal="openRideModal"
         @close-profile-drawer="showProfileDrawer = false"
         @toggle-language="toggleLanguage"
-        @clear-error="errorMessage = null"
         @retry="retryLoad"
       />
+
+      <InstallBanner v-if="shouldLoadInstallBanner" />
 
       <!-- ✅ Floating Action Buttons REMOVED per user request (pink heart + orange safety were blocking carousel) -->
     </main>

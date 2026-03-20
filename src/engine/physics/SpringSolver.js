@@ -98,7 +98,7 @@ class Spring {
 }
 
 export class SpringSolver {
-	constructor(maxSprings = 256) {
+	constructor(_maxSprings = 256) {
 		this._springs = new Map(); // id → Spring
 		this._list = []; // ordered for SAB writes
 		this.count = 0;

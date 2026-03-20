@@ -83,6 +83,7 @@ const handleTouchEnd = () => {
 </script>
 
 <template>
+  <!-- aria-label -->
   <div
     class="tilt-card-wrapper"
     :style="tiltStyle"
@@ -117,5 +118,12 @@ const handleTouchEnd = () => {
   );
   pointer-events: none;
   border-radius: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tilt-card-wrapper * {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 </style>

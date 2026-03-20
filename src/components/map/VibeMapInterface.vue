@@ -1,4 +1,5 @@
 <template>
+  <!-- aria-label -->
   <div class="vibe-map-interface">
     <!-- Search Bar -->
     <div class="search-section">
@@ -220,11 +221,11 @@ const exploreNearby = () => {
 }
 
 .vibe-fill {
-  @apply h-full bg-gradient-to-r from-pink-500 to-purple-500 transition-all duration-500;
+  @apply h-full bg-gradient-to-r from-pink-500 to-cyan-500 transition duration-slow;
 }
 
 .vibe-label {
-  @apply text-sm font-bold text-purple-400 whitespace-nowrap;
+  @apply text-sm font-bold text-cyan-400 whitespace-nowrap;
 }
 
 .zone-buttons {
@@ -232,7 +233,7 @@ const exploreNearby = () => {
 }
 
 .zone-action-btn {
-  @apply flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-bold text-white transition-all duration-300;
+  @apply flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-bold text-white transition duration-normal;
 }
 
 .claim-btn {
@@ -256,7 +257,7 @@ const exploreNearby = () => {
 }
 
 .quick-action-btn {
-  @apply flex items-center gap-2 px-3 py-2 rounded-lg backdrop-blur-xl border border-white/10 text-white text-sm font-medium transition-all duration-200;
+  @apply flex items-center gap-2 px-3 py-2 rounded-lg backdrop-blur-xl border border-white/10 text-white text-sm font-medium transition duration-fast;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
   @apply hover:scale-105 hover:bg-white/20;
 }

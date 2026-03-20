@@ -106,7 +106,7 @@ defineExpose({ reset });
         @keydown.esc="skip"
         role="dialog"
         aria-modal="true"
-        aria-label="Onboarding Tour"
+        :aria-label="$t('auto.k_43f25eca')"
       >
         <div
           :class="['onboarding-modal', isDarkMode ? 'bg-zinc-900' : 'bg-white']"
@@ -119,9 +119,9 @@ defineExpose({ reset });
               :class="[
                 'w-2 h-2 rounded-full transition duration-300',
                 i === currentStep
-                  ? 'w-6 bg-gradient-to-r from-purple-500 to-pink-500'
+                  ? 'w-6 bg-gradient-to-r from-cyan-500 to-pink-500'
                   : i < currentStep
-                    ? 'bg-purple-500'
+                    ? 'bg-cyan-500'
                     : isDarkMode
                       ? 'bg-zinc-700'
                       : 'bg-gray-300',
@@ -181,7 +181,7 @@ defineExpose({ reset });
 
             <button
               @click="nextStep"
-              class="flex-1 py-3 rounded-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 transition active:scale-95"
+              class="flex-1 py-3 rounded-xl font-bold bg-gradient-to-r from-cyan-600 to-pink-600 text-white shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 transition active:scale-95"
             >
               {{ currentStep === steps.length - 1 ? "Let's Go!" : "Next" }}
             </button>

@@ -123,7 +123,7 @@ onUnmounted(() => {
         class="gallery-overlay"
         role="dialog"
         aria-modal="true"
-        aria-label="Photo gallery lightbox"
+        :aria-label="$t('auto.k_78ebd292')"
         @click.self="close"
         @touchstart.passive="handleTouchStart"
         @touchend="handleTouchEnd"
@@ -132,7 +132,7 @@ onUnmounted(() => {
         <button
           type="button"
           @click="close"
-          aria-label="Close gallery"
+          :aria-label="$t('auto.k_c96bbeb9')"
           class="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md hover:bg-black/70 transition-colors"
         >
           ✕
@@ -150,7 +150,7 @@ onUnmounted(() => {
           v-if="images.length > 1"
           type="button"
           @click="prev"
-          aria-label="Previous image"
+          :aria-label="$t('auto.k_41e27be5')"
           class="absolute left-4 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full bg-black/50 text-white text-2xl flex items-center justify-center backdrop-blur-md hover:bg-black/70 transition-colors"
         >
           ‹
@@ -160,7 +160,7 @@ onUnmounted(() => {
           v-if="images.length > 1"
           type="button"
           @click="next"
-          aria-label="Next image"
+          :aria-label="$t('auto.k_929cea25')"
           class="absolute right-4 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full bg-black/50 text-white text-2xl flex items-center justify-center backdrop-blur-md hover:bg-black/70 transition-colors"
         >
           ›
@@ -179,7 +179,7 @@ onUnmounted(() => {
               playsinline
               @error="markImageFailed(currentIndex)"
             />
-            <img
+            <img loading="lazy"
               v-else
               :key="`img-${currentIndex}`"
               :src="currentImage"
@@ -217,10 +217,10 @@ onUnmounted(() => {
               preload="metadata"
               @error="markImageFailed(i)"
             />
-            <img
+            <img loading="lazy"
               v-else
               :src="failedImageIndexes.has(i) ? FALLBACK_IMAGE : img"
-              alt="Thumbnail image"
+              :alt="$t('auto.k_331f71fa')"
               class="w-full h-full object-cover"
               @error="markImageFailed(i)"
             />
@@ -235,7 +235,7 @@ onUnmounted(() => {
 .gallery-overlay {
   position: fixed;
   inset: 0;
-  z-index: 14000;
+  z-index: 13000; /* Z.SUBMODAL */
   display: flex;
   align-items: center;
   justify-content: center;

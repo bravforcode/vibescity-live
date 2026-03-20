@@ -3,24 +3,64 @@
  * Provides paginated, filterable access to all tables
  */
 import { supabase } from "../lib/supabase";
+import {
+	isSoftSupabaseReadError,
+	logUnexpectedSupabaseReadError,
+	runSupabaseReadPolicy,
+} from "../utils/supabaseReadPolicy";
 
 const DEFAULT_PAGE_SIZE = 25;
 
-const safeCount = async (table, filters = {}) => {
+const buildEmptyPage = (page, pageSize) => ({
+	rows: [],
+	total: 0,
+	page,
+	pageSize,
+	totalPages: 0,
+});
+
+const runAdminRead = async ({
+	label,
+	run,
+	fallback,
+	throwUnexpected = false,
+}) => {
 	try {
-		let q = supabase.from(table).select("*", { count: "exact", head: true });
-		for (const [col, val] of Object.entries(filters)) {
-			if (val !== undefined && val !== null && val !== "") {
-				q = q.eq(col, val);
-			}
+		return await runSupabaseReadPolicy({
+			resourceType: "adminRead",
+			run,
+		});
+	} catch (error) {
+		if (isSoftSupabaseReadError(error)) {
+			return typeof fallback === "function" ? fallback(error) : fallback;
 		}
-		const { count, error } = await q;
-		if (error) throw error;
-		return count || 0;
-	} catch {
-		return 0;
+		if (import.meta.env.DEV) {
+			logUnexpectedSupabaseReadError(
+				`[adminDataService] ${label} failed:`,
+				error,
+			);
+		}
+		if (throwUnexpected) throw error;
+		return typeof fallback === "function" ? fallback(error) : fallback;
 	}
 };
+
+const safeCount = async (table, filters = {}) =>
+	await runAdminRead({
+		label: `count ${table}`,
+		fallback: 0,
+		run: async () => {
+			let q = supabase.from(table).select("*", { count: "exact", head: true });
+			for (const [col, val] of Object.entries(filters)) {
+				if (val !== undefined && val !== null && val !== "") {
+					q = q.eq(col, val);
+				}
+			}
+			const { count, error } = await q;
+			if (error) throw error;
+			return count || 0;
+		},
+	});
 
 // ═══════════════════════════════════════
 // Generic paginated query
@@ -43,46 +83,56 @@ const queryTable = async (
 	const from = (page - 1) * pageSize;
 	const to = from + pageSize - 1;
 
-	let q = supabase
-		.from(table)
-		.select(select, { count: "exact" })
-		.order(orderBy, { ascending })
-		.range(from, to);
+	return await runAdminRead({
+		label: `query ${table}`,
+		fallback: buildEmptyPage(page, pageSize),
+		run: async () => {
+			let q = supabase
+				.from(table)
+				.select(select, { count: "exact" })
+				.order(orderBy, { ascending })
+				.range(from, to);
 
-	// Apply equality filters
-	for (const [col, val] of Object.entries(filters)) {
-		if (val !== undefined && val !== null && val !== "") {
-			q = q.eq(col, val);
-		}
-	}
+			for (const [col, val] of Object.entries(filters)) {
+				if (val !== undefined && val !== null && val !== "") {
+					q = q.eq(col, val);
+				}
+			}
 
-	// Apply text search (ilike on multiple columns)
-	if (search && searchColumns.length > 0) {
-		const orClauses = searchColumns
-			.map((col) => `${col}.ilike.%${search}%`)
-			.join(",");
-		q = q.or(orClauses);
-	}
+			if (search && searchColumns.length > 0) {
+				const orClauses = searchColumns
+					.map((col) => `${col}.ilike.%${search}%`)
+					.join(",");
+				q = q.or(orClauses);
+			}
 
-	// Apply date range
-	if (dateRange?.from) {
-		q = q.gte(dateColumn, dateRange.from);
-	}
-	if (dateRange?.to) {
-		q = q.lte(dateColumn, dateRange.to);
-	}
+			if (dateRange?.from) {
+				q = q.gte(dateColumn, dateRange.from);
+			}
+			if (dateRange?.to) {
+				q = q.lte(dateColumn, dateRange.to);
+			}
 
-	const { data, error, count } = await q;
-	if (error) throw error;
+			const { data, error, count } = await q;
+			if (error) throw error;
 
-	return {
-		rows: data || [],
-		total: count || 0,
-		page,
-		pageSize,
-		totalPages: Math.ceil((count || 0) / pageSize),
-	};
+			return {
+				rows: data || [],
+				total: count || 0,
+				page,
+				pageSize,
+				totalPages: Math.ceil((count || 0) / pageSize),
+			};
+		},
+	});
 };
+
+const readAdminCollection = async ({ label, fallback, run }) =>
+	await runAdminRead({
+		label,
+		fallback,
+		run,
+	});
 
 // ═══════════════════════════════════════
 // Overview KPIs
@@ -95,6 +145,8 @@ const getOverviewKPIs = async () => {
 		reviewCount,
 		adCount,
 		gamificationCount,
+		totalRevenue,
+		totalCoins,
 	] = await Promise.all([
 		safeCount("venues"),
 		safeCount("visitor_sessions"),
@@ -102,30 +154,36 @@ const getOverviewKPIs = async () => {
 		safeCount("reviews"),
 		safeCount("local_ads"),
 		safeCount("visitor_gamification_stats"),
+		readAdminCollection({
+			label: "orders revenue",
+			fallback: 0,
+			run: async () => {
+				const { data, error } = await supabase
+					.from("orders")
+					.select("amount")
+					.eq("status", "paid");
+				if (error) throw error;
+				return (data || []).reduce(
+					(sum, row) => sum + (Number(row.amount) || 0),
+					0,
+				);
+			},
+		}),
+		readAdminCollection({
+			label: "coin balances",
+			fallback: 0,
+			run: async () => {
+				const { data, error } = await supabase
+					.from("visitor_gamification_stats")
+					.select("balance");
+				if (error) throw error;
+				return (data || []).reduce(
+					(sum, row) => sum + (Number(row.balance) || 0),
+					0,
+				);
+			},
+		}),
 	]);
-
-	// Revenue sum
-	let totalRevenue = 0;
-	try {
-		const { data } = await supabase
-			.from("orders")
-			.select("amount")
-			.eq("status", "paid");
-		if (data) {
-			totalRevenue = data.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
-		}
-	} catch {}
-
-	// Total coins distributed
-	let totalCoins = 0;
-	try {
-		const { data } = await supabase
-			.from("visitor_gamification_stats")
-			.select("balance");
-		if (data) {
-			totalCoins = data.reduce((sum, r) => sum + (Number(r.balance) || 0), 0);
-		}
-	} catch {}
 
 	return {
 		venues: venueCount,
@@ -208,111 +266,117 @@ const getReviews = (opts) =>
 // ═══════════════════════════════════════
 // Aggregations for charts
 // ═══════════════════════════════════════
-const getVenuesByCategory = async () => {
-	try {
-		const { data, error } = await supabase.from("venues").select("category");
-		if (error) throw error;
-		const counts = {};
-		(data || []).forEach((r) => {
-			const cat = r.category || "unknown";
-			counts[cat] = (counts[cat] || 0) + 1;
-		});
-		return Object.entries(counts)
-			.map(([label, value]) => ({ label, value }))
-			.sort((a, b) => b.value - a.value);
-	} catch {
-		return [];
-	}
-};
+const getVenuesByCategory = async () =>
+	await readAdminCollection({
+		label: "venues by category",
+		fallback: [],
+		run: async () => {
+			const { data, error } = await supabase.from("venues").select("category");
+			if (error) throw error;
+			const counts = {};
+			(data || []).forEach((r) => {
+				const cat = r.category || "unknown";
+				counts[cat] = (counts[cat] || 0) + 1;
+			});
+			return Object.entries(counts)
+				.map(([label, value]) => ({ label, value }))
+				.sort((a, b) => b.value - a.value);
+		},
+	});
 
-const getReviewRatingDistribution = async () => {
-	try {
-		const { data, error } = await supabase.from("reviews").select("rating");
-		if (error) throw error;
-		const dist = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-		(data || []).forEach((r) => {
-			const rating = Math.round(Number(r.rating) || 0);
-			if (rating >= 1 && rating <= 5) dist[rating]++;
-		});
-		return dist;
-	} catch {
-		return { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-	}
-};
+const getReviewRatingDistribution = async () =>
+	await readAdminCollection({
+		label: "review rating distribution",
+		fallback: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+		run: async () => {
+			const { data, error } = await supabase.from("reviews").select("rating");
+			if (error) throw error;
+			const dist = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+			(data || []).forEach((r) => {
+				const rating = Math.round(Number(r.rating) || 0);
+				if (rating >= 1 && rating <= 5) dist[rating]++;
+			});
+			return dist;
+		},
+	});
 
-const getOrderStatusBreakdown = async () => {
-	try {
-		const { data, error } = await supabase.from("orders").select("status");
-		if (error) throw error;
-		const counts = {};
-		(data || []).forEach((r) => {
-			const s = r.status || "unknown";
-			counts[s] = (counts[s] || 0) + 1;
-		});
-		return counts;
-	} catch {
-		return {};
-	}
-};
+const getOrderStatusBreakdown = async () =>
+	await readAdminCollection({
+		label: "order status breakdown",
+		fallback: {},
+		run: async () => {
+			const { data, error } = await supabase.from("orders").select("status");
+			if (error) throw error;
+			const counts = {};
+			(data || []).forEach((r) => {
+				const s = r.status || "unknown";
+				counts[s] = (counts[s] || 0) + 1;
+			});
+			return counts;
+		},
+	});
 
-const getVisitorGeoDistribution = async () => {
-	try {
-		const { data, error } = await supabase
-			.from("visitor_sessions")
-			.select("country");
-		if (error) throw error;
-		const counts = {};
-		(data || []).forEach((r) => {
-			const c = r.country || "Unknown";
-			counts[c] = (counts[c] || 0) + 1;
-		});
-		return Object.entries(counts)
-			.map(([label, value]) => ({ label, value }))
-			.sort((a, b) => b.value - a.value);
-	} catch {
-		return [];
-	}
-};
+const getVisitorGeoDistribution = async () =>
+	await readAdminCollection({
+		label: "visitor geo distribution",
+		fallback: [],
+		run: async () => {
+			const { data, error } = await supabase
+				.from("visitor_sessions")
+				.select("country");
+			if (error) throw error;
+			const counts = {};
+			(data || []).forEach((r) => {
+				const c = r.country || "Unknown";
+				counts[c] = (counts[c] || 0) + 1;
+			});
+			return Object.entries(counts)
+				.map(([label, value]) => ({ label, value }))
+				.sort((a, b) => b.value - a.value);
+		},
+	});
 
-const getVisitorDeviceDistribution = async () => {
-	try {
-		const { data, error } = await supabase
-			.from("visitor_sessions")
-			.select("device_type");
-		if (error) throw error;
-		const counts = {};
-		(data || []).forEach((r) => {
-			const d = r.device_type || "Unknown";
-			counts[d] = (counts[d] || 0) + 1;
-		});
-		return Object.entries(counts)
-			.map(([label, value]) => ({ label, value }))
-			.sort((a, b) => b.value - a.value);
-	} catch {
-		return [];
-	}
-};
+const getVisitorDeviceDistribution = async () =>
+	await readAdminCollection({
+		label: "visitor device distribution",
+		fallback: [],
+		run: async () => {
+			const { data, error } = await supabase
+				.from("visitor_sessions")
+				.select("device_type");
+			if (error) throw error;
+			const counts = {};
+			(data || []).forEach((r) => {
+				const d = r.device_type || "Unknown";
+				counts[d] = (counts[d] || 0) + 1;
+			});
+			return Object.entries(counts)
+				.map(([label, value]) => ({ label, value }))
+				.sort((a, b) => b.value - a.value);
+		},
+	});
 
-const getOrderRevenueTrend = async () => {
-	try {
-		const { data, error } = await supabase
-			.from("orders")
-			.select("created_at, amount")
-			.eq("status", "paid");
-		if (error) throw error;
-		const trend = {};
-		(data || []).forEach((r) => {
-			if (!r.created_at) return;
-			const dateStr = r.created_at.split("T")[0];
-			trend[dateStr] = (trend[dateStr] || 0) + (Number(r.amount) || 0);
-		});
-		return Object.entries(trend)
-			.map(([date, amount]) => ({ date, amount }))
-			.sort((a, b) => a.date.localeCompare(b.date));
-	} catch {
-		return [];
-	}
-};
+const getOrderRevenueTrend = async () =>
+	await readAdminCollection({
+		label: "order revenue trend",
+		fallback: [],
+		run: async () => {
+			const { data, error } = await supabase
+				.from("orders")
+				.select("created_at, amount")
+				.eq("status", "paid");
+			if (error) throw error;
+			const trend = {};
+			(data || []).forEach((r) => {
+				if (!r.created_at) return;
+				const dateStr = r.created_at.split("T")[0];
+				trend[dateStr] = (trend[dateStr] || 0) + (Number(r.amount) || 0);
+			});
+			return Object.entries(trend)
+				.map(([date, amount]) => ({ date, amount }))
+				.sort((a, b) => a.date.localeCompare(b.date));
+		},
+	});
 
 export const adminDataService = {
 	queryTable,

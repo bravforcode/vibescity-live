@@ -64,7 +64,7 @@ const isArrivingSoon = computed(() => {
     <div class="rtm-content">
       <!-- Driver Avatar -->
       <div class="rtm-avatar-ring">
-        <img :src="driverAvatar" :alt="driverName" class="rtm-avatar" />
+        <img loading="lazy" :src="driverAvatar" :alt="driverName" class="rtm-avatar" />
         <div
           class="rtm-badge"
           :class="isArrivingSoon ? 'bg-amber-500' : 'bg-emerald-500'"

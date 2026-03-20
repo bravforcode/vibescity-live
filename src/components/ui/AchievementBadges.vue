@@ -87,7 +87,7 @@ const tierColors = {
 	bronze: "from-amber-700 to-amber-500",
 	silver: "from-gray-400 to-gray-300",
 	gold: "from-yellow-500 to-amber-400",
-	platinum: "from-purple-500 to-pink-500",
+	platinum: "from-cyan-500 to-pink-500",
 };
 
 const unlockedBadges = computed(() => {
@@ -100,15 +100,14 @@ const getBadgeStatus = (badge) => {
 </script>
 
 <template>
+  <!-- aria-label -->
   <div class="badges-container">
     <h3
       :class="[
         'text-lg font-black mb-4',
         isDarkMode ? 'text-white' : 'text-gray-900',
       ]"
-    >
-      🏆 Achievements
-    </h3>
+    > {{ $t("auto.k_3104831") }} </h3>
 
     <div class="grid grid-cols-3 gap-3">
       <div
@@ -168,8 +167,7 @@ const getBadgeStatus = (badge) => {
         isDarkMode ? 'text-white/50' : 'text-gray-500',
       ]"
     >
-      {{ unlockedBadges.length }} / {{ badges.length }} badges unlocked
-    </div>
+      {{ unlockedBadges.length }} / {{ badges.length }} {{ $t("auto.k_a3a315ca") }} </div>
   </div>
 </template>
 
@@ -214,6 +212,14 @@ const getBadgeStatus = (badge) => {
   }
   50% {
     box-shadow: 0 4px 20px rgba(139, 92, 246, 0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .badge-card,
+  .badge-card * {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
   }
 }
 </style>

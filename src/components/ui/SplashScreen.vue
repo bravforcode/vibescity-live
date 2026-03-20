@@ -23,7 +23,7 @@
           <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
         </svg>
       </div>
-      <h1 class="text-3xl font-black text-white tracking-tight">Live City</h1>
+      <h1 class="text-3xl font-black text-white tracking-tight">{{ $t("auto.k_8d3a195a") }}</h1>
     </div>
 
     <!-- Spinner -->

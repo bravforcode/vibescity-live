@@ -1,7 +1,13 @@
 import { useInfiniteQuery } from "@tanstack/vue-query";
 import { computed, ref } from "vue";
-import { supabase } from "../lib/supabase";
+import { isSupabaseSchemaCacheError, supabase } from "../lib/supabase";
 import { useLocationStore } from "../store/locationStore";
+import { isTransientNetworkError } from "../utils/networkErrorUtils";
+import {
+	computeBackoffDelayMs,
+	shouldRetryResource,
+	waitForBackoff,
+} from "../utils/retryPolicy";
 
 /**
  * 🚀 VibeCity Core Engine V2 - Feed Composable (Vue Query powered)
@@ -12,27 +18,42 @@ import { useLocationStore } from "../store/locationStore";
  */
 
 const PAGE_SIZE = 20;
+const FEED_RPC_MISSING_ERROR_CODE = "PGRST202";
+
+const isFeedRpcMissingError = (errorLike) =>
+	String(errorLike?.code || "").toUpperCase() === FEED_RPC_MISSING_ERROR_CODE;
 
 /**
  * Fetch a single page of feed data from the Supabase RPC.
  */
-async function fetchFeedPage({ lat, lng }) {
-	const { data, error } = await supabase.rpc("get_feed_cards", {
-		p_lat: lat,
-		p_lng: lng,
-	});
-
-	if (error) {
-		// RPC function may not exist yet – return empty instead of crashing
-		if (error.code === "PGRST202") {
-			if (import.meta.env.DEV) {
-				console.warn("⚠️ get_feed_cards RPC not found, returning empty feed");
+export async function fetchFeedPage({ lat, lng }) {
+	for (let attempt = 0; ; attempt += 1) {
+		try {
+			const { data, error } = await supabase.rpc("get_feed_cards", {
+				p_lat: lat,
+				p_lng: lng,
+			});
+			if (error) throw error;
+			return data || [];
+		} catch (error) {
+			if (isFeedRpcMissingError(error) || isSupabaseSchemaCacheError(error)) {
+				return [];
 			}
-			return [];
+			if (
+				isTransientNetworkError(error) &&
+				shouldRetryResource({ resourceType: "feed", attempt })
+			) {
+				await waitForBackoff(
+					computeBackoffDelayMs({ resourceType: "feed", attempt }),
+				);
+				continue;
+			}
+			if (isTransientNetworkError(error)) {
+				return [];
+			}
+			throw error;
 		}
-		throw error;
 	}
-	return data || [];
 }
 
 export function useFeedV2() {
@@ -79,6 +100,7 @@ export function useFeedV2() {
 		enabled: computed(
 			() => userCoords.value.lat !== null && userCoords.value.lng !== null,
 		),
+		retry: false,
 	});
 
 	// Flatten pages into a single cards array with client-side filtering

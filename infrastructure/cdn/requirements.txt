@@ -1,0 +1,8 @@
+# Python dependencies for CDN management tools
+
+# HTTP client for cache management and testing
+requests>=2.31.0
+
+# Optional: For advanced testing
+# pytest>=7.4.0
+# pytest-asyncio>=0.21.0

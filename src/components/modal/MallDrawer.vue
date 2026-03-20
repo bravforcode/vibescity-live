@@ -21,6 +21,7 @@ import {
 import { useI18n } from "vue-i18n";
 import { useChromaticGlass } from "@/composables/engine/useChromaticGlass.js";
 import { useGranularAudio } from "@/composables/engine/useGranularAudio.js";
+import { useFocusTrap } from "@/composables/useFocusTrap";
 import { useNotifications } from "@/composables/useNotifications";
 import { usePerformance } from "@/composables/usePerformance";
 import { useSpatialFeedback } from "@/composables/useSpatialFeedback";
@@ -146,6 +147,10 @@ const {
 		}
 	},
 });
+
+// ✅ A11y: Focus trap within drawer
+useFocusTrap(drawerRef);
+
 // Refractive glass panel — WebGL overlay captures map behind drawer
 const { enabled: glassEnabled, fallbackClass } = useChromaticGlass({
 	panelId: "mall-drawer",
@@ -175,13 +180,13 @@ if (mapPaddingApi) {
 		([id, shops, building]) => {
 			if (id && shops?.length) {
 				const shop = shops.find((s) => String(s.id) === String(id));
-				if (shop && shop.lat && shop.lng) {
+				if (shop?.lat && shop.lng) {
 					mapPaddingApi.setActivePin([Number(shop.lng), Number(shop.lat)]);
 					mapPaddingApi.setActivePinId(id);
 					return;
 				}
 			}
-			if (building && building.lat && building.lng) {
+			if (building?.lat && building.lng) {
 				mapPaddingApi.setActivePin([
 					Number(building.lng),
 					Number(building.lat),
@@ -477,7 +482,7 @@ onUnmounted(() => {
           />
           <div
             v-else
-            class="w-full h-full bg-gradient-to-br from-indigo-900 via-purple-900 to-black"
+            class="w-full h-full bg-gradient-to-br from-indigo-900 via-cyan-900 to-black"
           ></div>
           <div
             class="absolute inset-0 bg-gradient-to-t from-zinc-900 via-zinc-900/60 to-transparent"
@@ -487,7 +492,7 @@ onUnmounted(() => {
         <button
           ref="closeButtonRef"
           @click="emit('close')"
-          aria-label="Close mall drawer"
+          :aria-label="$t('auto.k_b3515c50')"
           class="absolute top-4 right-4 w-12 h-12 rounded-full bg-black/40 text-white flex items-center justify-center backdrop-blur-md hover:bg-black/60 transition z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
         >
           <X class="w-5 h-5" />
@@ -522,7 +527,7 @@ onUnmounted(() => {
           @click.stop="
             building && emit('toggle-favorite', building.id || building.key)
           "
-          aria-label="Toggle mall favorite"
+          :aria-label="$t('auto.k_31366cf')"
           class="w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md transition active:scale-90 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70"
           :class="[
             building && favorites.includes(Number(building.id || building.key))
@@ -552,7 +557,7 @@ onUnmounted(() => {
         </button>
         <button
           @click.stop="handleShare(building)"
-          aria-label="Share mall"
+          :aria-label="$t('auto.k_98f4e9ea')"
           class="w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md bg-white/10 border border-white/20 text-white hover:bg-white/20 transition active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
         >
           <Share2 class="w-5 h-5 text-white" />
@@ -621,7 +626,7 @@ onUnmounted(() => {
             <!-- Small Magnifying Glass Button -->
             <button
               @click="handleExpandSearch"
-              aria-label="Expand search"
+              :aria-label="$t('auto.k_ec2beab')"
               class="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
               :class="
                 isDarkMode
@@ -640,9 +645,9 @@ onUnmounted(() => {
                 ref="searchInputRef"
                 v-model="searchQuery"
                 type="text"
-                aria-label="Search venues"
+                :aria-label="$t('auto.k_a6567c3f')"
                 :placeholder="t('mall.search')"
-                class="w-full pl-10 pr-4 py-2 rounded-xl text-sm transition-colors outline-none"
+                class="w-full pl-10 pr-4 py-2 rounded-xl text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50"
                 :class="
                   isDarkMode
                     ? 'bg-black/30 text-white placeholder-white/30 border border-white/10 focus:border-blue-500/50'
@@ -663,9 +668,7 @@ onUnmounted(() => {
                   ? 'text-white font-black hover:text-white'
                   : 'text-gray-500 hover:text-gray-900'
               "
-            >
-              ยกเลิก
-            </button>
+            > {{ $t("auto.k_e45aa30c") }} </button>
           </div>
         </div>
 
@@ -721,7 +724,7 @@ onUnmounted(() => {
               v-if="activeFloor && building.floorPlanUrls?.[activeFloor]"
               class="relative rounded-2xl overflow-hidden bg-black/40 border border-white/10 shadow-2xl group"
             >
-              <img
+              <img alt=""
                 :src="building.floorPlanUrls[activeFloor]"
                 class="w-full aspect-video object-contain p-4 transition-transform duration-700 group-hover:scale-110"
                 loading="lazy"
@@ -761,7 +764,7 @@ onUnmounted(() => {
                   :key="idx"
                   class="snap-center flex-shrink-0 w-64 h-36 rounded-xl overflow-hidden relative shadow-md bg-gray-800"
                 >
-                  <img
+                  <img alt=""
                     :src="hl.src"
                     class="w-full h-full object-cover"
                     loading="lazy"
@@ -809,7 +812,7 @@ onUnmounted(() => {
               v-if="filteredShops.length === 0"
               class="py-10 text-center opacity-50"
             >
-              <p>ไม่พบร้านค้าในหมวดนี้</p>
+              <p>{{ $t("auto.k_939c7ad6") }}</p>
             </div>
 
             <!-- Shop Items -->
@@ -883,15 +886,13 @@ onUnmounted(() => {
                   <span
                     class="text-[10px] font-medium opacity-80 flex items-center gap-1"
                   >
-                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                    ชั้น {{ shop.Floor || "?" }}
+                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span> {{ $t("auto.k_ab09f6ea") }} {{ shop.Floor || "?" }}
                   </span>
                   <span v-if="shop.Zone" class="text-[10px] opacity-60">
                     • {{ shop.Zone }}
                   </span>
                 </div>
-                <p v-if="shop.openTime" class="text-[10px] opacity-50 mt-0.5">
-                  เปิด {{ shop.openTime }} - {{ shop.closeTime }}
+                <p v-if="shop.openTime" class="text-[10px] opacity-50 mt-0.5"> {{ $t("auto.k_1cf89574") }} {{ shop.openTime }} - {{ shop.closeTime }}
                 </p>
               </div>
 
@@ -937,7 +938,7 @@ onUnmounted(() => {
 
   <!-- Backdrop — opacity + blur tied to swipe gesture in real-time -->
   <transition name="fade">
-    <div
+    <div role="button" tabindex="0"
       v-if="isOpen"
       ref="backdropRef"
       class="fixed inset-0 will-change-[backdrop-filter,opacity]"

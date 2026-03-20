@@ -6,18 +6,19 @@
  * Auto-pauses when tab hidden. Adaptive resolution on budget miss.
  */
 
-import { onUnmounted, watch } from "vue";
+import { getCurrentInstance, onUnmounted, watch } from "vue";
 import { caps } from "@/engine/capabilities.js";
 import { FluidHeatmapLayer } from "@/engine/rendering/FluidHeatmapLayer.js";
 import { useShopStore } from "@/store/shopStore.js";
 
 export function useFluidOverlay(map) {
 	if (!caps.webgl2 || !caps.floatTextures || !map) {
-		return { enabled: false };
+		return { enabled: false, dispose: () => {} };
 	}
 
 	const shopStore = useShopStore();
 	const layer = new FluidHeatmapLayer();
+	let _disposed = false;
 
 	let _prevMapCenter = null;
 	let _hidden = false;
@@ -25,6 +26,7 @@ export function useFluidOverlay(map) {
 
 	// ─── Setup layer ──────────────────────────────────────────────
 	const setup = () => {
+		if (_disposed || !map) return;
 		if (!map.isStyleLoaded()) {
 			map.once("style.load", setup);
 			return;
@@ -38,7 +40,7 @@ export function useFluidOverlay(map) {
 
 	// ─── Inject density splats from venue visitorCounts ───────────
 	const injectDensity = () => {
-		if (_hidden) return;
+		if (_hidden || _disposed) return;
 		const shops = shopStore.rawShops;
 		if (!shops?.length) return;
 
@@ -66,7 +68,7 @@ export function useFluidOverlay(map) {
 
 	// ─── Map pan → velocity injection ────────────────────────────
 	const onMapMove = () => {
-		if (_hidden) return;
+		if (_hidden || _disposed) return;
 		const center = map.getCenter();
 		if (_prevMapCenter) {
 			const proj = map.project(center);
@@ -82,6 +84,7 @@ export function useFluidOverlay(map) {
 
 	// ─── Tab visibility ───────────────────────────────────────────
 	const onVisibilityChange = () => {
+		if (_disposed) return;
 		_hidden = document.visibilityState === "hidden";
 	};
 
@@ -99,9 +102,12 @@ export function useFluidOverlay(map) {
 		() => injectDensity(),
 	);
 
-	onUnmounted(() => {
+	const dispose = () => {
+		if (_disposed) return;
+		_disposed = true;
 		stopWatch();
 		clearInterval(_splatInterval);
+		_splatInterval = null;
 		map.off("move", onMapMove);
 		document.removeEventListener("visibilitychange", onVisibilityChange);
 		try {
@@ -109,7 +115,11 @@ export function useFluidOverlay(map) {
 		} catch {
 			/* noop */
 		}
-	});
+	};
 
-	return { enabled: true, layer };
+	if (getCurrentInstance()) {
+		onUnmounted(dispose);
+	}
+
+	return { enabled: true, layer, dispose };
 }

@@ -6,7 +6,7 @@ import { onUnmounted, ref, watch } from "vue";
 const props = defineProps({
 	src: {
 		type: String,
-		required: true,
+		default: "",
 	},
 	alt: {
 		type: String,

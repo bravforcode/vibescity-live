@@ -1,4 +1,5 @@
 import { readonly, ref } from "vue";
+import { isAppDebugLoggingEnabled } from "../utils/debugFlags";
 
 const isLowPowerMode = ref(false);
 const hardwareConcurrency = ref(navigator.hardwareConcurrency || 4);
@@ -9,7 +10,7 @@ const isReducedMotion = ref(false);
 const isDegraded = ref(false);
 let degradedResetTimer = null;
 let longTaskCount = 0;
-const LONG_TASK_THRESHOLD = 3; // 3 long tasks in a short window
+const LONG_TASK_THRESHOLD = 5; // 5 long tasks in a short window
 const DEGRADE_DURATION_MS = 10000; // Stay degraded for 10s
 
 // Module-level guard: register the mediaQuery listener only once.
@@ -35,7 +36,7 @@ export function usePerformance() {
 		if (hardwareConcurrency.value <= 4 || deviceMemory.value <= 4) {
 			isLowPowerMode.value = true;
 			isDegraded.value = true; // Devices this low power should always run degraded
-			if (import.meta.env.DEV)
+			if (isAppDebugLoggingEnabled())
 				console.log(
 					"⚡️ VibeCity: Low Power Mode Activated (Hardware Heuristic)",
 				);
@@ -53,8 +54,8 @@ export function usePerformance() {
 							// If we hit threshold, trigger degradation
 							if (longTaskCount >= LONG_TASK_THRESHOLD && !isDegraded.value) {
 								isDegraded.value = true;
-								if (import.meta.env.DEV)
-									console.warn(
+								if (isAppDebugLoggingEnabled())
+									console.info(
 										"📉 VibeCity: Performance degradation detected. Simplifying UI.",
 									);
 							}

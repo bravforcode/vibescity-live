@@ -3,6 +3,10 @@ import { computed, ref } from "vue";
 import { normalizeVenueViewModel } from "../domain/venue/viewModel";
 import { getAllEvents } from "../services/eventService";
 import { useShopStore } from "../store/shopStore";
+import {
+	isTransientNetworkError,
+	logUnexpectedNetworkError,
+} from "../utils/networkErrorUtils";
 
 const EVENT_FUTURE_WINDOW_DAYS = 14;
 const EVENT_PAST_GRACE_HOURS = 12;
@@ -245,13 +249,32 @@ export function useEventLogic() {
 	const realTimeEvents = ref([]);
 	const timedEvents = ref([]);
 	const buildingsData = ref({});
+	const eventSyncError = ref(null);
+	const isSyncingEvents = ref(false);
+	let activeSyncRequestId = 0;
 
 	const updateEventsData = async () => {
+		const requestId = ++activeSyncRequestId;
+		isSyncingEvents.value = true;
 		try {
 			const events = await getAllEvents();
+			if (requestId !== activeSyncRequestId) return;
 			realTimeEvents.value = Array.isArray(events) ? events : [];
+			eventSyncError.value = null;
 		} catch (err) {
-			console.warn("Real-time events sync failed:", err?.message || err);
+			if (requestId !== activeSyncRequestId) return;
+			if (isTransientNetworkError(err)) {
+				eventSyncError.value = null;
+				return;
+			}
+			if (import.meta.env.DEV) {
+				logUnexpectedNetworkError("Real-time events sync failed:", err);
+			}
+			eventSyncError.value = err?.message || "Failed to sync events";
+		} finally {
+			if (requestId === activeSyncRequestId) {
+				isSyncingEvents.value = false;
+			}
 		}
 	};
 
@@ -309,6 +332,8 @@ export function useEventLogic() {
 		realTimeEvents,
 		timedEvents,
 		buildingsData,
+		eventSyncError,
+		isSyncingEvents,
 		updateEventsData,
 		activeEvents,
 	};

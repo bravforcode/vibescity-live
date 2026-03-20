@@ -283,7 +283,7 @@
         <button
           @click="submitForm"
           :disabled="isSubmitting"
-          class="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-black text-lg shadow-lg hover:shadow-blue-500/20 active:scale-95 transition disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50"
+          class="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-black text-lg shadow-lg hover:shadow-blue-500/20 active:scale-95 transition disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50"
         >
           {{ isSubmitting ? t('merchant.submitting') : t('merchant.confirm_promote') }}
         </button>
@@ -300,6 +300,7 @@ import QrcodeVue from "qrcode.vue";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useNotifications } from "@/composables/useNotifications";
+import { runCommitMutation } from "@/composables/useOptimisticUpdate";
 import { supabase } from "@/lib/supabase";
 
 const { t } = useI18n();
@@ -443,7 +444,7 @@ const slipInput = ref(null);
 const isSubmitting = ref(false);
 const previewUrl = ref(null);
 const uploadProgress = ref(0);
-const { notifySuccess, notifyError } = useNotifications();
+const { notify, notifySuccess, notifyError } = useNotifications();
 
 const availablePackages = computed(() =>
 	packageCatalog.filter((pkg) => pkg.pinType === form.value.pinType),
@@ -561,70 +562,78 @@ const submitForm = async () => {
 	}
 
 	isSubmitting.value = true;
-	uploadProgress.value = 10;
 	try {
-		const fileExt = slipFile.value.name.split(".").pop();
-		const fileName = `${Date.now()}_${crypto.randomUUID()}.${fileExt}`;
-		const { data: uploadData, error: uploadError } = await supabase.storage
-			.from("sensitive-uploads")
-			.upload(fileName, slipFile.value);
+		await runCommitMutation({
+			commit: async () => {
+				uploadProgress.value = 10;
+				const fileExt = slipFile.value.name.split(".").pop();
+				const fileName = `${Date.now()}_${crypto.randomUUID()}.${fileExt}`;
+				const { data: uploadData, error: uploadError } = await supabase.storage
+					.from("sensitive-uploads")
+					.upload(fileName, slipFile.value);
 
-		if (uploadError) throw uploadError;
-		uploadProgress.value = 70;
+				if (uploadError) throw uploadError;
+				uploadProgress.value = 70;
 
-		const visitorId =
-			localStorage.getItem("vibe_visitor_id") || `anon_${Date.now()}`;
-		if (!localStorage.getItem("vibe_visitor_id")) {
-			localStorage.setItem("vibe_visitor_id", visitorId);
-		}
+				const visitorId =
+					localStorage.getItem("vibe_visitor_id") || `anon_${Date.now()}`;
+				if (!localStorage.getItem("vibe_visitor_id")) {
+					localStorage.setItem("vibe_visitor_id", visitorId);
+				}
 
-		const pinType = form.value.pinType === "giant" ? "giant" : "standard";
-		const pinMetadata = {
-			package_id: selectedPackage.value.id,
-			package_label: selectedPackage.value.label,
-			duration_days: selectedPackage.value.durationDays,
-			pin_type: pinType,
-			payment_tab: paymentTab.value,
-			addons: selectedAddOnObjects.value.map((addon) => ({
-				id: addon.id,
-				label: addon.label,
-				price: addon.price,
-			})),
-			features: {
-				glow: selectedAddOns.value.includes("glow"),
-				animated_pin: selectedAddOns.value.includes("animated_pin"),
-				neon_trail: selectedAddOns.value.includes("neon_trail"),
-				spotlight: selectedAddOns.value.includes("spotlight"),
-				boost_feed: selectedAddOns.value.includes("boost_feed"),
-				verified_badge: selectedAddOns.value.includes("verified_badge"),
-				featured_explore: selectedAddOns.value.includes("featured_explore"),
-				priority_placement: selectedAddOns.value.includes("priority_placement"),
+				const pinType = form.value.pinType === "giant" ? "giant" : "standard";
+				const pinMetadata = {
+					package_id: selectedPackage.value.id,
+					package_label: selectedPackage.value.label,
+					duration_days: selectedPackage.value.durationDays,
+					pin_type: pinType,
+					payment_tab: paymentTab.value,
+					addons: selectedAddOnObjects.value.map((addon) => ({
+						id: addon.id,
+						label: addon.label,
+						price: addon.price,
+					})),
+					features: {
+						glow: selectedAddOns.value.includes("glow"),
+						animated_pin: selectedAddOns.value.includes("animated_pin"),
+						neon_trail: selectedAddOns.value.includes("neon_trail"),
+						spotlight: selectedAddOns.value.includes("spotlight"),
+						boost_feed: selectedAddOns.value.includes("boost_feed"),
+						verified_badge: selectedAddOns.value.includes("verified_badge"),
+						featured_explore: selectedAddOns.value.includes("featured_explore"),
+						priority_placement:
+							selectedAddOns.value.includes("priority_placement"),
+					},
+				};
+
+				const { error: dbError } = await supabase.from("venues").insert({
+					name: form.value.name,
+					description: `${form.value.category} - Promoted via VibeNow`,
+					latitude: form.value.lat,
+					longitude: form.value.lng,
+					category: form.value.category,
+					package_type: selectedPackage.value.id,
+					price_total: totalPrice.value,
+					payment_slip_url: uploadData.path,
+					status: "pending",
+					owner_visitor_id: visitorId,
+					pin_type: pinType,
+					pin_metadata: pinMetadata,
+				});
+
+				if (dbError) throw dbError;
+
+				uploadProgress.value = 100;
+				return true;
 			},
-		};
-
-		const { error: dbError } = await supabase.from("venues").insert({
-			name: form.value.name,
-			description: `${form.value.category} - Promoted via VibeNow`,
-			latitude: form.value.lat,
-			longitude: form.value.lng,
-			category: form.value.category,
-			package_type: selectedPackage.value.id,
-			price_total: totalPrice.value,
-			payment_slip_url: uploadData.path,
-			status: "pending",
-			owner_visitor_id: visitorId,
-			pin_type: pinType,
-			pin_metadata: pinMetadata,
+			onSuccess: () => {
+				notifySuccess("Submission successful! We will review shortly.");
+				confetti({ particleCount: 90, spread: 70, origin: { y: 0.7 } });
+				emit("close");
+			},
+			notify,
+			errorMessage: (err) => `Error: ${err?.message || "Submission failed"}`,
 		});
-
-		if (dbError) throw dbError;
-
-		uploadProgress.value = 100;
-		notifySuccess("Submission successful! We will review shortly.");
-		confetti({ particleCount: 90, spread: 70, origin: { y: 0.7 } });
-		emit("close");
-	} catch (err) {
-		notifyError(`Error: ${err.message}`);
 	} finally {
 		isSubmitting.value = false;
 		setTimeout(() => {

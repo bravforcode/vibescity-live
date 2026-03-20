@@ -1,10 +1,11 @@
 import { v4 as uuidv4 } from "uuid";
-import { supabase } from "../lib/supabase";
+import { invokePublicEdgeFunction } from "./publicEdgeFunctionClient";
 
 const ANALYTICS_ENDPOINT = "analytics-ingest";
 const STORAGE_KEY_CONSENT = "vibe_analytics_consent";
 const STORAGE_KEY_VISITOR = "vibe_visitor_id";
 const INVOKE_TIMEOUT_MS = 2500;
+const LOCALHOST_PATTERN = /^(localhost|127\.0\.0\.1)$/i;
 
 // Circuit breaker state
 let failureCount = 0;
@@ -23,7 +24,12 @@ const parseEnvBool = (value) => {
 
 // Default: disabled in dev, enabled in prod (unless explicitly overridden).
 const analyticsEnabled =
-	parseEnvBool(import.meta.env.VITE_ANALYTICS_ENABLED) ?? !import.meta.env.DEV;
+	parseEnvBool(import.meta.env.VITE_ANALYTICS_ENABLED) ??
+	(!import.meta.env.DEV &&
+		!(
+			typeof window !== "undefined" &&
+			LOCALHOST_PATTERN.test(window.location.hostname)
+		));
 
 const recordFailure = (reason) => {
 	failureCount++;
@@ -76,7 +82,7 @@ export const analyticsService = {
 		if (!this.hasConsent() || circuitOpen) return;
 
 		try {
-			const { error } = await supabase.functions.invoke(ANALYTICS_ENDPOINT, {
+			const { error } = await invokePublicEdgeFunction(ANALYTICS_ENDPOINT, {
 				body: {
 					event_type: "session_start",
 					visitor_id: this.getVisitorId(),
@@ -105,7 +111,7 @@ export const analyticsService = {
 		try {
 			const normalizedVenueRef =
 				shopId === null || shopId === undefined ? null : String(shopId);
-			const { error } = await supabase.functions.invoke(ANALYTICS_ENDPOINT, {
+			const { error } = await invokePublicEdgeFunction(ANALYTICS_ENDPOINT, {
 				body: {
 					event_type: eventType,
 					visitor_id: this.getVisitorId(),
@@ -140,7 +146,7 @@ export const analyticsService = {
 				device_form_factor: String(payload.device_form_factor || "unknown"),
 				connection_type: String(payload.connection_type || "unknown"),
 			};
-			const { error } = await supabase.functions.invoke(ANALYTICS_ENDPOINT, {
+			const { error } = await invokePublicEdgeFunction(ANALYTICS_ENDPOINT, {
 				body: {
 					event_type: "web_vital",
 					metadata,

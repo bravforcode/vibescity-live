@@ -3,7 +3,7 @@
     <div class="dashboard-header">
       <h1>{{ $t("auto.k_25316332") }}</h1>
       <div class="header-controls">
-        <select v-model="selectedTimeRange" @change="refreshData">
+        <select aria-label="Dropdown" v-model="selectedTimeRange" @change="refreshData">
           <option value="1h">{{ $t("auto.k_b465e4d5") }}</option>
           <option value="6h">{{ $t("auto.k_c36b5d64") }}</option>
           <option value="24h">{{ $t("auto.k_6f094336") }}</option>
@@ -137,7 +137,7 @@
     <section class="alerts-section">
       <h2>{{ $t("auto.k_14bbb352") }}</h2>
       <div class="alerts-controls">
-        <select v-model="alertFilter">
+        <select aria-label="Dropdown" v-model="alertFilter">
           <option value="all">{{ $t("auto.k_7a0f3b7b") }}</option>
           <option value="critical">{{ $t("auto.k_8fb4e6aa") }}</option>
           <option value="warning">{{ $t("auto.k_d04eb096") }}</option>
@@ -177,7 +177,7 @@
     <section class="logs-section">
       <h2>{{ $t("auto.k_6c77b18d") }}</h2>
       <div class="logs-controls">
-        <select v-model="logLevel">
+        <select aria-label="Dropdown" v-model="logLevel">
           <option value="all">{{ $t("auto.k_ec55df33") }}</option>
           <option value="error">{{ $t("auto.k_7acd9a94") }}</option>
           <option value="warning">{{ $t("auto.k_d04eb096") }}</option>
@@ -198,8 +198,8 @@
     </section>
 
     <!-- Component Details Modal -->
-    <div v-if="selectedComponent" class="modal-overlay" @click="closeModal">
-      <div class="modal-content" @click.stop>
+    <div role="button" tabindex="0" v-if="selectedComponent" class="modal-overlay" @click="closeModal">
+      <div role="button" tabindex="0" class="modal-content" @click.stop>
         <div class="modal-header">
           <h3>{{ selectedComponent.icon }} {{ selectedComponent.name }} Details</h3>
           <button @click="closeModal" class="close-btn">✖️</button>

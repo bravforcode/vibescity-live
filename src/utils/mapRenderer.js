@@ -64,11 +64,11 @@ const COIN_FLIP_HTML = `<div class="vibe-coin-flip"><div class="vibe-coin-flip-i
  */
 export const createPopupHTML = ({
 	item,
-	isDarkMode,
+	isDarkMode: _isDarkMode,
 	hasCoins,
 	roadDistance,
 	roadDuration,
-	_tt, // translation function
+	tt, // translation function
 }) => {
 	const media = resolveVenueMedia(item || {});
 	const pinState = String(item?.pin_state || "").toLowerCase();
@@ -77,12 +77,6 @@ export const createPopupHTML = ({
 		String(item?.status || "").toUpperCase() === "LIVE" ||
 		Boolean(item?.is_live);
 	const isEvent = pinState === "event" || Boolean(item?.is_event);
-	const bgClass = isDarkMode ? "bg-zinc-900/95" : "bg-white/95";
-	const textClass = isDarkMode ? "text-white" : "text-gray-900";
-
-	// Real-time Vibe calculation (Simplified Logic from Ref)
-	const currentHour = new Date().getHours();
-	// ... (Simplified logic for brevity, ideally passed in or utility used)
 	const vibeLevel = item.vibe_level || item.VibeLevel || 3;
 
 	// Visual Vibe Bars
@@ -90,15 +84,15 @@ export const createPopupHTML = ({
 		.fill(0)
 		.map(
 			(_, i) =>
-				`<div class="h-4 w-2 rounded-sm ${i < vibeLevel ? "bg-gradient-to-t from-pink-500 to-purple-400" : "bg-white"}"></div>`,
+				`<span class="vibe-popup__vibe-bar ${i < vibeLevel ? "vibe-popup__vibe-bar--active" : "vibe-popup__vibe-bar--inactive"}"></span>`,
 		)
 		.join("");
 
 	// Map correctly to i18n if _tt is provided, else fallback
 	const fallbackCrowd = crowdMap[vibeLevel] || "Moderate";
 	const crowdText =
-		_tt && crowdKeyMap[vibeLevel]
-			? _tt(crowdKeyMap[vibeLevel], fallbackCrowd)
+		tt && crowdKeyMap[vibeLevel]
+			? tt(crowdKeyMap[vibeLevel], fallbackCrowd)
 			: fallbackCrowd;
 	const crowdEmoji = crowdEmojiMap[vibeLevel] || "👥";
 
@@ -107,19 +101,19 @@ export const createPopupHTML = ({
 
 	// Distance HTML
 	let distanceHtml = "";
-	if (roadDistance) {
+	if (roadDistance != null && roadDuration != null) {
 		const distTxt =
 			roadDistance < 1000
 				? `${Math.round(roadDistance)} m`
 				: `${(roadDistance / 1000).toFixed(1)} km`;
 		const timeTxt = `${Math.round(roadDuration / 60)} min`;
-		distanceHtml = `<div class="road-dist-label absolute bottom-2 right-2 px-2 py-1 rounded-lg bg-black text-white text-[11px] font-black border border-white/30 shadow-xl">📍 ${distTxt} (${timeTxt})</div>`;
+		distanceHtml = `<div class="road-dist-label vibe-popup__distance">📍 ${distTxt} (${timeTxt})</div>`;
 	} else if (item.distance !== undefined) {
 		const fallbackTxt =
 			item.distance < 1
 				? `${(item.distance * 1000).toFixed(0)} m`
 				: `${item.distance.toFixed(1)} km`;
-		distanceHtml = `<div class="road-dist-label absolute bottom-2 right-2 px-2 py-1 rounded-lg bg-black text-white text-[11px] font-black border border-white/30 shadow-xl">📍 ${fallbackTxt}</div>`;
+		distanceHtml = `<div class="road-dist-label vibe-popup__distance">📍 ${fallbackTxt}</div>`;
 	}
 
 	// Descriptions (Optional: Pass defaultDescs or handle here)
@@ -147,60 +141,54 @@ export const createPopupHTML = ({
 	const safeShopId = sanitizeId(item.id);
 
 	return `
-    <div class="vibe-popup ${bgClass} rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] border-2 border-white/20 overflow-hidden w-[340px] backdrop-blur-3xl" data-shop-id="${safeShopId}">
-     <div class="relative w-full aspect-[16/9] max-h-[180px] overflow-hidden">
-        <div class="absolute inset-0 bg-gradient-to-br from-purple-700 via-pink-600 to-red-600"></div>
+    <div class="vibe-popup" data-shop-id="${safeShopId}">
+      <div class="vibe-popup__hero">
+        <div class="vibe-popup__hero-fallback"></div>
         ${
 					hasRenderableVideo
-						? `<video src="${safeVideoUrl}" poster="${safeImageUrl}" class="absolute inset-0 w-full h-full object-cover" autoplay muted loop playsinline crossorigin="anonymous"></video>`
+						? `<video src="${safeVideoUrl}" poster="${safeImageUrl}" class="vibe-popup__media" autoplay muted loop playsinline crossorigin="anonymous"></video>`
 						: safeImageUrl
-							? `<img src="${safeImageUrl}" alt="${safeName}" class="absolute inset-0 w-full h-full object-cover" crossorigin="anonymous" />`
+							? `<img src="${safeImageUrl}" alt="${safeName}" class="vibe-popup__media" crossorigin="anonymous" />`
 							: ""
 				}
-        <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
+        <div class="vibe-popup__hero-scrim"></div>
 
-        <div class="absolute top-2 left-2 flex flex-col gap-1">
-          ${isEvent ? `<div class="px-1.5 py-0.5 rounded-full bg-purple-600 text-white text-[9px] font-black">● EVENT</div>` : isLive ? `<div class="px-1.5 py-0.5 rounded-full bg-red-600 text-white text-[9px] font-black animate-pulse">● LIVE</div>` : `<div class="px-1.5 py-0.5 rounded-full bg-zinc-500 text-white text-[9px] font-black">● OFF</div>`}
-          ${hasCoins ? `<div class="px-1.5 py-0.5 rounded-full bg-yellow-400 text-black text-[9px] font-black">🪙 +10</div>` : ""}
+        <div class="vibe-popup__badges">
+          ${isEvent ? `<div class="vibe-popup__badge vibe-popup__badge--event">● EVENT</div>` : isLive ? `<div class="vibe-popup__badge vibe-popup__badge--live">● LIVE</div>` : `<div class="vibe-popup__badge vibe-popup__badge--off">● OFF</div>`}
+          ${hasCoins ? `<div class="vibe-popup__badge vibe-popup__badge--coins">🪙 +10</div>` : ""}
         </div>
 
-        <button type="button" aria-label="Close popup" class="popup-close-btn absolute top-2 right-2 w-7 h-7 rounded-full bg-black text-white flex items-center justify-center text-sm font-black border-2 border-white/20 z-10">✕</button>
+        <button type="button" aria-label="Close popup" class="popup-close-btn vibe-popup__close">✕</button>
 
         <!-- Info Overlay -->
-        <div class="absolute bottom-3 left-3 right-3">
-          <h3 class="text-sm font-black leading-tight mb-0.5 truncate uppercase text-white drop-shadow-lg">${safeName}</h3>
-          <div class="text-[10px] font-black text-white/80 uppercase tracking-widest">${safeCategory}</div>
+        <div class="vibe-popup__hero-meta">
+          <h3 class="vibe-popup__title">${safeName}</h3>
+          <div class="vibe-popup__category">${safeCategory}</div>
         </div>
 
         ${distanceHtml}
       </div>
 
-      <div class="p-3 ${textClass}">
-        <div class="flex items-center justify-between mb-2 p-1.5 rounded-lg bg-white/10 border border-white/20 backdrop-blur-md">
-          <div class="flex items-center gap-1">
-            <span class="text-[10px] font-black">VIBE</span>
-            <div class="flex items-end gap-px">${vibeBars}</div>
+      <div class="vibe-popup__body">
+        <div class="vibe-popup__vibe-panel">
+          <div class="vibe-popup__vibe-group">
+            <span class="vibe-popup__vibe-label">VIBE</span>
+            <div class="vibe-popup__vibe-bars">${vibeBars}</div>
           </div>
-          <div class="flex items-center gap-1">
-            <span class="text-xs">${crowdEmoji}</span>
-            <span class="text-[10px] font-black">${crowdText}</span>
+          <div class="vibe-popup__crowd">
+            <span class="vibe-popup__crowd-emoji">${crowdEmoji}</span>
+            <span class="vibe-popup__crowd-text">${escapeHtml(crowdText)}</span>
           </div>
         </div>
 
-        ${openHours ? `<div class="text-[10px] font-black mb-1.5">🕐 ${safeOpenHours}</div>` : ""}
+        ${openHours ? `<div class="vibe-popup__hours">🕐 ${safeOpenHours}</div>` : ""}
 
-        <p class="text-[11px] font-bold leading-relaxed mb-2">${safeShortDesc}</p>
+        <p class="vibe-popup__description">${safeShortDesc}</p>
 
-        <div class="flex gap-2" style="pointer-events:auto;position:relative;z-index:10;">
-          <button type="button" aria-label="Navigate to ${safeName}" class="popup-nav-btn flex-1 flex items-center justify-center gap-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white active:scale-95 transition-colors transition-transform">
-            <span class="text-xs">🗺️</span>
-            <span class="text-[11px] font-bold">Navigate</span>
-          </button>
-          <button type="button" aria-label="Call ride to ${safeName}" class="popup-ride-btn flex-1 flex items-center justify-center gap-1 py-2 rounded-xl bg-zinc-700 hover:bg-zinc-600 text-white border border-white/10 active:scale-95 transition-colors transition-transform">
-            <span class="text-xs">🚗</span>
-            <span class="text-[11px] font-bold">Ride</span>
-          </button>
-        </div>
+        <button type="button" aria-label="Navigate to ${safeName}" class="popup-nav-btn vibe-popup__nav-btn">
+          <span class="vibe-popup__nav-icon">🗺️</span>
+          <span class="vibe-popup__nav-text">Navigate</span>
+        </button>
       </div>
     </div>
   `;
@@ -210,7 +198,7 @@ export const createPopupHTML = ({
  * Determines the correct pin image based on venue state
  */
 const getPinImage = (item) => {
-	if (item.is_giant_active) return "/images/pins/pin-purple.png";
+	if (item.is_giant_active) return "/images/pins/pin-blue.png";
 	if (item.status === "LIVE" || item.is_open !== false)
 		return "/images/pins/pin-red.png";
 	return "/images/pins/pin-gray.png";
@@ -268,16 +256,16 @@ export const createGiantPinElement = (event) => {
 	el.dataset.eventId = sanitizeId(event.id);
 	const safeLabel = escapeHtml(event.shortName || event.name || "Event");
 
-	// Purple pin marker with glow + label
+	// cyan pin marker with glow + label
 	el.innerHTML = `
     <div class="giant-pin-wrapper" style="pointer-events:auto; position:relative; transform-origin:bottom center;">
       <div style="position:absolute; top:-8px; right:-8px; z-index:3; pointer-events:none;">
         ${COIN_FLIP_HTML}
       </div>
       <div class="giant-pin-glow-ring"></div>
-      <img src="/images/pins/pin-purple.png" alt="" width="48" height="64"
+      <img src="/images/pins/pin-blue.png" alt="" width="48" height="64"
            draggable="false"
-           class="giant-pin-purple-img"
+           class="giant-pin-blue-img"
            style="width:48px;height:64px;filter:drop-shadow(0 4px 12px rgba(147,51,234,0.5));position:relative;z-index:2;" />
       <div class="giant-pin-label-new">${safeLabel}</div>
     </div>

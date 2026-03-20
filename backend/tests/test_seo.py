@@ -13,25 +13,37 @@ def test_og_site_png():
     assert len(response.content) > 100
 
 
-def test_redirect_root_defaults_to_th():
+def test_redirect_root_defaults_to_en():
     with TestClient(app) as client:
         response = client.get("/api/v1/seo/redirect/root", follow_redirects=False)
     assert response.status_code == 301
-    assert response.headers.get("location") == "/th"
-    assert "vibe_locale=th" in response.headers.get("set-cookie", "")
+    assert response.headers.get("location") == "/en"
+    assert "vibe_locale=en" in response.headers.get("set-cookie", "")
 
 
-def test_redirect_public_uses_detected_locale():
+def test_redirect_public_defaults_to_en_without_cookie():
     with TestClient(app) as client:
         response = client.get(
             "/api/v1/seo/redirect/public",
             params={"path": "/privacy"},
-            headers={"x-vercel-ip-country": "US"},
             follow_redirects=False,
         )
     assert response.status_code == 301
     assert response.headers.get("location") == "/en/privacy"
     assert "vibe_locale=en" in response.headers.get("set-cookie", "")
+
+
+def test_redirect_public_respects_cookie_locale():
+    with TestClient(app) as client:
+        client.cookies.set("vibe_locale", "th")
+        response = client.get(
+            "/api/v1/seo/redirect/public",
+            params={"path": "/privacy"},
+            follow_redirects=False,
+        )
+    assert response.status_code == 301
+    assert response.headers.get("location") == "/th/privacy"
+    assert "vibe_locale=th" in response.headers.get("set-cookie", "")
 
 
 def test_redirect_public_rejects_private_paths():
@@ -64,9 +76,8 @@ def test_redirect_venue_short_code_found():
         with TestClient(app) as client:
             response = client.get(
                 "/api/v1/seo/redirect/venue/ABC2DEF",
-                headers={"x-vercel-ip-country": "TH"},
                 follow_redirects=False,
             )
 
     assert response.status_code == 301
-    assert response.headers.get("location") == "/th/v/test-venue"
+    assert response.headers.get("location") == "/en/v/test-venue"

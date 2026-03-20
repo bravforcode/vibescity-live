@@ -1,0 +1,137 @@
+{
+  "default_profile": "synthetic_headless",
+  "profiles": {
+    "synthetic_headless": {
+      "default": {
+        "p95_fps_min": 3,
+        "avg_fps_min": 6,
+        "min_sample_count": 50
+      },
+      "scenario_overrides": {
+        "baseline": {
+          "p95_fps_min": 5,
+          "avg_fps_min": 7
+        },
+        "network-4g": {
+          "p95_fps_min": 8,
+          "avg_fps_min": 10
+        },
+        "network-3g": {
+          "p95_fps_min": 8,
+          "avg_fps_min": 12
+        },
+        "network-2g": {
+          "p95_fps_min": 8,
+          "avg_fps_min": 10
+        },
+        "provincial-3bb": {
+          "p95_fps_min": 8,
+          "avg_fps_min": 10
+        },
+        "cat-rural": {
+          "p95_fps_min": 8,
+          "avg_fps_min": 10
+        },
+        "nt-gov": {
+          "p95_fps_min": 8,
+          "avg_fps_min": 10
+        },
+        "thermal-moderate": {
+          "p95_fps_min": 7,
+          "avg_fps_min": 9
+        },
+        "thermal-high": {
+          "p95_fps_min": 3,
+          "avg_fps_min": 7
+        },
+        "battery-low": {
+          "p95_fps_min": 7,
+          "avg_fps_min": 9
+        }
+      },
+      "profile_overrides": {
+        "ios": {
+          "default": {
+            "p95_fps_min": 2,
+            "avg_fps_min": 3,
+            "min_sample_count": 20
+          },
+          "scenario_overrides": {
+            "thermal-high": {
+              "p95_fps_min": 2,
+              "avg_fps_min": 3
+            }
+          }
+        }
+      }
+    },
+    "real_device": {
+      "default": {
+        "p95_fps_min": 60,
+        "avg_fps_min": 56,
+        "min_sample_count": 180
+      },
+      "scenario_overrides": {
+        "baseline": {
+          "p95_fps_min": 60,
+          "avg_fps_min": 56
+        },
+        "network-4g": {
+          "p95_fps_min": 56,
+          "avg_fps_min": 52
+        },
+        "network-3g": {
+          "p95_fps_min": 48,
+          "avg_fps_min": 44
+        },
+        "network-2g": {
+          "p95_fps_min": 40,
+          "avg_fps_min": 36
+        },
+        "provincial-3bb": {
+          "p95_fps_min": 54,
+          "avg_fps_min": 50
+        },
+        "cat-rural": {
+          "p95_fps_min": 42,
+          "avg_fps_min": 38
+        },
+        "nt-gov": {
+          "p95_fps_min": 46,
+          "avg_fps_min": 42
+        },
+        "thermal-moderate": {
+          "p95_fps_min": 48,
+          "avg_fps_min": 44
+        },
+        "thermal-high": {
+          "p95_fps_min": 40,
+          "avg_fps_min": 36
+        },
+        "battery-low": {
+          "p95_fps_min": 46,
+          "avg_fps_min": 42
+        }
+      },
+      "profile_overrides": {
+        "ios": {
+          "default": {
+            "p95_fps_min": 54,
+            "avg_fps_min": 50,
+            "min_sample_count": 150
+          },
+          "scenario_overrides": {
+            "network-2g": {
+              "p95_fps_min": 36,
+              "avg_fps_min": 32
+            },
+            "thermal-high": {
+              "p95_fps_min": 36,
+              "avg_fps_min": 32
+            }
+          }
+        }
+      }
+    }
+  }
+}

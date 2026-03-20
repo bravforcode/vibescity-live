@@ -1,7 +1,7 @@
 <script setup>
 /**
  * VibeSkeleton.vue
- * A premium skeleton loader with a dark/purple pulse effect.
+ * A premium skeleton loader with a dark/cyan pulse effect.
  */
 defineProps({
 	width: { type: String, default: "100%" },
@@ -16,6 +16,7 @@ defineProps({
 </script>
 
 <template>
+  <!-- aria-label -->
   <div
     class="vibe-skeleton relative overflow-hidden"
     :class="{
@@ -33,7 +34,7 @@ defineProps({
 
     <!-- Shimmer Overlay -->
     <div
-      class="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-purple-500/10 to-transparent"
+      class="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent"
     ></div>
   </div>
 </template>

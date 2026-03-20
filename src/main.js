@@ -4,6 +4,10 @@ import { createPinia } from "pinia";
 import piniaPluginPersistedstate from "pinia-plugin-persistedstate";
 import { createApp } from "vue";
 import App from "./App.vue";
+// ✅ MapLibre GL CSS must be imported eagerly here (not inside the lazy HomeView chunk)
+// Importing inside MapboxContainer.vue or useMapCore.js causes ERR_INSUFFICIENT_RESOURCES
+// because the browser tries to load it as part of a dynamically-split CSS chunk.
+import "maplibre-gl/dist/maplibre-gl.css";
 import "./assets/css/main.postcss";
 import "./assets/vibe-animations.css";
 import "./design-system/tokens.css";
@@ -33,6 +37,8 @@ app.use(head);
 import Clarity from "@microsoft/clarity";
 
 const clarityId = import.meta.env.VITE_CLARITY_PROJECT_ID;
+const LOCALHOST_PATTERN = /^(localhost|127\.0\.0\.1)$/i;
+const DEV_SW_RELOAD_GUARD = "__vibecity_dev_sw_reloaded__";
 const parseEnvBool = (value) => {
 	const raw = String(value ?? "")
 		.trim()
@@ -42,6 +48,15 @@ const parseEnvBool = (value) => {
 	if (["0", "false", "no", "off"].includes(raw)) return false;
 	return null;
 };
+const isLocalPreviewHost =
+	typeof window !== "undefined" &&
+	import.meta.env.PROD &&
+	LOCALHOST_PATTERN.test(window.location.hostname);
+const isE2E =
+	import.meta.env.VITE_E2E === "true" ||
+	import.meta.env.VITE_E2E_MAP_REQUIRED === "true" ||
+	import.meta.env.MODE === "e2e";
+const swDevEnabled = parseEnvBool(import.meta.env.VITE_SW_DEV) === true;
 
 // Default: disabled in dev, enabled in prod (unless explicitly overridden).
 const analyticsDisabledByEnv =
@@ -49,7 +64,7 @@ const analyticsDisabledByEnv =
 const analyticsEnabled = analyticsDisabledByEnv
 	? false
 	: (parseEnvBool(import.meta.env.VITE_ANALYTICS_ENABLED) ??
-		!import.meta.env.DEV);
+		(!import.meta.env.DEV && !isLocalPreviewHost));
 const hasAnalyticsConsent = () => {
 	try {
 		// Respect Do Not Track as a hard deny.
@@ -77,6 +92,56 @@ const deferTask = (fn) => {
 	} else {
 		window.addEventListener("load", () => setTimeout(fn, 0), { once: true });
 	}
+};
+
+const clearDevServiceWorkersBeforeMount = async () => {
+	if (
+		typeof window === "undefined" ||
+		!import.meta.env.DEV ||
+		swDevEnabled ||
+		isE2E ||
+		!("serviceWorker" in navigator)
+	) {
+		return true;
+	}
+
+	try {
+		const registrations = await navigator.serviceWorker.getRegistrations();
+		const hadController = Boolean(navigator.serviceWorker.controller);
+
+		if (!registrations.length && !hadController) {
+			sessionStorage.removeItem(DEV_SW_RELOAD_GUARD);
+			return true;
+		}
+
+		await Promise.allSettled(
+			registrations.map((registration) => registration.unregister()),
+		);
+
+		if (
+			"caches" in window &&
+			LOCALHOST_PATTERN.test(window.location.hostname)
+		) {
+			const cacheKeys = await caches.keys();
+			await Promise.allSettled(cacheKeys.map((key) => caches.delete(key)));
+		}
+
+		if (hadController) {
+			const alreadyReloaded =
+				sessionStorage.getItem(DEV_SW_RELOAD_GUARD) === "1";
+			if (!alreadyReloaded) {
+				sessionStorage.setItem(DEV_SW_RELOAD_GUARD, "1");
+				window.location.reload();
+				return false;
+			}
+		}
+
+		sessionStorage.removeItem(DEV_SW_RELOAD_GUARD);
+	} catch {
+		// Fail open in dev: if cleanup fails, do not block the app.
+	}
+
+	return true;
 };
 
 deferTask(() => {
@@ -159,11 +224,6 @@ pinia.use(piniaPluginPersistedstate);
 
 app.use(pinia);
 
-const isE2E =
-	import.meta.env.VITE_E2E === "true" ||
-	import.meta.env.VITE_E2E_MAP_REQUIRED === "true" ||
-	import.meta.env.MODE === "e2e";
-
 // Initialize remote feature flags in the background.
 const featureFlagStore = useFeatureFlagStore(pinia);
 if (!isE2E) {
@@ -231,12 +291,20 @@ import vHaptic from "./directives/vHaptic.js";
 
 app.directive("haptic", vHaptic);
 
-// ✅ Register Lottie
-import Vue3Lottie from "vue3-lottie";
+// ✅ Phase 1: Foundation Systems Integration
+import MasterIntegration from "./plugins/masterIntegration";
 
-app.use(Vue3Lottie);
-
-app.mount("#app");
+app.use(MasterIntegration, {
+	phase1: {
+		enablePerformanceMonitoring: !import.meta.env.DEV && !isLocalPreviewHost,
+		enableAnalytics: analyticsEnabled,
+		enableErrorHandling: true,
+		enableHealthChecks: !import.meta.env.DEV && !isLocalPreviewHost,
+		enableServiceWorker: !import.meta.env.DEV,
+		enableSecurity: true,
+		enableCodeOptimization: true,
+	},
+});
 
 // ✅ Cleanup Supabase Realtime channels and store subscriptions on page unload
 if (typeof window !== "undefined") {
@@ -279,58 +347,33 @@ try {
 		.catch(() => {});
 }
 
-// ✅ Register Service Worker for PWA
-// In E2E runs, service worker caching can make script/chunk loading flaky.
-const swDevEnabled = parseEnvBool(import.meta.env.VITE_SW_DEV) === true;
+const mountApp = async () => {
+	const shouldMount = await clearDevServiceWorkersBeforeMount();
+	if (!shouldMount) return;
 
-// Dev-only warning when a SW is already controlling the page (can cause "CSS missing" / stale chunks).
-if (
-	import.meta.env.DEV &&
-	!swDevEnabled &&
-	"serviceWorker" in navigator &&
-	navigator.serviceWorker?.controller
-) {
-	console.warn(
-		"[SW] A Service Worker is controlling this page. In dev, this can cause stale JS/CSS.",
-		"To fix: DevTools > Application > Service Workers > Unregister, then hard reload.",
-	);
-}
+	app.mount("#app");
 
-// In dev, aggressively unregister old service workers unless explicitly enabled.
-if (
-	import.meta.env.DEV &&
-	!swDevEnabled &&
-	!isE2E &&
-	"serviceWorker" in navigator
-) {
-	void navigator.serviceWorker
-		.getRegistrations()
-		.then((registrations) =>
-			Promise.allSettled(
-				registrations.map((registration) => registration.unregister()),
-			),
-		)
-		.catch(() => {});
-}
+	// Default: register SW only in prod/preview. Allow opt-in in dev via VITE_SW_DEV=true.
+	if (
+		!isE2E &&
+		"serviceWorker" in navigator &&
+		(!import.meta.env.DEV || swDevEnabled)
+	) {
+		window.addEventListener("load", () => {
+			navigator.serviceWorker
+				.register("/sw.js")
+				.then((registration) => {
+					if (import.meta.env.DEV) {
+						console.log("✅ SW registered:", registration.scope);
+					}
+				})
+				.catch((error) => {
+					if (import.meta.env.DEV) {
+						console.error("❌ SW registration failed:", error);
+					}
+				});
+		});
+	}
+};
 
-// Default: register SW only in prod/preview. Allow opt-in in dev via VITE_SW_DEV=true.
-if (
-	!isE2E &&
-	"serviceWorker" in navigator &&
-	(!import.meta.env.DEV || swDevEnabled)
-) {
-	window.addEventListener("load", () => {
-		navigator.serviceWorker
-			.register("/sw.js")
-			.then((registration) => {
-				if (import.meta.env.DEV) {
-					console.log("✅ SW registered:", registration.scope);
-				}
-			})
-			.catch((error) => {
-				if (import.meta.env.DEV) {
-					console.error("❌ SW registration failed:", error);
-				}
-			});
-	});
-}
+void mountApp();

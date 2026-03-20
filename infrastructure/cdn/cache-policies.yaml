@@ -1,0 +1,320 @@
+# CDN Cache Policies Configuration
+# This file defines caching strategies for different asset types
+
+version: "1.0"
+
+# Global cache settings
+global:
+  enabled: true
+  respect_origin_headers: true
+  bypass_cache_on_cookie: false
+  
+# Cache policies by asset type
+policies:
+  # Static Assets - Maximum caching
+  static_assets:
+    description: "JavaScript, CSS, fonts, and other static files"
+    patterns:
+      - "*.js"
+      - "*.css"
+      - "*.woff"
+      - "*.woff2"
+      - "*.ttf"
+      - "*.otf"
+      - "*.eot"
+    cache_level: "aggressive"
+    edge_ttl: 31536000  # 1 year
+    browser_ttl: 31536000  # 1 year
+    cache_by_device_type: false
+    cache_by_geo: false
+    compression: "auto"  # Brotli/Gzip
+    minification:
+      js: true
+      css: true
+      html: false
+    
+  # Images - Long caching with optimization
+  images:
+    description: "Image files with automatic optimization"
+    patterns:
+      - "*.jpg"
+      - "*.jpeg"
+      - "*.png"
+      - "*.gif"
+      - "*.svg"
+      - "*.webp"
+      - "*.avif"
+      - "*.ico"
+    cache_level: "aggressive"
+    edge_ttl: 2592000  # 30 days
+    browser_ttl: 2592000  # 30 days
+    cache_by_device_type: true  # Serve different sizes
+    cache_by_geo: false
+    compression: "auto"
+    image_optimization:
+      enabled: true
+      format: "auto"  # WebP/AVIF when supported
+      quality: 85
+      metadata: "strip"
+    
+  # Videos - Long caching
+  videos:
+    description: "Video and audio files"
+    patterns:
+      - "*.mp4"
+      - "*.webm"
+      - "*.ogg"
+      - "*.mp3"
+      - "*.wav"
+      - "*.flac"
+      - "*.aac"
+    cache_level: "aggressive"
+    edge_ttl: 2592000  # 30 days
+    browser_ttl: 2592000  # 30 days
+    cache_by_device_type: false
+    cache_by_geo: false
+    compression: "none"  # Already compressed
+    
+  # API Responses - Short caching
+  api_responses:
+    description: "API endpoints with short-lived data"
+    patterns:
+      - "/api/v1/shops*"
+      - "/api/v1/venues*"
+      - "/api/v1/analytics*"
+    cache_level: "standard"
+    edge_ttl: 300  # 5 minutes
+    browser_ttl: 60  # 1 minute
+    cache_by_device_type: false
+    cache_by_geo: true  # Different data per region
+    compression: "auto"
+    cache_key_fields:
+      - query_string
+      - headers:
+          - "Accept-Language"
+          - "CF-Device-Type"
+    stale_while_revalidate: 60  # Serve stale for 60s while revalidating
+    
+  # HTML Pages - Medium caching
+  html_pages:
+    description: "HTML pages and documents"
+    patterns:
+      - "*.html"
+      - "/"
+      - "/map"
+      - "/about"
+    cache_level: "standard"
+    edge_ttl: 3600  # 1 hour
+    browser_ttl: 300  # 5 minutes
+    cache_by_device_type: true  # Mobile vs desktop
+    cache_by_geo: true  # Localized content
+    compression: "auto"
+    minification:
+      html: true
+    stale_while_revalidate: 300
+    
+  # No Cache - Sensitive endpoints
+  no_cache:
+    description: "Endpoints that should never be cached"
+    patterns:
+      - "/api/v1/auth/*"
+      - "/api/v1/payment/*"
+      - "/api/v1/user/*"
+      - "/api/v1/admin/*"
+    cache_level: "bypass"
+    edge_ttl: 0
+    browser_ttl: 0
+    cache_by_device_type: false
+    cache_by_geo: false
+
+# Cache invalidation rules
+invalidation:
+  # Automatic invalidation triggers
+  triggers:
+    - event: "deployment"
+      patterns:
+        - "*.js"
+        - "*.css"
+        - "*.html"
+      
+    - event: "content_update"
+      patterns:
+        - "/api/v1/shops*"
+        - "/api/v1/venues*"
+      
+    - event: "user_action"
+      patterns:
+        - "/api/v1/user/*"
+  
+  # Purge strategies
+  strategies:
+    - name: "full_purge"
+      description: "Purge all cached content"
+      scope: "everything"
+      
+    - name: "selective_purge"
+      description: "Purge specific URLs or patterns"
+      scope: "urls"
+      
+    - name: "tag_purge"
+      description: "Purge by cache tags"
+      scope: "tags"
+
+# Cache warming configuration
+warming:
+  enabled: true
+  schedule: "0 */6 * * *"  # Every 6 hours
+  
+  # Critical pages to warm
+  critical_pages:
+    - url: "/"
+      priority: 1
+      
+    - url: "/map"
+      priority: 1
+      
+    - url: "/api/v1/shops?province=Bangkok"
+      priority: 2
+      
+    - url: "/api/v1/shops?province=Chiang%20Mai"
+      priority: 2
+      
+    - url: "/api/v1/venues?featured=true"
+      priority: 2
+      
+    - url: "/api/v1/venues?category=restaurant"
+      priority: 3
+  
+  # Warming strategy
+  strategy:
+    concurrent_requests: 5
+    delay_between_requests: 100  # ms
+    retry_on_failure: true
+    max_retries: 3
+
+# Geo-routing configuration
+geo_routing:
+  enabled: true
+  
+  # Regional origins
+  regions:
+    - name: "asia"
+      countries: ["TH", "SG", "MY", "ID", "VN", "PH", "JP", "KR", "CN", "TW", "HK"]
+      origin: "https://asia.api.vibecity.live"
+      fallback: "https://api.vibecity.live"
+      
+    - name: "europe"
+      countries: ["GB", "DE", "FR", "IT", "ES", "NL", "SE", "NO", "DK", "FI"]
+      origin: "https://eu.api.vibecity.live"
+      fallback: "https://api.vibecity.live"
+      
+    - name: "us"
+      countries: ["US", "CA", "MX"]
+      origin: "https://us.api.vibecity.live"
+      fallback: "https://api.vibecity.live"
+      
+    - name: "default"
+      countries: ["*"]
+      origin: "https://api.vibecity.live"
+
+# Performance optimization
+optimization:
+  # Compression
+  compression:
+    brotli:
+      enabled: true
+      quality: 6
+    gzip:
+      enabled: true
+      quality: 6
+  
+  # Minification
+  minification:
+    js:
+      enabled: true
+      remove_comments: true
+      remove_whitespace: true
+    css:
+      enabled: true
+      remove_comments: true
+      remove_whitespace: true
+    html:
+      enabled: true
+      remove_comments: true
+      remove_whitespace: false  # Preserve formatting
+  
+  # Image optimization
+  image_optimization:
+    enabled: true
+    formats:
+      - webp
+      - avif
+    quality: 85
+    progressive: true
+    strip_metadata: true
+  
+  # HTTP/2 Server Push
+  http2_push:
+    enabled: true
+    resources:
+      - "/assets/main.js"
+      - "/assets/main.css"
+      - "/assets/fonts/main.woff2"
+
+# Monitoring and analytics
+monitoring:
+  # Cache hit rate tracking
+  cache_analytics:
+    enabled: true
+    sample_rate: 1.0
+    
+  # Performance metrics
+  performance_metrics:
+    enabled: true
+    track_ttfb: true
+    track_cache_age: true
+    
+  # Alerts
+  alerts:
+    - metric: "cache_hit_rate"
+      threshold: 0.8
+      operator: "less_than"
+      action: "notify"
+      
+    - metric: "origin_response_time"
+      threshold: 1000  # ms
+      operator: "greater_than"
+      action: "notify"
+      
+    - metric: "error_rate"
+      threshold: 0.01  # 1%
+      operator: "greater_than"
+      action: "notify"
+
+# Security settings
+security:
+  # CORS
+  cors:
+    enabled: true
+    allowed_origins:
+      - "https://vibecity.live"
+      - "https://www.vibecity.live"
+    allowed_methods:
+      - "GET"
+      - "HEAD"
+      - "OPTIONS"
+    allowed_headers:
+      - "Content-Type"
+      - "Authorization"
+    max_age: 86400
+  
+  # Rate limiting
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 1000
+    burst: 2000
+  
+  # DDoS protection
+  ddos_protection:
+    enabled: true
+    challenge_on_high_traffic: true

@@ -2,6 +2,7 @@
 import { Heart, MapPin, Navigation, Share2, Sparkles } from "lucide-vue-next";
 import { defineAsyncComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useNeonSignTheme } from "../../composables/map/useNeonSignTheme";
 import "vue-virtual-scroller/dist/vue-virtual-scroller.css";
 import { useBottomFeedLogic } from "../../composables/useBottomFeedLogic";
 import { useDragScroll } from "../../composables/useDragScroll";
@@ -15,72 +16,72 @@ const { t } = useI18n();
 
 // ✅ Lazy load heavy components
 const VisitorCount = defineAsyncComponent(
-  () => import("../ui/VisitorCount.vue"),
+	() => import("../ui/VisitorCount.vue"),
 );
 
 const SkeletonCard = defineAsyncComponent(
-  () => import("../ui/SkeletonCard.vue"),
+	() => import("../ui/SkeletonCard.vue"),
 );
 
 const VideoExpandedView = defineAsyncComponent(
-  () => import("./VideoExpandedView.vue"),
+	() => import("./VideoExpandedView.vue"),
 );
 
 const GiantPinDialog = defineAsyncComponent(
-  () => import("./GiantPinDialog.vue"),
+	() => import("./GiantPinDialog.vue"),
 );
 
 const props = defineProps({
-  isDataLoading: Boolean,
-  isRefreshing: Boolean,
-  isImmersive: Boolean, // Feature: Immersive Mode
-  isDarkMode: Boolean,
-  isIndoorView: Boolean,
-  activeFloor: String,
-  liveCount: Number,
-  carouselShops: {
-    type: Array,
-    default: () => [],
-  },
-  suggestedShops: {
-    type: Array,
-    default: () => [],
-  },
-  favorites: {
-    type: Array,
-    default: () => [],
-  },
-  activeShopId: [Number, String],
-  mallShops: {
-    type: Array,
-    default: () => [],
-  },
-  setBottomUiRef: Function,
-  setMobileCardScrollRef: Function,
-  enableCinemaExplorer: {
-    type: Boolean,
-    default: false,
-  },
+	isDataLoading: Boolean,
+	isRefreshing: Boolean,
+	isImmersive: Boolean, // Feature: Immersive Mode
+	isDarkMode: Boolean,
+	isIndoorView: Boolean,
+	activeFloor: String,
+	liveCount: Number,
+	carouselShops: {
+		type: Array,
+		default: () => [],
+	},
+	suggestedShops: {
+		type: Array,
+		default: () => [],
+	},
+	favorites: {
+		type: Array,
+		default: () => [],
+	},
+	activeShopId: [Number, String],
+	mallShops: {
+		type: Array,
+		default: () => [],
+	},
+	setBottomUiRef: Function,
+	setMobileCardScrollRef: Function,
+	enableCinemaExplorer: {
+		type: Boolean,
+		default: false,
+	},
 });
 
 const emit = defineEmits([
-  "click-shop",
-  "open-detail",
-  "open-ride",
-  "swipe-left",
-  "swipe-right",
-  "toggle-favorite",
-  "toggle-immersive",
-  "refresh",
-  "set-active-floor",
-  "reset-filters",
-  "scroll",
-  "scroll-start",
-  "scroll-end",
-  "load-more",
-  "enter-giant-view",
-  "exit-giant-view",
-  "share-shop", // ✅ Added share event
+	"click-shop",
+	"open-detail",
+	"open-ride",
+	"swipe-left",
+	"swipe-right",
+	"toggle-favorite",
+	"toggle-immersive",
+	"refresh",
+	"set-active-floor",
+	"reset-filters",
+	"scroll",
+	"scroll-start",
+	"scroll-end",
+	"load-more",
+	"enter-giant-view",
+	"exit-giant-view",
+	"share-shop", // ✅ Added share event
 ]);
 
 // ✅ Haptic Feedback
@@ -89,55 +90,74 @@ const { createThrottledAction } = useThrottledAction({ delayMs: 1000 });
 
 // ✅ Bottom Feed Logic (extracted to composable)
 const {
-  isGiantPinView,
-  activeGiantPin,
-  giantPinShops,
-  selectedGiantShop,
-  selectedGiantVideoUrl,
-  selectedGiantImage,
-  isVideoExpanded,
-  expandedShop,
-  videoRef,
-  normalizeId,
-  getShopPreviewImage,
-  exitGiantView,
-  selectGiantShop,
-  closeExpandedVideo,
-  selectShop,
-  handleScroll,
+	isGiantPinView,
+	activeGiantPin,
+	giantPinShops,
+	selectedGiantShop,
+	selectedGiantVideoUrl,
+	selectedGiantImage,
+	isVideoExpanded,
+	expandedShop,
+	videoRef,
+	normalizeId,
+	getShopPreviewImage,
+	exitGiantView,
+	selectGiantShop,
+	closeExpandedVideo,
+	selectShop,
+	handleScroll,
 } = useBottomFeedLogic(props, emit);
 
 // ✅ Drag-to-Scroll for Desktop Users
 const carouselRef = ref(null);
 const { isDragging } = useDragScroll(carouselRef, {
-  momentum: true,
-  snapSelector: ".vibe-card-item",
-  sensitivity: 1.2,
-  onScrollStart: () => emit("scroll-start"),
-  onScrollEnd: () => emit("scroll-end"),
+	momentum: true,
+	snapSelector: ".vibe-card-item",
+	sensitivity: 1.2,
+	onScrollStart: () => emit("scroll-start"),
+	onScrollEnd: () => emit("scroll-end"),
 });
 
 const isFavorited = (shopId) => {
-  const id = normalizeId(shopId);
-  if (!id) return false;
-  return (props.favorites || []).some((fav) => normalizeId(fav) === id);
+	const id = normalizeId(shopId);
+	if (!id) return false;
+	return (props.favorites || []).some((fav) => normalizeId(fav) === id);
 };
 
 const isGridView = ref(false);
 const toggleView = () => {
-  isGridView.value = !isGridView.value;
-  selectFeedback();
+	isGridView.value = !isGridView.value;
+	selectFeedback();
+};
+
+const { getNeonDescriptor } = useNeonSignTheme();
+const getNeonStyle = (shop) => {
+	try {
+		const hex = getNeonDescriptor(shop)?.neon_theme?.frame || "#06b6d4";
+		const r = parseInt(hex.slice(1, 3), 16) || 6;
+		const g = parseInt(hex.slice(3, 5), 16) || 182;
+		const b = parseInt(hex.slice(5, 7), 16) || 212;
+		return {
+			"--neon": hex,
+			"--neon-border": `rgba(${r},${g},${b},0.5)`,
+			"--neon-glow": `rgba(${r},${g},${b},0.2)`,
+			"--neon-bg": `rgba(${r},${g},${b},0.12)`,
+			"--neon-text-glow": `rgba(${r},${g},${b},0.35)`,
+		};
+	} catch {
+		return { "--neon": "#06b6d4" };
+	}
 };
 
 const emitToggleFavorite = createThrottledAction((shopId) => {
-  emit("toggle-favorite", shopId);
+	emit("toggle-favorite", shopId);
 });
 
 // ✅ Virtual scroller item size (dynamic)
 const getItemSize = (index) => {
-  // Active card is larger due to scale effect
-  const isActive = props.carouselShops[index]?.id === props.activeShopId;
-  return props.isImmersive ? window.innerHeight : isActive ? 160 : 140;
+	// Active card is larger due to scale effect
+	const isActive = props.carouselShops[index]?.id === props.activeShopId;
+	return props.isImmersive ? window.innerHeight : isActive ? 160 : 140;
 };
 </script>
 
@@ -196,11 +216,11 @@ const getItemSize = (index) => {
       <div class="w-10 h-1 rounded-full bg-white/30"></div>
     </div>
 
-    <!-- Grid View -->
+    <!-- Grid View — Neon Block Layout -->
     <div
       v-if="isGridView"
       @scroll="handleScroll"
-      class="px-4 py-2 pb-24 h-[60vh] overflow-y-auto no-scrollbar grid grid-cols-2 md:grid-cols-3 gap-3 animate-fade-in pointer-events-auto"
+      class="px-3 pt-2 pb-24 h-[65vh] overflow-y-auto no-scrollbar grid grid-cols-2 gap-3 animate-fade-in pointer-events-auto"
     >
       <button
         v-for="shop in carouselShops"
@@ -208,65 +228,79 @@ const getItemSize = (index) => {
         @click="emit('open-detail', shop)"
         :aria-label="`Open details for ${shop.name}`"
         type="button"
-        class="relative aspect-[3/4] rounded-2xl overflow-hidden bg-zinc-900 border border-white/10 shadow-xl active:scale-95 transition-[transform,opacity,box-shadow,border-color,background-color] hover:shadow-2xl hover:shadow-purple-500/20 text-left"
+        class="neon-block-card text-left"
+        :style="getNeonStyle(shop)"
       >
-        <img
-          v-if="shop.Image_URL1"
-          :src="shop.Image_URL1"
-          :alt="shop.name"
-          class="absolute inset-0 w-full h-full object-cover"
-          loading="lazy"
-          decoding="async"
-        />
-        <div
-          class="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent"
-        ></div>
-
-        <!-- Badges -->
-        <div class="absolute top-2 left-2 flex flex-col gap-1.5 z-10">
-          <div
-            v-if="shop.status === 'LIVE'"
-            class="px-2 py-1 rounded-lg bg-red-600 text-white text-[9px] font-black animate-pulse shadow-lg backdrop-blur-sm border border-red-400/50"
-          >
-            <span class="flex items-center gap-1">
-              <span class="w-1.5 h-1.5 bg-white rounded-full"></span>
-              LIVE
-            </span>
+        <!-- Thumbnail -->
+        <div class="neon-card-thumb">
+          <img
+            v-if="shop.Image_URL1"
+            :src="shop.Image_URL1"
+            :alt="shop.name"
+            class="absolute inset-0 w-full h-full object-cover"
+            loading="lazy"
+            decoding="async"
+          />
+          <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+          <!-- LIVE badge -->
+          <div v-if="shop.status === 'LIVE'" class="neon-live-badge">
+            <span class="neon-live-dot" />
+            {{ $t("auto.k_live_now") }}
           </div>
-          <div
-            v-if="shop.isPromoted"
-            class="px-2 py-1 rounded-lg bg-gradient-to-r from-yellow-400 to-amber-600 text-black text-[9px] font-black shadow-lg border border-yellow-300/50"
+          <!-- Favorite -->
+          <button
+            class="neon-fav-btn"
+            type="button"
+            :aria-label="$t('auto.k_55b96365')"
+            @click.stop="emitToggleFavorite(shop.id)"
           >
-            ⭐ HOT
-          </div>
+            <Heart
+              class="w-3.5 h-3.5"
+              :class="isFavorited(shop.id) ? 'text-pink-500' : 'text-white/70'"
+              :fill="isFavorited(shop.id) ? 'currentColor' : 'none'"
+            />
+          </button>
         </div>
 
         <!-- Info -->
-        <div
-          class="absolute bottom-0 left-0 right-0 p-3 z-10 transition-transform duration-300 group-hover:translate-y-[-4px]"
-        >
-          <h4
-            class="text-sm font-black text-white leading-tight truncate mb-1 drop-shadow-md"
+        <div class="neon-card-info">
+          <!-- Category badge with neon color -->
+          <span class="neon-cat-badge">{{ shop.category || "Venue" }}</span>
+          <h4 class="neon-card-name">{{ shop.name }}</h4>
+          <div class="neon-card-meta">
+            <span class="neon-dot-count">● 0</span>
+            <span v-if="shop.distance !== undefined" class="neon-distance">
+              <MapPin class="w-2.5 h-2.5 inline-block" />
+              {{ shop.distance.toFixed(1) }} km
+            </span>
+          </div>
+        </div>
+
+        <!-- Action row -->
+        <div class="neon-card-actions">
+          <button
+            type="button"
+            class="neon-action-btn"
+            :aria-label="$t('vibe.share')"
+            @click.stop="emit('share-shop', shop)"
           >
-            {{ shop.name }}
-          </h4>
-          <div class="flex items-center gap-2 mb-2">
-            <span
-              class="text-[10px] font-bold text-white/80 uppercase tracking-wide bg-black/30 px-1.5 py-0.5 rounded backdrop-blur-sm"
-            >
-              {{ shop.category || "Venue" }}
-            </span>
-            <span
-              v-if="shop.distance !== undefined"
-              class="text-[10px] font-black text-blue-400 flex items-center gap-0.5 bg-black/40 px-1.5 py-0.5 rounded backdrop-blur-sm"
-            >
-              <MapPin class="w-3 h-3" />
-              {{ shop.distance.toFixed(1) }}km
-            </span>
-          </div>
-          <div class="scale-90 origin-left">
-            <!-- Analytics removed for public view -->
-          </div>
+            <Share2 class="w-3 h-3" />
+            {{ $t("vibe.share") }}
+          </button>
+          <button
+            type="button"
+            class="neon-action-btn neon-ride-btn"
+            :aria-label="$t('vibe.ride')"
+            @click.stop="emit('open-ride', shop)"
+          >
+            <Navigation class="w-3 h-3" />
+            {{ $t("vibe.ride") }}
+          </button>
+        </div>
+
+        <!-- Distance footer -->
+        <div v-if="shop.distance !== undefined" class="neon-card-footer">
+          {{ shop.distance.toFixed(1) }} km
         </div>
       </button>
 
@@ -302,7 +336,7 @@ const getItemSize = (index) => {
       >
         <!-- ✅ Larger, more prominent icon -->
         <div
-          class="w-24 h-24 rounded-3xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center mb-6 border border-white/10"
+          class="w-24 h-24 rounded-3xl bg-gradient-to-br from-cyan-500/20 to-pink-500/20 flex items-center justify-center mb-6 border border-white/10"
         >
           <span class="text-5xl">🎭</span>
         </div>
@@ -327,7 +361,7 @@ const getItemSize = (index) => {
             type="button"
             class="suggested-chip relative flex-shrink-0 w-20 h-20 rounded-2xl overflow-hidden border border-white/30 cursor-pointer transition-[transform,opacity,box-shadow,border-color,background-color] duration-300 hover:scale-110 hover:border-white/50 shadow-lg"
           >
-            <img
+            <img loading="lazy"
               v-if="s.Image_URL1"
               :src="s.Image_URL1"
               :alt="s.name"
@@ -347,7 +381,7 @@ const getItemSize = (index) => {
         <!-- ✅ Premium button with icon -->
         <button
           @click="emit('reset-filters')"
-          class="premium-button-large px-8 py-4 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 text-white text-base font-black flex items-center gap-3 shadow-xl shadow-purple-500/30 hover:shadow-2xl hover:shadow-purple-500/40 active:scale-95 transition-[transform,opacity,box-shadow,border-color,background-color]"
+          class="premium-button-large px-8 py-4 rounded-2xl bg-gradient-to-r from-cyan-600 to-pink-600 text-white text-base font-black flex items-center gap-3 shadow-xl shadow-cyan-500/30 hover:shadow-2xl hover:shadow-cyan-500/40 active:scale-95 transition-[transform,opacity,box-shadow,border-color,background-color]"
         >
           <Sparkles class="w-5 h-5" />
           <span>{{ t("feed.explore_all") }}</span>
@@ -378,7 +412,7 @@ const getItemSize = (index) => {
               'flex gap-3 no-scrollbar items-end transition-[transform,opacity,box-shadow,border-color,background-color] duration-300 snap-x snap-mandatory scroll-smooth',
               isImmersive
                 ? 'flex-col h-full overflow-y-auto overflow-x-hidden pt-0 pb-0 gap-0'
-                : 'flex-row overflow-x-auto overflow-y-visible px-2 pt-2 pb-[calc(env(safe-area-inset-bottom,0px)+10px)] mb-0 h-[330px] items-end',
+                : 'flex-row overflow-x-auto overflow-y-visible px-2 pt-2 pb-[calc(env(safe-area-inset-bottom,0px)+10px)] mb-0 h-[250px] items-end',
               'opacity-100',
               isDragging ? 'cursor-grabbing' : 'cursor-grab',
             ]"
@@ -405,7 +439,7 @@ const getItemSize = (index) => {
                 v-for="shop in mallShops.filter((s) => s.Floor === activeFloor)"
                 :key="`indoor-${shop.id}`"
                 :shop="shop"
-                class="flex-shrink-0 w-[340px] h-[400px] snap-center"
+                class="flex-shrink-0 w-[240px] h-[320px] snap-center"
               />
             </template>
 
@@ -431,11 +465,12 @@ const getItemSize = (index) => {
                 :data-shop-id="shop.id"
                 data-testid="shop-card"
                 :is-immersive="isImmersive"
+                :style="!isImmersive ? getNeonStyle(shop) : undefined"
                 class="vibe-card-item flex-shrink-0 snap-center"
                 :class="[
                   isImmersive
                     ? 'w-full h-[100dvh] rounded-none scale-100 opacity-100'
-                    : 'w-[250px] h-[310px]',
+                    : 'w-[160px] h-[170px]',
                   !isImmersive && activeShopId === shop.id
                     ? 'scale-100 z-20'
                     : '',
@@ -473,8 +508,7 @@ const getItemSize = (index) => {
                       class="text-base text-white/80 flex items-center gap-2 font-bold drop-shadow-lg"
                     >
                       <MapPin class="w-5 h-5" />
-                      {{ shop.distance.toFixed(1) }}km away
-                    </span>
+                      {{ shop.distance.toFixed(1) }}{{ $t("auto.k_915a78c1") }} </span>
                   </div>
                 </div>
 
@@ -485,7 +519,7 @@ const getItemSize = (index) => {
                 >
                   <button
                     @click="emitToggleFavorite(shop.id)"
-                    aria-label="Like this venue"
+                    :aria-label="$t('auto.k_55b96365')"
                     class="w-14 h-14 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center text-white border border-white/20 shadow-xl hover:scale-110 active:scale-95 transition-[transform,opacity,box-shadow,border-color,background-color]"
                     :class="
                       isFavorited(shop.id)
@@ -500,21 +534,21 @@ const getItemSize = (index) => {
                   </button>
                   <button
                     @click="emit('toggle-immersive')"
-                    aria-label="Exit immersive mode"
+                    :aria-label="$t('auto.k_2d3d7215')"
                     class="w-14 h-14 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center text-white border border-white/20 shadow-xl hover:scale-110 active:scale-95 transition-[transform,opacity,box-shadow,border-color,background-color]"
                   >
                     <MapPin class="w-7 h-7" />
                   </button>
                   <button
                     @click="emit('open-ride', shop)"
-                    aria-label="Open ride options"
+                    :aria-label="$t('auto.k_fc78732f')"
                     class="w-14 h-14 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center text-white border border-white/20 shadow-xl hover:scale-110 active:scale-95 transition-[transform,opacity,box-shadow,border-color,background-color]"
                   >
                     <Navigation class="w-7 h-7" />
                   </button>
                   <button
                     @click="emit('open-detail', shop)"
-                    aria-label="Share venue details"
+                    :aria-label="$t('auto.k_cfe61971')"
                     class="w-14 h-14 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center text-white border border-white/20 shadow-xl hover:scale-110 active:scale-95 transition-[transform,opacity,box-shadow,border-color,background-color]"
                   >
                     <Share2 class="w-7 h-7" />
@@ -547,6 +581,157 @@ const getItemSize = (index) => {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   🌟 NEON BLOCK CARDS
+   ═══════════════════════════════════════════════════════════════ */
+.neon-block-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(8, 8, 18, 0.98);
+  border: 1px solid var(--neon-border, rgba(6,182,212,0.5));
+  box-shadow: 0 0 12px var(--neon-glow, rgba(6,182,212,0.2));
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  cursor: pointer;
+}
+.neon-block-card:active {
+  transform: scale(0.97);
+}
+.neon-block-card:hover {
+  box-shadow: 0 0 20px var(--neon-glow, rgba(6,182,212,0.2));
+}
+
+.neon-card-thumb {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: #111;
+}
+
+.neon-live-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(220, 38, 38, 0.92);
+  color: white;
+  font-size: 9px;
+  font-weight: 900;
+  padding: 2px 6px;
+  border-radius: 6px;
+  letter-spacing: 0.03em;
+  animation: livePulse 2s infinite;
+}
+@keyframes livePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}
+.neon-live-dot {
+  width: 5px;
+  height: 5px;
+  background: white;
+  border-radius: 50%;
+}
+
+.neon-fav-btn {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+.neon-card-info {
+  padding: 8px 10px 4px;
+  flex: 1;
+}
+
+.neon-cat-badge {
+  display: inline-block;
+  background: var(--neon-bg, rgba(6,182,212,0.12));
+  color: var(--neon, #06b6d4);
+  border: 1px solid var(--neon-border, rgba(6,182,212,0.5));
+  font-size: 8px;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.neon-card-name {
+  font-size: 12px;
+  font-weight: 800;
+  color: white;
+  line-height: 1.25;
+  margin: 4px 0 3px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  text-shadow: 0 0 6px var(--neon-text-glow, rgba(6,182,212,0.35));
+}
+
+.neon-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  color: rgba(255,255,255,0.5);
+}
+.neon-dot-count {
+  color: var(--neon, #06b6d4);
+  font-weight: 700;
+}
+.neon-distance {
+  font-weight: 600;
+}
+
+.neon-card-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 0 8px 6px;
+}
+
+.neon-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 5px 4px;
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 700;
+  background: rgba(255,255,255,0.07);
+  color: rgba(255,255,255,0.8);
+  border: 1px solid rgba(255,255,255,0.08);
+  white-space: nowrap;
+}
+
+.neon-ride-btn {
+  background: var(--neon-bg, rgba(6,182,212,0.12));
+  border-color: var(--neon-border, rgba(6,182,212,0.5));
+  color: var(--neon, #06b6d4);
+}
+
+.neon-card-footer {
+  font-size: 9px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.35);
+  padding: 2px 10px 6px;
+  text-align: right;
 }
 
 /* ═══════════════════════════════════════════════════════════════

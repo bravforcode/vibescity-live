@@ -1,3 +1,4 @@
+import i18n from "@/i18n.js";
 import { getApiV1BaseUrl, getSupabaseEdgeBaseUrl } from "../lib/runtimeConfig";
 import { supabase } from "../lib/supabase";
 import { analyticsService } from "./analyticsService";
@@ -13,7 +14,7 @@ export const paymentService = {
 		const {
 			data: { session },
 		} = await supabase.auth.getSession();
-		// if (!session) throw new Error("User must be logged in"); // ✅ Removed strict check for Anon
+		// if (!session) throw new Error(i18n.global.t("auto.k_7bf6281")); // ✅ Removed strict check for Anon
 
 		const visitorId = localStorage.getItem("vibe_visitor_id"); // ✅ Get Visitor ID
 		const returnUrl = window.location.origin + window.location.pathname;

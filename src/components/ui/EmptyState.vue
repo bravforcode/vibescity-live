@@ -12,8 +12,8 @@
       :class="[
         'rounded-3xl flex items-center justify-center mb-5 border border-white/10',
         compact
-          ? 'w-16 h-16 bg-gradient-to-br from-purple-500/15 to-pink-500/15'
-          : 'w-24 h-24 bg-gradient-to-br from-purple-500/20 to-pink-500/20',
+          ? 'w-16 h-16 bg-gradient-to-br from-cyan-500/15 to-pink-500/15'
+          : 'w-24 h-24 bg-gradient-to-br from-cyan-500/20 to-pink-500/20',
       ]"
     >
       <span :class="compact ? 'text-3xl' : 'text-5xl'" aria-hidden="true">{{ icon }}</span>

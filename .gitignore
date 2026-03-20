@@ -164,6 +164,7 @@ playwright-report*/
 
 # Temporary files
 .tmp*
+tmp/
 
 nul
 playwright-report*/
@@ -176,3 +177,7 @@ findings.md
 progress.md
 task_plan.md
 observability/
+
+# Secrets / captured network traces
+backend/credentials/google-sheets-credentials.json
+tmp/trace_inspect*/

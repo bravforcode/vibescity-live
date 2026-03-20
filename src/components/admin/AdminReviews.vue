@@ -22,9 +22,7 @@
           <polygon
             points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
           />
-        </svg>
-        Rating Distribution
-      </h3>
+        </svg> {{ $t("auto.k_8a640e12") }} </h3>
       <div class="flex flex-col gap-2.5">
         <div
           v-for="star in [5, 4, 3, 2, 1]"
@@ -69,9 +67,7 @@
           <path
             d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
           />
-        </svg>
-        Venue Reviews
-      </h3>
+        </svg> {{ $t("auto.k_a93b7da1") }} </h3>
       <DataTable
         :columns="columns"
         :fetch-fn="adminDataService.getReviews"

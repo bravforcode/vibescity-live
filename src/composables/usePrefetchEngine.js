@@ -100,7 +100,7 @@ export function usePrefetchEngine() {
 		if (isSlowNetwork.value || isLowPowerMode.value) return;
 
 		// If browser supports navigator.connection.saveData, respect it!
-		if (navigator.connection && navigator.connection.saveData) {
+		if (navigator.connection?.saveData) {
 			if (import.meta.env.DEV)
 				console.log("[Prefetch] Disabled: Save-Data header is on.");
 			return;

@@ -13,30 +13,35 @@ import {
 } from "vue";
 import { useChromaticGlass } from "../../composables/engine/useChromaticGlass.js";
 import { useGranularAudio } from "../../composables/engine/useGranularAudio.js";
+import { useFocusTrap } from "../../composables/useFocusTrap";
 import { useHaptics } from "../../composables/useHaptics";
 import { Z } from "../../constants/zIndex";
 import { resolveVenueMedia } from "../../domain/venue/viewModel";
 import { getMediaDetails } from "../../utils/linkHelper";
+import AsyncFallback from "../ui/AsyncFallback.vue";
 
 // ==========================================
 // ✅ LAZY LOADED COMPONENTS
 // ==========================================
 const VisitorCount = defineAsyncComponent({
 	loader: () => import("../ui/VisitorCount.vue"),
+	errorComponent: AsyncFallback,
 	delay: 200,
-	timeout: 10000,
+	timeout: 8000,
 });
 
 const ReviewSystem = defineAsyncComponent({
 	loader: () => import("../ui/ReviewSystem.vue"),
+	errorComponent: AsyncFallback,
 	delay: 200,
-	timeout: 10000,
+	timeout: 8000,
 });
 
 const PhotoGallery = defineAsyncComponent({
 	loader: () => import("../ui/PhotoGallery.vue"),
+	errorComponent: AsyncFallback,
 	delay: 120,
-	timeout: 10000,
+	timeout: 8000,
 });
 
 // ==========================================
@@ -58,11 +63,13 @@ import {
 	X,
 } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
+import { useNeonSignTheme } from "../../composables/map/useNeonSignTheme";
 import {
 	openBoltApp,
 	openGrabApp,
 	openLinemanApp,
 } from "../../services/DeepLinkService";
+import { getRealVenueMedia } from "../../services/shopService";
 import {
 	copyToClipboard,
 	isMobileDevice,
@@ -122,6 +129,28 @@ const emit = defineEmits(["close", "toggle-favorite"]);
 
 // UI State
 const modalCard = ref(null);
+
+// ✅ A11y: Focus trap within modal
+useFocusTrap(modalCard);
+
+// Neon sign theme — derive venue's neon color to anchor modal to its sign
+const { getNeonDescriptor } = useNeonSignTheme();
+const modalNeonColor = computed(() => {
+	try {
+		const d = getNeonDescriptor(props.shop);
+		return d?.neon_theme?.frame || "#06b6d4";
+	} catch {
+		return "#06b6d4";
+	}
+});
+const modalNeonGlow = computed(() => {
+	const hex = modalNeonColor.value;
+	const r = parseInt(hex.slice(1, 3), 16) || 6;
+	const g = parseInt(hex.slice(3, 5), 16) || 182;
+	const b = parseInt(hex.slice(5, 7), 16) || 212;
+	return `rgba(${r},${g},${b},0.6)`;
+});
+
 // Refractive glass panel — placed after modalCard so ref is captured
 const { enabled: glassEnabled, fallbackClass } = useChromaticGlass({
 	panelId: "vibe-modal",
@@ -145,6 +174,9 @@ const lastHapticIndex = ref(-1); // For dots snap haptics
 const isGalleryOpen = ref(false);
 const galleryInitialIndex = ref(0);
 
+// Real Media State
+const realMediaData = ref(null);
+
 // Ride App State
 const showRidePopup = ref(false);
 const copyStatus = ref("");
@@ -161,8 +193,8 @@ const isPromoActive = ref(false);
 let timerInterval = null;
 
 // Lazy Loading State
-const isMediaVisible = ref(false);
-const isReviewsVisible = ref(false);
+const isMediaVisible = ref(true); // Show immediately — no IntersectionObserver delay
+const isReviewsVisible = ref(true); // Show all content immediately
 const mediaObserver = ref(null);
 const reviewsObserver = ref(null);
 const mediaLoadFailed = ref(false);
@@ -179,7 +211,7 @@ const lastPointerTap = ref(0);
 
 const media = computed(() => {
 	try {
-		const resolved = resolveVenueMedia(props.shop || {});
+		const resolved = resolveVenueMedia(props.shop || {}, realMediaData.value);
 		const mediaUrl =
 			resolved.videoUrl || resolved.primaryImage || FALLBACK_IMAGE;
 		return getMediaDetails(mediaUrl);
@@ -206,7 +238,7 @@ const safeTopOffset = computed(
 const processedImages = computed(() => {
 	try {
 		const items = [];
-		const resolved = resolveVenueMedia(props.shop || {});
+		const resolved = resolveVenueMedia(props.shop || {}, realMediaData.value);
 		if (resolved.videoUrl) items.push(resolved.videoUrl);
 
 		const images = Array.isArray(resolved.images) ? resolved.images : [];
@@ -246,10 +278,22 @@ const isPromoted = computed(
 
 watch(
 	() => props.shop?.id,
-	() => {
+	async (newId) => {
 		mediaLoadFailed.value = false;
 		currentImageIndex.value = 0;
 		isGalleryOpen.value = false;
+		realMediaData.value = null;
+
+		if (newId) {
+			try {
+				const data = await getRealVenueMedia(newId);
+				if (data && data.length > 0) {
+					realMediaData.value = data;
+				}
+			} catch (error) {
+				console.error("Failed to fetch real media:", error);
+			}
+		}
 	},
 	{ immediate: true },
 );
@@ -750,7 +794,7 @@ const setupIntersectionObservers = () => {
 					}
 				});
 			},
-			{ threshold: 0.1 },
+			{ threshold: 0.01, root: scrollContentRef.value ?? null },
 		);
 
 		// Reviews Observer
@@ -763,7 +807,7 @@ const setupIntersectionObservers = () => {
 					}
 				});
 			},
-			{ threshold: 0.1 },
+			{ threshold: 0.01, root: scrollContentRef.value ?? null },
 		);
 
 		nextTick(() => {
@@ -827,6 +871,8 @@ onMounted(() => {
 
 		setupIntersectionObservers();
 
+		// Content visible immediately — no observer delay needed
+
 		// ✅ Add carousel scroll listener (Passive + Throttled)
 		if (imageCarouselRef.value) {
 			imageCarouselRef.value.addEventListener(
@@ -885,7 +931,7 @@ onUnmounted(() => {
     :style="{ zIndex: Z.MODAL }"
   >
     <!-- iOS-Style Backdrop with Blur -->
-    <div
+    <div role="button" tabindex="0"
       class="absolute inset-0 bg-black/70 backdrop-blur-xl transition-opacity duration-300"
       :style="{ opacity: 1 - dragProgress * 0.5 }"
       @click="handleClose"
@@ -897,28 +943,45 @@ onUnmounted(() => {
       @touchstart.stop="handleTouchStart"
       @touchmove.stop="handleTouchMove"
       @touchend.stop="handleTouchEnd"
-      class="relative w-full md:max-w-5xl bg-white dark:bg-zinc-900 md:rounded-[2rem] rounded-t-[2rem] flex flex-col shadow-[0_-10px_80px_rgba(0,0,0,0.3)] max-h-[94vh] md:max-h-[90vh] pointer-events-auto overflow-hidden"
+      class="relative w-full md:max-w-5xl bg-zinc-950 md:rounded-[2rem] rounded-none flex flex-col max-h-[90vh] md:max-h-[90vh] pointer-events-auto overflow-hidden"
       :class="fallbackClass"
       :style="{
         zIndex: Z.MODAL,
         '--safe-area-top': 'env(safe-area-inset-top)',
         '--safe-area-bottom': 'env(safe-area-inset-bottom)',
-        background: glassEnabled ? 'rgba(10,10,18,0.55)' : undefined,
+        '--modal-neon': modalNeonColor,
+        '--modal-neon-glow': modalNeonGlow,
+        background: glassEnabled ? 'rgba(10,10,18,0.96)' : 'rgba(10,10,18,0.99)',
+        border: `1.5px solid ${modalNeonColor}`,
+        boxShadow: `0 0 24px ${modalNeonGlow}, 0 -10px 80px rgba(0,0,0,0.7), inset 0 0 40px rgba(0,0,0,0.4)`,
       }"
       role="dialog"
       aria-modal="true"
       :aria-labelledby="modalTitleId"
       tabindex="-1"
     >
-      <!-- iOS-Style Drag Handle -->
+      <!-- Neon top strip — category color accent bar -->
       <div
-        class="flex justify-center pt-3 pb-1 cursor-grab active:cursor-grabbing"
+        class="neon-modal-topbar"
+        :style="{ background: `linear-gradient(90deg, transparent, ${modalNeonColor}, transparent)`, boxShadow: `0 0 12px ${modalNeonGlow}` }"
+        aria-hidden="true"
+      />
+
+      <!-- Drag Handle + Neon Sign Beacon (anchors modal to venue neon sign on map) -->
+      <div
+        class="flex flex-col items-center pt-2 pb-1 cursor-grab active:cursor-grabbing gap-0.5"
+        :style="{ '--modal-neon': modalNeonColor, '--modal-neon-glow': modalNeonGlow }"
       >
+        <!-- Upward-pointing callout arrow — visually connects modal to the neon sign above -->
+        <div class="neon-modal-callout" aria-hidden="true" />
+        <!-- Thin neon accent line -->
+        <div class="neon-modal-beacon-line" aria-hidden="true" />
+        <!-- Drag pill -->
         <div
-          class="w-10 h-1 bg-gray-300 dark:bg-gray-500 rounded-full transition-[width,background-color] duration-200"
+          class="w-10 h-1 rounded-full transition-[width,background-color] duration-200 mt-1"
           :style="{
             width: dragProgress > 0 ? `${10 + dragProgress * 20}px` : '40px',
-            backgroundColor: dragProgress > 0.3 ? '#10b981' : undefined,
+            backgroundColor: dragProgress > 0.3 ? '#10b981' : 'rgba(255,255,255,0.2)',
           }"
         />
       </div>
@@ -926,11 +989,11 @@ onUnmounted(() => {
       <!-- Close Button -->
       <button
         @click="handleClose"
-        aria-label="Close details"
+        :aria-label="$t('auto.k_e9260901')"
         class="absolute right-4 z-50 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/10 backdrop-blur-xl transition active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 dark:bg-white/10"
         :style="{ top: safeTopOffset }"
       >
-        <X class="w-5 h-5 text-gray-700 dark:text-white" />
+        <X class="w-5 h-5 text-white" />
       </button>
 
       <!-- Scrollable Content -->
@@ -945,12 +1008,12 @@ onUnmounted(() => {
             <div class="flex-1 min-w-0">
               <h2
                 :id="modalTitleId"
-                class="text-2xl font-black text-gray-900 dark:text-white leading-tight break-words"
+                class="text-2xl font-black text-white leading-tight break-words"
               >
                 {{ shop.name }}
               </h2>
               <div
-                class="mt-2 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400"
+                class="mt-2 flex items-center gap-2 text-sm text-zinc-400"
               >
                 <MapPin class="w-4 h-4" />
                 <span class="font-medium">{{
@@ -965,18 +1028,14 @@ onUnmounted(() => {
                 <div
                   v-if="isPromoActive"
                   class="px-2.5 py-1 text-[10px] font-black rounded-full uppercase tracking-wider text-white bg-gradient-to-r from-red-500 to-orange-500 shadow-lg animate-pulse"
-                >
-                  🔥 FLASH
-                </div>
+                > {{ $t("auto.k_9c5705f9") }} </div>
               </transition>
 
               <transition name="scale">
                 <div
                   v-if="isPromoted"
                   class="px-2.5 py-1 text-[10px] font-black rounded-full uppercase tracking-tight bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-lg"
-                >
-                  ⭐ HOT
-                </div>
+                > {{ $t("auto.k_9696cfdc") }} </div>
               </transition>
 
               <div
@@ -1005,15 +1064,15 @@ onUnmounted(() => {
           <!-- Stats Grid -->
           <div class="mt-4 grid grid-cols-4 gap-2">
             <div
-              class="flex min-h-[74px] flex-col items-center justify-between rounded-xl border border-black/5 bg-gray-50 p-2 backdrop-blur-sm dark:border-white/5 dark:bg-zinc-800/50"
+              class="flex min-h-[74px] flex-col items-center justify-between rounded-xl border border-white/5 bg-zinc-800/50 p-2 backdrop-blur-sm"
             >
               <span
-                class="text-[10px] font-semibold text-gray-500 dark:text-gray-400"
+                class="text-[10px] font-semibold text-zinc-400"
               >
                 {{ t("vibe.rating") }}
               </span>
               <div class="flex items-center gap-1 mt-0.5">
-                <span class="text-sm font-black text-gray-900 dark:text-white">
+                <span class="text-sm font-black text-white">
                   {{ shop.rating ? shop.rating.toFixed(1) : "-" }}
                 </span>
                 <Sparkles v-if="shop.rating" class="w-3 h-3 text-yellow-500" />
@@ -1021,45 +1080,45 @@ onUnmounted(() => {
             </div>
 
             <div
-              class="flex min-h-[74px] flex-col items-center justify-between rounded-xl border border-black/5 bg-gray-50 p-2 backdrop-blur-sm dark:border-white/5 dark:bg-zinc-800/50"
+              class="flex min-h-[74px] flex-col items-center justify-between rounded-xl border border-white/5 bg-zinc-800/50 p-2 backdrop-blur-sm"
             >
               <span
-                class="text-[10px] font-semibold text-gray-500 dark:text-gray-400"
+                class="text-[10px] font-semibold text-zinc-400"
               >
                 {{ t("vibe.reviews") }}
               </span>
               <span
-                class="text-sm font-black text-gray-900 dark:text-white mt-0.5"
+                class="text-sm font-black text-white mt-0.5"
               >
                 {{ shop.reviewCount || 0 }}
               </span>
             </div>
 
             <div
-              class="flex min-h-[74px] flex-col items-center justify-between rounded-xl border border-black/5 bg-gray-50 p-2 backdrop-blur-sm dark:border-white/5 dark:bg-zinc-800/50"
+              class="flex min-h-[74px] flex-col items-center justify-between rounded-xl border border-white/5 bg-zinc-800/50 p-2 backdrop-blur-sm"
             >
               <span
-                class="text-[10px] font-semibold text-gray-500 dark:text-gray-400"
+                class="text-[10px] font-semibold text-zinc-400"
               >
                 {{ t("vibe.checkins") }}
               </span>
               <span
-                class="text-sm font-black text-gray-900 dark:text-white mt-0.5"
+                class="text-sm font-black text-white mt-0.5"
               >
                 {{ shop.checkins || 0 }}
               </span>
             </div>
 
             <div
-              class="flex min-h-[74px] flex-col items-center justify-between rounded-xl border border-black/5 bg-gray-50 p-2 backdrop-blur-sm dark:border-white/5 dark:bg-zinc-800/50"
+              class="flex min-h-[74px] flex-col items-center justify-between rounded-xl border border-white/5 bg-zinc-800/50 p-2 backdrop-blur-sm"
             >
               <span
-                class="text-[10px] font-semibold text-gray-500 dark:text-gray-400"
+                class="text-[10px] font-semibold text-zinc-400"
               >
                 {{ t("vibe.photos") }}
               </span>
               <span
-                class="text-sm font-black text-gray-900 dark:text-white mt-0.5"
+                class="text-sm font-black text-white mt-0.5"
               >
                 {{ processedImages.length }}
               </span>
@@ -1109,7 +1168,7 @@ onUnmounted(() => {
           <!-- Loading Skeleton -->
           <div
             v-if="!isMediaVisible"
-            class="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-zinc-700 dark:to-zinc-800 animate-pulse"
+            class="absolute inset-0 bg-gradient-to-br from-zinc-800 to-zinc-900 animate-pulse"
           />
 
           <!-- Heart Animation -->
@@ -1176,7 +1235,7 @@ onUnmounted(() => {
               v-else-if="media.type === 'youtube' && !mediaLoadFailed"
               :src="resolvedMediaUrl"
               class="w-full h-full"
-              title="Venue Video"
+              :title="$t('auto.k_ee15f9ef')"
               allow="autoplay; encrypted-media; picture-in-picture"
               allowfullscreen
               loading="lazy"
@@ -1195,7 +1254,7 @@ onUnmounted(() => {
         <!-- Image Gallery Carousel -->
         <div v-if="hasGallery" class="relative px-5 py-4">
           <h4
-            class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3"
+            class="text-xs font-bold text-zinc-400 uppercase tracking-wide mb-3"
           >
             {{ t("vibe.gallery") }} ({{ processedImages.length }})
           </h4>
@@ -1211,7 +1270,7 @@ onUnmounted(() => {
                 :key="`gallery-${idx}`"
                 type="button"
                 :aria-label="`Open gallery image ${idx + 1}`"
-                class="h-32 w-32 flex-shrink-0 cursor-pointer snap-start overflow-hidden rounded-2xl bg-gray-100 transition-transform active:scale-95 dark:bg-zinc-800"
+                class="h-32 w-32 flex-shrink-0 cursor-pointer snap-start overflow-hidden rounded-2xl bg-zinc-800 transition-transform active:scale-95"
                 @click="openGalleryAt(idx)"
               >
                 <video
@@ -1253,19 +1312,19 @@ onUnmounted(() => {
             <button
               v-if="currentImageIndex > 0"
               @click="prevImage"
-              aria-label="Previous image"
+              :aria-label="$t('auto.k_41e27be5')"
               class="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 dark:bg-black/50 backdrop-blur-md shadow-lg active:scale-90 transition z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
             >
-              <ChevronLeft class="w-5 h-5 text-gray-700 dark:text-white" />
+              <ChevronLeft class="w-5 h-5 text-white" />
             </button>
 
             <button
               v-if="currentImageIndex < processedImages.length - 1"
               @click="nextImage"
-              aria-label="Next image"
+              :aria-label="$t('auto.k_929cea25')"
               class="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 dark:bg-black/50 backdrop-blur-md shadow-lg active:scale-90 transition z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
             >
-              <ChevronRight class="w-5 h-5 text-gray-700 dark:text-white" />
+              <ChevronRight class="w-5 h-5 text-white" />
             </button>
           </div>
         </div>
@@ -1274,7 +1333,7 @@ onUnmounted(() => {
         <div class="px-5 py-4 space-y-3">
           <!-- Crowd Info -->
           <div
-            class="bg-gray-50 dark:bg-zinc-800/50 rounded-2xl p-4 backdrop-blur-sm"
+            class="bg-zinc-800/50 rounded-2xl p-4 backdrop-blur-sm"
           >
             <div class="flex items-start gap-3">
               <div
@@ -1284,12 +1343,12 @@ onUnmounted(() => {
               </div>
               <div class="flex-1 min-w-0">
                 <h5
-                  class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1"
+                  class="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-1"
                 >
                   {{ t("vibe.crowd_vibe") }}
                 </h5>
                 <p
-                  class="text-sm font-medium text-gray-900 dark:text-white leading-relaxed line-clamp-3"
+                  class="text-sm font-medium text-white leading-relaxed line-clamp-3"
                 >
                   {{
                     shop.description ||
@@ -1303,24 +1362,24 @@ onUnmounted(() => {
 
           <!-- Vibe Tag -->
           <div
-            class="bg-gray-50 dark:bg-zinc-800/50 rounded-2xl p-4 backdrop-blur-sm"
+            class="bg-zinc-800/50 rounded-2xl p-4 backdrop-blur-sm"
           >
             <div class="flex items-start gap-3">
               <div
-                class="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center shrink-0"
+                class="w-10 h-10 rounded-full bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center shrink-0"
               >
                 <Sparkles
-                  class="w-5 h-5 text-purple-600 dark:text-purple-400"
+                  class="w-5 h-5 text-cyan-600 dark:text-cyan-400"
                 />
               </div>
               <div class="flex-1 min-w-0">
                 <h5
-                  class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1"
+                  class="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-1"
                 >
                   {{ t("vibe.atmosphere") }}
                 </h5>
                 <p
-                  class="text-sm font-medium text-gray-900 dark:text-white leading-relaxed"
+                  class="text-sm font-medium text-white leading-relaxed"
                 >
                   {{
                     shop.category ||
@@ -1336,7 +1395,7 @@ onUnmounted(() => {
         <!-- Social Links -->
         <div v-if="hasSocialLinks" class="px-5 py-4">
           <h4
-            class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3"
+            class="text-xs font-bold text-zinc-400 uppercase tracking-wide mb-3"
           >
             {{ t("vibe.explore_atmosphere") }}
           </h4>
@@ -1403,9 +1462,9 @@ onUnmounted(() => {
 
       <!-- iOS-Style Action Bar (Sticky Bottom) -->
       <div
-        class="border-t border-gray-200 dark:border-zinc-700 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl"
+        class="border-t border-zinc-800 bg-zinc-950/95 backdrop-blur-xl"
       >
-        <div class="px-5 py-3 grid grid-cols-3 gap-2">
+        <div class="px-5 py-3 grid grid-cols-2 gap-2">
           <!-- Share -->
           <button
             @click="handleShare"
@@ -1422,29 +1481,13 @@ onUnmounted(() => {
           <!-- Navigate -->
           <button
             @click="openGoogleMaps"
-            class="h-14 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50"
+            class="h-14 rounded-2xl bg-gradient-to-r from-indigo-500 to-cyan-600 flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50"
           >
             <Navigation class="w-5 h-5 text-white" />
             <span
               class="text-[10px] sm:text-[11px] font-bold text-white uppercase tracking-wide leading-tight px-1 text-center"
             >
               {{ t("vibe.navigate") }}
-            </span>
-          </button>
-
-          <!-- Ride -->
-          <button
-            @click="
-              showRidePopup = true;
-              impactFeedback('medium');
-            "
-            class="h-14 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/50"
-          >
-            <Car class="w-5 h-5 text-white" />
-            <span
-              class="text-[10px] sm:text-[11px] font-bold text-white uppercase tracking-wide leading-tight px-1 text-center"
-            >
-              {{ t("vibe.ride") }}
             </span>
           </button>
         </div>
@@ -1456,14 +1499,14 @@ onUnmounted(() => {
 
     <!-- Ride Selection Bottom Sheet -->
     <transition name="sheet">
-      <div
+      <div role="button" tabindex="0"
         v-if="showRidePopup"
         class="fixed inset-0 flex items-end justify-center bg-black/70 backdrop-blur-xl"
         :style="{ zIndex: Z.SUBMODAL }"
         @click.self="showRidePopup = false"
       >
         <div
-          class="w-full max-w-md bg-white dark:bg-zinc-900 rounded-t-[2rem] shadow-2xl"
+          class="w-full max-w-md bg-zinc-950 rounded-t-[2rem] shadow-2xl"
         >
           <!-- Drag Handle -->
           <div class="flex justify-center pt-3 pb-1">
@@ -1478,10 +1521,10 @@ onUnmounted(() => {
               >
                 <Car class="w-8 h-8 text-white" />
               </div>
-              <h3 class="text-xl font-black text-gray-900 dark:text-white">
+              <h3 class="text-xl font-black text-white">
                 {{ t("vibe.book_ride") }}
               </h3>
-              <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              <p class="text-sm text-zinc-400 mt-1">
                 {{ shop.name }}
               </p>
             </div>
@@ -1568,7 +1611,7 @@ onUnmounted(() => {
             <!-- Helper Text -->
             <p
               v-if="isMobile"
-              class="text-center text-xs text-gray-400 dark:text-gray-500 mt-4"
+              class="text-center text-xs text-zinc-500 mt-4"
             >
               {{ t("vibe.app_manual") }}
             </p>
@@ -1594,6 +1637,59 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* ====================================================
+   Neon Sign Beacon — anchors modal to venue neon sign
+   ==================================================== */
+
+/* Upward callout arrow — points modal toward the neon sign on the map */
+/* Neon top accent bar */
+.neon-modal-topbar {
+  height: 2px;
+  width: 100%;
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.neon-modal-callout {
+  width: 0;
+  height: 0;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-bottom: 11px solid var(--modal-neon, #06b6d4);
+  filter: drop-shadow(0 0 6px var(--modal-neon-glow, rgba(6,182,212,0.6)));
+  animation: neon-callout-pulse 2.4s ease-in-out infinite;
+}
+
+/* Thin glowing line below the callout arrow */
+.neon-modal-beacon-line {
+  width: 48px;
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--modal-neon, #06b6d4),
+    transparent
+  );
+  box-shadow: 0 0 8px var(--modal-neon-glow, rgba(6,182,212,0.4));
+  animation: neon-beacon-shimmer 2.4s ease-in-out infinite;
+}
+
+@keyframes neon-callout-pulse {
+  0%, 100% { opacity: 0.6; filter: drop-shadow(0 0 4px var(--modal-neon-glow, rgba(6,182,212,0.4))); }
+  50% { opacity: 1; filter: drop-shadow(0 0 10px var(--modal-neon-glow, rgba(6,182,212,0.8))); }
+}
+
+@keyframes neon-beacon-shimmer {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .neon-modal-callout { animation: none; opacity: 0.85; }
+  .neon-modal-beacon-line { animation: none; opacity: 0.7; }
+}
+
 /* iOS-Style Smooth Scrolling */
 .overflow-y-auto {
   -webkit-overflow-scrolling: touch;

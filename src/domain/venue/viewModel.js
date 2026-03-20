@@ -232,8 +232,18 @@ const collectMediaCandidates = (venue) => {
 	]);
 };
 
-export const resolveVenueMedia = (venue) => {
+export const resolveVenueMedia = (venue, realMedia = null) => {
+	const realVideos = [];
+	const realImages = [];
+	if (Array.isArray(realMedia)) {
+		realMedia.forEach((m) => {
+			if (m.type === "video") realVideos.push(m.url);
+			else if (m.type === "image" || m.type === "photo") realImages.push(m.url);
+		});
+	}
+
 	const videoCandidates = [
+		...realVideos,
 		venue?.media?.videoUrl,
 		venue?.cinematic_video_url,
 		venue?.video_url,
@@ -245,7 +255,7 @@ export const resolveVenueMedia = (venue) => {
 		.map(sanitizeUrl)
 		.filter(Boolean);
 
-	const images = collectMediaCandidates(venue);
+	const images = [...realImages, ...collectMediaCandidates(venue)];
 	const mediaImages = images.filter(
 		(url) =>
 			IMAGE_EXT_RE.test(url) ||

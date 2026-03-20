@@ -91,7 +91,7 @@ watch(
 <style scoped>
 .offline-slide-enter-active,
 .offline-slide-leave-active {
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .offline-slide-enter-from,

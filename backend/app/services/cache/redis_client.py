@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import redis
-import time
 import logging
+import time
+
+import redis
 
 from app.core.config import get_settings
 
@@ -12,10 +13,30 @@ _logger = logging.getLogger(__name__)
 
 # Fallback in-memory cache for when Redis is unavailable
 class InMemoryCache:
-    """Simple in-memory TTL-based cache as fallback"""
+    """Simple in-memory TTL-based cache with LRU eviction as fallback"""
+    MAX_ENTRIES = 5000
+
     def __init__(self):
         self.data = {}
         self.ttl = {}
+
+    def _evict_if_needed(self):
+        if len(self.data) < self.MAX_ENTRIES:
+            return
+        now = time.time()
+        # First pass: remove expired entries
+        expired = [k for k, exp in self.ttl.items() if exp < now]
+        for k in expired:
+            self.data.pop(k, None)
+            self.ttl.pop(k, None)
+        if len(self.data) < self.MAX_ENTRIES:
+            return
+        # Second pass: evict oldest 10% by TTL
+        by_ttl = sorted(self.ttl.items(), key=lambda x: x[1])
+        evict_count = max(1, self.MAX_ENTRIES // 10)
+        for k, _ in by_ttl[:evict_count]:
+            self.data.pop(k, None)
+            self.ttl.pop(k, None)
 
     def get(self, key):
         if key in self.ttl and time.time() > self.ttl[key]:
@@ -25,6 +46,7 @@ class InMemoryCache:
         return self.data.get(key)
 
     def set(self, key, value, ex=None):
+        self._evict_if_needed()
         self.data[key] = value
         if ex:
             self.ttl[key] = time.time() + ex

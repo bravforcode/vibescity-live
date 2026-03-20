@@ -1,5 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 import { getNetworkOnlineState } from "../services/networkState";
+import {
+	isAbortLikeError,
+	logUnexpectedNetworkError,
+} from "../utils/networkErrorUtils";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -116,17 +120,6 @@ const isOffline = () => {
 	}
 	return !getNetworkOnlineState();
 };
-const isAbortLikeError = (errorLike) => {
-	const name = String(errorLike?.name || "");
-	if (name === "AbortError") return true;
-	const message = toErrorMessage(errorLike?.message || errorLike);
-	return (
-		message.includes("aborterror") ||
-		message.includes("signal is aborted") ||
-		message.includes("the operation was aborted")
-	);
-};
-
 const buildOfflineResponse = (meta) => {
 	const body = JSON.stringify({
 		code: OFFLINE_ERROR_CODE,
@@ -207,7 +200,10 @@ const createSupabaseFetch = () => {
 				}
 				if (isSupabaseRequest(meta.url)) {
 					if (import.meta.env.DEV) {
-						console.error("[supabase] Network request failed:", fetchError);
+						logUnexpectedNetworkError(
+							"[supabase] Network request failed:",
+							fetchError,
+						);
 					}
 					return buildOfflineResponse(meta);
 				}
@@ -241,9 +237,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
 	]
 		.filter(Boolean)
 		.join(", ");
-	throw new Error(
-		`Missing required env vars: ${missing}. Check your .env file.`,
-	);
+	const errStr = `MISSING_ENV: ${missing}`;
+	throw new Error(errStr);
 }
 
 const getVisitorHeader = () => {

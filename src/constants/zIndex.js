@@ -34,4 +34,8 @@ export const Z = Object.freeze({
 
 	// Sub-modals / popups inside modal (ride popup, zoom image)
 	SUBMODAL: 13000,
+
+	// Global utility overlays that must stay above venue modals
+	SETTINGS_PANEL: 13100,
+	CONFIRM_DIALOG: 13200,
 });

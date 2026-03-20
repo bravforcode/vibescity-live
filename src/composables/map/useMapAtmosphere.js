@@ -34,6 +34,11 @@ export function useMapAtmosphere(
 	const firefliesData = ref({ type: "FeatureCollection", features: [] });
 	const weatherLayer = new WeatherLayer();
 	const currentMapZoom = ref(15);
+	const shouldRenderWeatherLayer = computed(
+		() =>
+			Boolean(allowWeatherFx.value) &&
+			(weatherCondition.value === "rain" || weatherCondition.value === "storm"),
+	);
 
 	watch(
 		() => map.value,
@@ -306,8 +311,19 @@ export function useMapAtmosphere(
 
 	const updateWeatherVisuals = () => {
 		if (!map.value || !isMapReady.value) return;
+		const mapInstance = map.value;
 
-		if (!map.value.getLayer("weather-layer")) {
+		if (!shouldRenderWeatherLayer.value) {
+			weatherLayer.setIntensity(0);
+			if (mapInstance.getLayer("weather-layer")) {
+				try {
+					mapInstance.removeLayer("weather-layer");
+				} catch {}
+			}
+			return;
+		}
+
+		if (!mapInstance.getLayer("weather-layer")) {
 			const labelLayerId = getFirstExistingLayerId([
 				"waterway-label",
 				"road-label",
@@ -315,10 +331,14 @@ export function useMapAtmosphere(
 				"settlement-label",
 			]);
 			try {
+				const gl = mapInstance.painter?.context?.gl;
+				if (!weatherLayer.isSupportedContext(gl)) {
+					return;
+				}
 				if (labelLayerId) {
-					map.value.addLayer(weatherLayer, labelLayerId);
+					mapInstance.addLayer(weatherLayer, labelLayerId);
 				} else {
-					map.value.addLayer(weatherLayer);
+					mapInstance.addLayer(weatherLayer);
 				}
 			} catch (e) {
 				console.warn("Weather layer add failed", e);

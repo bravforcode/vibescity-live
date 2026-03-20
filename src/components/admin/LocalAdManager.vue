@@ -1,8 +1,8 @@
 <template>
   <div class="local-ad-manager">
     <header class="lam-header">
-      <h3>📍 Local Ads</h3>
-      <button class="btn-new" @click="showForm = !showForm">
+      <h3>{{ $t("auto.k_12fed442") }}</h3>
+      <button class="btn-new" @click="showForm = !showForm" :disabled="saving">
         {{ showForm ? "Cancel" : "+ New Ad" }}
       </button>
     </header>
@@ -12,14 +12,14 @@
       <form v-if="showForm" class="ad-form" @submit.prevent="saveAd">
         <div class="form-grid">
           <div class="field">
-            <label>Title *</label>
-            <label for="ad-title">Title *</label>
+            <label>{{ $t("auto.k_684f9913") }}</label>
+            <label for="ad-title">{{ $t("auto.k_684f9913") }}</label>
             <input
               id="ad-title"
               name="ad-title"
               v-model="form.title"
               required
-              placeholder="e.g. 50% off Coffee"
+              :placeholder="$t('auto.k_2ee9bb96')"
             />
           </div>
           <div
@@ -29,11 +29,11 @@
               id="ad-description"
               name="ad-description"
               v-model="form.description"
-              placeholder="Short promo text"
+              :placeholder="$t('auto.k_55d8312d')"
             />
           </div>
           <div class="field">
-            <label for="ad-image-url">Image URL</label>
+            <label for="ad-image-url">{{ $t("auto.k_dbebc57f") }}</label>
             <input
               id="ad-image-url"
               name="ad-image-url"
@@ -43,7 +43,7 @@
             />
           </div>
           <div class="field">
-            <label for="ad-link-url">Link URL</label>
+            <label for="ad-link-url">{{ $t("auto.k_dc2857dc") }}</label>
             <input
               id="ad-link-url"
               name="ad-link-url"
@@ -75,7 +75,7 @@
             />
           </div>
           <div class="field half">
-            <label for="ad-radius">Radius (km)</label>
+            <label for="ad-radius">{{ $t("auto.k_509d4222") }}</label>
             <input
               id="ad-radius"
               name="ad-radius"
@@ -93,7 +93,7 @@
             </select>
           </div>
           <div class="field half">
-            <label for="ad-starts-at">Starts at</label>
+            <label for="ad-starts-at">{{ $t("auto.k_f7ccfdd9") }}</label>
             <input
               id="ad-starts-at"
               name="ad-starts-at"
@@ -102,7 +102,7 @@
             />
           </div>
           <div class="field half">
-            <label for="ad-ends-at">Ends at</label>
+            <label for="ad-ends-at">{{ $t("auto.k_a6c4363c") }}</label>
             <input
               id="ad-ends-at"
               name="ad-ends-at"
@@ -121,7 +121,7 @@
     </Transition>
 
     <!-- loading -->
-    <div v-if="loading" class="lam-loading">Loading ads…</div>
+    <div v-if="loading" class="lam-loading">{{ $t("auto.k_4353cba5") }}</div>
 
     <!-- list -->
     <div v-else-if="ads.length" class="ad-list">
@@ -132,7 +132,7 @@
         :class="{ paused: ad.status !== 'active' }"
       >
         <div class="ad-card-top">
-          <img
+          <img loading="lazy"
             v-if="ad.image_url"
             :src="ad.image_url"
             class="ad-thumb"
@@ -140,8 +140,7 @@
           />
           <div class="ad-info">
             <strong>{{ ad.title }}</strong>
-            <span class="ad-meta">
-              r={{ ad.radius_km }}km · {{ ad.status }}
+            <span class="ad-meta"> {{ $t("auto.k_105403f8") }}{{ ad.radius_km }}{{ $t("auto.k_cdb32198") }} {{ ad.status }}
             </span>
             <span v-if="ad.description" class="ad-card-desc">{{
               ad.description
@@ -149,23 +148,29 @@
           </div>
         </div>
         <div class="ad-card-actions">
-          <button class="btn-sm" @click="editAd(ad)">Edit</button>
-          <button class="btn-sm" @click="toggleStatus(ad)">
+          <button class="btn-sm" @click="editAd(ad)" :disabled="saving || isAdPending(ad.id)">Edit</button>
+          <button class="btn-sm" @click="toggleStatus(ad)" :disabled="saving || isAdPending(ad.id)">
             {{ ad.status === "active" ? "Pause" : "Activate" }}
           </button>
-          <button class="btn-sm btn-danger" @click="deleteAd(ad.id)">
+          <button class="btn-sm btn-danger" @click="deleteAd(ad.id)" :disabled="saving || isAdPending(ad.id)">
             Delete
           </button>
         </div>
       </div>
     </div>
 
-    <p v-else class="lam-empty">No ads yet. Click "+ New Ad" to create one.</p>
+    <p v-else class="lam-empty">{{ $t("auto.k_b7292eb7") }}</p>
   </div>
 </template>
 
 <script setup>
 import { onMounted, ref } from "vue";
+import { useNotifications } from "@/composables/useNotifications";
+import {
+	cloneOptimisticValue,
+	runOptimisticMutation,
+} from "@/composables/useOptimisticUpdate";
+import i18n from "@/i18n.js";
 import { localAdService } from "@/services/localAdService";
 
 const ads = ref([]);
@@ -174,6 +179,8 @@ const showForm = ref(false);
 const saving = ref(false);
 const formError = ref(null);
 const editingId = ref(null);
+const pendingActionIds = ref(new Set());
+const { notify, notifyError, notifySuccess } = useNotifications();
 
 const defaultForm = () => ({
 	title: "",
@@ -190,12 +197,48 @@ const defaultForm = () => ({
 
 const form = ref(defaultForm());
 
+const setAdPending = (id, isPending) => {
+	const next = new Set(pendingActionIds.value);
+	if (isPending) next.add(id);
+	else next.delete(id);
+	pendingActionIds.value = next;
+};
+
+const isAdPending = (id) => pendingActionIds.value.has(id);
+
+const resetForm = () => {
+	form.value = defaultForm();
+	editingId.value = null;
+	showForm.value = false;
+	formError.value = null;
+};
+
+const toFormPayload = () => {
+	const payload = { ...form.value };
+	if (!payload.starts_at) delete payload.starts_at;
+	if (!payload.ends_at) delete payload.ends_at;
+	return payload;
+};
+
+const buildOptimisticAd = (payload, id) => ({
+	id,
+	title: payload.title,
+	description: payload.description || "",
+	image_url: payload.image_url || "",
+	link_url: payload.link_url || "",
+	radius_km: payload.radius_km || 5,
+	status: payload.status || "active",
+	starts_at: payload.starts_at || null,
+	ends_at: payload.ends_at || null,
+	location: `POINT(${payload.lng} ${payload.lat})`,
+});
+
 async function loadAds() {
 	loading.value = true;
 	try {
 		ads.value = await localAdService.getAll();
 	} catch (e) {
-		console.error("[LocalAdManager] load failed", e);
+		notifyError(e?.message || "Failed to load ads");
 	} finally {
 		loading.value = false;
 	}
@@ -205,20 +248,69 @@ async function saveAd() {
 	saving.value = true;
 	formError.value = null;
 	try {
-		const payload = { ...form.value };
-		// clean empty date strings
-		if (!payload.starts_at) delete payload.starts_at;
-		if (!payload.ends_at) delete payload.ends_at;
+		const payload = toFormPayload();
 
 		if (editingId.value) {
-			await localAdService.update(editingId.value, payload);
+			const currentId = editingId.value;
+			const optimisticAd = buildOptimisticAd(payload, currentId);
+			await runOptimisticMutation({
+				capture: () => cloneOptimisticValue(ads.value),
+				applyOptimistic: () => {
+					ads.value = ads.value.map((ad) =>
+						ad.id === currentId ? { ...ad, ...optimisticAd } : ad,
+					);
+				},
+				rollback: (snapshot) => {
+					ads.value = snapshot || [];
+				},
+				commit: () => localAdService.update(currentId, payload),
+				onSuccess: async (savedAd) => {
+					if (savedAd) {
+						ads.value = ads.value.map((ad) =>
+							ad.id === currentId ? { ...ad, ...savedAd } : ad,
+						);
+					} else {
+						await loadAds();
+					}
+					resetForm();
+					notifySuccess("Ad updated.");
+				},
+				onError: (error) => {
+					formError.value = error?.message || "Save failed";
+				},
+				notify,
+				errorMessage: (error) => error?.message || "Save failed",
+			});
 		} else {
-			await localAdService.create(payload);
+			const tempId = `local-ad-temp-${Date.now()}`;
+			const optimisticAd = buildOptimisticAd(payload, tempId);
+			await runOptimisticMutation({
+				capture: () => cloneOptimisticValue(ads.value),
+				applyOptimistic: () => {
+					ads.value = [optimisticAd, ...ads.value];
+				},
+				rollback: (snapshot) => {
+					ads.value = snapshot || [];
+				},
+				commit: () => localAdService.create(payload),
+				onSuccess: async (createdAd) => {
+					if (createdAd) {
+						ads.value = ads.value.map((ad) =>
+							ad.id === tempId ? createdAd : ad,
+						);
+					} else {
+						await loadAds();
+					}
+					resetForm();
+					notifySuccess("Ad created.");
+				},
+				onError: (error) => {
+					formError.value = error?.message || "Save failed";
+				},
+				notify,
+				errorMessage: (error) => error?.message || "Save failed",
+			});
 		}
-		form.value = defaultForm();
-		editingId.value = null;
-		showForm.value = false;
-		await loadAds();
 	} catch (e) {
 		formError.value = e.message || "Save failed";
 	} finally {
@@ -255,21 +347,64 @@ function editAd(ad) {
 }
 
 async function toggleStatus(ad) {
+	if (isAdPending(ad.id)) return;
+
+	const nextStatus = ad.status === "active" ? "paused" : "active";
+	setAdPending(ad.id, true);
 	try {
-		await localAdService.toggleStatus(ad.id, ad.status);
-		await loadAds();
-	} catch (e) {
-		console.error("[LocalAdManager] toggle failed", e);
+		await runOptimisticMutation({
+			capture: () => cloneOptimisticValue(ads.value),
+			applyOptimistic: () => {
+				ads.value = ads.value.map((item) =>
+					item.id === ad.id ? { ...item, status: nextStatus } : item,
+				);
+			},
+			rollback: (snapshot) => {
+				ads.value = snapshot || [];
+			},
+			commit: () => localAdService.toggleStatus(ad.id, ad.status),
+			onSuccess: async (savedAd) => {
+				if (savedAd) {
+					ads.value = ads.value.map((item) =>
+						item.id === ad.id ? { ...item, ...savedAd } : item,
+					);
+				} else {
+					await loadAds();
+				}
+				notifySuccess(nextStatus === "active" ? "Ad activated." : "Ad paused.");
+			},
+			notify,
+			errorMessage: (error) => error?.message || "Failed to update ad status",
+		});
+	} finally {
+		setAdPending(ad.id, false);
 	}
 }
 
 async function deleteAd(id) {
-	if (!confirm("Delete this ad permanently?")) return;
+	if (!confirm(i18n.global.t("auto.k_d6607f1b"))) return;
+	if (isAdPending(id)) return;
+
+	setAdPending(id, true);
 	try {
-		await localAdService.remove(id);
-		await loadAds();
-	} catch (e) {
-		console.error("[LocalAdManager] delete failed", e);
+		await runOptimisticMutation({
+			capture: () => cloneOptimisticValue(ads.value),
+			applyOptimistic: () => {
+				ads.value = ads.value.filter((ad) => ad.id !== id);
+			},
+			rollback: (snapshot) => {
+				ads.value = snapshot || [];
+			},
+			commit: () => localAdService.remove(id),
+			onSuccess: () => {
+				if (editingId.value === id) resetForm();
+				notifySuccess("Ad deleted.");
+			},
+			notify,
+			errorMessage: (error) => error?.message || "Failed to delete ad",
+		});
+	} finally {
+		setAdPending(id, false);
 	}
 }
 
@@ -304,6 +439,11 @@ onMounted(loadAds);
 }
 .btn-new:hover {
   opacity: 0.85;
+}
+.btn-new:disabled,
+.btn-sm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* form */
@@ -439,6 +579,9 @@ onMounted(loadAds);
 }
 .btn-sm:hover {
   background: rgba(255, 255, 255, 0.08);
+}
+.btn-sm:disabled:hover {
+  background: transparent;
 }
 .btn-danger {
   border-color: rgba(248, 113, 113, 0.3);

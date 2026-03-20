@@ -14,6 +14,12 @@ const runtimeContext = {
 	deviceTier: "",
 	mapMode: "full",
 };
+const latestVitals = {
+	fcp: null,
+	lcp: null,
+	cls: null,
+	inp: null,
+};
 
 const parseEnvFloat = (raw, fallback) => {
 	const v = Number(raw);
@@ -118,15 +124,28 @@ const reportVital = (metricName, value) => {
 };
 
 const observeLcp = () => {
+	if (
+		!PerformanceObserver.supportedEntryTypes?.includes(
+			"largest-contentful-paint",
+		)
+	) {
+		return;
+	}
 	let lastLcp = null;
 	const observer = new PerformanceObserver((list) => {
 		const entries = list.getEntries();
 		lastLcp = entries[entries.length - 1];
+		if (lastLcp?.startTime) {
+			latestVitals.lcp = lastLcp.startTime;
+		}
 	});
 	observer.observe({ type: "largest-contentful-paint", buffered: true });
 
 	const flush = () => {
-		if (lastLcp?.startTime) reportVital("LCP", lastLcp.startTime);
+		if (lastLcp?.startTime) {
+			latestVitals.lcp = lastLcp.startTime;
+			reportVital("LCP", lastLcp.startTime);
+		}
 		observer.disconnect();
 	};
 	document.addEventListener(
@@ -139,11 +158,15 @@ const observeLcp = () => {
 };
 
 const observeCls = () => {
+	if (!PerformanceObserver.supportedEntryTypes?.includes("layout-shift")) {
+		return;
+	}
 	let cls = 0;
 	const observer = new PerformanceObserver((list) => {
 		for (const entry of list.getEntries()) {
 			if (!entry.hadRecentInput) cls += entry.value;
 		}
+		latestVitals.cls = cls;
 	});
 	observer.observe({ type: "layout-shift", buffered: true });
 
@@ -151,6 +174,7 @@ const observeCls = () => {
 		"visibilitychange",
 		() => {
 			if (document.visibilityState === "hidden") {
+				latestVitals.cls = cls;
 				reportVital("CLS", cls);
 				observer.disconnect();
 			}
@@ -166,6 +190,7 @@ const observeInp = () => {
 		for (const entry of list.getEntries()) {
 			if (entry.duration > maxDuration) {
 				maxDuration = entry.duration;
+				latestVitals.inp = maxDuration;
 			}
 		}
 	});
@@ -174,7 +199,10 @@ const observeInp = () => {
 		"visibilitychange",
 		() => {
 			if (document.visibilityState === "hidden") {
-				if (maxDuration > 0) reportVital("INP", maxDuration);
+				if (maxDuration > 0) {
+					latestVitals.inp = maxDuration;
+					reportVital("INP", maxDuration);
+				}
 				observer.disconnect();
 			}
 		},
@@ -231,6 +259,11 @@ export const webVitalsService = {
 			mapMode: runtimeContext.mapMode || "full",
 			frameBudgetMissCount,
 			longTaskCount,
+		};
+	},
+	getLatestVitals() {
+		return {
+			...latestVitals,
 		};
 	},
 };

@@ -1,0 +1,2707 @@
+{
+  "info": {
+    "name": "VibeCity Local API",
+    "_postman_id": "07b3abda-8ee1-453c-8865-a0079565ab15",
+    "description": "Generated from local OpenAPI: http://localhost:8000/api/v1/openapi.json",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "system",
+      "item": [
+        {
+          "name": "GET /",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [],
+              "query": [],
+              "variable": []
+            },
+            "description": "Root"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Health Check"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Health returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Health body has status', function () {",
+                  "  const data = pm.response.json();",
+                  "  pm.expect(data).to.have.property('status');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /health/liveness",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health/liveness",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health",
+                "liveness"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Health Liveness"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /health/readiness",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health/readiness",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health",
+                "readiness"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Health Readiness"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/metrics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "metrics"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Metrics Endpoint"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "v1",
+      "item": [
+        {
+          "name": "GET /api/v1/admin/pending/shops",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/pending/shops",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "pending",
+                "shops"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "List Pending Shops"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/analytics/dashboard/stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/dashboard/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "analytics",
+                "dashboard",
+                "stats"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Get Dashboard Stats"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/emergency/contacts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emergency/contacts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emergency",
+                "contacts"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Get Emergency Contacts"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/emergency/hospitals",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emergency/hospitals",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emergency",
+                "hospitals"
+              ],
+              "query": [
+                {
+                  "key": "lat",
+                  "value": "{{lat}}",
+                  "description": "User latitude"
+                },
+                {
+                  "key": "lng",
+                  "value": "{{lng}}",
+                  "description": "User longitude"
+                },
+                {
+                  "key": "radius",
+                  "value": "{{radius}}",
+                  "description": "Search radius in meters"
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "description": "Max results"
+                }
+              ],
+              "variable": []
+            },
+            "description": "Get Nearby Hospitals"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/emergency/nearby",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emergency/nearby",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emergency",
+                "nearby"
+              ],
+              "query": [
+                {
+                  "key": "lat",
+                  "value": "{{lat}}",
+                  "description": "User latitude"
+                },
+                {
+                  "key": "lng",
+                  "value": "{{lng}}",
+                  "description": "User longitude"
+                },
+                {
+                  "key": "radius",
+                  "value": "{{radius}}",
+                  "description": "Search radius in meters"
+                }
+              ],
+              "variable": []
+            },
+            "description": "Get All Nearby Emergency"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/emergency/police",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emergency/police",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emergency",
+                "police"
+              ],
+              "query": [
+                {
+                  "key": "lat",
+                  "value": "{{lat}}",
+                  "description": "User latitude"
+                },
+                {
+                  "key": "lng",
+                  "value": "{{lng}}",
+                  "description": "User longitude"
+                },
+                {
+                  "key": "radius",
+                  "value": "{{radius}}",
+                  "description": "Search radius in meters"
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "description": "Max results"
+                }
+              ],
+              "variable": []
+            },
+            "description": "Get Nearby Police"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/owner/insights",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Visitor-Token",
+                "value": "{{X_Visitor_Token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/owner/insights",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "owner",
+                "insights"
+              ],
+              "query": [
+                {
+                  "key": "visitor_id",
+                  "value": "{{visitor_id}}",
+                  "description": ""
+                },
+                {
+                  "key": "days",
+                  "value": "{{days}}",
+                  "description": ""
+                }
+              ],
+              "variable": []
+            },
+            "description": "Get Owner Insights"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/owner/portfolio",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Visitor-Token",
+                "value": "{{X_Visitor_Token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/owner/portfolio",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "owner",
+                "portfolio"
+              ],
+              "query": [
+                {
+                  "key": "visitor_id",
+                  "value": "{{visitor_id}}",
+                  "description": ""
+                }
+              ],
+              "variable": []
+            },
+            "description": "Get Owner Portfolio"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/owner/stats/{shop_id}",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/owner/stats/{shop_id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "owner",
+                "stats",
+                ":shop_id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "shop_id",
+                  "value": "{{shop_id}}"
+                }
+              ]
+            },
+            "description": "Get Shop Stats"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/owner/venues",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Visitor-Token",
+                "value": "{{X_Visitor_Token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/owner/venues",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "owner",
+                "venues"
+              ],
+              "query": [
+                {
+                  "key": "visitor_id",
+                  "value": "{{visitor_id}}",
+                  "description": ""
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "description": ""
+                }
+              ],
+              "variable": []
+            },
+            "description": "Get Owner Venues"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/partner/dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Visitor-Token",
+                "value": "{{X_Visitor_Token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/partner/dashboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "partner",
+                "dashboard"
+              ],
+              "query": [
+                {
+                  "key": "visitor_id",
+                  "value": "{{visitor_id}}",
+                  "description": ""
+                }
+              ],
+              "variable": []
+            },
+            "description": "Get Partner Dashboard"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/partner/status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Visitor-Token",
+                "value": "{{X_Visitor_Token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/partner/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "partner",
+                "status"
+              ],
+              "query": [
+                {
+                  "key": "visitor_id",
+                  "value": "{{visitor_id}}",
+                  "description": ""
+                }
+              ],
+              "variable": []
+            },
+            "description": "Get Partner Status"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/places/authority",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/places/authority",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "places",
+                "authority"
+              ],
+              "query": [
+                {
+                  "key": "province",
+                  "value": "{{province}}",
+                  "description": ""
+                },
+                {
+                  "key": "q",
+                  "value": "{{q}}",
+                  "description": ""
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "description": ""
+                }
+              ],
+              "variable": []
+            },
+            "description": "Authority"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/places/nearby",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/places/nearby",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "places",
+                "nearby"
+              ],
+              "query": [
+                {
+                  "key": "lat",
+                  "value": "{{lat}}",
+                  "description": ""
+                },
+                {
+                  "key": "lng",
+                  "value": "{{lng}}",
+                  "description": ""
+                },
+                {
+                  "key": "radius",
+                  "value": "{{radius}}",
+                  "description": ""
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "description": ""
+                },
+                {
+                  "key": "provider",
+                  "value": "{{provider}}",
+                  "description": ""
+                }
+              ],
+              "variable": []
+            },
+            "description": "Nearby"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/places/search",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/places/search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "places",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "{{q}}",
+                  "description": ""
+                },
+                {
+                  "key": "lat",
+                  "value": "{{lat}}",
+                  "description": ""
+                },
+                {
+                  "key": "lng",
+                  "value": "{{lng}}",
+                  "description": ""
+                },
+                {
+                  "key": "radius",
+                  "value": "{{radius}}",
+                  "description": ""
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "description": ""
+                },
+                {
+                  "key": "province",
+                  "value": "{{province}}",
+                  "description": ""
+                },
+                {
+                  "key": "category",
+                  "value": "{{category}}",
+                  "description": ""
+                }
+              ],
+              "variable": []
+            },
+            "description": "Search Places"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/proxy/mapbox-directions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Mapbox-Token",
+                "value": "{{X_Mapbox_Token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/proxy/mapbox-directions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "proxy",
+                "mapbox-directions"
+              ],
+              "query": [
+                {
+                  "key": "start_lat",
+                  "value": "{{start_lat}}",
+                  "description": ""
+                },
+                {
+                  "key": "start_lng",
+                  "value": "{{start_lng}}",
+                  "description": ""
+                },
+                {
+                  "key": "end_lat",
+                  "value": "{{end_lat}}",
+                  "description": ""
+                },
+                {
+                  "key": "end_lng",
+                  "value": "{{end_lng}}",
+                  "description": ""
+                },
+                {
+                  "key": "profile",
+                  "value": "{{profile}}",
+                  "description": ""
+                },
+                {
+                  "key": "geometries",
+                  "value": "{{geometries}}",
+                  "description": ""
+                },
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "description": ""
+                }
+              ],
+              "variable": []
+            },
+            "description": "Mapbox Directions"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/proxy/osm-roads",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/proxy/osm-roads",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "proxy",
+                "osm-roads"
+              ],
+              "query": [
+                {
+                  "key": "south",
+                  "value": "{{south}}",
+                  "description": ""
+                },
+                {
+                  "key": "west",
+                  "value": "{{west}}",
+                  "description": ""
+                },
+                {
+                  "key": "north",
+                  "value": "{{north}}",
+                  "description": ""
+                },
+                {
+                  "key": "east",
+                  "value": "{{east}}",
+                  "description": ""
+                }
+              ],
+              "variable": []
+            },
+            "description": "Osm Roads"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/rides/providers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/rides/providers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "rides",
+                "providers"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "List Providers"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/seo/og/site.png",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/seo/og/site.png",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "seo",
+                "og",
+                "site.png"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Og Site"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/seo/og/venue/{slug}.png",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/seo/og/venue/{slug}.png",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "seo",
+                "og",
+                "venue",
+                "{slug}.png"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Og Venue"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/seo/redirect/public",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/seo/redirect/public",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "seo",
+                "redirect",
+                "public"
+              ],
+              "query": [
+                {
+                  "key": "path",
+                  "value": "{{path}}",
+                  "description": ""
+                }
+              ],
+              "variable": []
+            },
+            "description": "Redirect Public"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/seo/redirect/root",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/seo/redirect/root",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "seo",
+                "redirect",
+                "root"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Redirect Root"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/seo/redirect/venue/{code}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/seo/redirect/venue/{code}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "seo",
+                "redirect",
+                "venue",
+                ":code"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "code",
+                  "value": "{{code}}"
+                }
+              ]
+            },
+            "description": "Redirect Venue Short Code"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/shops/",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/shops/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shops"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Read Shops"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/shops/{shop_id}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/shops/{shop_id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shops",
+                ":shop_id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "shop_id",
+                  "value": "{{shop_id}}"
+                }
+              ]
+            },
+            "description": "Read Shop"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/shops/{shop_id}/reviews",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/shops/{shop_id}/reviews",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shops",
+                ":shop_id",
+                "reviews"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "description": ""
+                }
+              ],
+              "variable": [
+                {
+                  "key": "shop_id",
+                  "value": "{{shop_id}}"
+                }
+              ]
+            },
+            "description": "Read Shop Reviews"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/ugc/achievements",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ugc/achievements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ugc",
+                "achievements"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Get Achievements"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/ugc/leaderboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ugc/leaderboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ugc",
+                "leaderboard"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "description": "Max results"
+                }
+              ],
+              "variable": []
+            },
+            "description": "Get Leaderboard"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/ugc/my-stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ugc/my-stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ugc",
+                "my-stats"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Get User Stats"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/ugc/my-submissions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ugc/my-submissions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ugc",
+                "my-submissions"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Get User Submissions"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/vibes/status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/vibes/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "vibes",
+                "status"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Get Vibes Status"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/visitor/bootstrap",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/visitor/bootstrap",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "visitor",
+                "bootstrap"
+              ],
+              "query": [
+                {
+                  "key": "visitor_id",
+                  "value": "{{visitor_id}}",
+                  "description": ""
+                }
+              ],
+              "variable": []
+            },
+            "description": "Bootstrap Visitor Get"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/admin/shops/{shop_id}/approve",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/shops/{shop_id}/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "shops",
+                ":shop_id",
+                "approve"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "shop_id",
+                  "value": "{{shop_id}}"
+                }
+              ]
+            },
+            "description": "Approve Shop"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/admin/shops/{shop_id}/reject",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/shops/{shop_id}/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "shops",
+                ":shop_id",
+                "reject"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "shop_id",
+                  "value": "{{shop_id}}"
+                }
+              ]
+            },
+            "description": "Reject Shop",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/analytics/log",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/log",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "analytics",
+                "log"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Log Event",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_type\": \"string\",\n  \"data\": {},\n  \"user_id\": \"string\",\n  \"visitor_id\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/owner/promote/{shop_id}",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/owner/promote/{shop_id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "owner",
+                "promote",
+                ":shop_id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "shop_id",
+                  "value": "{{shop_id}}"
+                }
+              ]
+            },
+            "description": "Toggle Promote"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/partner/bank",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Visitor-Token",
+                "value": "{{X_Visitor_Token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/partner/bank",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "partner",
+                "bank"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Update Partner Bank",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"visitor_id\": \"string\",\n  \"bank_code\": \"string\",\n  \"account_name\": \"string\",\n  \"account_number\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/partner/profile",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Visitor-Token",
+                "value": "{{X_Visitor_Token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/partner/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "partner",
+                "profile"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Upsert Partner Profile",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"visitor_id\": \"string\",\n  \"display_name\": \"string\",\n  \"referral_code\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/payments/create-checkout-session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/create-checkout-session",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "create-checkout-session"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Create Checkout Session",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"itemType\": \"string\",\n  \"itemId\": \"string\",\n  \"successUrl\": \"string\",\n  \"cancelUrl\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/payments/manual-order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/manual-order",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "manual-order"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Create Manual Order",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sku\": \"string\",\n  \"slip_url\": \"string\",\n  \"buyer_profile\": {\n    \"full_name\": \"string\",\n    \"phone\": \"string\",\n    \"email\": \"string\",\n    \"address_line1\": \"string\",\n    \"country\": \"string\",\n    \"province\": \"string\",\n    \"district\": \"string\",\n    \"postal_code\": \"string\",\n    \"address_line2\": \"string\"\n  },\n  \"venue_id\": \"string\",\n  \"amount\": 1.0,\n  \"visitor_id\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/payments/webhook",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/webhook",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "webhook"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Stripe Webhook"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/redemption/claim/{coupon_id}",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/redemption/claim/{coupon_id}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "redemption",
+                "claim",
+                ":coupon_id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "coupon_id",
+                  "value": "{{coupon_id}}"
+                }
+              ]
+            },
+            "description": "Claim Coupon"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/rides/estimate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/rides/estimate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "rides",
+                "estimate"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Estimate Ride",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"origin\": {\n    \"lat\": 1.0,\n    \"lng\": 1.0\n  },\n  \"destination\": {\n    \"lat\": 1.0,\n    \"lng\": 1.0\n  },\n  \"province\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/shops/{shop_id}/reviews",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/shops/{shop_id}/reviews",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shops",
+                ":shop_id",
+                "reviews"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "shop_id",
+                  "value": "{{shop_id}}"
+                }
+              ]
+            },
+            "description": "Create Shop Review",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 1.0,\n  \"comment\": \"string\",\n  \"userName\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/ugc/check-in",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ugc/check-in",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ugc",
+                "check-in"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Check In",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"venue_id\": \"string\",\n  \"note\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/ugc/photos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ugc/photos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ugc",
+                "photos"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Upload Photo",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"venue_id\": \"string\",\n  \"image_url\": \"string\",\n  \"caption\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/ugc/shops",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ugc/shops",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ugc",
+                "shops"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Submit Shop",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"category\": \"string\",\n  \"latitude\": 1.0,\n  \"longitude\": 1.0,\n  \"province\": \"string\",\n  \"images\": [\n    \"string\"\n  ],\n  \"description\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/visitor/bootstrap",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/visitor/bootstrap",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "visitor",
+                "bootstrap"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Bootstrap Visitor",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"visitor_id\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx response', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503, 504]);",
+                  "});",
+                  "pm.test('Response time < 5000ms', function () {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "event": [],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000"
+    }
+  ]
+}

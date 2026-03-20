@@ -11,6 +11,8 @@ const getHeaders = async () => {
 	};
 };
 
+const readJsonSafe = async (response) => response.json().catch(() => ({}));
+
 export const redemptionService = {
 	async claimCoupon(couponId) {
 		const apiBase = getApiV1BaseUrl();
@@ -20,8 +22,26 @@ export const redemptionService = {
 			headers,
 		});
 
-		const data = await res.json();
+		const data = await readJsonSafe(res);
 		if (!res.ok) throw new Error(data.detail || "Failed to claim coupon");
 		return data; // { success: true, message: "…" }
+	},
+
+	async getHistory(limit = 5) {
+		const apiBase = getApiV1BaseUrl();
+		const headers = await getHeaders();
+		const res = await fetch(
+			`${apiBase}/redemption/history?limit=${encodeURIComponent(limit)}`,
+			{
+				method: "GET",
+				headers,
+			},
+		);
+
+		const data = await readJsonSafe(res);
+		if (!res.ok) {
+			throw new Error(data.detail || "Failed to load redemption history");
+		}
+		return Array.isArray(data?.data) ? data.data : [];
 	},
 };

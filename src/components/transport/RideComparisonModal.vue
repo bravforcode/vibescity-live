@@ -1,6 +1,6 @@
 <script setup>
 import { Car, Clock, X, Zap } from "lucide-vue-next";
-import { computed, watch } from "vue";
+import { computed, onUnmounted, watch } from "vue";
 import { useSwipeToDismiss } from "../../composables/useSwipeToDismiss";
 import { useTransportLogic } from "../../composables/useTransportLogic";
 import { Z } from "../../constants/zIndex";
@@ -13,7 +13,10 @@ const props = defineProps({
 
 const emit = defineEmits(["close", "open-app"]);
 
-const { estimates, isLoading, error, fetchRideEstimates } = useTransportLogic();
+const { estimates, isLoading, error, fetchRideEstimates, cleanup } =
+	useTransportLogic();
+
+onUnmounted(cleanup);
 
 const {
 	elementRef: drawerRef,
@@ -100,7 +103,7 @@ defineExpose({
 <template>
   <!-- Gesture-synced backdrop — no CSS transition while dragging -->
   <Transition name="fade-backdrop">
-    <div
+    <div role="button" tabindex="0"
       v-if="isOpen"
       class="fixed inset-0 will-change-[backdrop-filter,opacity]"
       :style="{
@@ -123,7 +126,7 @@ defineExpose({
       class="fixed inset-x-0 bottom-0 flex flex-col rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.6)] overflow-hidden"
       role="dialog"
       aria-modal="true"
-      aria-label="Ride comparison"
+      :aria-label="$t('auto.k_cd9c38c')"
       tabindex="-1"
       :style="{
         zIndex: Z.DRAWER,
@@ -142,15 +145,14 @@ defineExpose({
         <!-- Header -->
         <div class="flex justify-between items-start mb-5 mt-2">
           <div>
-            <h3 class="text-xl font-black text-white italic tracking-wide">RIDE VIBES</h3>
-            <p class="text-sm text-zinc-400 mt-0.5">
-              To: <span class="text-blue-400 font-bold">{{ shop?.name }}</span>
+            <h3 class="text-xl font-black text-white italic tracking-wide">{{ $t("auto.k_2f61be56") }}</h3>
+            <p class="text-sm text-zinc-400 mt-0.5"> {{ $t("auto.k_539be85a") }} <span class="text-blue-400 font-bold">{{ shop?.name }}</span>
             </p>
           </div>
           <button
             @click="$emit('close')"
             class="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-            aria-label="Close ride comparison"
+            :aria-label="$t('auto.k_f62c2e48')"
           >
             <X class="w-5 h-5" />
           </button>
@@ -164,7 +166,7 @@ defineExpose({
             class="space-y-3"
             aria-busy="true"
             aria-live="polite"
-            aria-label="Loading ride options"
+            :aria-label="$t('auto.k_7c07e19d')"
           >
             <div
               v-for="n in 3"
@@ -218,7 +220,7 @@ defineExpose({
               <!-- Best option badge -->
               <div
                 v-if="isBestRide(ride)"
-                class="absolute -top-2.5 left-3 flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-[9px] font-black text-white uppercase tracking-wider shadow-lg shadow-purple-500/30"
+                class="absolute -top-2.5 left-3 flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 text-[9px] font-black text-white uppercase tracking-wider shadow-lg shadow-cyan-500/30"
               >
                 <Zap class="w-2.5 h-2.5" aria-hidden="true" />
                 {{ bestBadgeLabel(ride) }}
@@ -257,9 +259,7 @@ defineExpose({
 
         <!-- Footer -->
         <div class="mt-5 pt-4 border-t border-white/5 flex justify-center">
-          <p class="text-[10px] text-zinc-600">
-            Prices are estimates. Subject to provider terms.
-          </p>
+          <p class="text-[10px] text-zinc-600"> {{ $t("auto.k_f820f791") }} </p>
         </div>
       </div>
     </div>
@@ -296,7 +296,7 @@ defineExpose({
     conic-gradient(
         from var(--border-angle),
         #ec4899 0%,
-        #8b5cf6 33%,
+        #22d3ee 33%,
         #3b82f6 66%,
         #ec4899 100%
       )

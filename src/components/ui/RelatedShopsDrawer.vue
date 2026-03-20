@@ -26,7 +26,7 @@ const getShopImage = (shop) => {
       leave-from-class="opacity-100"
       leave-to-class="opacity-0"
     >
-      <div
+      <div role="button" tabindex="0"
         v-if="isOpen"
         @click="$emit('close')"
         class="fixed inset-0 bg-black/50 backdrop-blur-sm"
@@ -51,12 +51,8 @@ const getShopImage = (shop) => {
           class="p-4 border-b border-white/10 flex items-center justify-between bg-black/20"
         >
           <div>
-            <h2 class="text-sm font-black text-white uppercase tracking-widest">
-              More Vibes
-            </h2>
-            <p class="text-[10px] text-gray-400">
-              Related to your current view
-            </p>
+            <h2 class="text-sm font-black text-white uppercase tracking-widest"> {{ $t("auto.k_b59c6135") }} </h2>
+            <p class="text-[10px] text-gray-400"> {{ $t("auto.k_dbf3185a") }} </p>
           </div>
           <button
             @click="$emit('close')"
@@ -68,7 +64,7 @@ const getShopImage = (shop) => {
 
         <!-- List -->
         <div class="flex-1 overflow-y-auto p-4 space-y-3">
-          <div
+          <div role="button" tabindex="0"
             v-for="shop in shops"
             :key="shop.id"
             @click="
@@ -81,7 +77,7 @@ const getShopImage = (shop) => {
             <div
               class="w-16 h-16 rounded-lg bg-gray-800 flex-shrink-0 overflow-hidden"
             >
-              <img
+              <img loading="lazy"
                 v-if="getShopImage(shop)"
                 :src="getShopImage(shop)"
                 :alt="shop.name || 'Shop image'"

@@ -10,7 +10,7 @@
         >
         <span
           class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-1"
-          >Total Users</span
+          >{{ $t("auto.k_c0bd24a5") }}</span
         >
       </div>
       <div
@@ -22,7 +22,7 @@
         >
         <span
           class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-1"
-          >Coins Distributed</span
+          >{{ $t("auto.k_791f9648") }}</span
         >
       </div>
       <div
@@ -33,7 +33,7 @@
         }}</span>
         <span
           class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-1"
-          >Avg Balance</span
+          >{{ $t("auto.k_bded07") }}</span
         >
       </div>
       <div
@@ -44,7 +44,7 @@
         }}</span>
         <span
           class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-1"
-          >Avg Streak</span
+          >{{ $t("auto.k_ee9bc42f") }}</span
         >
       </div>
     </div>
@@ -68,9 +68,7 @@
         >
           <circle cx="12" cy="12" r="10" />
           <path d="m16 10-4 4-4-4" />
-        </svg>
-        Gamification Leaderboard
-      </h3>
+        </svg> {{ $t("auto.k_f19152d7") }} </h3>
       <DataTable
         ref="table"
         :columns="columns"

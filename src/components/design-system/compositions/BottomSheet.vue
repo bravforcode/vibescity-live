@@ -7,16 +7,16 @@
     <!-- Background layer with pointer events -->
     <div
       class="absolute inset-0 bg-surface-glass backdrop-blur-[20px] rounded-t-[32px] border-t border-white/10 shadow-elevation-3 pointer-events-auto"
-      @touchstart="handleTouchStart"
-      @touchmove="handleTouchMove"
+      @touchstart.passive="handleTouchStart"
+      @touchmove.passive="handleTouchMove"
       @touchend="handleTouchEnd"
     ></div>
 
     <!-- Handle -->
     <div
       class="w-full flex justify-center py-4 cursor-grab active:cursor-grabbing pointer-events-auto z-10"
-      @touchstart="handleTouchStart"
-      @touchmove="handleTouchMove"
+      @touchstart.passive="handleTouchStart"
+      @touchmove.passive="handleTouchMove"
       @touchend="handleTouchEnd"
     >
       <div class="w-12 h-1.5 bg-white/20 rounded-full"></div>

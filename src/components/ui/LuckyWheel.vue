@@ -4,6 +4,7 @@
  */
 
 import { computed, onMounted, onUnmounted, ref } from "vue";
+import { runCommitMutation } from "@/composables/useOptimisticUpdate";
 import { gamificationService } from "@/services/gamificationService";
 
 defineProps({ isDarkMode: { type: Boolean, default: true } });
@@ -29,8 +30,8 @@ const prizes = [
 		code: "coins_10",
 		label: "10 Coins",
 		value: 10,
-		color: "#7C3AED",
-		glow: "#A78BFA",
+		color: "#06B6D4",
+		glow: "#22D3EE",
 		icon: "🪙",
 	},
 	{
@@ -149,7 +150,7 @@ const normalizePrize = (raw) => {
 			code: code || "unknown",
 			label: raw?.label || raw?.prize_label || "Reward",
 			value: Number(raw?.reward_coins || 0),
-			color: "#8B5CF6",
+			color: "#22D3EE",
 			glow: "#C084FC",
 			icon: raw?.metadata?.icon || "🎁",
 		}
@@ -177,29 +178,33 @@ const spin = async () => {
 	isSpinning.value = true;
 	statusMessage.value = "";
 	selectedPrize.value = null;
-	try {
-		const result = await gamificationService.spinLuckyWheel();
-		// RPC may return { prize: {...} } or flat { prize_code, reward_coins }
-		const rawPrize = result?.prize || result;
-		const prize = normalizePrize(rawPrize);
-		const prizeIndex = Math.max(
-			prizes.findIndex((p) => p.code === prize.code),
-			0,
-		);
-		rotation.value +=
-			360 * 5 + prizeIndex * segmentAngle.value + segmentAngle.value / 2;
-		const delay = prefersReducedMotion.value ? 160 : 3800;
-		setTimeout(() => {
+	await runCommitMutation({
+		commit: () => gamificationService.spinLuckyWheel(),
+		onSuccess: (result) => {
+			// RPC may return { prize: {...} } or flat { prize_code, reward_coins }
+			const rawPrize = result?.prize || result;
+			const prize = normalizePrize(rawPrize);
+			const prizeIndex = Math.max(
+				prizes.findIndex((p) => p.code === prize.code),
+				0,
+			);
+			rotation.value +=
+				360 * 5 + prizeIndex * segmentAngle.value + segmentAngle.value / 2;
+			const delay = prefersReducedMotion.value ? 160 : 3800;
+			setTimeout(() => {
+				isSpinning.value = false;
+				canSpinToday.value = false;
+				selectedPrize.value = prize;
+				spinHistory.value = [prize, ...spinHistory.value].slice(0, 3);
+				emit("spin-complete", prize);
+			}, delay);
+		},
+		onError: (error) => {
 			isSpinning.value = false;
-			canSpinToday.value = false;
-			selectedPrize.value = prize;
-			spinHistory.value = [prize, ...spinHistory.value].slice(0, 3);
-			emit("spin-complete", prize);
-		}, delay);
-	} catch (err) {
-		isSpinning.value = false;
-		statusMessage.value = err?.message || "Spin failed. Try again.";
-	}
+			statusMessage.value = error?.message || "Spin failed. Try again.";
+		},
+		errorMessage: (error) => error?.message || "Spin failed. Try again.",
+	});
 };
 
 const show = async () => {
@@ -258,7 +263,7 @@ onUnmounted(() =>
           <button
             type="button"
             class="lw-close-btn"
-            aria-label="Close lucky wheel"
+            :aria-label="$t('auto.k_7ee263cc')"
             @click="hide"
           >
             ✕
@@ -266,9 +271,9 @@ onUnmounted(() =>
 
           <!-- Header -->
           <div class="lw-header">
-            <div class="lw-badge">DAILY SPIN</div>
-            <h2 id="lw-title" class="lw-title">Lucky Wheel</h2>
-            <p class="lw-sub">Spin once per day · No sign-in needed</p>
+            <div class="lw-badge">{{ $t("auto.k_9b605a22") }}</div>
+            <h2 id="lw-title" class="lw-title">{{ $t("auto.k_1bcacd70") }}</h2>
+            <p class="lw-sub">{{ $t("auto.k_667fd2f") }}</p>
           </div>
 
           <!-- Wheel -->
@@ -442,7 +447,7 @@ onUnmounted(() =>
           </div>
 
           <!-- Spin CTA button -->
-          <button
+          <button :aria-label="$t('a11y.action')"
             type="button"
             class="lw-spin-btn"
             :class="{
@@ -452,13 +457,13 @@ onUnmounted(() =>
             :disabled="isSpinning || !canSpinToday || isLoadingStatus"
             @click="spin"
           >
-            <span v-if="isSpinning">Spinning…</span>
-            <span v-else-if="isLoadingStatus">Loading…</span>
+            <span v-if="isSpinning">{{ $t("auto.k_476e6617") }}</span>
+            <span v-else-if="isLoadingStatus">{{ $t("auto.k_2e7e4ae3") }}</span>
             <span v-else-if="!canSpinToday && selectedPrize"
-              >🎉 Come back tomorrow!</span
+              >{{ $t("auto.k_db6efab") }}</span
             >
-            <span v-else-if="!canSpinToday">Daily limit reached</span>
-            <span v-else>🎰 SPIN NOW</span>
+            <span v-else-if="!canSpinToday">{{ $t("auto.k_8cef355b") }}</span>
+            <span v-else>{{ $t("auto.k_e684050f") }}</span>
           </button>
 
           <!-- Prize reveal -->
@@ -470,7 +475,7 @@ onUnmounted(() =>
               aria-live="polite"
             >
               <div class="lw-prize-icon">{{ selectedPrize.icon }}</div>
-              <div class="lw-prize-won">YOU WON</div>
+              <div class="lw-prize-won">{{ $t("auto.k_60fef9e4") }}</div>
               <div class="lw-prize-value">{{ selectedPrize.label }}</div>
               <div
                 v-if="Number(selectedPrize.value) > 0"
@@ -485,7 +490,7 @@ onUnmounted(() =>
           <div
             v-if="spinHistory.length"
             class="lw-history"
-            aria-label="Recent spins"
+            :aria-label="$t('auto.k_5dec6383')"
           >
             <span
               v-for="(p, idx) in spinHistory"
@@ -604,7 +609,7 @@ onUnmounted(() =>
   display: inline-block;
   padding: 2px 10px;
   border-radius: 99px;
-  background: linear-gradient(90deg, #7c3aed, #ec4899);
+  background: linear-gradient(90deg, #06b6d4, #ec4899);
   color: white;
   font-size: 9px;
   font-weight: 900;
@@ -707,7 +712,7 @@ onUnmounted(() =>
   width: 100%;
   padding: 14px;
   border-radius: 14px;
-  background: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%);
+  background: linear-gradient(135deg, #06b6d4 0%, #ec4899 100%);
   color: white;
   font-size: 15px;
   font-weight: 900;
@@ -761,9 +766,9 @@ onUnmounted(() =>
     rgba(var(--prize-color-rgb, 139, 92, 246), 0.15),
     rgba(0, 0, 0, 0.2)
   );
-  border: 1px solid var(--prize-glow, #a78bfa);
+  border: 1px solid var(--prize-glow, #22D3EE);
   box-shadow: 0 0 24px
-    color-mix(in srgb, var(--prize-glow, #a78bfa) 30%, transparent);
+    color-mix(in srgb, var(--prize-glow, #22D3EE) 30%, transparent);
   text-align: center;
 }
 .lw-prize-icon {

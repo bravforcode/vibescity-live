@@ -38,7 +38,7 @@ const toggleLanguage = () => {
   <button
     @click="toggleLanguage"
     class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/10 transition-colors transition-transform active:scale-95"
-    aria-label="Toggle Language"
+    :aria-label="$t('auto.k_9b0c921')"
   >
     <Globe class="w-4 h-4 text-white" />
     <span class="text-xs font-bold text-white uppercase">{{ currentLocale() }}</span>

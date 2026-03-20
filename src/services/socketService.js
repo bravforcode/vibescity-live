@@ -1,5 +1,9 @@
 import { ref } from "vue";
 import { getWebSocketUrl } from "../lib/runtimeConfig";
+import { isAppDebugLoggingEnabled } from "../utils/debugFlags";
+
+const isSocketDebugEnabled = () =>
+	isAppDebugLoggingEnabled() || import.meta.env.VITE_WS_CONFIG_DEBUG === "true";
 
 class SocketService {
 	constructor() {
@@ -24,8 +28,11 @@ class SocketService {
 		this.wsUrl = getWebSocketUrl();
 
 		if (!this.wsUrl) {
-			if (import.meta.env.DEV) {
-				console.warn("🔌 Socket URL not configured, realtime vibes disabled.");
+			if (
+				import.meta.env.DEV &&
+				import.meta.env.VITE_WS_CONFIG_DEBUG === "true"
+			) {
+				console.info("🔌 Realtime autoconnect disabled for this runtime.");
 			}
 			return false;
 		}
@@ -41,7 +48,7 @@ class SocketService {
 		this.shouldReconnect = true;
 
 		try {
-			if (import.meta.env.DEV) {
+			if (isSocketDebugEnabled()) {
 				console.log("🔌 Connecting to VibeStream:", this.wsUrl);
 			}
 			this.socket = new WebSocket(this.wsUrl);
@@ -51,7 +58,7 @@ class SocketService {
 		}
 
 		this.socket.onopen = () => {
-			if (import.meta.env.DEV) console.log("✅ VibeStream Connected");
+			if (isSocketDebugEnabled()) console.log("✅ VibeStream Connected");
 			this.isConnected.value = true;
 			this.reconnectAttempts = 0;
 			// Request current online count from server
@@ -73,14 +80,14 @@ class SocketService {
 				}
 				this.notifyListeners(data);
 			} catch (e) {
-				if (import.meta.env.DEV)
+				if (isSocketDebugEnabled())
 					console.warn("Non-JSON socket message:", event.data);
 				this.notifyListeners({ type: "text", content: event.data });
 			}
 		};
 
 		this.socket.onclose = () => {
-			if (import.meta.env.DEV) console.log("❌ VibeStream Disconnected");
+			if (isSocketDebugEnabled()) console.log("❌ VibeStream Disconnected");
 			this.isConnected.value = false;
 			if (this.shouldReconnect) {
 				this.retryConnection();
@@ -117,7 +124,7 @@ class SocketService {
 		const jitter = base * (0.75 + Math.random() * 0.5); // ±25% jitter prevents thundering herd
 		const backoff = Math.round(jitter);
 
-		if (this.reconnectAttempts > 0 && import.meta.env.DEV) {
+		if (this.reconnectAttempts > 0 && isSocketDebugEnabled()) {
 			console.log(
 				`🔌 Reconnecting in ${(backoff / 1000).toFixed(1)}s (Attempt ${this.reconnectAttempts}/${this.maxReconnects})...`,
 			);
@@ -152,7 +159,7 @@ class SocketService {
 			this.socket.send(payload);
 		} else {
 			// Only warn if we have a URL but socket isn't ready
-			if (import.meta.env.DEV)
+			if (isSocketDebugEnabled())
 				console.warn("Socket not open, cannot send vibe");
 		}
 	}
@@ -166,7 +173,7 @@ class SocketService {
 			this.pendingRoomIds.add(normalizedShopId);
 			this.connect();
 		}
-		if (import.meta.env.DEV) console.log(`🔌 Joined Room: ${shopId}`);
+		if (isSocketDebugEnabled()) console.log(`🔌 Joined Room: ${shopId}`);
 	}
 
 	addListener(callback) {

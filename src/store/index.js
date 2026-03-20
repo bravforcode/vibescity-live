@@ -116,6 +116,8 @@ export const initializeStores = async () => {
 export const cleanupStores = async () => {
 	const stores = useStores();
 
+	stores.shop.stopRotationTimer();
+	stores.user.cleanup();
 	await Promise.all([
 		stores.shop.unsubscribe(),
 		stores.room.cleanup(),
@@ -123,6 +125,16 @@ export const cleanupStores = async () => {
 	]);
 
 	if (import.meta.env.DEV) console.log("🧹 Stores cleaned up");
+};
+
+// ═══════════════════════════════════════════
+// 🔒 Logout Reset — clears all user-specific data
+// ═══════════════════════════════════════════
+export const resetAllOnLogout = () => {
+	const stores = useStores();
+	stores.shop.$reset();
+	// coinStore + favoritesStore reset via their own auth watchers
+	if (import.meta.env.DEV) console.log("🔒 All stores reset on logout");
 };
 
 // Default export

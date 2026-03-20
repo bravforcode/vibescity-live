@@ -3,7 +3,11 @@
  * ✅ Favorites Store with Optimistic UI + Offline Queue + CRDT Dedup
  */
 import { defineStore } from "pinia";
-import { computed, ref, shallowRef, watch } from "vue";
+import { computed, onScopeDispose, ref, shallowRef, watch } from "vue";
+import {
+	cloneOptimisticValue,
+	runOptimisticMutation,
+} from "../composables/useOptimisticUpdate";
 import { supabase } from "../lib/supabase";
 import { getNetworkOnlineState } from "../services/networkState";
 import {
@@ -15,6 +19,12 @@ import {
 	MAX_RETRIES,
 	saveOfflineActionQueue,
 } from "../services/offlineActionQueue";
+import { logUnexpectedNetworkError } from "../utils/networkErrorUtils";
+import {
+	isSoftSupabaseReadError,
+	logUnexpectedSupabaseReadError,
+	runSupabaseReadPolicy,
+} from "../utils/supabaseReadPolicy";
 import { useUserStore } from "./userStore";
 
 const hapticPulse = () => {
@@ -102,7 +112,10 @@ export const useFavoritesStore = defineStore(
 				}
 			} catch (error) {
 				if (import.meta.env.DEV) {
-					console.error("[favorites] Sync failed, queued for retry:", error);
+					logUnexpectedNetworkError(
+						"[favorites] Sync failed, queued for retry:",
+						error,
+					);
 				}
 				if (queueOnFailure) {
 					await queueOfflineFavorite(shopId, isAdding ? "add" : "remove");
@@ -151,22 +164,44 @@ export const useFavoritesStore = defineStore(
 		};
 
 		const clearAll = async () => {
-			const oldFavorites = [...favoriteIds.value];
-			favoriteIds.value = [];
-
-			if (!userStore.isAuthenticated || !userStore.userId) return;
-			try {
-				const { error } = await supabase
-					.from("user_favorites")
-					.delete()
-					.eq("user_id", userStore.userId);
-				if (error) throw error;
-			} catch (error) {
-				favoriteIds.value = oldFavorites;
-				if (import.meta.env.DEV) {
-					console.error("[favorites] Failed to clear favorites:", error);
-				}
+			if (!userStore.isAuthenticated || !userStore.userId) {
+				favoriteIds.value = [];
+				return { success: true };
 			}
+
+			const result = await runOptimisticMutation({
+				capture: () => cloneOptimisticValue(favoriteIds.value),
+				applyOptimistic: () => {
+					favoriteIds.value = [];
+				},
+				rollback: (snapshot) => {
+					favoriteIds.value = snapshot || [];
+				},
+				commit: async () => {
+					const { error } = await supabase
+						.from("user_favorites")
+						.delete()
+						.eq("user_id", userStore.userId);
+					if (error) throw error;
+					return true;
+				},
+				reportError: import.meta.env.DEV
+					? (error) => {
+							logUnexpectedNetworkError(
+								"[favorites] Failed to clear favorites:",
+								error,
+							);
+						}
+					: undefined,
+				errorMessage: (error) =>
+					String(error?.message || "Failed to clear favorites"),
+			});
+
+			if (!result.success) {
+				return { success: false, error: result.error };
+			}
+
+			return { success: true };
 		};
 
 		const fetchFavorites = async () => {
@@ -174,19 +209,31 @@ export const useFavoritesStore = defineStore(
 
 			syncStatus.value = "syncing";
 			try {
-				const { data, error } = await supabase
-					.from("user_favorites")
-					.select("venue_id")
-					.eq("user_id", userStore.userId);
-
-				if (error) throw error;
+				const { data } = await runSupabaseReadPolicy({
+					resourceType: "favoritesRead",
+					run: async () => {
+						const result = await supabase
+							.from("user_favorites")
+							.select("venue_id")
+							.eq("user_id", userStore.userId);
+						if (result.error) throw result.error;
+						return result;
+					},
+				});
 				favoriteIds.value = data?.map((item) => item.venue_id) || [];
 				lastSyncTime.value = Date.now();
 				syncStatus.value = "idle";
 			} catch (error) {
+				if (isSoftSupabaseReadError(error)) {
+					syncStatus.value = "idle";
+					return;
+				}
 				syncStatus.value = "error";
 				if (import.meta.env.DEV) {
-					console.error("[favorites] Failed to fetch favorites:", error);
+					logUnexpectedSupabaseReadError(
+						"[favorites] Failed to fetch favorites:",
+						error,
+					);
 				}
 			}
 		};
@@ -311,16 +358,22 @@ export const useFavoritesStore = defineStore(
 
 		void hydrateOfflineQueue();
 
-		// Auto-flush when coming back online
+		// Auto-flush when coming back online (named handlers for proper cleanup)
 		if (typeof window !== "undefined") {
-			window.addEventListener("online", () => void flushOfflineFavorites());
-
-			// sendBeacon fallback: flush pending mutations on page close
-			window.addEventListener("beforeunload", () => {
+			const onlineHandler = () => void flushOfflineFavorites();
+			const beforeUnloadHandler = () => {
 				if (pendingSync.value.length > 0 && navigator.sendBeacon) {
 					const payload = JSON.stringify(pendingSync.value);
 					navigator.sendBeacon("/api/sync-favorites", payload);
 				}
+			};
+
+			window.addEventListener("online", onlineHandler);
+			window.addEventListener("beforeunload", beforeUnloadHandler);
+
+			onScopeDispose(() => {
+				window.removeEventListener("online", onlineHandler);
+				window.removeEventListener("beforeunload", beforeUnloadHandler);
 			});
 		}
 

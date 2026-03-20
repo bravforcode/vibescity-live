@@ -8,7 +8,6 @@ import pytest
 
 from app.api.routers import map_core as map_core_module
 
-
 # ── Supabase fake ─────────────────────────────────────────────────
 
 

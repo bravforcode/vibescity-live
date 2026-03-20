@@ -18,9 +18,27 @@ export class WeatherLayer {
 		this.wind = { x: 0.5, y: 0.5 }; // normalized wind vector
 	}
 
+	isSupportedContext(gl = this.gl) {
+		if (!gl) return false;
+		if (
+			typeof WebGL2RenderingContext !== "undefined" &&
+			gl instanceof WebGL2RenderingContext
+		) {
+			return true;
+		}
+		try {
+			return /webgl 2/i.test(String(gl.getParameter(gl.VERSION) || ""));
+		} catch {
+			return false;
+		}
+	}
+
 	onAdd(map, gl) {
 		this.map = map;
 		this.gl = gl;
+		if (!this.isSupportedContext(gl)) {
+			return;
+		}
 
 		// Vertex Shader: Moves particles based on time and wind
 		const vertexSource = `#version 300 es
@@ -93,6 +111,7 @@ export class WeatherLayer {
 			this.getVertexShader(),
 			this.getFragmentShader(),
 		);
+		if (!this.program) return;
 		this.aPos = gl.getAttribLocation(this.program, "a_pos");
 		this.uMatrix = gl.getUniformLocation(this.program, "u_matrix");
 		this.uTime = gl.getUniformLocation(this.program, "u_time");
@@ -119,7 +138,14 @@ export class WeatherLayer {
 	// For now, let's implement the standard particle drop.
 
 	render(gl, matrix) {
-		if (this.intensity <= 0) return;
+		if (
+			this.intensity <= 0 ||
+			!this.program ||
+			!this.buffer ||
+			!this.isSupportedContext(gl)
+		) {
+			return;
+		}
 
 		gl.useProgram(this.program);
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
@@ -225,14 +251,17 @@ export class WeatherLayer {
 		gl.shaderSource(vs, vsSource);
 		gl.compileShader(vs);
 		if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS)) {
-			console.error("VS Error:", gl.getShaderInfoLog(vs));
+			gl.deleteShader(vs);
+			return null;
 		}
 
 		const fs = gl.createShader(gl.FRAGMENT_SHADER);
 		gl.shaderSource(fs, fsSource);
 		gl.compileShader(fs);
 		if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
-			console.error("FS Error:", gl.getShaderInfoLog(fs));
+			gl.deleteShader(vs);
+			gl.deleteShader(fs);
+			return null;
 		}
 
 		const prog = gl.createProgram();
@@ -241,8 +270,13 @@ export class WeatherLayer {
 		gl.linkProgram(prog);
 
 		if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-			console.error("Program Link Error:", gl.getProgramInfoLog(prog));
+			gl.deleteShader(vs);
+			gl.deleteShader(fs);
+			gl.deleteProgram(prog);
+			return null;
 		}
+		gl.deleteShader(vs);
+		gl.deleteShader(fs);
 		return prog;
 	}
 

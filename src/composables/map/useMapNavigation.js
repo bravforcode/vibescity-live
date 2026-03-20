@@ -1,9 +1,30 @@
-import { ref } from "vue";
+import { getCurrentInstance, onUnmounted, ref } from "vue";
 import { apiFetch } from "../../services/apiClient";
+import {
+	isExpectedAbortError,
+	logUnexpectedNetworkError,
+} from "../../utils/networkErrorUtils";
+
+const SHOULD_FETCH_ROUTE_PROXY =
+	!import.meta.env.DEV ||
+	import.meta.env.VITE_API_PROXY_DEV === "true" ||
+	import.meta.env.VITE_DIRECTIONS_DEV === "true";
 
 export function useMapNavigation(map) {
 	const roadDistance = ref(null);
 	const roadDuration = ref(null);
+	let activeRequestId = 0;
+	let routeAbortController = null;
+
+	const cleanup = () => {
+		activeRequestId += 1;
+		routeAbortController?.abort?.();
+		routeAbortController = null;
+	};
+
+	if (getCurrentInstance()) {
+		onUnmounted(cleanup);
+	}
 
 	const flyToLocation = (lngLat, zoom = 17, pitch = 60) => {
 		if (!map.value) return;
@@ -27,6 +48,11 @@ export function useMapNavigation(map) {
 
 	const fetchRoute = async (start, end, token) => {
 		if (!map.value || !start || !end) return;
+		if (!SHOULD_FETCH_ROUTE_PROXY) return;
+		const requestId = ++activeRequestId;
+		routeAbortController?.abort?.();
+		const controller = new AbortController();
+		routeAbortController = controller;
 
 		try {
 			const params = new URLSearchParams({
@@ -40,12 +66,20 @@ export function useMapNavigation(map) {
 			const res = await apiFetch(
 				`/proxy/mapbox-directions?${params.toString()}`,
 				{
+					signal: controller.signal,
 					includeVisitor: false,
 					headers: { "X-Mapbox-Token": String(token || "") },
 				},
 			);
-			if (!res.ok) return;
+			if (
+				!res.ok ||
+				requestId !== activeRequestId ||
+				controller.signal.aborted
+			) {
+				return;
+			}
 			const data = await res.json();
+			if (requestId !== activeRequestId || controller.signal.aborted) return;
 
 			if (data.routes?.[0]) {
 				const route = data.routes[0];
@@ -61,13 +95,26 @@ export function useMapNavigation(map) {
 				}
 			}
 		} catch (e) {
-			console.error("Route fetch failed", e);
+			if (
+				requestId !== activeRequestId ||
+				isExpectedAbortError(e, { signal: controller.signal })
+			) {
+				return;
+			}
+			logUnexpectedNetworkError("Route fetch failed", e, {
+				signal: controller.signal,
+			});
+		} finally {
+			if (routeAbortController === controller) {
+				routeAbortController = null;
+			}
 		}
 	};
 
 	return {
 		flyToLocation,
 		fetchRoute,
+		cleanup,
 		roadDistance,
 		roadDuration,
 	};

@@ -196,7 +196,56 @@
         </div>
 
         <div v-else>
-          <h2 class="text-xl font-semibold mb-4">{{ $t("auto.k_3bf4a801") }}</h2>
+          <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 class="text-xl font-semibold">{{ $t("auto.k_3bf4a801") }}</h2>
+            <div class="flex flex-wrap gap-2">
+              <button
+                type="button"
+                class="rounded-lg border border-gray-600 bg-gray-800 px-3 py-2 text-xs font-semibold text-white hover:bg-gray-700 transition-colors"
+                :disabled="isBulkModerating"
+                :class="{ 'cursor-not-allowed opacity-50': isBulkModerating }"
+                @click="toggleAllPendingSelections"
+              >
+                {{ allPendingSelected ? adminUiText("Clear selection", "ล้างการเลือก") : adminUiText(`Select all (${pendingShops.length})`, `เลือกทั้งหมด (${pendingShops.length})`) }}
+              </button>
+              <button
+                type="button"
+                class="rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white hover:bg-green-500 transition-colors disabled:opacity-50"
+                :disabled="selectedPendingCount === 0 || isBulkModerating"
+                @click="handleBulkApprove"
+              >
+                {{
+                  bulkPendingAction === "approve"
+                    ? adminUiText("Approving...", "กำลังอนุมัติ...")
+                    : adminUiText(`Approve selected (${selectedPendingCount})`, `อนุมัติที่เลือก (${selectedPendingCount})`)
+                }}
+              </button>
+              <button
+                type="button"
+                class="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-500 transition-colors disabled:opacity-50"
+                :disabled="selectedPendingCount === 0 || isBulkModerating"
+                @click="handleBulkReject"
+              >
+                {{
+                  bulkPendingAction === "reject"
+                    ? adminUiText("Rejecting...", "กำลังปฏิเสธ...")
+                    : adminUiText(`Reject selected (${selectedPendingCount})`, `ปฏิเสธที่เลือก (${selectedPendingCount})`)
+                }}
+              </button>
+            </div>
+          </div>
+
+          <div
+            class="mb-4 rounded-xl border border-gray-700 bg-gray-800/70 px-4 py-3"
+            aria-live="polite"
+          >
+            <p class="text-sm font-medium text-gray-200">
+              {{ pendingSelectionSummary }}
+            </p>
+            <p v-if="bulkPendingLabel" class="mt-1 text-xs text-amber-300">
+              {{ bulkPendingLabel }}
+            </p>
+          </div>
 
           <div
             v-if="pendingShops.length === 0"
@@ -236,10 +285,24 @@
 
               <!-- Content -->
               <div class="flex-1">
-                <h3 class="text-xl font-bold">{{ shop.name }}</h3>
-                <p class="text-sm text-gray-400 mb-2">
-                  {{ shop.category }} • {{ shop.province }}
-                </p>
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <h3 class="text-xl font-bold">{{ shop.name }}</h3>
+                    <p class="text-sm text-gray-400 mb-2">
+                      {{ shop.category }} • {{ shop.province }}
+                    </p>
+                  </div>
+                  <label class="inline-flex shrink-0 items-center gap-2 rounded-lg border border-gray-700 bg-gray-900/60 px-3 py-2 text-xs text-gray-200">
+                    <input
+                      :checked="isPendingShopSelected(shop.id)"
+                      :disabled="isPendingReviewAction(shop.id) || isBulkModerating"
+                      type="checkbox"
+                      class="rounded border-gray-500 bg-gray-800 text-green-500 focus:ring-green-400"
+                      @change="togglePendingShopSelection(shop.id)"
+                    />
+                    <span>{{ adminUiText("Select", "เลือก") }}</span>
+                  </label>
+                </div>
                 <p class="text-gray-300 mb-4">
                   {{ shop.description || "No description provided." }}
                 </p>
@@ -247,17 +310,23 @@
                 <div class="flex gap-2">
                   <button
                     @click="handleApprove(shop.id)"
+                    :disabled="isPendingReviewAction(shop.id) || isBulkModerating"
                     class="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded transition-colors duration-150"
-                  > {{ $t("auto.k_a6987039") }} </button>
+                    :class="{ 'cursor-not-allowed opacity-60': isPendingReviewAction(shop.id) || isBulkModerating }"
+                  > {{ isPendingReviewAction(shop.id) ? adminUiText("Working...", "กำลังดำเนินการ...") : $t("auto.k_a6987039") }} </button>
                   <button
                     @click="openPromoteModal(shop.id)"
+                    :disabled="isPendingReviewAction(shop.id) || isBulkModerating"
                     class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded transition-colors duration-150"
-                  > {{ $t("auto.k_6ff4dcfa") }} </button>
+                    :class="{ 'cursor-not-allowed opacity-60': isPendingReviewAction(shop.id) || isBulkModerating }"
+                  > {{ isPendingReviewAction(shop.id) ? adminUiText("Working...", "กำลังดำเนินการ...") : $t("auto.k_6ff4dcfa") }} </button>
                   <button
                     @click="handleReject(shop.id)"
+                    :disabled="isPendingReviewAction(shop.id) || isBulkModerating"
                     class="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded transition-colors duration-150"
+                    :class="{ 'cursor-not-allowed opacity-60': isPendingReviewAction(shop.id) || isBulkModerating }"
                   >
-                    Reject
+                    {{ isPendingReviewAction(shop.id) ? adminUiText("Working...", "กำลังดำเนินการ...") : "Reject" }}
                   </button>
                 </div>
               </div>
@@ -1508,7 +1577,8 @@
             </button>
             <button
               @click="confirmPromote"
-              class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded font-bold"
+              :disabled="isPendingReviewAction(promoteModal.shopId)"
+              class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed text-white px-4 py-2 rounded font-bold"
             > {{ $t("auto.k_cb7f1093") }} </button>
           </div>
         </div>
@@ -1545,6 +1615,11 @@
 import { useHead } from "@unhead/vue";
 import { computed, defineAsyncComponent, onMounted, ref, watch } from "vue";
 import { useNotifications } from "@/composables/useNotifications";
+import {
+	cloneOptimisticValue,
+	runCommitMutation,
+	runOptimisticMutation,
+} from "@/composables/useOptimisticUpdate";
 import { usePresence } from "@/composables/usePresence";
 import i18n from "@/i18n.js";
 import { adminAnalyticsService } from "../services/adminAnalyticsService";
@@ -1586,6 +1661,9 @@ const pendingShops = ref([]);
 const loading = ref(true);
 const error = ref(null);
 const pendingLoaded = ref(false);
+const pendingReviewActionIds = ref(new Set());
+const bulkPendingAction = ref("");
+const selectedPendingShopIds = ref(new Set());
 const adminAuthEmail = ref("");
 const adminAuthPassword = ref("");
 const adminAuthLoading = ref(false);
@@ -1682,7 +1760,118 @@ const slipSummary = ref({
 const slipTotalPages = computed(() => {
 	return Math.max(1, Math.ceil(slipTotal.value / slipLimit.value));
 });
-const { notifySuccess, notifyError } = useNotifications();
+const { notify, notifySuccess } = useNotifications();
+
+const normalizePendingShopId = (shopId) => String(shopId || "").trim();
+const adminUiText = (en, th) =>
+	String(i18n.global.locale?.value || i18n.global.locale || "en")
+		.toLowerCase()
+		.startsWith("th")
+		? th
+		: en;
+
+const setPendingReviewAction = (shopId, isPending) => {
+	const next = new Set(pendingReviewActionIds.value);
+	const key = normalizePendingShopId(shopId);
+	if (!key) return;
+	if (isPending) next.add(key);
+	else next.delete(key);
+	pendingReviewActionIds.value = next;
+};
+
+const setPendingReviewActionMany = (shopIds, isPending) => {
+	const next = new Set(pendingReviewActionIds.value);
+	for (const shopId of shopIds) {
+		const key = normalizePendingShopId(shopId);
+		if (!key) continue;
+		if (isPending) next.add(key);
+		else next.delete(key);
+	}
+	pendingReviewActionIds.value = next;
+};
+
+const isPendingReviewAction = (shopId) =>
+	pendingReviewActionIds.value.has(normalizePendingShopId(shopId));
+
+const syncPendingSelection = () => {
+	const allowed = new Set(
+		pendingShops.value
+			.map((shop) => normalizePendingShopId(shop.id))
+			.filter(Boolean),
+	);
+	selectedPendingShopIds.value = new Set(
+		[...selectedPendingShopIds.value].filter((shopId) => allowed.has(shopId)),
+	);
+};
+
+const selectedPendingIds = computed(() =>
+	pendingShops.value
+		.map((shop) => shop.id)
+		.filter((shopId) =>
+			selectedPendingShopIds.value.has(normalizePendingShopId(shopId)),
+		),
+);
+const selectedPendingCount = computed(() => selectedPendingIds.value.length);
+const allPendingSelected = computed(
+	() =>
+		pendingShops.value.length > 0 &&
+		selectedPendingCount.value === pendingShops.value.length,
+);
+const isBulkModerating = computed(() => Boolean(bulkPendingAction.value));
+const bulkPendingLabel = computed(() => {
+	if (bulkPendingAction.value === "approve") {
+		return adminUiText("Approving selected shops...", "กำลังอนุมัติร้านที่เลือก...");
+	}
+	if (bulkPendingAction.value === "reject") {
+		return adminUiText("Rejecting selected shops...", "กำลังปฏิเสธร้านที่เลือก...");
+	}
+	return "";
+});
+const pendingSelectionSummary = computed(() =>
+	selectedPendingCount.value > 0
+		? adminUiText(
+				`${selectedPendingCount.value} shops selected for moderation.`,
+				`เลือกร้านไว้สำหรับตรวจสอบ ${selectedPendingCount.value} รายการ`,
+			)
+		: adminUiText(
+				"Choose one or more shops to use bulk moderation.",
+				"เลือกร้านอย่างน้อยหนึ่งรายการเพื่อใช้การตรวจสอบแบบหลายรายการ",
+			),
+);
+const isPendingShopSelected = (shopId) =>
+	selectedPendingShopIds.value.has(normalizePendingShopId(shopId));
+const clearPendingShopSelection = (shopIds) => {
+	const keys = new Set(
+		(shopIds || [])
+			.map((shopId) => normalizePendingShopId(shopId))
+			.filter(Boolean),
+	);
+	if (keys.size === 0) return;
+	selectedPendingShopIds.value = new Set(
+		[...selectedPendingShopIds.value].filter((shopId) => !keys.has(shopId)),
+	);
+};
+const togglePendingShopSelection = (shopId) => {
+	if (isBulkModerating.value) return;
+	const key = normalizePendingShopId(shopId);
+	if (!key) return;
+	const next = new Set(selectedPendingShopIds.value);
+	if (next.has(key)) next.delete(key);
+	else next.add(key);
+	selectedPendingShopIds.value = next;
+};
+const toggleAllPendingSelections = () => {
+	if (isBulkModerating.value) return;
+	if (allPendingSelected.value) {
+		selectedPendingShopIds.value = new Set();
+		return;
+	}
+	selectedPendingShopIds.value = new Set(
+		pendingShops.value
+			.map((shop) => normalizePendingShopId(shop.id))
+			.filter(Boolean),
+	);
+};
 
 const analyticsLoading = ref(false);
 const analyticsError = ref(null);
@@ -1726,6 +1915,7 @@ const fetchPending = async () => {
 		const res = await adminService.listPendingShops();
 		// API returns { success: true, data: [...] }
 		pendingShops.value = res.data || [];
+		syncPendingSelection();
 	} catch (e) {
 		error.value = e.message;
 		trackAdminError("pending_shops_fetch", e);
@@ -1792,14 +1982,21 @@ const runSheetSync = async () => {
 	sheetSyncError.value = "";
 	sheetSyncMessage.value = "";
 	try {
-		const payload = await adminService.runSheetSync({
-			mode: "incremental",
-			scope: "all",
+		await runCommitMutation({
+			commit: () =>
+				adminService.runSheetSync({
+					mode: "incremental",
+					scope: "all",
+				}),
+			onSuccess: (payload) => {
+				sheetSyncStats.value = payload?.stats || null;
+				sheetSyncMessage.value = `Sync complete (run_id: ${payload?.run_id || "n/a"})`;
+			},
+			onError: (error) => {
+				sheetSyncError.value = String(error?.message || "Sheet sync failed");
+			},
+			errorMessage: (error) => String(error?.message || "Sheet sync failed"),
 		});
-		sheetSyncStats.value = payload?.stats || null;
-		sheetSyncMessage.value = `Sync complete (run_id: ${payload?.run_id || "n/a"})`;
-	} catch (e) {
-		sheetSyncError.value = String(e?.message || "Sheet sync failed");
 	} finally {
 		sheetSyncLoading.value = false;
 	}
@@ -2000,25 +2197,222 @@ const exportPiiAccessLog = async () => {
 
 const handleApprove = async (id) => {
 	if (!confirm(i18n.global.t("auto.k_9730be33"))) return;
+	if (isPendingReviewAction(id) || isBulkModerating.value) return;
+
+	setPendingReviewAction(id, true);
 	try {
-		await adminService.approveShop(id);
-		// Remove from list locally
-		pendingShops.value = pendingShops.value.filter((s) => s.id !== id);
-		notifySuccess("Shop approved & rewards granted.");
-	} catch (e) {
-		notifyError(`Error approving: ${e.message}`);
+		await runOptimisticMutation({
+			capture: () => ({
+				shops: cloneOptimisticValue(pendingShops.value),
+				selected: [...selectedPendingShopIds.value],
+			}),
+			applyOptimistic: (snapshot) => {
+				pendingShops.value = (snapshot?.shops || []).filter(
+					(shop) => shop.id !== id,
+				);
+				clearPendingShopSelection([id]);
+			},
+			rollback: (snapshot) => {
+				pendingShops.value = snapshot?.shops || [];
+				selectedPendingShopIds.value = new Set(snapshot?.selected || []);
+			},
+			commit: () => adminService.approveShop(id),
+			onSuccess: () => {
+				notifySuccess("Shop approved & rewards granted.");
+			},
+			notify,
+			errorMessage: (error) =>
+				`Error approving: ${error?.message || "Failed to approve shop"}`,
+		});
+	} finally {
+		setPendingReviewAction(id, false);
 	}
 };
 
 const handleReject = async (id) => {
 	const reason = prompt("Reason for rejection:");
 	if (reason === null) return;
+	if (isPendingReviewAction(id) || isBulkModerating.value) return;
 
+	setPendingReviewAction(id, true);
 	try {
-		await adminService.rejectShop(id, reason || "Policy violation");
-		pendingShops.value = pendingShops.value.filter((s) => s.id !== id);
-	} catch (e) {
-		notifyError(`Error rejecting: ${e.message}`);
+		await runOptimisticMutation({
+			capture: () => ({
+				shops: cloneOptimisticValue(pendingShops.value),
+				selected: [...selectedPendingShopIds.value],
+			}),
+			applyOptimistic: (snapshot) => {
+				pendingShops.value = (snapshot?.shops || []).filter(
+					(shop) => shop.id !== id,
+				);
+				clearPendingShopSelection([id]);
+			},
+			rollback: (snapshot) => {
+				pendingShops.value = snapshot?.shops || [];
+				selectedPendingShopIds.value = new Set(snapshot?.selected || []);
+			},
+			commit: () => adminService.rejectShop(id, reason || "Policy violation"),
+			onSuccess: () => {
+				notifySuccess("Shop rejected.");
+			},
+			notify,
+			errorMessage: (error) =>
+				`Error rejecting: ${error?.message || "Failed to reject shop"}`,
+		});
+	} finally {
+		setPendingReviewAction(id, false);
+	}
+};
+
+const handleBulkApprove = async () => {
+	const shopIds = [...selectedPendingIds.value];
+	if (!shopIds.length || isBulkModerating.value) return;
+	if (
+		!confirm(
+			adminUiText(
+				`Approve ${shopIds.length} selected shops?`,
+				`อนุมัติร้านที่เลือก ${shopIds.length} รายการใช่ไหม?`,
+			),
+		)
+	)
+		return;
+
+	const selectedKeys = new Set(
+		shopIds.map((shopId) => normalizePendingShopId(shopId)),
+	);
+	bulkPendingAction.value = "approve";
+	setPendingReviewActionMany(shopIds, true);
+	try {
+		await runOptimisticMutation({
+			capture: () => ({
+				shops: cloneOptimisticValue(pendingShops.value),
+				selected: [...selectedPendingShopIds.value],
+			}),
+			applyOptimistic: (snapshot) => {
+				pendingShops.value = (snapshot?.shops || []).filter(
+					(shop) => !selectedKeys.has(normalizePendingShopId(shop.id)),
+				);
+				selectedPendingShopIds.value = new Set(
+					[...selectedPendingShopIds.value].filter(
+						(shopId) => !selectedKeys.has(shopId),
+					),
+				);
+			},
+			rollback: (snapshot) => {
+				pendingShops.value = snapshot?.shops || [];
+				selectedPendingShopIds.value = new Set(snapshot?.selected || []);
+			},
+			commit: () => adminService.bulkApproveShops(shopIds),
+			onSuccess: async (payload) => {
+				const failedCount = Array.isArray(payload?.failed)
+					? payload.failed.length
+					: 0;
+				if (failedCount > 0) {
+					notify({
+						type: "error",
+						message: adminUiText(
+							`${failedCount} selected shops still need review.`,
+							`ยังมีร้านที่เลือก ${failedCount} รายการต้องตรวจต่อ`,
+						),
+					});
+				}
+				notifySuccess(
+					failedCount > 0
+						? adminUiText(
+								`Approved ${shopIds.length - failedCount} shops. Refreshed remaining items.`,
+								`อนุมัติแล้ว ${shopIds.length - failedCount} รายการ และรีเฟรชรายการที่เหลือแล้ว`,
+							)
+						: adminUiText(
+								`Approved ${shopIds.length} shops.`,
+								`อนุมัติแล้ว ${shopIds.length} รายการ`,
+							),
+				);
+				await fetchPending();
+			},
+			notify,
+			errorMessage: (error) =>
+				adminUiText(
+					`Error approving selected shops: ${error?.message || "Failed to approve shops"}`,
+					`อนุมัติร้านที่เลือกไม่สำเร็จ: ${error?.message || "อนุมัติร้านไม่สำเร็จ"}`,
+				),
+		});
+	} finally {
+		setPendingReviewActionMany(shopIds, false);
+		bulkPendingAction.value = "";
+	}
+};
+
+const handleBulkReject = async () => {
+	const shopIds = [...selectedPendingIds.value];
+	if (!shopIds.length || isBulkModerating.value) return;
+	const reason = prompt(
+		adminUiText("Reason for rejection:", "เหตุผลในการปฏิเสธ:"),
+	);
+	if (reason === null) return;
+
+	const selectedKeys = new Set(
+		shopIds.map((shopId) => normalizePendingShopId(shopId)),
+	);
+	bulkPendingAction.value = "reject";
+	setPendingReviewActionMany(shopIds, true);
+	try {
+		await runOptimisticMutation({
+			capture: () => ({
+				shops: cloneOptimisticValue(pendingShops.value),
+				selected: [...selectedPendingShopIds.value],
+			}),
+			applyOptimistic: (snapshot) => {
+				pendingShops.value = (snapshot?.shops || []).filter(
+					(shop) => !selectedKeys.has(normalizePendingShopId(shop.id)),
+				);
+				selectedPendingShopIds.value = new Set(
+					[...selectedPendingShopIds.value].filter(
+						(shopId) => !selectedKeys.has(shopId),
+					),
+				);
+			},
+			rollback: (snapshot) => {
+				pendingShops.value = snapshot?.shops || [];
+				selectedPendingShopIds.value = new Set(snapshot?.selected || []);
+			},
+			commit: () =>
+				adminService.bulkRejectShops(shopIds, reason || "Policy violation"),
+			onSuccess: async (payload) => {
+				const failedCount = Array.isArray(payload?.failed)
+					? payload.failed.length
+					: 0;
+				if (failedCount > 0) {
+					notify({
+						type: "error",
+						message: adminUiText(
+							`${failedCount} selected shops still need review.`,
+							`ยังมีร้านที่เลือก ${failedCount} รายการต้องตรวจต่อ`,
+						),
+					});
+				}
+				notifySuccess(
+					failedCount > 0
+						? adminUiText(
+								`Rejected ${shopIds.length - failedCount} shops. Refreshed remaining items.`,
+								`ปฏิเสธแล้ว ${shopIds.length - failedCount} รายการ และรีเฟรชรายการที่เหลือแล้ว`,
+							)
+						: adminUiText(
+								`Rejected ${shopIds.length} shops.`,
+								`ปฏิเสธแล้ว ${shopIds.length} รายการ`,
+							),
+				);
+				await fetchPending();
+			},
+			notify,
+			errorMessage: (error) =>
+				adminUiText(
+					`Error rejecting selected shops: ${error?.message || "Failed to reject shops"}`,
+					`ปฏิเสธร้านที่เลือกไม่สำเร็จ: ${error?.message || "ปฏิเสธร้านไม่สำเร็จ"}`,
+				),
+		});
+	} finally {
+		setPendingReviewActionMany(shopIds, false);
+		bulkPendingAction.value = "";
 	}
 };
 
@@ -2032,23 +2426,35 @@ const promoteModal = ref({
 });
 
 const openPromoteModal = (shopId) => {
+	if (isBulkModerating.value) return;
 	promoteModal.value.shopId = shopId;
 	promoteModal.value.isOpen = true;
 };
 
 const confirmPromote = async () => {
+	const { shopId, category, scale, color, rank } = promoteModal.value;
+	if (!shopId || isPendingReviewAction(shopId)) return;
+
+	setPendingReviewAction(shopId, true);
 	try {
-		const { shopId, category, scale, color, rank } = promoteModal.value;
-		await adminService.promoteToGiant(shopId, category, {
-			model_scale: scale,
-			glow_color: color,
-			anchor_rank: rank,
+		await runCommitMutation({
+			commit: () =>
+				adminService.promoteToGiant(shopId, category, {
+					model_scale: scale,
+					glow_color: color,
+					anchor_rank: rank,
+				}),
+			onSuccess: async () => {
+				notifySuccess("Shop promoted to Giant successfully! 🌟");
+				promoteModal.value.isOpen = false;
+				await fetchPending();
+			},
+			notify,
+			errorMessage: (error) =>
+				`Error promoting: ${error?.message || "Failed to promote shop"}`,
 		});
-		notifySuccess("Shop promoted to Giant successfully! 🌟");
-		promoteModal.value.isOpen = false;
-		fetchPending(); // Refresh logic
-	} catch (e) {
-		notifyError(`Error promoting: ${e.message}`);
+	} finally {
+		setPendingReviewAction(shopId, false);
 	}
 };
 

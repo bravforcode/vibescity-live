@@ -34,7 +34,9 @@ except:
 SKIP_DIRS = {
     'node_modules', '.next', 'dist', 'build', '.git', '.github',
     '__pycache__', '.vscode', '.idea', 'coverage', 'test', 'tests',
-    '__tests__', 'spec', 'docs', 'documentation', 'examples'
+    '__tests__', 'spec', 'docs', 'documentation', 'examples',
+    '.vercel', 'tmp', '.worktrees', 'demo', 'storybook-static', 'playwright-report',
+    'reports', 'playwright-report-smoke-map-lite-local', 'playwright-report-smoke-map-lite', 'playwright-report-map-quarantine'
 }
 
 # Files to skip (not pages)
@@ -76,20 +78,31 @@ def is_page_file(file_path: Path) -> bool:
 
 
 def find_pages(project_path: Path) -> list:
-    """Find page files to check."""
+    """Find page files to check - only within src/ and public/ to avoid coverage, reports, etc."""
     patterns = ['**/*.html', '**/*.htm', '**/*.jsx', '**/*.tsx']
-    
+
+    # Only scan these top-level directories (allowlist approach)
+    SCAN_DIRS = ['src', 'public']
+    search_roots = [project_path / d for d in SCAN_DIRS if (project_path / d).is_dir()]
+    # If none exist, fall back to project root with skip-dirs blocklist
+    if not search_roots:
+        search_roots = [project_path]
+
     files = []
-    for pattern in patterns:
-        for f in project_path.glob(pattern):
-            # Skip excluded directories
-            if any(skip in f.parts for skip in SKIP_DIRS):
-                continue
-            
-            # Check if it's likely a page
-            if is_page_file(f):
-                files.append(f)
-    
+    seen = set()
+    for root in search_roots:
+        for pattern in patterns:
+            for f in root.glob(pattern):
+                if f in seen:
+                    continue
+                # Skip excluded directories
+                if any(skip in f.parts for skip in SKIP_DIRS):
+                    continue
+                # Check if it's likely a page
+                if is_page_file(f):
+                    files.append(f)
+                    seen.add(f)
+
     return files[:50]  # Limit to 50 files
 
 

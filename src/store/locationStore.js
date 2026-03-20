@@ -5,6 +5,7 @@
  */
 import { defineStore } from "pinia";
 import { computed, ref, shallowRef } from "vue";
+import { isAppDebugLoggingEnabled } from "../utils/debugFlags";
 
 // Chiang Mai default coordinates
 const DEFAULT_LOCATION = { lat: 18.7883, lng: 98.9853 };
@@ -48,6 +49,7 @@ export const useLocationStore = defineStore(
 		const error = shallowRef(null);
 
 		let watchId = null;
+		let permissionCleanup = null;
 
 		// ═══════════════════════════════════════════
 		// 📊 Computed
@@ -141,16 +143,20 @@ export const useLocationStore = defineStore(
 		const startWatching = async () => {
 			if (isTracking.value || !navigator.geolocation) return;
 
-			// Check permission first
+			// Check permission first (clean up previous listener to prevent accumulation)
 			if (navigator.permissions) {
 				try {
+					permissionCleanup?.();
 					const result = await navigator.permissions.query({
 						name: "geolocation",
 					});
 					permissionStatus.value = result.state;
-					result.addEventListener("change", () => {
+					const onPermissionChange = () => {
 						permissionStatus.value = result.state;
-					});
+					};
+					result.addEventListener("change", onPermissionChange);
+					permissionCleanup = () =>
+						result.removeEventListener("change", onPermissionChange);
 				} catch {} // Some browsers don't support this
 			}
 
@@ -172,6 +178,8 @@ export const useLocationStore = defineStore(
 				navigator.geolocation.clearWatch(watchId);
 				watchId = null;
 			}
+			permissionCleanup?.();
+			permissionCleanup = null;
 			isTracking.value = false;
 		};
 
@@ -210,7 +218,7 @@ export const useLocationStore = defineStore(
 			error.value = null;
 			isLoading.value = false;
 
-			if (import.meta.env.DEV) {
+			if (isAppDebugLoggingEnabled()) {
 				console.log(
 					`📍 Location updated: [${latitude.toFixed(5)}, ${longitude.toFixed(5)}] ±${acc?.toFixed(0)}m`,
 				);
@@ -236,8 +244,11 @@ export const useLocationStore = defineStore(
 			};
 
 			if (err.code === 1) permissionStatus.value = "denied";
-			if (import.meta.env.DEV)
-				console.warn("📍 Geolocation error:", error.value);
+			if (isAppDebugLoggingEnabled()) {
+				const log =
+					err.code === 1 || err.code === 3 ? console.info : console.warn;
+				log("📍 Geolocation fallback:", error.value);
+			}
 
 			// Use default if no location set
 			if (!userLocation.value) {

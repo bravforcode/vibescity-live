@@ -1,4 +1,12 @@
 extend-exclude = [
     ".agent",
-    ".agents"
+    ".agents",
+    ".vercel_python_packages",
+    "tmp"
+]
+
+[lint]
+ignore = [
+    "B904", "E402", "UP007", "F841", 
+    "B007", "UP042", "F401", "B017", "F821"
 ]

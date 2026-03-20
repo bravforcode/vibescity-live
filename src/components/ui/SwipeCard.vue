@@ -469,7 +469,7 @@ const handleManualExpand = () => {
               <ImageOff class="w-6 h-6" />
             </div>
             <span class="text-[9px] uppercase tracking-widest font-bold"
-              >No Preview</span
+              >{{ $t("auto.k_85c32f02") }}</span
             >
           </div>
         </div>
@@ -572,12 +572,8 @@ const handleManualExpand = () => {
         <h4 class="sc-venue-name">{{ displayName }}</h4>
 
         <!-- Meta row -->
-        <div class="flex items-center gap-2 mb-3">
+        <div class="flex items-center gap-1.5 mb-1">
           <span class="sc-chip">{{ displayCategory }}</span>
-          <span class="sc-meta-item">
-            <Clock class="w-3 h-3 flex-shrink-0" aria-hidden="true" />
-            {{ displayTime }}
-          </span>
           <span class="sc-meta-item">
             <MapPin class="w-3 h-3 flex-shrink-0" aria-hidden="true" />
             {{ displayDistance }}
@@ -585,7 +581,7 @@ const handleManualExpand = () => {
         </div>
 
         <!-- Stats Row -->
-        <div class="flex items-center gap-2 mb-4">
+        <div class="flex items-center gap-2 mb-1">
           <!-- Rating -->
           <div class="sc-stat-pill">
             <span class="sc-rating-dot" aria-hidden="true" />
@@ -596,12 +592,12 @@ const handleManualExpand = () => {
           <!-- Open/Live indicator -->
           <div v-if="isLive" class="sc-stat-pill sc-stat-pill--live">
             <Zap class="w-3 h-3 text-red-400" aria-hidden="true" />
-            <span class="text-[10px] font-bold text-red-400">Live Now</span>
+            <span class="text-[10px] font-bold text-red-400">{{ $t("auto.k_4a1f407f") }}</span>
           </div>
         </div>
 
-        <!-- CTA: Share + Ride (stacked full-width) -->
-        <div class="flex flex-col gap-2">
+        <!-- CTA: Share + Ride — hidden on compact cards; accessible via VibeModal after expand -->
+        <div v-if="false" class="flex flex-col gap-2">
           <button
             class="sc-cta sc-cta--full"
             :aria-label="t('common.share')"
@@ -696,13 +692,14 @@ const handleManualExpand = () => {
   border-radius: 24px;
   overflow: hidden;
   background: #0f0f12;
-  border: 1px solid rgba(255 255 255 / 0.06);
+  border: 1.5px solid var(--neon-border, rgba(255 255 255 / 0.06));
 
-  /* Shadow stack: ambient + directional + glow */
+  /* Shadow stack: ambient + directional + neon category glow */
   box-shadow:
     0 4px 6px -1px rgba(0 0 0 / 0.5),
     0 20px 50px -12px rgba(0 0 0 / 0.7),
-    0 0 0 0.5px rgba(255 255 255 / 0.04) inset;
+    0 0 0 0.5px rgba(255 255 255 / 0.04) inset,
+    0 0 18px var(--neon-glow, transparent);
 
   backface-visibility: hidden;
   transform: translateZ(0);
@@ -747,14 +744,14 @@ const handleManualExpand = () => {
   height: 200px;
   top: -60px;
   left: -60px;
-  background: #ec489966;
+  background: var(--neon-glow, #ec489966);
 }
 .sc-glow--cyan {
   width: 200px;
   height: 200px;
   bottom: -60px;
   right: -60px;
-  background: #06b6d466;
+  background: var(--neon-glow, #06b6d466);
 }
 .sc-glow--amber {
   width: 150px;
@@ -806,7 +803,7 @@ const handleManualExpand = () => {
   border: 1px solid rgba(253 224 71 / 0.5);
 }
 .sc-badge--giant {
-  background: linear-gradient(90deg, #a855f7, #6366f1);
+  background: linear-gradient(90deg, #06b6d4, #6366f1);
   color: #fff;
   border: 1px solid rgba(192 132 252 / 0.4);
 }
@@ -897,23 +894,23 @@ const handleManualExpand = () => {
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 1rem 1rem 2.5rem;
+  padding: 0.5rem 0.75rem 1rem;
   z-index: 20;
   overflow: hidden;
 }
 
 .sc-venue-name {
-  font-size: clamp(1rem, 0.78rem + 1cqi, 1.35rem);
+  font-size: clamp(0.75rem, 0.65rem + 1cqi, 0.9rem);
   font-weight: 900;
   color: #fff;
   line-height: 1.2;
   letter-spacing: -0.02em;
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.25rem;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* Multi-line truncate at 2 lines */
+  /* Single line truncate for compact height */
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-shadow: 0 2px 12px rgba(0 0 0 / 0.6);
@@ -923,14 +920,14 @@ const handleManualExpand = () => {
   display: inline-block;
   padding: 2px 8px;
   border-radius: 6px;
-  background: rgba(255 255 255 / 0.16);
+  background: var(--neon-bg, rgba(255 255 255 / 0.16));
   backdrop-filter: blur(6px);
-  border: 1px solid rgba(255 255 255 / 0.08);
+  border: 1px solid var(--neon-border, rgba(255 255 255 / 0.08));
   font-size: clamp(0.58rem, 0.5rem + 0.4cqi, 0.65rem);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: rgba(255 255 255 / 0.9);
+  color: var(--neon, rgba(255 255 255 / 0.9));
   white-space: nowrap;
 }
 
@@ -1115,11 +1112,11 @@ const handleManualExpand = () => {
 
 @container (max-width: 14rem) {
   .sc-info {
-    padding: 0.8rem 0.8rem 2rem;
+    padding: 0.5rem 0.75rem 1rem;
   }
 
   .sc-cta {
-    padding: 0.6rem 0.8rem;
+    padding: 0.4rem 0.6rem;
   }
 }
 </style>

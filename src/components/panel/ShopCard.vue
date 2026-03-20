@@ -39,6 +39,10 @@ const props = defineProps({
 		type: Boolean,
 		default: false,
 	},
+	layoutMode: {
+		type: String,
+		default: "default",
+	},
 });
 
 const emit = defineEmits([
@@ -51,6 +55,7 @@ const emit = defineEmits([
 ]);
 
 const showStats = ref(false);
+const isDesktopRailMode = computed(() => props.layoutMode === "desktop-rail");
 let lastTapTime = 0;
 const touchStartY = ref(0);
 const touchStartX = ref(0);
@@ -187,7 +192,10 @@ const cardAriaLabel = computed(
     tabindex="0"
     :aria-label="cardAriaLabel"
     :class="[
-      'shop-card-panel group relative w-full min-h-[300px] md:min-h-[340px] aspect-[4/5] rounded-2xl overflow-hidden cursor-pointer transition-transform transition-shadow duration-300 hover:scale-[1.02] hover:-translate-y-1',
+      'shop-card-panel group relative w-full overflow-hidden cursor-pointer transition-transform transition-shadow duration-300 hover:scale-[1.02] hover:-translate-y-1',
+      isDesktopRailMode
+        ? 'aspect-[16/11] min-h-[212px] rounded-[26px] lg:min-h-[226px]'
+        : 'aspect-[4/5] min-h-[250px] rounded-2xl md:min-h-[280px]',
       isActive
         ? 'card-active-glow ring-1 ring-white/50 shadow-2xl scale-[1.01]'
         : 'shadow-lg hover:shadow-2xl',
@@ -195,8 +203,8 @@ const cardAriaLabel = computed(
     ]"
     :style="tiltStyle"
     @click="emit('click', shop)"
-    @touchstart="handleTouchStart"
-    @touchmove="handleTouchMove"
+    @touchstart.passive="handleTouchStart"
+    @touchmove.passive="handleTouchMove"
     @touchend="handleTouchEnd"
     @touchcancel="handleTouchCancel"
     @mouseenter="handleMouseEnter"
@@ -207,20 +215,24 @@ const cardAriaLabel = computed(
   >
     <!-- Tilt glare overlay -->
     <div
-      class="absolute inset-0 z-30 pointer-events-none rounded-2xl"
+      :class="[
+        'absolute inset-0 z-30 pointer-events-none',
+        isDesktopRailMode ? 'rounded-[26px]' : 'rounded-2xl',
+      ]"
       :style="glareStyle"
     ></div>
     <!-- Image/Video Section - FULL CARD COVERAGE -->
     <div class="absolute inset-0 w-full h-full z-0 overflow-hidden">
       <!-- Background Image/Video -->
       <video
-        v-if="shop.Video_URL"
+        v-if="shop.Video_URL && isActive"
         ref="videoRef"
         :src="shop.Video_URL"
         :poster="shop.Image_URL1"
         muted
         loop
         playsinline
+        preload="none"
         class="smart-video absolute inset-0 w-full h-full object-cover"
       />
       <!-- Fallback Image if no video (or while loading handled by poster) -->
@@ -235,7 +247,7 @@ const cardAriaLabel = computed(
       />
       <div
         v-else
-        class="absolute inset-0 bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600"
+        class="absolute inset-0 bg-gradient-to-br from-cyan-600 via-pink-600 to-blue-600"
       ></div>
 
       <!-- Layered Gradient Overlay for Premium Depth -->
@@ -260,7 +272,12 @@ const cardAriaLabel = computed(
       ></div>
 
       <!-- Content Overlay -->
-      <div class="absolute inset-0 p-3 flex flex-col justify-between z-10">
+      <div
+        :class="[
+          'absolute inset-0 flex flex-col justify-between z-10',
+          isDesktopRailMode ? 'p-2.5' : 'p-3',
+        ]"
+      >
         <!-- Top Left: Badges -->
         <div class="flex flex-col gap-1.5">
           <!-- LIVE Badge -->
@@ -285,22 +302,17 @@ const cardAriaLabel = computed(
             v-if="shop.is_giant_active || shop.isGiantPin"
             class="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white text-[10px] font-black border border-amber-400/50 shadow-lg flex items-center gap-1.5 animate-pulse"
           >
-            <span>🏢</span> GIANT PIN
-          </div>
+            <span>🏢</span> {{ $t("auto.k_ece9f571") }} </div>
 
           <!-- Flash/Golden Badges -->
           <div
             v-else-if="isFlashActive(shop)"
             class="px-2.5 py-1.5 rounded-xl text-white text-[10px] font-black shadow-lg border border-orange-400/60 bg-gradient-to-r from-red-500 to-orange-500"
-          >
-            🔥 FLASH
-          </div>
+          > {{ $t("auto.k_9c5705f9") }} </div>
           <div
             v-else-if="shop.isGolden || shop.isPromoted"
             class="px-2.5 py-1.5 rounded-xl text-black text-[10px] font-black shadow-lg border border-yellow-300/60 bg-gradient-to-br from-yellow-300 to-yellow-500"
-          >
-            ✨ GOLDEN
-          </div>
+          > {{ $t("auto.k_b58c2f54") }} </div>
         </div>
 
         <!-- Distance Badge -->
@@ -324,7 +336,12 @@ const cardAriaLabel = computed(
       </div>
 
       <!-- Right Top: Action Buttons (Absolute) -->
-      <div class="absolute top-12 right-3 flex flex-col gap-2 z-20">
+      <div
+        :class="[
+          'absolute right-3 z-20 flex flex-col gap-2',
+          isDesktopRailMode ? 'top-3' : 'top-12',
+        ]"
+      >
         <!-- Favorite Button -->
         <button
           @click.stop="
@@ -333,8 +350,9 @@ const cardAriaLabel = computed(
               coinStore.awardCoins(1);
             }
           "
-          class="w-11 h-11 flex items-center justify-center rounded-full backdrop-blur-md border transition-[transform,background-color,border-color,color] active:scale-90 shadow-xl"
           :class="[
+            'flex items-center justify-center rounded-full backdrop-blur-md border transition-[transform,background-color,border-color,color] active:scale-90 shadow-xl',
+            isDesktopRailMode ? 'h-10 w-10' : 'h-11 w-11',
             isFavorited
               ? 'bg-pink-500/80 border-pink-400 text-white'
               : 'bg-black/30 border-white/20 text-white/70 hover:bg-black/50',
@@ -345,7 +363,7 @@ const cardAriaLabel = computed(
           :aria-pressed="isFavorited"
         >
           <Heart
-            class="w-4 h-4"
+            :class="isDesktopRailMode ? 'h-3.5 w-3.5' : 'w-4 h-4'"
             :fill="isFavorited ? 'currentColor' : 'none'"
             stroke-width="2.5"
             aria-hidden="true"
@@ -355,18 +373,35 @@ const cardAriaLabel = computed(
         <!-- Share Button -->
         <button
           @click.stop="handleShare"
-          class="w-11 h-11 flex items-center justify-center rounded-full bg-black/30 backdrop-blur-md border border-white/20 text-white/70 hover:bg-black/50 transition-[transform,background-color,border-color,color] active:scale-90 shadow-xl"
-          :aria-label="t('common.share')"
+          :class="[
+            'flex items-center justify-center rounded-full bg-black/30 backdrop-blur-md border border-white/20 text-white/70 hover:bg-black/50 transition-[transform,background-color,border-color,color] active:scale-90 shadow-xl',
+            isDesktopRailMode ? 'h-10 w-10' : 'h-11 w-11',
+          ]"
+          :aria-label="
+            t('common.share')
+          "
         >
-          <Share2 class="w-4 h-4" stroke-width="2.5" aria-hidden="true" />
+          <Share2
+            :class="isDesktopRailMode ? 'h-3.5 w-3.5' : 'w-4 h-4'"
+            stroke-width="2.5"
+            aria-hidden="true"
+          />
         </button>
       </div>
 
       <!-- Content Section — Glassmorphism Info Panel -->
       <div
-        class="absolute bottom-0 left-0 right-0 p-4 pb-2 z-10 flex flex-col justify-end h-full pointer-events-none"
+        :class="[
+          'absolute bottom-0 left-0 right-0 z-10 flex h-full flex-col justify-end pointer-events-none',
+          isDesktopRailMode ? 'p-3 pb-2' : 'p-4 pb-2',
+        ]"
       >
-        <div class="pointer-events-auto glass-info-panel rounded-xl p-2.5">
+        <div
+          :class="[
+            'pointer-events-auto glass-info-panel',
+            isDesktopRailMode ? 'rounded-2xl p-2.5' : 'rounded-xl p-2.5',
+          ]"
+        >
           <!-- Stats Mode Toggle (Merchant Only) -->
           <div v-if="showStats" class="mb-2">
             <MerchantStats :shopId="shop.id" :isDarkMode="isDarkMode" />
@@ -382,17 +417,26 @@ const cardAriaLabel = computed(
             <!-- Header -->
             <div class="flex items-start justify-between">
               <h3
-                class="text-xl font-black text-white leading-none mb-1 drop-shadow-xl tracking-tighter font-sans line-clamp-1"
+                :class="[
+                  'font-black text-white leading-none mb-1 drop-shadow-xl tracking-tighter font-sans line-clamp-1',
+                  isDesktopRailMode ? 'text-lg lg:text-[1.15rem]' : 'text-xl',
+                ]"
               >
                 {{ shop.name }}
               </h3>
               <!-- Chart Toggle Button -->
               <button
                 @click.stop="showStats = true"
-                class="w-11 h-11 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white/80 border border-white/10 backdrop-blur-md"
+                :class="[
+                  'flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white/80 border border-white/10 backdrop-blur-md',
+                  isDesktopRailMode ? 'h-9 w-9' : 'w-11 h-11',
+                ]"
                 :aria-label="t('shop.view_stats')"
               >
-                <BarChart class="w-4 h-4" aria-hidden="true" />
+                <BarChart
+                  :class="isDesktopRailMode ? 'h-3.5 w-3.5' : 'w-4 h-4'"
+                  aria-hidden="true"
+                />
               </button>
             </div>
 
@@ -416,7 +460,7 @@ const cardAriaLabel = computed(
               </span>
               <span
                 v-else
-                class="px-1.5 py-0.5 rounded-md bg-purple-500/30 backdrop-blur-sm border border-purple-400/30"
+                class="px-1.5 py-0.5 rounded-md bg-cyan-500/30 backdrop-blur-sm border border-cyan-400/30"
               >
                 {{ t("shop.new") }}
               </span>
@@ -427,7 +471,12 @@ const cardAriaLabel = computed(
             </div>
 
             <!-- Visitor Count -->
-            <div class="mb-2 origin-left scale-90">
+            <div
+              :class="[
+                'origin-left',
+                isDesktopRailMode ? 'mb-1 scale-[0.84]' : 'mb-2 scale-90',
+              ]"
+            >
               <VisitorCount :shopId="shop.id" :isDarkMode="true" />
             </div>
 
@@ -444,7 +493,7 @@ const cardAriaLabel = computed(
             </div>
 
             <!-- Action Buttons -->
-            <div class="grid grid-cols-2 gap-2 mt-1">
+            <div class="mt-1 grid grid-cols-2 gap-2">
               <button
                 v-if="useRideButton"
                 @click.stop="emit('open-ride', shop)"
@@ -456,13 +505,19 @@ const cardAriaLabel = computed(
               <template v-else>
                 <button
                   @click.stop="emit('open-detail', shop)"
-                  class="py-2.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-white text-[10px] font-bold hover:bg-white/20 transition-colors"
+                  :class="[
+                    'rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-white text-[10px] font-bold hover:bg-white/20 transition-colors',
+                    isDesktopRailMode ? 'py-2' : 'py-2.5',
+                  ]"
                 >
                   {{ t("shop.details") }}
                 </button>
                 <button
                   @click.stop="openGoogleMaps"
-                  class="py-2.5 rounded-xl bg-green-500/20 backdrop-blur-md border border-green-500/30 text-green-300 text-[10px] font-bold hover:bg-green-500/30 transition-colors"
+                  :class="[
+                    'rounded-xl bg-green-500/20 backdrop-blur-md border border-green-500/30 text-green-300 text-[10px] font-bold hover:bg-green-500/30 transition-colors',
+                    isDesktopRailMode ? 'py-2' : 'py-2.5',
+                  ]"
                 >
                   {{ t("shop.navigate") }}
                 </button>

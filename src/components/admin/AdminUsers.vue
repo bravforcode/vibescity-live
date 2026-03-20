@@ -22,11 +22,7 @@
         <line x1="12" y1="17" x2="12.01" y2="17" />
       </svg>
       <div>
-        <strong>Notice:</strong> User data is loaded from Supabase Auth and
-        `user_profiles`. Profile data may be unavailable or empty if Row Level
-        Security (RLS) restrictions prevent admin access. Ensure your admin user
-        has the correct RLS bypass role.
-      </div>
+        <strong>{{ $t("auto.k_c31601f1") }}</strong> {{ $t("auto.k_d070b821") }} </div>
     </div>
 
     <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm">
@@ -49,9 +45,7 @@
           <circle cx="9" cy="7" r="4" />
           <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
           <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-        </svg>
-        Registered Users
-      </h3>
+        </svg> {{ $t("auto.k_9c1313d9") }} </h3>
       <DataTable
         :columns="columns"
         :fetch-fn="fetchUsers"

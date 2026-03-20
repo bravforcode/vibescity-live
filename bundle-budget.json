@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "bundles": {
+    "main.js": {
+      "match": [
+        "/static/js/(index|main).*\\.js$"
+      ],
+      "maxSize": "150kb",
+      "gzip": true
+    },
+    "maplibre": {
+      "match": [
+        "/static/js/.+maplibre.+\\.js$",
+        "/static/js/async/.+mapbox.+\\.js$"
+      ],
+      "maxSize": "250kb",
+      "gzip": true
+    },
+    "vendor": {
+      "match": [
+        "/static/js/.+vendor.+\\.js$",
+        "/static/js/.+chunk-vendors.+\\.js$"
+      ],
+      "maxSize": "200kb",
+      "gzip": true
+    }
+  },
+  "totalInitial": {
+    "maxSize": "500kb",
+    "gzip": true
+  },
+  "totalAsync": {
+    "maxSize": "1mb",
+    "gzip": true
+  }
+}
+

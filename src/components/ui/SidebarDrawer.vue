@@ -118,8 +118,8 @@ const close = () => {
 
 const go = (eventName) => {
 	successFeedback();
+	emit(eventName); // fire first — before close() unmounts this component
 	emit("close");
-	requestAnimationFrame(() => emit(eventName));
 };
 
 defineExpose({ close });
@@ -193,12 +193,12 @@ defineExpose({ close });
 
             <button
               type="button"
-              class="sd-item sd-item--purple"
+              class="sd-item sd-item--cyan"
               data-testid="sidebar-action-daily-checkin"
               :aria-label="$t('auto.k_7388f8ac')"
               @click="go('open-daily-checkin')"
             >
-              <span class="sd-item-icon sd-item-icon--purple">
+              <span class="sd-item-icon sd-item-icon--cyan">
                 <CalendarDays class="w-5 h-5" aria-hidden="true" />
               </span>
               <span class="sd-item-text">
@@ -600,12 +600,12 @@ defineExpose({ close });
   background: rgba(255 255 255 / 0.08);
 }
 
-.sd-item--purple {
+.sd-item--cyan {
   background: linear-gradient(100deg, rgba(109 40 217 / 0.22), rgba(192 38 211 / 0.18));
   border-color: rgba(139 92 246 / 0.25);
 }
 
-.sd-item--purple:hover {
+.sd-item--cyan:hover {
   background: linear-gradient(100deg, rgba(109 40 217 / 0.35), rgba(192 38 211 / 0.3));
 }
 
@@ -656,7 +656,7 @@ defineExpose({ close });
   color: #fff;
 }
 
-.sd-item-icon--purple {
+.sd-item-icon--cyan {
   background: rgba(109 40 217 / 0.55);
 }
 

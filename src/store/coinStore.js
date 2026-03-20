@@ -5,9 +5,16 @@
  */
 import { defineStore } from "pinia";
 import { computed, onScopeDispose, ref, shallowRef, watch } from "vue";
-import { isSupabaseSchemaCacheError, supabase } from "../lib/supabase";
+import { runOptimisticMutation } from "../composables/useOptimisticUpdate";
+import { supabase } from "../lib/supabase";
 import { gamificationService } from "../services/gamificationService";
 import { bootstrapVisitor } from "../services/visitorIdentity";
+import { logUnexpectedNetworkError } from "../utils/networkErrorUtils";
+import {
+	isSoftSupabaseReadError,
+	logUnexpectedSupabaseReadError,
+	runSupabaseReadPolicy,
+} from "../utils/supabaseReadPolicy";
 import { useUserStore } from "./userStore";
 
 // ═══════════════════════════════════════════
@@ -17,7 +24,7 @@ const LEVEL_CONFIG = [
 	{ level: 1, xpRequired: 0, title: "Newbie Explorer", color: "#6b7280" },
 	{ level: 2, xpRequired: 100, title: "Vibe Seeker", color: "#10b981" },
 	{ level: 3, xpRequired: 300, title: "Night Owl", color: "#3b82f6" },
-	{ level: 4, xpRequired: 600, title: "Party Animal", color: "#8b5cf6" },
+	{ level: 4, xpRequired: 600, title: "Party Animal", color: "#22d3ee" },
 	{ level: 5, xpRequired: 1000, title: "Vibe Master", color: "#f59e0b" },
 	{ level: 6, xpRequired: 2000, title: "Legend", color: "#ef4444" },
 	{ level: 7, xpRequired: 5000, title: "Vibe God", color: "#ec4899" },
@@ -182,8 +189,7 @@ export const useCoinStore = defineStore(
 				// 3. Check Achievements (Client-side for UI feedback, Server should verify later)
 				// For MVP, we presume server granted the coins, achievements are visual here.
 				// Ideally, server returns unlocked_achievements.
-				const isNightOwl =
-					new Date().getHours() >= 0 && new Date().getHours() < 5;
+				const isNightOwl = new Date().getHours() < 5;
 				const newAchievements = checkForAchievements(isNightOwl);
 				rewards.push(
 					...newAchievements.map((a) => ({ type: "achievement", ...a })),
@@ -199,7 +205,9 @@ export const useCoinStore = defineStore(
 					newLevel: currentLevel.value,
 				};
 			} catch (e) {
-				console.error("❌ Check-in failed:", e);
+				if (import.meta.env.DEV) {
+					logUnexpectedNetworkError("[coinStore] Check-in failed:", e);
+				}
 				return { success: false, reason: "error", error: e.message };
 			} finally {
 				isProcessing.value = false;
@@ -243,18 +251,43 @@ export const useCoinStore = defineStore(
 			if (coins.value < amount)
 				return { success: false, reason: "insufficient_funds" };
 
-			coins.value -= amount;
+			if (!userStore.isAuthenticated) {
+				coins.value -= amount;
+				return { success: true, newBalance: coins.value };
+			}
 
-			if (userStore.isAuthenticated) {
-				await supabase
-					.from("coin_transactions")
-					.insert({
+			const result = await runOptimisticMutation({
+				capture: () => coins.value,
+				applyOptimistic: () => {
+					coins.value -= amount;
+				},
+				rollback: (snapshot) => {
+					coins.value = Number.isFinite(snapshot) ? snapshot : 0;
+				},
+				commit: async () => {
+					const { error } = await supabase.from("coin_transactions").insert({
 						user_id: userStore.userId,
 						amount: -amount,
 						type: "SPEND",
 						reason,
-					})
-					.catch(console.error);
+					});
+					if (error) throw error;
+					return true;
+				},
+				reportError: import.meta.env.DEV
+					? (error) => {
+							logUnexpectedNetworkError(
+								"[coinStore] Failed to persist spent coins:",
+								error,
+							);
+						}
+					: undefined,
+				errorMessage: (error) =>
+					String(error?.message || "Unable to spend coins right now"),
+			});
+
+			if (!result.success) {
+				return { success: false, reason: "error", error: result.error };
 			}
 
 			return { success: true, newBalance: coins.value };
@@ -266,7 +299,10 @@ export const useCoinStore = defineStore(
 		const awardBonus = async (amount, reason) => {
 			coins.value += amount;
 			totalEarned.value += amount;
-			pendingRewards.value.push({ type: "coins", amount, reason });
+			pendingRewards.value = [
+				...pendingRewards.value,
+				{ type: "coins", amount, reason },
+			];
 
 			if (navigator.vibrate) navigator.vibrate([20, 10, 40]);
 			return { success: true, newBalance: coins.value };
@@ -292,7 +328,9 @@ export const useCoinStore = defineStore(
 					details: { venue_id: venueId, venue_name: venueName },
 				});
 			} catch (e) {
-				console.error("❌ Sync failed:", e);
+				if (import.meta.env.DEV) {
+					logUnexpectedNetworkError("[coinStore] Sync failed:", e);
+				}
 			}
 		};
 
@@ -303,7 +341,10 @@ export const useCoinStore = defineStore(
 			try {
 				// Always use gamification service (works for both auth + anonymous)
 				await bootstrapVisitor({ forceRefresh: false }).catch(() => {});
-				const status = await gamificationService.getDailyCheckinStatus();
+				const status = await runSupabaseReadPolicy({
+					resourceType: "gamificationStats",
+					run: () => gamificationService.getDailyCheckinStatus(),
+				});
 				const balance = Number(status?.balance ?? 0);
 				const streak = Number(status?.streak ?? 0);
 				if (Number.isFinite(balance)) {
@@ -315,25 +356,34 @@ export const useCoinStore = defineStore(
 					dailyStreak.value = Math.max(0, Math.round(streak));
 				}
 			} catch (e) {
-				if (isSupabaseSchemaCacheError(e)) {
-					if (import.meta.env.DEV) {
-						console.warn(
-							"⚠️ user_stats temporarily unavailable (schema cache retrying)",
-						);
-					}
+				if (isSoftSupabaseReadError(e)) {
 					return;
 				}
 				if (import.meta.env.DEV) {
-					console.warn("⚠️ Failed to fetch stats:", e?.message || e);
+					logUnexpectedSupabaseReadError(
+						"[coinStore] Failed to fetch stats:",
+						e,
+					);
 				}
 			}
 		};
 
-		// Auto-fetch on auth
+		// Auto-fetch on auth (only on login, reset on logout)
 		watch(
 			() => userStore.isAuthenticated,
-			() => {
-				void fetchUserStats();
+			(isAuth) => {
+				if (isAuth) {
+					void fetchUserStats();
+				} else {
+					// Reset gamification state on logout
+					coins.value = 0;
+					totalEarned.value = 0;
+					collectedVenues.value = [];
+					achievements.value = [];
+					dailyStreak.value = 0;
+					lastCheckInDate.value = null;
+					pendingRewards.value = [];
+				}
 			},
 			{ immediate: true },
 		);

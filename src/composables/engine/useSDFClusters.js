@@ -8,7 +8,7 @@
  * Gracefully degrades to standard layers if WebGL2 unavailable.
  */
 
-import { onUnmounted, watch } from "vue";
+import { getCurrentInstance, onUnmounted, watch } from "vue";
 import { caps } from "@/engine/capabilities.js";
 import { SDFClusterLayer } from "@/engine/rendering/SDFClusterLayer.js";
 import { useShopStore } from "@/store/shopStore.js";
@@ -25,7 +25,7 @@ const SPRING_AMPLITUDE = 8; // max px displacement
  */
 export function useSDFClusters(map) {
 	if (!caps.webgl2 || !caps.floatTextures || !map) {
-		return { enabled: false };
+		return { enabled: false, dispose: () => {} };
 	}
 
 	const shopStore = useShopStore();
@@ -36,6 +36,7 @@ export function useSDFClusters(map) {
 	let _repaintRaf = null;
 	let _idleTimeout = null;
 	let _isAnimating = false;
+	let _disposed = false;
 
 	// Spring state per pin (index → { offsetX, offsetY, t0 })
 	let _springOffsets = [];
@@ -110,6 +111,7 @@ export function useSDFClusters(map) {
 
 	// ─── Layer setup ─────────────────────────────────────────────
 	const setup = () => {
+		if (!map || _disposed) return;
 		if (!map.isStyleLoaded()) {
 			map.once("style.load", setup);
 			return;
@@ -128,10 +130,10 @@ export function useSDFClusters(map) {
 
 	// ─── Continuous repaint loop for wobble ──────────────────────
 	const startRepaintLoop = () => {
-		if (_isAnimating) return;
+		if (_isAnimating || _disposed) return;
 		_isAnimating = true;
 		const loop = () => {
-			if (!_isAnimating) return;
+			if (!_isAnimating || _disposed) return;
 			map.triggerRepaint();
 			_repaintRaf = requestAnimationFrame(loop);
 		};
@@ -148,6 +150,7 @@ export function useSDFClusters(map) {
 	};
 
 	const scheduleIdle = () => {
+		if (_disposed) return;
 		if (_idleTimeout) clearTimeout(_idleTimeout);
 		_idleTimeout = setTimeout(() => {
 			stopRepaintLoop();
@@ -161,7 +164,7 @@ export function useSDFClusters(map) {
 
 	// ─── Update pins on shop changes ─────────────────────────────
 	const scheduleUpdate = () => {
-		if (_scheduled) return;
+		if (_scheduled || _disposed) return;
 		_scheduled = true;
 		_frameThrottle = requestAnimationFrame(() => {
 			_scheduled = false;
@@ -170,6 +173,7 @@ export function useSDFClusters(map) {
 	};
 
 	const updatePins = () => {
+		if (_disposed) return;
 		const shops = shopStore.rawShops;
 		if (!shops?.length) return;
 
@@ -205,6 +209,7 @@ export function useSDFClusters(map) {
 
 	// ─── Zoom spring trigger ─────────────────────────────────────
 	const onZoom = () => {
+		if (_disposed) return;
 		const currentZoom = map.getZoom();
 		const delta = currentZoom - _lastZoom;
 		if (Math.abs(delta) > 0.3) {
@@ -224,25 +229,34 @@ export function useSDFClusters(map) {
 	const stopWatch = watch(() => shopStore.rawShops?.length, scheduleUpdate);
 
 	const onMove = () => {
+		if (_disposed) return;
 		wakeUp();
 		scheduleUpdate();
 	};
 	map.on("move", onMove);
 	map.on("zoom", onZoom);
 
-	onUnmounted(() => {
+	const dispose = () => {
+		if (_disposed) return;
+		_disposed = true;
 		stopWatch();
 		map.off("move", onMove);
 		map.off("zoom", onZoom);
 		if (_frameThrottle) cancelAnimationFrame(_frameThrottle);
+		_frameThrottle = null;
 		stopRepaintLoop();
 		if (_idleTimeout) clearTimeout(_idleTimeout);
+		_idleTimeout = null;
 		try {
 			map.removeLayer(layer.id);
 		} catch {
 			/* noop */
 		}
-	});
+	};
 
-	return { enabled: true, layer };
+	if (getCurrentInstance()) {
+		onUnmounted(dispose);
+	}
+
+	return { enabled: true, layer, dispose };
 }

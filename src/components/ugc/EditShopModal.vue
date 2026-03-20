@@ -4,15 +4,15 @@
     class="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
   >
     <div
-      class="bg-gray-900 border border-purple-500/30 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl relative"
+      class="bg-gray-900 border border-cyan-500/30 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl relative"
     >
       <!-- Header -->
       <div
-        class="p-4 border-b border-white/10 flex justify-between items-center bg-gradient-to-r from-purple-900/50 to-blue-900/50"
+        class="p-4 border-b border-white/10 flex justify-between items-center bg-gradient-to-r from-cyan-900/50 to-blue-900/50"
       >
         <div class="flex items-center gap-2">
-          <component :is="Edit3" class="w-5 h-5 text-purple-400" />
-          <h2 class="text-lg font-bold text-white">Edit Place</h2>
+          <component :is="Edit3" class="w-5 h-5 text-cyan-400" />
+          <h2 class="text-lg font-bold text-white">{{ $t("auto.k_b76526ba") }}</h2>
         </div>
         <button
           @click="close"
@@ -30,10 +30,8 @@
         >
           <div class="text-2xl">📝</div>
           <div>
-            <div class="text-blue-400 font-bold text-sm">Improve VibeCity!</div>
-            <div class="text-blue-200/70 text-xs">
-              Help us keep info accurate. changes are reviewed clearly.
-            </div>
+            <div class="text-blue-400 font-bold text-sm">{{ $t("auto.k_b295dae9") }}</div>
+            <div class="text-blue-200/70 text-xs"> {{ $t("auto.k_74840489") }} </div>
           </div>
         </div>
 
@@ -41,12 +39,12 @@
         <div class="space-y-3">
           <div>
             <label class="block text-xs font-medium text-gray-400 mb-1"
-              >Place Name</label
+              >{{ $t("auto.k_48f9a6cf") }}</label
             >
-            <input
+            <input :aria-label="$t('a11y.input_field')"
               v-model="form.name"
               type="text"
-              class="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:border-purple-500 focus:outline-none transition"
+              class="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:border-cyan-500 focus:focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 transition"
             />
           </div>
 
@@ -57,13 +55,13 @@
               >
               <select
                 v-model="form.category"
-                class="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-purple-500 focus:outline-none transition"
+                class="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-cyan-500 focus:focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 transition"
               >
                 <option value="Cafe">Cafe</option>
                 <option value="Restaurant">Restaurant</option>
-                <option value="Bar">Bar / Pub</option>
+                <option value="Bar">{{ $t("auto.k_96adec58") }}</option>
                 <option value="Nightclub">Nightclub</option>
-                <option value="Street Food">Street Food</option>
+                <option value="Street Food">{{ $t("auto.k_bf917a6a") }}</option>
                 <option value="Attraction">Attraction</option>
               </select>
             </div>
@@ -71,10 +69,10 @@
               <label class="block text-xs font-medium text-gray-400 mb-1"
                 >Province</label
               >
-              <input
+              <input :aria-label="$t('a11y.input_field')"
                 v-model="form.province"
                 type="text"
-                class="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:border-purple-500 focus:outline-none transition"
+                class="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:border-cyan-500 focus:focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 transition"
               />
             </div>
           </div>
@@ -90,7 +88,7 @@
               <span>📍 {{ currentLocationText }}</span>
               <button
                 @click="getCurrentLocation"
-                class="text-purple-400 hover:text-purple-300 text-xs font-bold flex items-center gap-1"
+                class="text-cyan-400 hover:text-cyan-300 text-xs font-bold flex items-center gap-1"
               >
                 <component :is="Crosshair" class="w-3 h-3" /> Update
               </button>
@@ -100,12 +98,12 @@
           <!-- Image URL (For MVP) -->
           <div>
             <label class="block text-xs font-medium text-gray-400 mb-1"
-              >Image URL</label
+              >{{ $t("auto.k_dbebc57f") }}</label
             >
-            <input
+            <input :aria-label="$t('a11y.input_field')"
               v-model="form.imageUrl"
               type="text"
-              class="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:border-purple-500 focus:outline-none transition"
+              class="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:border-cyan-500 focus:focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 transition"
             />
           </div>
         </div>
@@ -119,13 +117,13 @@
         >
           Cancel
         </button>
-        <button
+        <button :aria-label="$t('a11y.action')"
           @click="submit"
           :disabled="loading"
-          class="flex-1 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold hover:shadow-lg hover:shadow-purple-500/20 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          class="flex-1 px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-bold hover:shadow-lg hover:shadow-cyan-500/20 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           <span v-if="loading" class="animate-spin">⏳</span>
-          <span v-else>Submit Changes</span>
+          <span v-else>{{ $t("auto.k_fe4ebbd8") }}</span>
         </button>
       </div>
     </div>
@@ -136,6 +134,7 @@
 import { Crosshair, Edit3, X } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
 import { useNotifications } from "@/composables/useNotifications";
+import { runCommitMutation } from "@/composables/useOptimisticUpdate";
 import { supabase } from "../../lib/supabase";
 
 const props = defineProps({
@@ -144,7 +143,7 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["close", "success"]);
-const { notifySuccess, notifyError } = useNotifications();
+const { notify, notifySuccess, notifyError } = useNotifications();
 
 const form = ref({
 	name: "",
@@ -209,35 +208,40 @@ const submit = async () => {
 	loading.value = true;
 
 	try {
-		const {
-			data: { user },
-		} = await supabase.auth.getUser();
-		const userId = user?.id || "anonymous_edit_mvp";
+		await runCommitMutation({
+			commit: async () => {
+				const {
+					data: { user },
+				} = await supabase.auth.getUser();
+				const userId = user?.id || "anonymous_edit_mvp";
 
-		// Direct Supabase Insert for Edit
-		const { data, error } = await supabase.from("user_submissions").insert([
-			{
-				user_id: userId,
-				venue_id: props.shop.id, // Link to existing venue
-				shop_name: form.value.name,
-				category: form.value.category,
-				latitude: form.value.lat,
-				longitude: form.value.lng,
-				province: form.value.province,
-				image_url: form.value.imageUrl,
-				status: "PENDING",
-				notes: "User suggested edit",
+				const { error } = await supabase.from("user_submissions").insert([
+					{
+						user_id: userId,
+						venue_id: props.shop.id,
+						shop_name: form.value.name,
+						category: form.value.category,
+						latitude: form.value.lat,
+						longitude: form.value.lng,
+						province: form.value.province,
+						image_url: form.value.imageUrl,
+						status: "PENDING",
+						notes: "User suggested edit",
+					},
+				]);
+
+				if (error) throw error;
+				return true;
 			},
-		]);
-
-		if (error) throw error;
-
-		notifySuccess("📝 Edit submitted for review! Thanks for helping.");
-		emit("success");
-		close();
-	} catch (error) {
-		console.error(error);
-		notifyError(`Error submitting edit: ${error.message}`);
+			onSuccess: () => {
+				notifySuccess("📝 Edit submitted for review! Thanks for helping.");
+				emit("success");
+				close();
+			},
+			notify,
+			errorMessage: (error) =>
+				`Error submitting edit: ${error?.message || "Unknown error"}`,
+		});
 	} finally {
 		loading.value = false;
 	}

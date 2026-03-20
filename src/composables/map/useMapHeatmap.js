@@ -5,7 +5,7 @@ const prefersReducedMotion =
 		? window.matchMedia("(prefers-reduced-motion: reduce)").matches
 		: false;
 
-// HSL color ramp: chill (violet) → warm (orange) → hype (crimson)
+// HSL color ramp: chill (cyan) → warm (orange) → hype (crimson)
 const BREATH_COLORS = {
 	chill: "hsla(260, 65%, 55%, 0)",
 	low: "hsla(220, 70%, 60%, 1)",

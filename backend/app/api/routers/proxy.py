@@ -93,6 +93,12 @@ async def osm_roads(
     return result
 
 
+@router.options("/mapbox-directions")
+async def mapbox_directions_options():
+    """Handle preflight CORS requests for Mapbox directions endpoint."""
+    return {"status": "ok"}
+
+
 @router.get("/mapbox-directions")
 async def mapbox_directions(
     start_lat: float = Query(...),

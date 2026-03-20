@@ -17,7 +17,7 @@
         <button
           type="button"
           class="absolute top-2 right-2 w-8 h-8 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
-          aria-label="Close consent banner"
+          :aria-label="$t('auto.k_df132715')"
           @click="decline"
         >
           ✕
@@ -25,39 +25,28 @@
         <div class="flex items-start gap-3">
           <span class="text-2xl" aria-hidden="true">🍪</span>
           <div>
-            <h3 id="consent-banner-title" class="font-bold text-sm mb-1">
-              VibeCity Analytics
-            </h3>
+            <h3 id="consent-banner-title" class="font-bold text-sm mb-1"> {{ $t("auto.k_7ae977a2") }} </h3>
             <p
               id="consent-banner-desc"
               class="text-xs text-gray-400 leading-relaxed mb-3"
-            >
-              We use anonymous cookies to improve your experience and count
-              venue visits. No personal data is sold.
-            </p>
+            > {{ $t("auto.k_54c8cc0e") }} </p>
             <a
               href="/privacy"
               class="text-xs text-blue-300 hover:text-blue-200 underline decoration-white/20"
-            >
-              Privacy policy
-            </a>
+            > {{ $t("auto.k_37cb16ff") }} </a>
             <div class="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 @click="accept"
                 :disabled="isPersisting"
-                class="min-h-[40px] bg-white text-black text-xs font-bold py-2 px-3 rounded-lg hover:bg-gray-200 transition disabled:opacity-70 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300/80"
-              >
-                Okay, Cool
-              </button>
+                class="min-h-[44px] bg-white text-black text-xs font-bold py-2 px-3 rounded-lg hover:bg-gray-200 transition disabled:opacity-70 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300/80"
+              > {{ $t("auto.k_4d27d574") }} </button>
               <button
                 type="button"
                 @click="decline"
                 :disabled="isPersisting"
-                class="min-h-[40px] bg-transparent border border-gray-600 text-gray-400 text-xs font-bold py-2 px-3 rounded-lg hover:text-white hover:border-white transition disabled:opacity-70 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300/80"
-              >
-                No Thanks
-              </button>
+                class="min-h-[44px] bg-transparent border border-gray-600 text-gray-400 text-xs font-bold py-2 px-3 rounded-lg hover:text-white hover:border-white transition disabled:opacity-70 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300/80"
+              > {{ $t("auto.k_d6b84a1b") }} </button>
             </div>
           </div>
         </div>
@@ -128,15 +117,20 @@ const handleEsc = (event) => {
 
 onMounted(() => {
 	if (typeof window === "undefined") return;
-	if (import.meta.env.VITE_E2E === "true") {
-		return;
-	}
+	// Auto-accept: silently grant consent on first visit. No banner shown.
 	const choice = localStorage.getItem("vibe_analytics_consent");
 	if (!choice) {
-		setTimeout(() => {
-			show.value = true;
-		}, 2000); // Delay display
+		localStorage.setItem("vibe_analytics_consent", "granted");
+		window.dispatchEvent(
+			new CustomEvent("vibecity:consent", { detail: { analytics: "granted" } }),
+		);
+		if (analyticsEnabled) {
+			void import("@/services/analyticsService")
+				.then(({ analyticsService }) => analyticsService.trackSession())
+				.catch(() => {});
+		}
 	}
+	// show remains false — the banner is never displayed
 });
 
 const accept = () => {

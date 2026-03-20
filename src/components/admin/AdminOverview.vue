@@ -23,9 +23,7 @@
           fill="currentColor"
           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
         ></path>
-      </svg>
-      Loading KPI Data...
-    </div>
+      </svg> {{ $t("auto.k_525a5f93") }} </div>
 
     <div
       v-else-if="error"
@@ -89,9 +87,7 @@
         >
           <h3
             class="text-sm font-semibold text-slate-300 mb-4 pb-2 border-b border-slate-700"
-          >
-            Venues by Category (Top 10)
-          </h3>
+          > {{ $t("auto.k_547b1ce1") }} </h3>
           <div class="h-64 relative w-full">
             <Bar
               v-if="categoryChartData"
@@ -101,9 +97,7 @@
             <div
               v-else
               class="absolute inset-0 flex items-center justify-center text-slate-500 text-sm"
-            >
-              No data available
-            </div>
+            > {{ $t("auto.k_fde1f819") }} </div>
           </div>
         </div>
 
@@ -113,9 +107,7 @@
         >
           <h3
             class="text-sm font-semibold text-slate-300 mb-4 pb-2 border-b border-slate-700"
-          >
-            Order Status Breakdown
-          </h3>
+          > {{ $t("auto.k_4ba6a22c") }} </h3>
           <div class="h-64 relative w-full flex justify-center pb-4">
             <Doughnut
               v-if="orderChartData"
@@ -125,9 +117,7 @@
             <div
               v-else
               class="absolute inset-0 flex items-center justify-center text-slate-500 text-sm"
-            >
-              No data available
-            </div>
+            > {{ $t("auto.k_fde1f819") }} </div>
           </div>
         </div>
       </div>
@@ -316,14 +306,24 @@ const fetchKPIs = async () => {
 	loading.value = true;
 	error.value = null;
 	try {
-		const [kpiData, catData, orderStatusData] = await Promise.all([
+		const results = await Promise.allSettled([
 			adminDataService.getOverviewKPIs(),
 			adminDataService.getVenuesByCategory(),
 			adminDataService.getOrderStatusBreakdown(),
 		]);
-		data.value = kpiData;
-		categoryData.value = catData;
-		orderData.value = orderStatusData;
+		if (results[0].status === "fulfilled") data.value = results[0].value;
+		if (results[1].status === "fulfilled")
+			categoryData.value = results[1].value;
+		if (results[2].status === "fulfilled") orderData.value = results[2].value;
+		const failed = results.filter((r) => r.status === "rejected");
+		if (failed.length === results.length) {
+			error.value = failed[0].reason?.message || "Failed to load dashboard";
+		} else if (failed.length > 0 && import.meta.env.DEV) {
+			console.warn(
+				"Partial dashboard load failure:",
+				failed.map((r) => r.reason),
+			);
+		}
 	} catch (e) {
 		error.value = e.message;
 	} finally {

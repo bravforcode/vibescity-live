@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Loader2, Save, X } from "lucide-vue-next";
 import { ref } from "vue";
+import i18n from "@/i18n.js";
 import { useNotifications } from "../../composables/useNotifications";
 import { useThrottledAction } from "../../composables/useThrottledAction";
 import { supabase } from "../../lib/supabase";
@@ -34,7 +35,7 @@ const saveChanges = async () => {
 	isSaving.value = true;
 	try {
 		const visitorId = localStorage.getItem("vibe_visitor_id");
-		if (!visitorId) throw new Error("Visitor ID missing");
+		if (!visitorId) throw new Error(i18n.global.t("auto.k_6785cbe"));
 
 		const { error } = await supabase.rpc("update_venue_anonymous", {
 			p_shop_id: props.venue.id,
@@ -63,7 +64,7 @@ const saveChangesThrottled = createThrottledAction(() => {
 <template>
   <div class="fixed inset-0 z-[8000] flex items-center justify-center p-4">
     <!-- Backdrop -->
-    <div
+    <div role="button" tabindex="0"
       class="absolute inset-0 bg-black/80 backdrop-blur-md"
       @click="emit('close')"
     ></div>
@@ -73,7 +74,7 @@ const saveChangesThrottled = createThrottledAction(() => {
       class="relative w-full max-w-md bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl p-6"
     >
       <div class="flex items-center justify-between mb-6">
-        <h3 class="text-xl font-bold text-white">Edit Venue</h3>
+        <h3 class="text-xl font-bold text-white">{{ $t("auto.k_5fe6d46e") }}</h3>
         <button
           @click="emit('close')"
           class="p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-white"
@@ -89,14 +90,14 @@ const saveChangesThrottled = createThrottledAction(() => {
       >
         <div>
           <label class="block text-xs font-bold text-white/50 uppercase mb-1"
-            >Venue Name</label
+            >{{ $t("auto.k_4a9895cf") }}</label
           >
           <input
             v-model="form.name"
             type="text"
             autocomplete="organization"
-            aria-label="Venue name"
-            class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none"
+            :aria-label="$t('auto.k_cd3f4aef')"
+            class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50"
           />
         </div>
 
@@ -106,8 +107,8 @@ const saveChangesThrottled = createThrottledAction(() => {
           >
           <select
             v-model="form.category"
-            aria-label="Venue category"
-            class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none"
+            :aria-label="$t('auto.k_920ac54c')"
+            class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50"
           >
             <option value="Cafe">Cafe</option>
             <option value="Restaurant">Restaurant</option>
@@ -125,15 +126,15 @@ const saveChangesThrottled = createThrottledAction(() => {
           <textarea
             v-model="form.description"
             rows="3"
-            aria-label="Venue description"
-            class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none resize-none"
+            :aria-label="$t('auto.k_39737e1e')"
+            class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 resize-none"
           ></textarea>
         </div>
 
         <button
           type="submit"
           :disabled="isSaving"
-          aria-label="Save venue changes"
+          :aria-label="$t('auto.k_98424efe')"
           class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition mt-4"
         >
           <Loader2 v-if="isSaving" class="w-4 h-4 animate-spin" />

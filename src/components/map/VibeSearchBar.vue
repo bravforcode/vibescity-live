@@ -306,7 +306,7 @@ watch(selectedIndex, (newIndex) => {
 }
 
 .suggestion-icon {
-  @apply p-2 rounded-lg bg-gradient-to-br from-pink-500/20 to-purple-500/20 text-pink-500;
+  @apply p-2 rounded-lg bg-gradient-to-br from-pink-500/20 to-cyan-500/20 text-pink-500;
 }
 
 .suggestion-content {
@@ -330,7 +330,7 @@ watch(selectedIndex, (newIndex) => {
 }
 
 .vibe-fill-small {
-  @apply h-full bg-gradient-to-r from-pink-500 to-purple-500;
+  @apply h-full bg-gradient-to-r from-pink-500 to-cyan-500;
 }
 
 .loading-spinner {

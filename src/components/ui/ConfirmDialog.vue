@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from "vue";
+import { Z } from "@/constants/zIndex";
 
 const props = defineProps({
 	isOpen: {
@@ -48,9 +49,10 @@ const closeDialog = () => {
 
 <template>
 	<Teleport to="body">
-		<div
+		<div tabindex="0"
 			v-if="isOpen"
-			class="fixed inset-0 z-[9100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+			class="fixed inset-0 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+			:style="{ zIndex: Z.CONFIRM_DIALOG }"
 			role="dialog"
 			aria-modal="true"
 			data-testid="confirm-dialog"

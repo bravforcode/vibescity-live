@@ -1,0 +1,4 @@
+interface:
+  display_name: "VibeCity Session Handoff"
+  short_description: "Resume and maintain VibeCity repo state."
+  default_prompt: "Read the VibeCity operating memory, recover repo state, and keep the memory updated while you work."

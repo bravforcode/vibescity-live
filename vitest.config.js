@@ -14,7 +14,7 @@ export default defineConfig({
     globals: true,
 
     // ✅ ให้ Vitest หาเทสของคุณ
-    include: ["tests/unit/**/*.spec.{js,ts}"],
+    include: ["tests/unit/**/*.spec.{js,ts}", "tests/integration/**/*.spec.{js,ts}"],
 
     // ✅ Coverage สำหรับ CI/SonarCloud
     coverage: {

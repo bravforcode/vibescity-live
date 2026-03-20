@@ -30,10 +30,11 @@ def detect_test_framework(project_path: Path) -> dict:
         "type": "unknown",
         "framework": None,
         "cmd": None,
-        "coverage_cmd": None
+        "coverage_cmd": None,
+        "cwd": project_path  # working directory to run tests from
     }
-    
-    # Node.js project
+
+    # Node.js project — always takes priority over Python when package.json exists
     package_json = project_path / "package.json"
     if package_json.exists():
         result["type"] = "node"
@@ -41,12 +42,16 @@ def detect_test_framework(project_path: Path) -> dict:
             pkg = json.loads(package_json.read_text(encoding='utf-8'))
             scripts = pkg.get("scripts", {})
             deps = {**pkg.get("dependencies", {}), **pkg.get("devDependencies", {})}
-            
+
             # Check for test script
-            if "test" in scripts:
+            if "test:unit" in scripts:
+                result["framework"] = "vitest"
+                result["cmd"] = ["bun", "run", "test:unit", "--run"]
+                result["coverage_cmd"] = ["bun", "run", "test:unit:coverage"]
+            elif "test" in scripts:
                 result["framework"] = "npm test"
                 result["cmd"] = ["npm", "test"]
-                
+
                 # Try to detect specific framework for coverage
                 if "vitest" in deps:
                     result["framework"] = "vitest"
@@ -62,18 +67,23 @@ def detect_test_framework(project_path: Path) -> dict:
                 result["framework"] = "jest"
                 result["cmd"] = ["npx", "jest"]
                 result["coverage_cmd"] = ["npx", "jest", "--coverage"]
-                
-        except:
+
+        except Exception:
             pass
-    
-    # Python project
-    if (project_path / "pyproject.toml").exists() or (project_path / "requirements.txt").exists():
-        result["type"] = "python"
-        result["framework"] = "pytest"
-        result["cmd"] = ["python", "-m", "pytest", "-v"]
-        result["coverage_cmd"] = ["python", "-m", "pytest", "--cov", "--cov-report=term-missing"]
-    
+
+    # Python project — only if no Node tests found, and run from backend/ if it exists
+    if result["cmd"] is None:
+        backend_dir = project_path / "backend"
+        python_root = backend_dir if (backend_dir / "pyproject.toml").exists() else project_path
+        if (python_root / "pyproject.toml").exists() or (python_root / "requirements.txt").exists():
+            result["type"] = "python"
+            result["framework"] = "pytest"
+            result["cmd"] = ["python", "-m", "pytest", "-v", "--tb=no", "-q"]
+            result["coverage_cmd"] = ["python", "-m", "pytest", "--cov", "--cov-report=term-missing"]
+            result["cwd"] = python_root
+
     return result
+
 
 
 def run_tests(cmd: list, cwd: Path) -> dict:
@@ -174,7 +184,7 @@ def main():
     print("-"*60)
     
     # Run tests
-    result = run_tests(cmd, project_path)
+    result = run_tests(cmd, test_info.get("cwd", project_path))
     
     # Print output (truncated)
     if result["output"]:

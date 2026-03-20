@@ -15,68 +15,7 @@
  *  ⑦ Zero-dep, zero-cost      — no library, no Vue state, no layout impact
  */
 import { onUnmounted, watch } from "vue";
-
-// ── Critical pin assets ───────────────────────────────────────────────────────
-
-/**
- * Map of Mapbox image IDs → public asset paths for the critical pin sprites.
- * These are the images Mapbox needs before it can render any pins on first idle.
- * Pre-decoding them avoids a flash where pins appear blank on slow connections.
- */
-const CRITICAL_PIN_IMAGES = {
-	"pin-normal": "/images/pins/pin-gray.png",
-	"pin-blue": "/images/pins/pin-blue.png",
-	"pin-purple": "/images/pins/pin-purple.png",
-	"pin-red": "/images/pins/pin-red.png",
-};
-
-/**
- * Prefetch and async-decode a single pin image URL.
- * Uses Image.decode() API (non-blocking) with onload fallback.
- * Resolves true on success, false on failure — never rejects.
- *
- * @param {string} url
- * @returns {Promise<boolean>}
- */
-const _decodePinImage = (url) =>
-	new Promise((resolve) => {
-		if (!url || typeof url !== "string") return resolve(false);
-		const img = new Image();
-		img.src = url;
-		if (typeof img.decode === "function") {
-			img
-				.decode()
-				.then(() => resolve(true))
-				.catch(() => resolve(false));
-		} else {
-			img.onload = () => resolve(true);
-			img.onerror = () => resolve(false);
-		}
-	});
-
-/**
- * Prefetch and decode all critical map pin images in parallel.
- * Call this as early as possible (before or alongside map.init()) so pin
- * assets are in the browser's image decoder cache when Mapbox first renders.
- * Non-blocking: uses Image.decode() API so main thread is never stalled.
- *
- * @returns {Promise<void>} — resolves when all prefetches complete (or fail gracefully)
- */
-export const prefetchCriticalPins = async () => {
-	const entries = Object.entries(CRITICAL_PIN_IMAGES);
-	const results = await Promise.allSettled(
-		entries.map(([, url]) => _decodePinImage(url)),
-	);
-
-	if (import.meta.env.DEV) {
-		const loaded = results.filter(
-			(r) => r.status === "fulfilled" && r.value,
-		).length;
-		console.log(
-			`[useMapImagePrefetch] Prefetched ${loaded}/${entries.length} critical pin images`,
-		);
-	}
-};
+import { prefetchCriticalPins } from "./prefetchCriticalPins";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 

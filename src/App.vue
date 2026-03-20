@@ -9,6 +9,7 @@ import { useHomeBase } from "@/composables/useHomeBase";
 import { useNetworkResilience } from "@/composables/useNetworkResilience";
 import { useVisualViewport } from "@/composables/useVisualViewport";
 import { useLocationStore } from "@/store/locationStore";
+import { isAppDebugLoggingEnabled } from "@/utils/debugFlags";
 
 const locationStore = useLocationStore();
 const { setHomeBase, hasHomeBase } = useHomeBase();
@@ -62,7 +63,7 @@ watch(
 	(newLoc) => {
 		if (newLoc && !hasHomeBase.value) {
 			setHomeBase(newLoc[0], newLoc[1]);
-			if (import.meta.env.DEV) {
+			if (isAppDebugLoggingEnabled()) {
 				console.log("📍 Home Base set automatically:", newLoc);
 			}
 		}

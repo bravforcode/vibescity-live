@@ -29,6 +29,7 @@ import {
 	watch,
 } from "vue";
 import { useI18n } from "vue-i18n";
+import { useFocusTrap } from "../../composables/useFocusTrap";
 import { useHaptics } from "../../composables/useHaptics";
 import { usePerformance } from "../../composables/usePerformance";
 import { useSpatialFeedback } from "../../composables/useSpatialFeedback";
@@ -144,6 +145,10 @@ const { elementRef: drawerRef } = useSwipeToDismiss({
 		}
 	},
 });
+
+// ✅ A11y: Focus trap within drawer
+useFocusTrap(drawerRef);
+
 const closeButtonRef = ref(null);
 
 const comingSoonToast = ref(false);
@@ -175,7 +180,12 @@ const handleClose = () => {
 
 const handleLogout = async () => {
 	selectFeedback();
-	await userStore.logout();
+	try {
+		await userStore.logout();
+	} catch (e) {
+		if (import.meta.env.DEV) console.error("[ProfileDrawer] logout failed:", e);
+		// Still close — local auth state was cleared even if signOut API failed
+	}
 	emit("close");
 };
 
@@ -371,7 +381,7 @@ const menuSections = computed(() => {
 					id: "quests",
 					label: t("profile.vibe_quests"),
 					icon: Trophy,
-					color: "text-purple-400",
+					color: "text-cyan-400",
 				},
 				{
 					id: "history",
@@ -411,7 +421,7 @@ const menuSections = computed(() => {
           ref="closeButtonRef"
           type="button"
           class="absolute top-4 left-4 z-30 w-9 h-9 rounded-xl bg-white/10 border border-white/20 text-white flex items-center justify-center transition hover:bg-white/20 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
-          aria-label="Close profile drawer"
+          :aria-label="$t('auto.k_acfdc97f')"
           @click="handleClose"
         >
           <X class="w-4 h-4" />
@@ -424,7 +434,7 @@ const menuSections = computed(() => {
             class="absolute -top-10 -right-10 w-40 h-40 bg-blue-600/30 blur-[60px] rounded-full animate-pulse-slow"
           ></div>
           <div
-            class="absolute top-20 -left-10 w-24 h-24 bg-purple-600/20 blur-[40px] rounded-full animate-pulse-slow delay-700"
+            class="absolute top-20 -left-10 w-24 h-24 bg-cyan-600/20 blur-[40px] rounded-full animate-pulse-slow delay-700"
           ></div>
 
           <div class="relative z-10 flex flex-col items-center">
@@ -433,7 +443,7 @@ const menuSections = computed(() => {
               class="relative mb-4 group cursor-pointer active:scale-95 transition-transform"
             >
               <div
-                class="w-24 h-24 rounded-[2rem] bg-gradient-to-br from-blue-500 to-purple-600 p-1 shadow-2xl rotate-3 group-hover:rotate-0 transition-transform duration-500"
+                class="w-24 h-24 rounded-[2rem] bg-gradient-to-br from-blue-500 to-cyan-600 p-1 shadow-2xl rotate-3 group-hover:rotate-0 transition-transform duration-500"
               >
                 <div
                   class="w-full h-full rounded-[1.8rem] bg-zinc-900 overflow-hidden border-2 border-white/20 relative"
@@ -468,7 +478,7 @@ const menuSections = computed(() => {
               <span
                 class="text-[10px] font-bold text-white/40 uppercase tracking-widest"
               >
-                LV.{{ userLevel }}
+                {{ "LV. " + userLevel }}
               </span>
             </div>
 
@@ -500,7 +510,7 @@ const menuSections = computed(() => {
                     class="w-full h-1 bg-white/10 rounded-full mt-1 overflow-hidden"
                   >
                     <div
-                      class="h-full bg-gradient-to-r from-blue-500 to-purple-500"
+                      class="h-full bg-gradient-to-r from-blue-500 to-cyan-500"
                       :style="{ width: `${progressPercent}%` }"
                     ></div>
                   </div>
@@ -519,7 +529,7 @@ const menuSections = computed(() => {
             <button
               @click="activeView = 'menu'"
               class="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
-              aria-label="Back to menu"
+              :aria-label="$t('auto.k_4b2689b6')"
             >
               <ChevronLeft class="w-5 h-5 text-white" />
             </button>
@@ -669,7 +679,7 @@ const menuSections = computed(() => {
                 selectFeedback();
               "
               class="w-full flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 active:scale-95 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
-              aria-label="Toggle language"
+              :aria-label="$t('auto.k_b9e5e501')"
             >
               <div class="flex items-center gap-3">
                 <div
@@ -727,7 +737,7 @@ const menuSections = computed(() => {
   <transition name="fade">
     <div
       v-if="comingSoonToast"
-      class="fixed top-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl bg-purple-600/90 text-white text-xs font-bold shadow-lg backdrop-blur-sm"
+      class="fixed top-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl bg-cyan-600/90 text-white text-xs font-bold shadow-lg backdrop-blur-sm"
       :style="{ zIndex: Z.SUBMODAL }"
       role="status"
       aria-live="polite"
@@ -738,7 +748,7 @@ const menuSections = computed(() => {
 
   <!-- Backdrop — opacity + blur tied to swipe gesture in real-time -->
   <transition name="fade">
-    <div
+    <div role="button" tabindex="0"
       v-if="isOpen"
       ref="backdropRef"
       class="fixed inset-0 will-change-[backdrop-filter,opacity]"

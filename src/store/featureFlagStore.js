@@ -4,7 +4,12 @@ import {
 	getFlagGovernanceViolations,
 	validateFlagDependencies,
 } from "@/config/featureFlagGovernance";
-import { isSupabaseSchemaCacheError, supabase } from "../lib/supabase";
+import { supabase } from "../lib/supabase";
+import {
+	isSoftSupabaseReadError,
+	logUnexpectedSupabaseReadError,
+	runSupabaseReadPolicy,
+} from "../utils/supabaseReadPolicy";
 
 const DEFAULT_FLAGS = Object.freeze({
 	use_v2_feed: true,
@@ -198,11 +203,17 @@ export const useFeatureFlagStore = defineStore("feature-flags", () => {
 
 		isLoading.value = true;
 		try {
-			const result = await supabase
-				.from("feature_flags_public")
-				.select("*")
-				.limit(200);
-			if (result.error) throw result.error;
+			const result = await runSupabaseReadPolicy({
+				resourceType: "featureFlags",
+				run: async () => {
+					const result = await supabase
+						.from("feature_flags_public")
+						.select("*")
+						.limit(200);
+					if (result.error) throw result.error;
+					return result;
+				},
+			});
 
 			const nextMeta = buildDefaultFlagMeta();
 			for (const row of result.data || []) {
@@ -239,12 +250,15 @@ export const useFeatureFlagStore = defineStore("feature-flags", () => {
 			flags.value = nextFlags;
 			loadedAt.value = Date.now();
 		} catch (e) {
-			// Fail-open with defaults to protect app startup.
+			if (loadedAt.value && isSoftSupabaseReadError(e)) {
+				loadedAt.value = Date.now();
+				return;
+			}
 			if (import.meta.env.DEV) {
-				const label = isSupabaseSchemaCacheError(e)
-					? "⚠️ feature_flags_public unavailable (schema cache retrying; using defaults):"
-					: "⚠️ feature_flags_public fetch failed (using defaults):";
-				console.warn(label, e?.message || e);
+				logUnexpectedSupabaseReadError(
+					"[featureFlagStore] feature_flags_public fetch failed; using defaults",
+					e,
+				);
 			}
 			flagMeta.value = buildDefaultFlagMeta();
 			flags.value = Object.fromEntries(
