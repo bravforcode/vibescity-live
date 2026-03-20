@@ -51,7 +51,7 @@
         "@playwright/test": "^1.58.0",
         "@rsbuild/core": "^1.7.2",
         "@rsbuild/plugin-vue": "^1.2.3",
-        "@rspack/binding-linux-x64-gnu": "^1.7.2",
+        "@rspack/binding-linux-x64-gnu": "1.7.3",
         "@storybook/addon-a11y": "^10.2.0",
         "@storybook/addon-docs": "^10.2.0",
         "@storybook/addon-onboarding": "^10.2.0",
@@ -610,7 +610,7 @@
 
     "@rspack/binding": ["@rspack/binding@1.7.3", "", { "optionalDependencies": { "@rspack/binding-win32-x64-msvc": "1.7.3" } }, ""],
 
-    "@rspack/binding-linux-x64-gnu": ["@rspack/binding-linux-x64-gnu@1.7.9", "", { "os": "linux", "cpu": "x64" }, "sha512-0kldV+3WTs/VYDWzxJ7K40hCW26IHtnk8xPK3whKoo1649rgeXXa0EdsU5P7hG8Ef5SWQjHHHZ/fuHYSO3Y6HA=="],
+    "@rspack/binding-linux-x64-gnu": ["@rspack/binding-linux-x64-gnu@1.7.3", "", { "os": "linux", "cpu": "x64" }, "sha512-adnDbUqafSAI6/N6vZ+iONSo1W3yUpnNtJqP3rVp7+YdABhUpbOhtaY37qpIJ3uFajXctYFyISPrb4MWl1M9Yg=="],
 
     "@rspack/binding-win32-x64-msvc": ["@rspack/binding-win32-x64-msvc@1.7.3", "", { "os": "win32", "cpu": "x64" }, ""],
 
