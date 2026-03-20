@@ -167,13 +167,6 @@ const setLocaleCookie = (locale) => {
 	});
 };
 
-const readBool = (value) => {
-	if (value && typeof value === "object" && "value" in value) {
-		return Boolean(value.value);
-	}
-	return Boolean(value);
-};
-
 const getPreferredLocale = () => {
 	if (typeof window !== "undefined") {
 		const stored = localStorage.getItem("locale") || readCookie(LOCALE_COOKIE);

@@ -11,7 +11,7 @@ test.describe("Map User Flow", () => {
       test.skip(true, "Skip map flow on mobile devices");
     }
   });
-  test("Map shell reports ready @map-quarantine", async ({ page }) => {
+  test("Map shell reports ready @map-required", async ({ page }) => {
     const consoleGate = attachConsoleGate(page);
     await page.goto("/", { waitUntil: "domcontentloaded", timeout: 90_000 });
 
@@ -27,7 +27,7 @@ test.describe("Map User Flow", () => {
     consoleGate.assertClean();
   });
 
-  test("Map Load -> Click Shop -> Open Drawer @map-quarantine", async ({ page }) => {
+  test("Map Load -> Click Shop -> Open Drawer @map-required", async ({ page }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
 
     const mapReady = await waitForMapReadyOrSkip(page, 60_000);

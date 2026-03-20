@@ -1,4 +1,5 @@
 <script setup>
+import { onMounted, watch } from "vue";
 import ReloadPrompt from "@/components/pwa/ReloadPrompt.vue";
 import ConsentBanner from "@/components/ui/ConsentBanner.vue";
 import ErrorBoundary from "@/components/ui/ErrorBoundary.vue";
@@ -16,31 +17,44 @@ useNetworkResilience();
 useVisualViewport();
 
 const parseEnvBool = (value) => {
-  const raw = String(value ?? "")
-    .trim()
-    .toLowerCase();
-  if (!raw) return null;
-  if (["1", "true", "yes", "on"].includes(raw)) return true;
-  if (["0", "false", "no", "off"].includes(raw)) return false;
-  return null;
+	const raw = String(value ?? "")
+		.trim()
+		.toLowerCase();
+	if (!raw) return null;
+	if (["1", "true", "yes", "on"].includes(raw)) return true;
+	if (["0", "false", "no", "off"].includes(raw)) return false;
+	return null;
 };
 
 // Default: disabled in dev, enabled in prod (unless explicitly overridden).
 const analyticsEnabled =
-  parseEnvBool(import.meta.env.VITE_ANALYTICS_ENABLED) ?? !import.meta.env.DEV;
+	parseEnvBool(import.meta.env.VITE_ANALYTICS_ENABLED) ?? !import.meta.env.DEV;
+
+const hasAnalyticsConsent = () => {
+	try {
+		// Respect Do Not Track as a hard deny.
+		if (typeof navigator !== "undefined" && navigator.doNotTrack === "1") {
+			return false;
+		}
+		return localStorage.getItem("vibe_analytics_consent") === "granted";
+	} catch {
+		return false;
+	}
+};
 
 const trackSessionIfAllowed = () => {
-  if (!analyticsEnabled) return;
-  void import("@/services/analyticsService")
-    .then(({ analyticsService }) => analyticsService.trackSession())
-    .catch(() => {});
+	if (!analyticsEnabled) return;
+	if (!hasAnalyticsConsent()) return;
+	void import("@/services/analyticsService")
+		.then(({ analyticsService }) => analyticsService.trackSession())
+		.catch(() => {});
 };
 
 onMounted(() => {
-  trackSessionIfAllowed();
+	trackSessionIfAllowed();
 
-  // Start tracking location for Home Base
-  locationStore.startWatching();
+	// Start tracking location for Home Base
+	locationStore.startWatching();
 });
 
 // Auto-set Home Base on first location fix

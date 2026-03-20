@@ -439,25 +439,6 @@ const reportMapLifecycle = (eventType, metadata = {}) => {
 	});
 };
 
-// ── Traffic dash / fireflies stubs ──────────────────
-// These functions are called from map lifecycle hooks but were
-// extracted into future composables. Define no-op stubs until
-// the composables are wired in, so the component boots cleanly.
-const resetTrafficDashState = () => {
-  /* noop — traffic dash composable WIP */
-};
-const removeFirefliesLayer = () => {
-  if (!map.value) return;
-  try {
-    if (map.value.getLayer("fireflies-layer"))
-      map.value.removeLayer("fireflies-layer");
-    if (map.value.getSource("fireflies-source"))
-      map.value.removeSource("fireflies-source");
-  } catch {
-    /* layer may not exist */
-  }
-};
-
 const emit = defineEmits([
 	"select-shop",
 	"open-detail",
@@ -1193,23 +1174,6 @@ const showPopupScanline = computed(
 		allowNeonPulse.value &&
 		!prefs.isReducedMotion &&
 		!prefersReducedMotion.value,
-);
-
-const selectedShopVisitors = computed(() =>
-  selectedShopVisitorsById(props.highlightedShopId),
-);
-const syncBuildingPopupContent = (shop) => {
-  syncBuildingPopupContentCore(shop, props.highlightedShopId);
-};
-const syncBuildingInfoPopupFromSelection = () => {
-  syncBuildingInfoPopupFromSelectionCore(props.shops, props.highlightedShopId);
-};
-const showPopupScanline = computed(
-  () =>
-    buildingPopupVisible.value &&
-    allowNeonPulse.value &&
-    !prefs.isReducedMotion &&
-    !prefersReducedMotion.value,
 );
 
 // Realtime composable

@@ -208,24 +208,24 @@ const spin = async () => {
 };
 
 const show = async () => {
-  isVisible.value = true;
-  await loadSpinStatus();
+	isVisible.value = true;
+	await loadSpinStatus();
 };
 const hide = () => {
-  isVisible.value = false;
-  rotation.value = 0;
-  selectedPrize.value = null;
-  statusMessage.value = "";
-  emit("close");
+	isVisible.value = false;
+	rotation.value = 0;
+	selectedPrize.value = null;
+	statusMessage.value = "";
+	emit("close");
 };
 
 defineExpose({ show, hide });
 
 onMounted(() => {
-  if (typeof window === "undefined" || !window.matchMedia) return;
-  motionMediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-  prefersReducedMotion.value = motionMediaQuery.matches;
-  motionMediaQuery.addEventListener?.("change", handleMotionChange);
+	if (typeof window === "undefined" || !window.matchMedia) return;
+	motionMediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+	prefersReducedMotion.value = motionMediaQuery.matches;
+	motionMediaQuery.addEventListener?.("change", handleMotionChange);
 });
 onUnmounted(() =>
 	motionMediaQuery?.removeEventListener?.("change", handleMotionChange),
