@@ -1,9 +1,14 @@
+import i18n from "@/i18n.js";
+
 const LOCALHOST_PATTERN = /(localhost|127\.0\.0\.1)/i;
 const PLACEHOLDER_PATTERN = /<[^>]+>/; // Detects <api-app>, <your-key>, etc.
 const IS_E2E = import.meta.env?.VITE_E2E === "true";
+const API_DEV_PROXY_ENABLED = import.meta.env?.VITE_API_PROXY_DEV === "true";
 const WS_REQUIRED = import.meta.env?.VITE_WS_REQUIRED === "true";
-const WS_DEV_AUTOCONNECT = import.meta.env?.VITE_WS_DEV_AUTOCONNECT !== "false";
+const WS_DEV_AUTOCONNECT = import.meta.env?.VITE_WS_DEV_AUTOCONNECT === "true";
 const WS_CONFIG_DEBUG = import.meta.env?.VITE_WS_CONFIG_DEBUG === "true";
+const LOCAL_DEV_MAP_RENDERER = import.meta.env?.VITE_LOCAL_DEV_MAP_RENDERER;
+const LOCAL_DEV_MAP_RENDERER_SESSION_KEY = "vibecity.dev.mapRenderer";
 const IS_LOCAL_HOST =
 	typeof window !== "undefined" &&
 	LOCALHOST_PATTERN.test(window.location.hostname);
@@ -13,6 +18,11 @@ const trimTrailingSlash = (value) => value.replace(/\/+$/, "");
 const sanitize = (value) => {
 	if (typeof value !== "string") return "";
 	return value.trim();
+};
+
+const getDevApiProxyBaseUrl = () => {
+	if (typeof window === "undefined") return "";
+	return `${trimTrailingSlash(window.location.origin)}/api`;
 };
 
 const rewriteLocalhostHostnameForDev = (rawValue) => {
@@ -35,6 +45,28 @@ const rewriteLocalhostHostnameForDev = (rawValue) => {
 	return rawValue;
 };
 
+const shouldPreferDevApiProxy = (rawValue) => {
+	if (!import.meta.env.DEV || typeof window === "undefined") return false;
+	if (!API_DEV_PROXY_ENABLED) return false;
+	if (!LOCALHOST_PATTERN.test(window.location.hostname)) return false;
+
+	const value = sanitize(rawValue);
+	if (!value) return true;
+	if (value.startsWith("/")) return false;
+
+	try {
+		const url = new URL(
+			rewriteLocalhostHostnameForDev(value),
+			window.location.origin,
+		);
+		const sameOrigin = url.origin === window.location.origin;
+		const localTarget = LOCALHOST_PATTERN.test(url.hostname);
+		return !sameOrigin && !localTarget;
+	} catch {
+		return false;
+	}
+};
+
 /**
  * Validates URL format and checks for placeholder patterns
  * @param {string} value - URL to validate
@@ -50,6 +82,18 @@ const validateUrl = (value, name) => {
 		};
 	}
 	return { valid: true };
+};
+
+const resolveExplicitApiBaseUrl = () => {
+	const explicit = import.meta.env.VITE_API_URL;
+	if (explicit) {
+		return trimTrailingSlash(rewriteLocalhostHostnameForDev(explicit));
+	}
+
+	const raw = requireClientEnv("VITE_API_URL", {
+		message: "VITE_API_URL is required for API calls.",
+	});
+	return trimTrailingSlash(rewriteLocalhostHostnameForDev(raw));
 };
 
 export const getSiteOrigin = (options = {}) => {
@@ -99,31 +143,113 @@ export const requireClientEnv = (name, options = {}) => {
 		!IS_LOCAL_HOST &&
 		LOCALHOST_PATTERN.test(rawValue)
 	) {
-		throw new Error(
-			`${name} points to localhost in production. Configure a public endpoint.`,
-		);
+		const errStr = `ERR_LOCALHOST_PROD: ${name}`;
+		throw new Error(errStr);
 	}
 
 	return rawValue;
 };
 
 export const getApiBaseUrl = () => {
-	// Prefer static access for bundler compatibility
-	const explicit = import.meta.env.VITE_API_URL;
-	if (explicit) {
-		return trimTrailingSlash(rewriteLocalhostHostnameForDev(explicit));
+	const directBase = resolveExplicitApiBaseUrl();
+	if (shouldPreferDevApiProxy(directBase)) {
+		return getDevApiProxyBaseUrl();
 	}
-
-	const raw = requireClientEnv("VITE_API_URL", {
-		message: "VITE_API_URL is required for API calls.",
-	});
-	return trimTrailingSlash(rewriteLocalhostHostnameForDev(raw));
+	if (!directBase && shouldPreferDevApiProxy("")) {
+		return getDevApiProxyBaseUrl();
+	}
+	return directBase;
 };
 
 export const getApiV1BaseUrl = () => {
 	const base = getApiBaseUrl();
-	return base.endsWith("/api/v1") ? base : `${base}/api/v1`;
+	if (base.endsWith("/api/v1")) return base;
+	if (base.endsWith("/api")) return `${base}/v1`;
+	return `${base}/api/v1`;
 };
+
+export const getDirectApiBaseUrl = () => resolveExplicitApiBaseUrl();
+
+export const isFrontendOnlyDevMode = () =>
+	import.meta.env.DEV &&
+	typeof window !== "undefined" &&
+	LOCALHOST_PATTERN.test(window.location.hostname) &&
+	!API_DEV_PROXY_ENABLED;
+
+const normalizeLocalDevMapRendererMode = (value) => {
+	const normalized = sanitize(value).toLowerCase();
+	if (["preview", "mapless", "safe"].includes(normalized)) return "preview";
+	if (["webgl", "full", "map"].includes(normalized)) return "webgl";
+	return "auto";
+};
+
+const getNavigatorFingerprint = () => {
+	if (typeof navigator === "undefined") return "";
+	const brands = Array.isArray(navigator.userAgentData?.brands)
+		? navigator.userAgentData.brands
+				.map((entry) => entry?.brand || "")
+				.join(" ")
+		: "";
+	return `${brands} ${navigator.userAgent || ""}`.trim();
+};
+
+const readSessionLocalDevMapRendererMode = () => {
+	if (typeof window === "undefined") return "auto";
+	try {
+		return normalizeLocalDevMapRendererMode(
+			window.sessionStorage.getItem(LOCAL_DEV_MAP_RENDERER_SESSION_KEY),
+		);
+	} catch {
+		return "auto";
+	}
+};
+
+export const persistLocalDevMapRendererMode = (mode) => {
+	if (typeof window === "undefined") return;
+	const normalized = normalizeLocalDevMapRendererMode(mode);
+	try {
+		if (normalized === "auto") {
+			window.sessionStorage.removeItem(LOCAL_DEV_MAP_RENDERER_SESSION_KEY);
+			return;
+		}
+		window.sessionStorage.setItem(
+			LOCAL_DEV_MAP_RENDERER_SESSION_KEY,
+			normalized,
+		);
+	} catch {
+		// Ignore storage failures in locked-down browsers.
+	}
+};
+
+export const isChromiumFamilyBrowser = () => {
+	const fingerprint = getNavigatorFingerprint().toLowerCase();
+	if (!fingerprint) return false;
+	return (
+		fingerprint.includes("chrome") ||
+		fingerprint.includes("chromium") ||
+		fingerprint.includes("crios") ||
+		fingerprint.includes("edg") ||
+		fingerprint.includes("opera") ||
+		fingerprint.includes("opr")
+	);
+};
+
+export const getLocalDevMapRendererMode = () => {
+	if (!isFrontendOnlyDevMode() || IS_E2E) return "webgl";
+
+	const sessionMode = readSessionLocalDevMapRendererMode();
+	if (sessionMode !== "auto") return sessionMode;
+
+	const configuredMode = normalizeLocalDevMapRendererMode(
+		LOCAL_DEV_MAP_RENDERER,
+	);
+	if (configuredMode !== "auto") return configuredMode;
+
+	return isChromiumFamilyBrowser() ? "preview" : "webgl";
+};
+
+export const shouldUseDevSafeMapPreview = () =>
+	getLocalDevMapRendererMode() === "preview";
 
 export const getSupabaseEdgeBaseUrl = () => {
 	const explicitEdge = sanitize(import.meta.env.VITE_SUPABASE_EDGE_URL);
@@ -139,9 +265,7 @@ export const getSupabaseEdgeBaseUrl = () => {
 				!IS_LOCAL_HOST &&
 				LOCALHOST_PATTERN.test(explicitEdge)
 			) {
-				throw new Error(
-					"VITE_SUPABASE_EDGE_URL points to localhost in production.",
-				);
+				throw new Error("ERR_EDGE_LOCALHOST");
 			}
 			return trimTrailingSlash(explicitEdge);
 		}
@@ -170,7 +294,7 @@ export const getWebSocketUrl = () => {
 	// Empty check
 	if (!ws) {
 		if (WS_REQUIRED) {
-			throw new Error("VITE_WS_URL is required when VITE_WS_REQUIRED=true");
+			throw new Error(i18n.global.t("auto.k_fd5265d"));
 		}
 		if (import.meta.env.DEV && WS_CONFIG_DEBUG) {
 			console.warn("⚠️ VITE_WS_URL not set - realtime features disabled");
@@ -178,19 +302,16 @@ export const getWebSocketUrl = () => {
 		return "";
 	}
 
-	// In local dev, only auto-connect WS when explicitly enabled.
-	if (
-		import.meta.env.DEV &&
-		LOCALHOST_PATTERN.test(ws) &&
-		!WS_DEV_AUTOCONNECT
-	) {
+	// In local localhost dev, keep realtime opt-in to avoid noisy failed sockets
+	// when the frontend runs without the matching backend websocket service.
+	if (import.meta.env.DEV && IS_LOCAL_HOST && !WS_DEV_AUTOCONNECT) {
 		return "";
 	}
 
 	// Placeholder check (critical for production safety)
 	if (PLACEHOLDER_PATTERN.test(ws)) {
 		if (WS_REQUIRED) {
-			throw new Error(`VITE_WS_URL contains placeholder value: ${ws}`);
+			throw new Error(i18n.global.t("auto.k_d8841bbf"));
 		}
 		if (WS_CONFIG_DEBUG)
 			console.warn(
@@ -202,7 +323,7 @@ export const getWebSocketUrl = () => {
 	// Protocol check
 	if (!ws.startsWith("ws://") && !ws.startsWith("wss://")) {
 		if (WS_REQUIRED) {
-			throw new Error(`VITE_WS_URL has invalid protocol: ${ws}`);
+			throw new Error(i18n.global.t("auto.k_98debb2f"));
 		}
 		if (WS_CONFIG_DEBUG)
 			console.warn(
@@ -219,7 +340,7 @@ export const getWebSocketUrl = () => {
 		LOCALHOST_PATTERN.test(ws)
 	) {
 		if (WS_REQUIRED) {
-			throw new Error("VITE_WS_URL points to localhost in production");
+			throw new Error(i18n.global.t("auto.k_b6b54c57"));
 		}
 		if (WS_CONFIG_DEBUG)
 			console.warn(
