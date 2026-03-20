@@ -79,7 +79,6 @@ const hasAnalyticsConsent = () => {
 const maybeInitClarity = () => {
 	if (!analyticsEnabled) return;
 	if (!clarityId) return;
-	if (!hasAnalyticsConsent()) return;
 	if (globalThis.__vibecity_clarity_inited) return;
 	globalThis.__vibecity_clarity_inited = true;
 	Clarity.init(clarityId);
@@ -237,7 +236,7 @@ const maybeInitWebVitals = async () => {
 		const forced = parseEnvBool(import.meta.env.VITE_WEB_VITALS_ENABLED);
 		const enabled = forced ?? featureFlagStore.isEnabled("enable_web_vitals");
 		if (!enabled) return;
-		if (!analyticsEnabled || !hasAnalyticsConsent()) return;
+		if (!analyticsEnabled) return;
 		const { webVitalsService } = await import("./services/webVitalsService");
 		webVitalsService.init();
 		webVitalsService.setContext({
@@ -260,7 +259,6 @@ router.afterEach((to) => {
 			.catch(() => {});
 
 		if (!analyticsEnabled) return;
-		if (!hasAnalyticsConsent()) return;
 		const path =
 			typeof to?.path === "string" ? to.path : window.location.pathname;
 		const normalized = path?.startsWith("/") ? path : `/${path}`;

@@ -12,10 +12,10 @@ import { gamificationService } from "@/services/gamificationService";
 const { t } = useI18n();
 
 defineProps({
-	isDarkMode: {
-		type: Boolean,
-		default: true,
-	},
+  isDarkMode: {
+    type: Boolean,
+    default: true,
+  },
 });
 
 const emit = defineEmits(["claim", "close"]);
@@ -26,10 +26,10 @@ const errorMessage = ref("");
 const dialogRef = ref(null);
 
 const checkinData = ref({
-	streak: 0,
-	lastCheckin: null,
-	totalDays: 0,
-	balance: 0,
+  streak: 0,
+  lastCheckin: null,
+  totalDays: 0,
+  balance: 0,
 });
 
 const canClaimToday = ref(false);
@@ -90,7 +90,7 @@ const loadCheckinData = async () => {
 };
 
 const claim = async () => {
-	if (!canClaimToday.value || isLoading.value) return;
+  if (!canClaimToday.value || isLoading.value) return;
 
 	isLoading.value = true;
 	errorMessage.value = "";
@@ -138,8 +138,8 @@ const show = async () => {
 };
 
 const hide = () => {
-	isVisible.value = false;
-	emit("close");
+  isVisible.value = false;
+  emit("close");
 };
 
 defineExpose({ show, hide });

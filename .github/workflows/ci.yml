@@ -37,9 +37,20 @@ jobs:
 
       - name: Install gitleaks
         run: |
-          curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/install.sh | sh -s -- -b /usr/local/bin v8.24.2
+          set -euo pipefail
+          mkdir -p "$HOME/.local/bin"
+          GITLEAKS_VERSION="8.24.2"
+          GITLEAKS_ARCHIVE="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${GITLEAKS_ARCHIVE}" -o /tmp/gitleaks.tar.gz
+          tar -xzf /tmp/gitleaks.tar.gz -C "$HOME/.local/bin" gitleaks
+          chmod +x "$HOME/.local/bin/gitleaks"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "GITLEAKS_BIN=$HOME/.local/bin/gitleaks" >> "$GITHUB_ENV"
+          "$HOME/.local/bin/gitleaks" version
 
       - name: Secret scan (gitleaks)
+        env:
+          GITLEAKS_BIN: ${{ env.GITLEAKS_BIN }}
         run: npm run ci:secret-scan:gitleaks
 
       - name: Secret scan (Stripe patterns)
@@ -120,6 +131,10 @@ jobs:
     if: ${{ github.event_name == 'pull_request' }}
     needs: [frontend, backend-tests]
     runs-on: ubuntu-latest
+    env:
+      VITE_API_URL: "https://vibecity-api.fly.dev"
+      VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -148,6 +163,10 @@ jobs:
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     needs: [frontend, backend-tests]
     runs-on: ubuntu-latest
+    env:
+      VITE_API_URL: "https://vibecity-api.fly.dev"
+      VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -161,8 +180,8 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
 
-      - name: Run E2E full matrix (exclude quarantine lane)
-        run: PW_GREP_INVERT=@map-quarantine npx playwright test
+      - name: Run E2E full matrix (exclude map lanes)
+        run: PW_GREP_INVERT='@map-(quarantine|required|preflight)' npx playwright test
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
@@ -176,6 +195,10 @@ jobs:
     if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
     needs: [frontend, backend-tests, map-quarantine-sla, e2e-map-preflight]
     runs-on: ubuntu-latest
+    env:
+      VITE_API_URL: "https://vibecity-api.fly.dev"
+      VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -217,6 +240,10 @@ jobs:
     if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
     needs: [frontend, backend-tests, map-quarantine-sla]
     runs-on: ubuntu-latest
+    env:
+      VITE_API_URL: "https://vibecity-api.fly.dev"
+      VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -259,6 +286,10 @@ jobs:
     needs: [frontend, backend-tests, map-quarantine-sla]
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      VITE_API_URL: "https://vibecity-api.fly.dev"
+      VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -300,6 +331,10 @@ jobs:
     if: ${{ needs.e2e-full.result == 'failure' }}
     needs: [e2e-full]
     runs-on: ubuntu-latest
+    env:
+      VITE_API_URL: "https://vibecity-api.fly.dev"
+      VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
     steps:
       - uses: actions/checkout@v4
 

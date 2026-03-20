@@ -22,6 +22,22 @@ import {
 const LEVEL_THRESHOLDS = [0, 100, 300, 600, 1000, 2000, 5000];
 const DEFAULT_AVATAR = (seed) =>
 	`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}`;
+const withTimeout = (promise, timeoutMs, label) =>
+	new Promise((resolve, reject) => {
+		const timer = setTimeout(
+			() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)),
+			timeoutMs,
+		);
+		promise
+			.then((value) => {
+				clearTimeout(timer);
+				resolve(value);
+			})
+			.catch((error) => {
+				clearTimeout(timer);
+				reject(error);
+			});
+	});
 
 // Admin emails must be configured via VITE_ADMIN_EMAIL_ALLOWLIST env var — never hardcode
 const DEFAULT_ADMIN_EMAILS = new Set();

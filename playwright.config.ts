@@ -34,6 +34,20 @@ const mapboxToken = sanitizeEnvToken(
 	process.env.VITE_MAPBOX_TOKEN || readMapboxTokenFromDotEnv(),
 );
 
+if (!noWebServer && isCI) {
+	const missingPreviewEnv = [
+		!apiBaseUrl && "VITE_API_URL",
+		!supabaseUrl && "VITE_SUPABASE_URL",
+		!supabaseAnonKey && "VITE_SUPABASE_ANON_KEY",
+	].filter(Boolean);
+
+	if (missingPreviewEnv.length > 0) {
+		throw new Error(
+			`Missing required CI Playwright preview env: ${missingPreviewEnv.join(", ")}`,
+		);
+	}
+}
+
 if (
 	(process.env.E2E_MAP_REQUIRED === "1" ||
 		(process.env.PW_GREP || "").includes("@map-required")) &&

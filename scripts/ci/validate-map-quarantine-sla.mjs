@@ -64,13 +64,31 @@ async function discoverQuarantineTests() {
     );
   }
 
-  const { stdout, stderr } = await execFileAsync(process.execPath, args, {
-    maxBuffer: 10 * 1024 * 1024,
-    env: {
-      ...process.env,
-      PW_NO_WEBSERVER: process.env.PW_NO_WEBSERVER || "1",
-    },
-  });
+  let stdout = "";
+  let stderr = "";
+  try {
+    const result = await execFileAsync(process.execPath, args, {
+      maxBuffer: 10 * 1024 * 1024,
+      env: {
+        ...process.env,
+        PW_NO_WEBSERVER: process.env.PW_NO_WEBSERVER || "1",
+      },
+    });
+    stdout = result.stdout;
+    stderr = result.stderr;
+  } catch (error) {
+    const combinedOutput = [
+      error?.stdout || "",
+      error?.stderr || "",
+      error?.message || "",
+    ]
+      .join("\n")
+      .trim();
+    if (/No tests found/i.test(combinedOutput)) {
+      return [];
+    }
+    throw error;
+  }
 
   if (stderr?.trim()) {
     console.warn(`[warn] playwright --list stderr: ${stderr.trim()}`);
@@ -173,6 +191,10 @@ async function main() {
     `- SLA entries provided: ${metadataEntries.length}`,
     `- Validation status: ${errors.length === 0 ? "PASS" : "FAIL"}`,
   ];
+
+  if (discoveredTests.length === 0) {
+    summary.push("- No @map-quarantine tests are registered right now.");
+  }
 
   if (errors.length > 0) {
     summary.push("", "### SLA Validation Errors");

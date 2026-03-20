@@ -83,7 +83,7 @@ jobs:
         id: api_healthcheck
         env:
           POSTDEPLOY_API_BASE_URL: "https://vibecity-api.fly.dev"
-          POSTDEPLOY_EDGE_BASE_URL: "${{ vars.POSTDEPLOY_EDGE_BASE_URL || 'https://nluuvnttweesnkrmgzsm.supabase.co/functions/v1' }}"
+          POSTDEPLOY_EDGE_BASE_URL: "${{ secrets.SUPABASE_URL && format('{0}/functions/v1', secrets.SUPABASE_URL) || vars.POSTDEPLOY_EDGE_BASE_URL || 'https://rukyitpjfmzhqjlfmbie.supabase.co/functions/v1' }}"
           POSTDEPLOY_SUPABASE_JWT: "${{ secrets.POSTDEPLOY_SUPABASE_JWT }}"
           POSTDEPLOY_ORDER_ID: "${{ vars.POSTDEPLOY_ORDER_ID || secrets.POSTDEPLOY_ORDER_ID }}"
           POSTDEPLOY_READ_ONLY: "1"
