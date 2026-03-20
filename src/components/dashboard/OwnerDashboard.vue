@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
+import { useRoute, useRouter } from "vue-router";
 import { useDashboardGuard } from "@/composables/useDashboardGuard";
 import { useNotifications } from "@/composables/useNotifications";
 import { ownerService } from "../../services/ownerService";
@@ -12,6 +13,8 @@ import EditVenueModal from "../modal/EditVenueModal.vue";
 import BuyPinsPanel from "./BuyPinsPanel.vue";
 
 const router = useRouter();
+const route = useRoute();
+const { t } = useI18n();
 const { notifyError } = useNotifications();
 useDashboardGuard("owner", { allowVisitorFallback: true, strictAuth: false });
 
@@ -43,17 +46,30 @@ const editingVenue = ref(null);
 
 const sourceBadge = computed(() => {
 	const values = Object.values(payloadSource.value);
-	const hasFallback = values.includes("supabase_fallback");
+	const hasSupabaseFallback = values.includes("supabase_fallback");
+	const hasLocalFallback = values.includes("local_fallback");
 	return {
-		mode: hasFallback ? "fallback" : "api",
-		label: hasFallback ? "Fallback mode (Supabase)" : "Live API mode",
+		mode: hasSupabaseFallback || hasLocalFallback ? "fallback" : "api",
+		label: hasLocalFallback
+			? "Local fallback mode"
+			: hasSupabaseFallback
+				? "Fallback mode (Supabase)"
+				: "Live API mode",
 	};
 });
 
 const fallbackModules = computed(() =>
 	Object.entries(payloadSource.value)
-		.filter(([, value]) => value === "supabase_fallback")
+		.filter(([, value]) =>
+			["supabase_fallback", "local_fallback"].includes(value),
+		)
 		.map(([key]) => key),
+);
+
+const fallbackNotice = computed(() =>
+	Object.values(payloadSource.value).includes("local_fallback")
+		? t("ownerDashboard.local_fallback_notice")
+		: t("ownerDashboard.supabase_fallback_notice"),
 );
 
 const kpis = computed(
@@ -90,12 +106,12 @@ const kpiCards = computed(() => [
 	{
 		label: "Views",
 		value: formatNumber(kpis.value.total_views),
-		tone: "from-fuchsia-500/25 to-violet-600/20",
+		tone: "from-cyan-500/25 to-cyan-600/20",
 	},
 	{
 		label: "Rating",
 		value: Number(kpis.value.avg_rating || 0).toFixed(2),
-		tone: "from-purple-400/25 to-orange-600/20",
+		tone: "from-cyan-400/25 to-orange-600/20",
 	},
 	{
 		label: "Promoted",
@@ -238,6 +254,30 @@ const trendRows = computed(() =>
 const trendMax = computed(() =>
 	Math.max(1, ...trendRows.value.map((row) => Number(row.events || 0))),
 );
+const promoteTargetVenue = computed(() => {
+	const rows = Array.isArray(venues.value) ? venues.value : [];
+	return (
+		rows.find((row) => !row?.is_promoted) ||
+		rows.find((row) => Number(row?.completeness?.score || 0) < 60) ||
+		rows[0] ||
+		null
+	);
+});
+const topVenue = computed(() => {
+	const rows = [...(venues.value || [])];
+	rows.sort(
+		(left, right) =>
+			Number(right?.total_views || 0) - Number(left?.total_views || 0),
+	);
+	return rows[0] || null;
+});
+const nextExpiryItem = computed(() => expiryTimeline.value[0] || null);
+const needsWorkCount = computed(
+	() =>
+		(venues.value || []).filter(
+			(row) => Number(row?.completeness?.score || 0) < 60,
+		).length,
+);
 
 const formatNumber = (value) =>
 	new Intl.NumberFormat("th-TH").format(Number(value || 0));
@@ -272,12 +312,34 @@ const closeEdit = (shouldRefresh = false) => {
 	if (shouldRefresh) void fetchDashboardData();
 };
 
+const resolveHomePath = () => {
+	const locale = String(route.params?.locale || "")
+		.trim()
+		.toLowerCase();
+	if (locale === "th" || locale === "en") {
+		return `/${locale}`;
+	}
+	return "/en";
+};
+
 const safeExit = async () => {
 	try {
-		await router.push("/");
+		await router.push(resolveHomePath());
 	} catch {
-		window.location.href = "/";
+		window.location.href = resolveHomePath();
 	}
+};
+
+const isAuthOrTechError = (msg) => {
+	if (!msg) return true;
+	const lower = String(msg).toLowerCase();
+	return (
+		lower.includes("api key") ||
+		lower.includes("jwt") ||
+		lower.includes("unauthorized") ||
+		lower.includes("invalid key") ||
+		lower.includes("401")
+	);
 };
 
 const fetchDashboardData = async () => {
@@ -303,7 +365,8 @@ const fetchDashboardData = async () => {
 			payloadSource.value.portfolio = portfolioResult.value?.source || "api";
 			loadedCount += 1;
 		} else {
-			notices.push(portfolioResult.reason?.message || "Portfolio unavailable.");
+			const msg = portfolioResult.reason?.message;
+			if (msg && !isAuthOrTechError(msg)) notices.push(msg);
 		}
 
 		if (venuesResult.status === "fulfilled") {
@@ -313,7 +376,8 @@ const fetchDashboardData = async () => {
 			payloadSource.value.venues = venuesResult.value?.source || "api";
 			loadedCount += 1;
 		} else {
-			notices.push(venuesResult.reason?.message || "Venues unavailable.");
+			const msg = venuesResult.reason?.message;
+			if (msg && !isAuthOrTechError(msg)) notices.push(msg);
 			venues.value = [];
 		}
 
@@ -327,7 +391,8 @@ const fetchDashboardData = async () => {
 			payloadSource.value.insights = insightsResult.value?.source || "api";
 			loadedCount += 1;
 		} else {
-			notices.push(insightsResult.reason?.message || "Insights unavailable.");
+			const msg = insightsResult.reason?.message;
+			if (msg && !isAuthOrTechError(msg)) notices.push(msg);
 			insights.value = {
 				trend: [],
 				actions: [],
@@ -337,14 +402,17 @@ const fetchDashboardData = async () => {
 		}
 
 		if (loadedCount === 0) {
-			throw new Error(notices.join(" ") || "Failed to load owner dashboard.");
+			throw new Error(t("ownerDashboard.load_failed"));
 		}
 
 		if (notices.length > 0) {
 			dashboardNotice.value = [...new Set(notices)].join(" ");
 		}
 	} catch (error) {
-		dashboardError.value = error?.message || "Failed to load owner dashboard.";
+		const msg = error?.message || "";
+		dashboardError.value = isAuthOrTechError(msg)
+			? "Service temporarily unavailable."
+			: msg || t("ownerDashboard.load_failed");
 		notifyError("Could not load Owner Dashboard. Please retry.");
 	} finally {
 		loading.value = false;
@@ -368,23 +436,33 @@ onMounted(() => {
   >
     <div class="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[#08091a]" aria-hidden="true">
       <div class="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-blue-500/20 blur-[100px]" />
-      <div class="absolute -right-20 -top-16 h-80 w-80 rounded-full bg-purple-500/20 blur-[100px]" />
-      <div class="absolute bottom-[-180px] left-1/4 h-96 w-96 rounded-full bg-fuchsia-500/15 blur-[110px]" />
+      <div class="absolute -right-20 -top-16 h-80 w-80 rounded-full bg-cyan-500/20 blur-[100px]" />
+      <div class="absolute bottom-[-180px] left-1/4 h-96 w-96 rounded-full bg-cyan-500/15 blur-[110px]" />
     </div>
 
     <div class="mx-auto flex w-full max-w-7xl flex-col gap-4 md:gap-5">
       <header
-        class="relative overflow-hidden rounded-2xl border border-white/10 bg-gray-900/90 p-5 shadow-2xl backdrop-blur-xl md:p-6"
+        class="relative overflow-hidden rounded-[28px] border border-cyan-400/20 bg-[radial-gradient(circle_at_top_left,_rgba(6,182,212,0.2),_transparent_34%),linear-gradient(145deg,rgba(3,7,18,0.96),rgba(8,15,32,0.92))] p-5 shadow-[0_28px_80px_rgba(2,8,23,0.5)] backdrop-blur-xl md:p-6"
         data-testid="owner-dashboard-hero"
       >
-        <div class="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-500/10 via-transparent to-purple-500/10" />
-        <div class="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div class="space-y-2">
+        <div class="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,rgba(34,211,238,0.12),transparent_40%,rgba(14,165,233,0.08))]" />
+        <div class="pointer-events-none absolute inset-y-0 right-0 w-[32rem] bg-[radial-gradient(circle_at_center,_rgba(59,130,246,0.18),_transparent_65%)]" />
+        <div class="relative z-10 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+          <div class="space-y-3">
             <p class="text-[11px] font-black uppercase tracking-[0.3em] text-white/55">{{ $t('auto.k_912f3194') }}</p>
-            <h1 class="text-2xl font-black leading-tight md:text-3xl">
-              <span class="bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent">{{ $t('auto.k_1fd0f9d7') }}</span>
+            <h1 class="max-w-3xl text-2xl font-black leading-tight md:text-4xl">
+              <span class="bg-gradient-to-r from-cyan-200 via-sky-300 to-emerald-200 bg-clip-text text-transparent">{{ $t('auto.k_1fd0f9d7') }}</span>
             </h1>
-            <p class="max-w-2xl text-sm text-white/70 md:text-base">{{ $t('auto.k_97f32e4a') }}</p>
+            <p class="max-w-2xl text-sm text-white/72 md:text-base">{{ $t('auto.k_97f32e4a') }}</p>
+            <div class="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-white/55">
+              <span class="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-cyan-100">{{ t('ownerDashboard.promotion_cockpit') }}</span>
+              <span v-if="topVenue" class="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-white/75">
+                {{ t('ownerDashboard.top_traffic_badge', { name: topVenue.name || t('ownerDashboard.generic_venue') }) }}
+              </span>
+              <span v-if="nextExpiryItem" class="rounded-full border border-amber-400/25 bg-amber-400/10 px-3 py-1 text-amber-100">
+                {{ t('ownerDashboard.next_expiry_badge', { feature: nextExpiryItem.feature }) }}
+              </span>
+            </div>
             <p class="break-all text-xs text-white/55 md:text-sm">
               {{ $t('auto.k_2aaa7eae') }}
               <span class="font-mono text-white/80">{{ visitorId || "-" }}</span>
@@ -402,32 +480,90 @@ onMounted(() => {
             </span>
           </div>
 
-          <div class="flex flex-wrap items-center gap-2">
-            <button
-              v-for="d in [7, 30]"
-              :key="d"
-              class="rounded-xl border px-3 py-2 text-xs font-bold transition"
-              :class="
-                days === d
-                  ? 'border-blue-400/60 bg-blue-500/20 text-white shadow-lg shadow-blue-500/20'
-                  : 'border-white/10 bg-black/40 text-white/75 hover:bg-white/10'
-              "
-              @click="reloadInsights(d)"
-            >
-              {{ d }}d
-            </button>
-            <button
-              class="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs font-bold text-white/80 transition hover:bg-white/10"
-              @click="fetchDashboardData"
-            >
-              Refresh
-            </button>
-            <button
-              class="rounded-xl bg-gradient-to-r from-rose-600 to-fuchsia-600 px-3 py-2 text-xs font-black text-white shadow-lg shadow-rose-900/40 transition hover:scale-[1.02] active:scale-[0.98]"
-              @click="safeExit"
-            >
-              {{ $t('auto.k_999dbe89') }}
-            </button>
+          <div class="grid gap-3 rounded-[26px] border border-white/10 bg-black/25 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+            <div class="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+              <div class="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-3">
+                <p class="text-[11px] font-black uppercase tracking-[0.22em] text-emerald-100/70">{{ t('ownerDashboard.best_next_push') }}</p>
+                <p class="mt-2 truncate text-lg font-black text-white">
+                  {{ promoteTargetVenue?.name || t('ownerDashboard.no_venue_yet') }}
+                </p>
+                <p class="mt-1 text-xs text-white/70">
+                  {{
+                    promoteTargetVenue
+                      ? t('ownerDashboard.best_next_push_summary', {
+                          quality: Number(promoteTargetVenue?.completeness?.score || 0),
+                          views: formatNumber(promoteTargetVenue?.total_views || 0),
+                        })
+                      : t('ownerDashboard.first_venue_unlock')
+                  }}
+                </p>
+              </div>
+
+              <div class="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-3">
+                <p class="text-[11px] font-black uppercase tracking-[0.22em] text-amber-100/70">{{ t('ownerDashboard.needs_attention') }}</p>
+                <p class="mt-2 text-lg font-black text-white">{{ formatNumber(needsWorkCount) }}</p>
+                <p class="mt-1 text-xs text-white/70">{{ t('ownerDashboard.profile_readiness_hint') }}</p>
+              </div>
+
+              <div class="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3">
+                <p class="text-[11px] font-black uppercase tracking-[0.22em] text-cyan-100/70">{{ t('ownerDashboard.next_expiry') }}</p>
+                <p class="mt-2 truncate text-lg font-black text-white">
+                  {{ nextExpiryItem?.venueName || t('ownerDashboard.nothing_urgent') }}
+                </p>
+                <p class="mt-1 text-xs text-white/70">
+                  {{
+                    nextExpiryItem
+                      ? t('ownerDashboard.next_expiry_summary', {
+                          feature: nextExpiryItem.feature,
+                          date: formatDate(nextExpiryItem.at),
+                        })
+                      : t('ownerDashboard.promotion_slots_clear')
+                  }}
+                </p>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <button
+                v-if="promoteTargetVenue"
+                class="rounded-xl bg-gradient-to-r from-emerald-500 via-cyan-500 to-sky-500 px-4 py-3 text-sm font-black text-slate-950 shadow-lg shadow-cyan-900/30 transition hover:scale-[1.01] active:scale-[0.98]"
+                @click="openPromote(promoteTargetVenue)"
+              >
+                {{ t('ownerDashboard.promote_named_venue', { name: promoteTargetVenue.name || t('ownerDashboard.generic_venue') }) }}
+              </button>
+              <button
+                v-if="promoteTargetVenue"
+                class="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white/85 transition hover:bg-white/10"
+                @click="openEdit(promoteTargetVenue)"
+              >
+                {{ t('ownerDashboard.tune_listing') }}
+              </button>
+              <button
+                v-for="d in [7, 30]"
+                :key="d"
+                class="rounded-xl border px-3 py-3 text-xs font-bold transition"
+                :class="
+                  days === d
+                    ? 'border-cyan-300/50 bg-cyan-400/15 text-white shadow-lg shadow-cyan-950/30'
+                    : 'border-white/10 bg-black/30 text-white/75 hover:bg-white/10'
+                "
+                @click="reloadInsights(d)"
+              >
+                {{ d }}d
+              </button>
+              <button
+                class="rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-xs font-bold text-white/80 transition hover:bg-white/10"
+                @click="fetchDashboardData"
+              >
+                {{ t('ownerDashboard.refresh') }}
+              </button>
+              <button
+                class="rounded-xl bg-gradient-to-r from-rose-600 to-cyan-600 px-3 py-3 text-xs font-black text-white shadow-lg shadow-rose-900/40 transition hover:scale-[1.02] active:scale-[0.98]"
+                @click="safeExit"
+              >
+                {{ $t('auto.k_999dbe89') }}
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -450,7 +586,7 @@ onMounted(() => {
 
       <template v-else>
         <div v-if="fallbackModules.length" class="rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-          {{ $t('auto.k_37d0e407') }}
+          {{ fallbackNotice }}
           <strong>{{ fallbackModules.join(", ") }}</strong>
         </div>
         <div v-if="dashboardNotice" class="rounded-xl border border-blue-400/25 bg-blue-500/10 px-4 py-3 text-sm text-blue-100">
@@ -476,6 +612,114 @@ onMounted(() => {
         </section>
 
         <section
+          class="grid grid-cols-1 gap-4 xl:grid-cols-[1.25fr_0.95fr]"
+          data-testid="owner-command-deck"
+        >
+          <article class="relative overflow-hidden rounded-[28px] border border-cyan-400/20 bg-[linear-gradient(145deg,rgba(3,7,18,0.96),rgba(8,15,32,0.9))] p-5 shadow-2xl">
+            <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(6,182,212,0.18),_transparent_38%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.14),_transparent_42%)]" />
+            <div class="relative z-10">
+              <p class="text-[11px] font-black uppercase tracking-[0.28em] text-cyan-200/70">{{ t('ownerDashboard.promote_shop_system') }}</p>
+              <h2 class="mt-2 text-2xl font-black text-white md:text-3xl">
+                {{
+                  promoteTargetVenue
+                    ? t('ownerDashboard.push_into_discovery', { name: promoteTargetVenue.name || t('ownerDashboard.your_next_venue') })
+                    : t('ownerDashboard.build_first_listing')
+                }}
+              </h2>
+              <p class="mt-2 max-w-2xl text-sm text-white/68 md:text-base">
+                {{
+                  promoteTargetVenue
+                    ? t('ownerDashboard.workflow_copy')
+                    : t('ownerDashboard.empty_workflow_copy')
+                }}
+              </p>
+
+              <div class="mt-5 grid gap-3 md:grid-cols-3">
+                <div class="rounded-2xl border border-white/10 bg-black/30 p-4">
+                  <p class="text-[11px] font-black uppercase tracking-[0.2em] text-white/55">{{ t('ownerDashboard.views') }}</p>
+                  <p class="mt-2 text-2xl font-black text-white">
+                    {{ formatNumber(promoteTargetVenue?.total_views || 0) }}
+                  </p>
+                </div>
+                <div class="rounded-2xl border border-white/10 bg-black/30 p-4">
+                  <p class="text-[11px] font-black uppercase tracking-[0.2em] text-white/55">{{ t('ownerDashboard.rating') }}</p>
+                  <p class="mt-2 text-2xl font-black text-white">
+                    {{ Number(promoteTargetVenue?.rating || 0).toFixed(1) }}
+                  </p>
+                </div>
+                <div class="rounded-2xl border border-white/10 bg-black/30 p-4">
+                  <p class="text-[11px] font-black uppercase tracking-[0.2em] text-white/55">{{ t('ownerDashboard.profile_quality') }}</p>
+                  <p class="mt-2 text-2xl font-black text-white">
+                    {{ Number(promoteTargetVenue?.completeness?.score || 0) }}%
+                  </p>
+                </div>
+              </div>
+
+              <div class="mt-5 flex flex-wrap gap-2">
+                <button
+                  v-if="promoteTargetVenue"
+                  class="rounded-xl bg-gradient-to-r from-emerald-500 via-cyan-500 to-sky-500 px-4 py-3 text-sm font-black text-slate-950 shadow-lg shadow-cyan-900/30 transition hover:scale-[1.01] active:scale-[0.98]"
+                  @click="openPromote(promoteTargetVenue)"
+                >
+                  {{ t('ownerDashboard.open_promote_flow') }}
+                </button>
+                <button
+                  v-if="promoteTargetVenue"
+                  class="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white/85 transition hover:bg-white/10"
+                  @click="openEdit(promoteTargetVenue)"
+                >
+                  {{ t('ownerDashboard.fix_listing_now') }}
+                </button>
+              </div>
+            </div>
+          </article>
+
+          <div class="grid gap-4 md:grid-cols-3 xl:grid-cols-1">
+            <article class="rounded-[24px] border border-amber-400/20 bg-[linear-gradient(160deg,rgba(120,53,15,0.22),rgba(17,24,39,0.92))] p-4 shadow-xl">
+              <p class="text-[11px] font-black uppercase tracking-[0.24em] text-amber-100/70">{{ t('ownerDashboard.expiry_watch') }}</p>
+              <p class="mt-2 truncate text-xl font-black text-white">
+                {{ nextExpiryItem?.venueName || t('ownerDashboard.all_clear') }}
+              </p>
+              <p class="mt-1 text-sm text-white/68">
+                {{
+                  nextExpiryItem
+                    ? t('ownerDashboard.expiry_watch_summary', {
+                        feature: nextExpiryItem.feature,
+                        date: formatDate(nextExpiryItem.at),
+                      })
+                    : t('ownerDashboard.no_expiry_scheduled')
+                }}
+              </p>
+            </article>
+
+            <article class="rounded-[24px] border border-teal-400/20 bg-[linear-gradient(160deg,rgba(19,78,74,0.18),rgba(17,24,39,0.92))] p-4 shadow-xl">
+              <p class="text-[11px] font-black uppercase tracking-[0.24em] text-teal-100/70">{{ t('ownerDashboard.top_performer') }}</p>
+              <p class="mt-2 truncate text-xl font-black text-white">
+                {{ topVenue?.name || t('ownerDashboard.no_top_venue') }}
+              </p>
+              <p class="mt-1 text-sm text-white/68">
+                {{
+                  topVenue
+                    ? t('ownerDashboard.top_performer_summary', {
+                        views: formatNumber(topVenue.total_views || 0),
+                        rating: Number(topVenue.rating || 0).toFixed(1),
+                      })
+                    : t('ownerDashboard.top_performer_empty')
+                }}
+              </p>
+            </article>
+
+            <article class="rounded-[24px] border border-rose-400/20 bg-[linear-gradient(160deg,rgba(157,23,77,0.18),rgba(17,24,39,0.92))] p-4 shadow-xl">
+              <p class="text-[11px] font-black uppercase tracking-[0.24em] text-rose-100/70">{{ t('ownerDashboard.quality_pressure') }}</p>
+              <p class="mt-2 text-xl font-black text-white">{{ formatNumber(needsWorkCount) }}</p>
+              <p class="mt-1 text-sm text-white/68">
+                {{ t('ownerDashboard.quality_pressure_hint') }}
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section
           class="rounded-2xl border border-white/10 bg-gray-900/90 p-4 shadow-2xl backdrop-blur-xl md:p-5"
           data-testid="owner-venue-panel"
         >
@@ -489,10 +733,10 @@ onMounted(() => {
           <div class="mt-4 grid grid-cols-1 gap-2 md:grid-cols-3">
             <label class="md:col-span-1">
               <span class="sr-only">{{ $t('auto.k_a6567c3f') }}</span>
-              <input
+              <input :aria-label="$t('a11y.input_field')"
                 v-model.trim="searchText"
                 type="search"
-                class="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none transition focus:border-blue-400"
+                class="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-white/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 transition focus:border-blue-400"
                 :placeholder="$t('auto.k_314a739d')"
               />
             </label>
@@ -500,7 +744,7 @@ onMounted(() => {
               <span class="sr-only">{{ $t('auto.k_81d2e3b6') }}</span>
               <select
                 v-model="statusFilter"
-                class="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none transition focus:border-blue-400"
+                class="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 transition focus:border-blue-400"
               >
                 <option value="all">{{ $t('auto.k_96e23776') }}</option>
                 <option value="live">Live</option>
@@ -512,7 +756,7 @@ onMounted(() => {
               <span class="sr-only">{{ $t('auto.k_e64a63fe') }}</span>
               <select
                 v-model="sortKey"
-                class="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none transition focus:border-blue-400"
+                class="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 transition focus:border-blue-400"
               >
                 <option value="views">{{ $t('auto.k_5af1c930') }}</option>
                 <option value="rating">{{ $t('auto.k_398a09d9') }}</option>
@@ -577,7 +821,7 @@ onMounted(() => {
 
               <div class="mt-3 grid grid-cols-2 gap-2">
                 <button
-                  class="rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-3 py-2 text-xs font-black text-white shadow-lg transition hover:scale-[1.01] active:scale-[0.98]"
+                  class="rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 px-3 py-2 text-xs font-black text-white shadow-lg transition hover:scale-[1.01] active:scale-[0.98]"
                   @click="openPromote(venue)"
                 >
                   {{ $t('auto.k_e51b60ed') }}
@@ -668,7 +912,7 @@ onMounted(() => {
                     <td class="px-4 py-3">
                       <div class="flex justify-end gap-2">
                         <button
-                          class="rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-3 py-2 text-xs font-black text-white shadow-lg transition hover:scale-[1.01] active:scale-[0.98]"
+                          class="rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 px-3 py-2 text-xs font-black text-white shadow-lg transition hover:scale-[1.01] active:scale-[0.98]"
                           @click="openPromote(venue)"
                         >
                           {{ $t('auto.k_e51b60ed') }}
@@ -802,7 +1046,7 @@ onMounted(() => {
                 </div>
                 <div class="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
                   <div
-                    class="h-full rounded-full bg-gradient-to-r from-blue-500 to-purple-500"
+                    class="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-500"
                     :style="{
                       width: `${Math.max(2, Math.round((Number(row.events || 0) / trendMax) * 100))}%`,
                     }"
@@ -823,7 +1067,7 @@ onMounted(() => {
     </div>
 
     <Teleport to="body">
-      <div
+      <div role="button" tabindex="0"
         v-if="promotingVenue"
         class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md"
         data-testid="owner-promote-modal"

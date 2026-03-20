@@ -15,6 +15,7 @@ import { useShopStore } from "../store/shopStore";
 import { useUserPreferencesStore } from "../store/userPreferencesStore";
 import { useUserStore } from "../store/userStore";
 import { openExternal } from "../utils/browserUtils";
+import { isAppDebugLoggingEnabled } from "../utils/debugFlags";
 import { calculateDistance } from "../utils/shopUtils";
 import {
 	loadFavoritesWithTTL,
@@ -157,7 +158,7 @@ export function useAppLogic() {
 	});
 
 	watch(visibleShops, (val) => {
-		if (import.meta.env.DEV) {
+		if (isAppDebugLoggingEnabled()) {
 			console.log(`🔍 [useAppLogic] visibleShops changed: ${val?.length}`);
 		}
 	});
@@ -207,6 +208,8 @@ export function useAppLogic() {
 	const isRefreshing = ref(false);
 	const legendHeight = computed(() => bottomUiHeight.value || 0);
 	const activeFilters = computed(() => [...activeCategories.value]);
+	const openedDetailShopIds = new Set();
+	let handleCenteredShopCommit = null;
 
 	const isUiVisible = computed(() => {
 		if (import.meta.env.VITE_E2E === "true") return true;
@@ -238,6 +241,7 @@ export function useAppLogic() {
 		selectFeedback,
 		mobileCardScrollRef,
 		onScrollDecelerate: intentPredictor.recordCarouselDeceleration,
+		onCenteredShopCommit: (payload) => handleCenteredShopCommit?.(payload),
 	});
 	const {
 		handleHorizontalScroll,
@@ -485,6 +489,11 @@ export function useAppLogic() {
 		const str = String(value).trim();
 		return str ? str : null;
 	};
+	const markDetailOpened = (shopId) => {
+		const normalizedId = normalizeVenueId(shopId);
+		if (normalizedId) openedDetailShopIds.add(normalizedId);
+		return normalizedId;
+	};
 	const normalizeVenueSlug = (value) => {
 		if (value === null || value === undefined) return null;
 		const str = String(value).trim().toLowerCase();
@@ -640,6 +649,7 @@ export function useAppLogic() {
 			closeDetailSheet({ syncRoute: false });
 			return;
 		}
+		markDetailOpened(shop.id);
 
 		// When opening detail sheet, the modal covers ~85-90vh of the screen on mobile,
 		// so we need a much larger offsetY (e.g. 40%) to ensure the pin flies into the visible top 10%.
@@ -683,6 +693,23 @@ export function useAppLogic() {
 		} catch {
 			// ignore
 		}
+	};
+
+	handleCenteredShopCommit = ({ shop, shopId }) => {
+		const normalizedId = normalizeVenueId(shopId || shop?.id);
+		if (!shop || !normalizedId) return;
+		if (openedDetailShopIds.has(normalizedId)) return;
+		if (
+			selectedShop.value &&
+			normalizeVenueId(selectedShop.value.id) === normalizedId
+		) {
+			markDetailOpened(normalizedId);
+			return;
+		}
+		handleOpenDetail(shop, {
+			trackEvent: false,
+			routeMode: "replace",
+		});
 	};
 
 	const handleCardClick = (shop) => {

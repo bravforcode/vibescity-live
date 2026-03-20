@@ -23,6 +23,49 @@
 		"retry": "Try Again",
 		"no_results": "No results found"
 	},
+	"ownerDashboard": {
+		"load_failed": "Failed to load owner dashboard.",
+		"promotion_cockpit": "Promotion cockpit",
+		"generic_venue": "venue",
+		"your_next_venue": "your next venue",
+		"top_traffic_badge": "Top traffic {name}",
+		"next_expiry_badge": "Next expiry {feature}",
+		"best_next_push": "Best next push",
+		"no_venue_yet": "No venue yet",
+		"best_next_push_summary": "{quality}% quality | {views} views",
+		"first_venue_unlock": "Create your first venue to unlock promotion tools.",
+		"needs_attention": "Needs attention",
+		"profile_readiness_hint": "venues under 60% profile readiness",
+		"next_expiry": "Next expiry",
+		"nothing_urgent": "Nothing urgent",
+		"next_expiry_summary": "{feature} | {date}",
+		"promotion_slots_clear": "All promotion slots are clear.",
+		"promote_named_venue": "Promote {name}",
+		"tune_listing": "Tune listing",
+		"refresh": "Refresh",
+		"promote_shop_system": "Promote shop system",
+		"push_into_discovery": "Push {name} into discovery",
+		"build_first_listing": "Build your first promotion-ready listing",
+		"workflow_copy": "Use the same promotion-first workflow as the buy-pins flow: tighten the listing, push visibility, and fix quality gaps before they cost reach.",
+		"empty_workflow_copy": "No venue is available yet. Once you have one live listing, this panel becomes your fast lane for promotion, quality fixes, and expiry control.",
+		"views": "Views",
+		"rating": "Rating",
+		"profile_quality": "Profile quality",
+		"open_promote_flow": "Open promote flow",
+		"fix_listing_now": "Fix listing now",
+		"expiry_watch": "Expiry watch",
+		"all_clear": "All clear",
+		"expiry_watch_summary": "{feature} expires {date}",
+		"no_expiry_scheduled": "No promotion expiry scheduled right now.",
+		"top_performer": "Top performer",
+		"no_top_venue": "No top venue yet",
+		"top_performer_summary": "{views} views | {rating} rating",
+		"top_performer_empty": "Traffic insights will appear once portfolio data loads.",
+		"quality_pressure": "Quality pressure",
+		"quality_pressure_hint": "venues need profile cleanup before more spend goes into promotion.",
+		"supabase_fallback_notice": "Running with Supabase fallback for:",
+		"local_fallback_notice": "Running with local fallback for:"
+	},
 	"nav": {
 		"home": "Home",
 		"explore": "Explore",
@@ -307,6 +350,7 @@
 		"skip_to_content": "Skip to main content",
 		"add_favorite": "Add to favorites",
 		"remove_favorite": "Remove from favorites",
+		"input_field": "Input field",
 		"collapse_details": "Collapse details",
 		"mute_video": "Mute video",
 		"unmute_video": "Unmute video"
@@ -349,6 +393,15 @@
 		},
 		"mapless": {
 			"unavailable": "Map unavailable on this device."
+		},
+		"dev_preview": {
+			"badge": "Stable local preview",
+			"title": "Chromium local dev now skips WebGL by default",
+			"desc": "This preview keeps localhost fast and console-clean. Production, E2E, and explicit WebGL opt-in still use the full MapLibre renderer.",
+			"visible": "Visible pins",
+			"empty": "No venue coordinates are available yet, so the local preview stays in placeholder mode.",
+			"open_webgl": "Open full WebGL map",
+			"note": "Use this only when you need to inspect real WebGL behavior in this browser session."
 		},
 		"token_error": {
 			"title": "Map token error",
@@ -407,7 +460,9 @@
 		"bank_thai": "Thai Bank (All Supported Banks)",
 		"bank_international": "Bank Name (International)",
 		"subscription_info": "Partner Program · 899 THB/month",
-		"period_end": "Current Period End"
+		"period_end": "Current Period End",
+		"error_payout_events_visitor_required": "Visitor information is required to subscribe to payout events.",
+		"error_payout_events_unsupported": "This payout event version is not supported yet."
 	},
 	"merchant": {
 		"title": "Merchant Registration",
@@ -1114,6 +1169,7 @@
 		"k_57e39f9": "VIBE:",
 		"k_2be7575a": "CLAIM YOUR VIBE",
 		"k_ff8907c2": "TAKE ME THERE",
+		"k_live_now": "LIVE NOW",
 		"k_b1e1a2d9": "ZONE VIBE:",
 		"k_1ccc1cf2": "My Location",
 		"k_d260a26f": "Explore Nearby",

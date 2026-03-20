@@ -8,6 +8,7 @@ export function useScrollSync({
 	selectFeedback,
 	mobileCardScrollRef,
 	onScrollDecelerate, // ✅ Track intent on deceleration
+	onCenteredShopCommit,
 }) {
 	const normalizeId = (value) => {
 		if (value === null || value === undefined) return null;
@@ -147,6 +148,13 @@ export function useScrollSync({
 		// Fire intent signal for prefetching
 		if (onScrollDecelerate && centerId) {
 			onScrollDecelerate(centerId);
+		}
+		if (shop && typeof onCenteredShopCommit === "function") {
+			onCenteredShopCommit({
+				shop,
+				shopId: centerId,
+				reason: "scroll_settle",
+			});
 		}
 	};
 

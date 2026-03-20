@@ -215,6 +215,10 @@ const onTouchMove = (e) => {
 	sheetRef.value.style.opacity = `${opacity}`;
 };
 
+const onBackdropTouchMove = (e) => {
+	if (e.cancelable) e.preventDefault();
+};
+
 const onTouchEnd = () => {
 	if (!sheetRef.value) return;
 
@@ -282,15 +286,14 @@ onUnmounted(() => {
     </p>
 
     <!-- Backdrop -->
-    <div role="button" tabindex="0"
+    <div
       class="fm-backdrop"
       :class="{
         'fm-backdrop--visible': isVisible,
         'pointer-events-none': isDragging,
       }"
       @click="close"
-      @touchmove.prevent
-      aria-hidden="true"
+      @touchmove="onBackdropTouchMove"
     />
 
     <!-- Bottom Sheet -->
@@ -346,7 +349,7 @@ onUnmounted(() => {
             :key="cat.id"
             @click="toggleCategory(cat.id, $event)"
             :aria-pressed="selectedSet.has(cat.id)"
-            :aria-label="`${cat.label} filter, ${selectedSet.has(cat.id) ? 'selected' : 'not selected'}`"
+            :aria-label="`${t(cat.label)} filter, ${selectedSet.has(cat.id) ? 'selected' : 'not selected'}`"
             class="fm-card"
             :class="{
               'fm-card--active': selectedSet.has(cat.id),
@@ -399,7 +402,7 @@ onUnmounted(() => {
                 selectedSet.has(cat.id) ? 'text-white' : 'text-white/80'
               "
             >
-              {{ cat.label }}
+              {{ t(cat.label) }}
             </span>
 
             <!-- Check indicator -->
@@ -715,7 +718,7 @@ onUnmounted(() => {
   background: linear-gradient(135deg, #fb923c, #f59e0b);
 }
 .fm-glow--nightlife {
-  background: linear-gradient(135deg, #a78bfa, #e879f9);
+  background: linear-gradient(135deg, #22D3EE, #e879f9);
 }
 .fm-glow--restaurant {
   background: linear-gradient(135deg, #fb7185, #f43f5e);

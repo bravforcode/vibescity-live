@@ -1,11 +1,13 @@
+import { isFrontendOnlyDevMode } from "../lib/runtimeConfig";
 import { supabase } from "../lib/supabase";
 import { apiFetch, parseApiError } from "./apiClient";
 import { bootstrapVisitor, getOrCreateVisitorId } from "./visitorIdentity";
 
 const API_SOURCE = "api";
 const FALLBACK_SOURCE = "supabase_fallback";
+const LOCAL_FALLBACK_SOURCE = "local_fallback";
 const OWNER_COLUMNS =
-	'id,name,category,status,total_views,view_count,rating,pin_type,image_urls,"Image_URL1",open_time,social_links,updated_at,created_at,verified_until,glow_until,boost_until,giant_until,owner_visitor_id';
+	"id,name,category,status,total_views,view_count,rating,pin_type,image_urls,open_time,social_links,updated_at,created_at,verified_until,glow_until,boost_until,giant_until,owner_visitor_id";
 
 const ensureVisitor = async (providedVisitorId = "") => {
 	const visitorId = String(providedVisitorId || getOrCreateVisitorId()).trim();
@@ -53,10 +55,10 @@ const isPromoted = (row, now) => {
 };
 
 const firstImage = (row) =>
-	row?.Image_URL1 ||
 	(Array.isArray(row?.image_urls)
 		? row.image_urls.find((x) => Boolean(x))
 		: null) ||
+	row?.Image_URL1 ||
 	null;
 
 const computeCompleteness = (row) => {
@@ -97,8 +99,10 @@ const parseApiPayload = async (response, fallbackMessage) => {
 	return withSource(payload, API_SOURCE);
 };
 
-const fallbackEligible = (error) =>
-	Number(error?.status || 0) === 404 || isNetworkLikeError(error);
+const fallbackEligible = (error) => {
+	const status = Number(error?.status || 0);
+	return status === 404 || status >= 500 || isNetworkLikeError(error);
+};
 
 const loadOwnedVenuesFallback = async (visitorId, limit = 400) => {
 	const normalizedLimit = Math.min(400, Math.max(1, Number(limit || 400)));
@@ -359,7 +363,13 @@ const callOwnerApiOrFallback = async ({
 	path,
 	fallbackMessage,
 	fallbackLoader,
+	localFallbackLoader,
 }) => {
+	if (isFrontendOnlyDevMode()) {
+		const payload = await localFallbackLoader();
+		return withSource(payload, LOCAL_FALLBACK_SOURCE);
+	}
+
 	try {
 		const response = await apiFetch(path, {
 			method: "GET",
@@ -369,8 +379,13 @@ const callOwnerApiOrFallback = async ({
 		return await parseApiPayload(response, fallbackMessage);
 	} catch (error) {
 		if (!fallbackEligible(error)) throw error;
-		const payload = await fallbackLoader();
-		return withSource(payload, FALLBACK_SOURCE);
+		try {
+			const payload = await fallbackLoader();
+			return withSource(payload, FALLBACK_SOURCE);
+		} catch {
+			const payload = await localFallbackLoader();
+			return withSource(payload, LOCAL_FALLBACK_SOURCE);
+		}
 	}
 };
 
@@ -384,6 +399,7 @@ export const ownerService = {
 				const venues = await loadOwnedVenuesFallback(visitorId, 400);
 				return buildPortfolioFallback(venues, visitorId);
 			},
+			localFallbackLoader: async () => buildPortfolioFallback([], visitorId),
 		});
 	},
 
@@ -400,6 +416,7 @@ export const ownerService = {
 				);
 				return buildVenuesFallback(venues);
 			},
+			localFallbackLoader: async () => buildVenuesFallback([]),
 		});
 	},
 
@@ -413,6 +430,8 @@ export const ownerService = {
 				const venues = await loadOwnedVenuesFallback(visitorId, 400);
 				return buildInsightsFallback(venues, normalizedDays);
 			},
+			localFallbackLoader: async () =>
+				buildInsightsFallback([], normalizedDays),
 		});
 	},
 };
