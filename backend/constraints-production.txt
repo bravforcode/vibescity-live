@@ -12,7 +12,7 @@ colorama==0.4.6
 cryptography==46.0.4
 Deprecated==1.3.1
 deprecation==2.1.0
-fakeredis==2.33.0
+fakeredis==2.34.1
 fastapi==0.128.0
 fsspec==2026.1.0
 h11==0.16.0
