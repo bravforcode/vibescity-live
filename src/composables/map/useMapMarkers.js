@@ -1,7 +1,5 @@
-import lottie from "lottie-web";
 import mapboxgl from "mapbox-gl";
 import { shallowRef } from "vue";
-import coinAnimation from "@/assets/animations/coin.json";
 import {
 	createGiantPinElement,
 	createMarkerElement,
@@ -105,22 +103,9 @@ export function useMapMarkers(map) {
 				.setLngLat([lng, lat])
 				.addTo(map.value);
 
-			// ✅ Lottie Animation Initialization
 			if (!isGiant && pinsVisible) {
-				const coinContainer = el.querySelector(".lottie-coin-target");
-				if (coinContainer) {
-					try {
-						lottie.loadAnimation({
-							container: coinContainer,
-							renderer: "svg",
-							loop: true,
-							autoplay: true,
-							animationData: coinAnimation,
-						});
-					} catch (err) {
-						// Silent fail for animation
-					}
-				}
+				// Coin animation handled by shared canvas layer in useMapLayers.js setupCoinAnimation
+				// Per-marker lottie removed to eliminate 80x concurrent SVG animation CPU cost
 			}
 
 			el.addEventListener("click", (e) => {

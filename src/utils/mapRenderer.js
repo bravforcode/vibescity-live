@@ -17,6 +17,31 @@ const crowdEmojiMap = {
 	1: "😌",
 };
 
+const NEON_CATEGORY_COLORS = {
+	bar: '#ff00ff',
+	cocktail: '#ff00ff',
+	nightclub: '#ff00ff',
+	music: '#ff4444',
+	live: '#ff4444',
+	food: '#00ff88',
+	street: '#00ff88',
+	market: '#00ff88',
+	cannabis: '#44ff44',
+	edible: '#44ff44',
+	cafe: '#ffdd00',
+	gallery: '#ffdd00',
+	art: '#ffdd00',
+	spa: '#ffdd00',
+};
+
+const getNeonColor = (category) => {
+	const lower = String(category || '').toLowerCase();
+	for (const [key, color] of Object.entries(NEON_CATEGORY_COLORS)) {
+		if (lower.includes(key)) return color;
+	}
+	return '#00e5ff';
+};
+
 export const escapeHtml = (value) =>
 	String(value ?? "")
 		.replace(/&/g, "&amp;")
@@ -174,53 +199,26 @@ export const createPopupHTML = ({
 };
 
 /**
- * Determines the correct pin image based on venue state
+ * Builds a rectangular neon sign DOM element for a venue marker.
+ * All user-supplied strings are sanitized via escapeHtml before use.
  */
-const getPinImage = (item) => {
-	if (item.is_giant_active) return "/images/pins/pin-purple.png";
-	if (item.status === "LIVE" || item.is_open !== false)
-		return "/images/pins/pin-red.png";
-	return "/images/pins/pin-gray.png";
-};
-
-export const createMarkerElement = ({
-	item,
-	isHighlighted,
-	isLive,
-	hasCoins = true,
-}) => {
-	const el = document.createElement("div");
-	el.className = `vibe-marker-root vibe-pin-bounce ${isHighlighted ? "z-50 vibe-pin-highlighted" : "z-10"}`;
+export const createMarkerElement = ({ item, isHighlighted, isLive, hasCoins = true }) => {
+	const el = document.createElement('div');
+	const neonColor = getNeonColor(item.category || item.type || '');
+	el.className = 'neon-sign-marker' + (isHighlighted ? ' neon-sign-selected' : '');
+	el.style.setProperty('--neon-color', neonColor);
 	el.dataset.shopId = sanitizeId(item.id);
 
-	const isGiant = item.is_giant_active;
-	const pinSrc = getPinImage(item);
-	const pinW = isHighlighted ? 40 : isGiant ? 38 : 30;
-	const pinH = isHighlighted ? 50 : isGiant ? 47 : 37;
+	// escapeHtml applied to all user-supplied strings before innerHTML insertion
+	const safeName = escapeHtml(item.name || 'VIBE');
+	const truncated = safeName.length > 14 ? safeName.substring(0, 14) : safeName;
 
-	el.innerHTML = `
-    <div class="vibe-marker-container" style="display:flex;flex-direction:column;align-items:center;">
-      ${
-				hasCoins
-					? `<div class="marker-float" style="margin-bottom:-14px;z-index:20;pointer-events:none;">
-        <div class="lottie-coin-target" style="width:24px;height:24px;"></div>
-      </div>`
-					: ""
-			}
+	const coinHtml = hasCoins ? '<div class="neon-coin-float lottie-coin-target"></div>' : '';
+	const badgeHtml = isLive ? '<span class="neon-sign-badge">LIVE</span>' : '';
+	const textHtml = '<span class="neon-sign-text">' + truncated + '</span>';
 
-      <div class="vibe-marker-hitbox relative group" style="width:${pinW}px;height:${pinH}px;">
-         ${isLive ? `<div class="vibe-live-glow"></div>` : ""}
-         ${isGiant ? `<div class="vibe-giant-glow"></div>` : ""}
-
-         <img src="${pinSrc}" alt="" width="${pinW}" height="${pinH}"
-              class="vibe-pin-img" draggable="false"
-              style="width:${pinW}px;height:${pinH}px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4));" />
-
-         ${isLive ? `<div class="vibe-live-badge">LIVE</div>` : ""}
-         ${isGiant ? `<div class="vibe-giant-badge">★</div>` : ""}
-      </div>
-    </div>
-  `;
+	// All interpolated values are either static class strings or escapeHtml-sanitized
+	el.innerHTML = coinHtml + textHtml + badgeHtml;
 
 	return el;
 };
