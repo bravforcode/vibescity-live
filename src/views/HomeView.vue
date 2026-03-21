@@ -69,6 +69,12 @@ const LuckyWheel = defineResilientAsync(
 const LocalAdBanner = defineResilientAsync(
 	() => import("../components/ads/LocalAdBanner.vue"),
 );
+const VibeBanner = defineAsyncComponent(
+	() => import("../components/ui/VibeBanner.vue"),
+);
+const VibeActionSheet = defineAsyncComponent(
+	() => import("../components/ui/VibeActionSheet.vue"),
+);
 
 const showMerchantModal = ref(false);
 const showAddShopModal = ref(false);
@@ -339,6 +345,14 @@ const onExitGiantView = () => {
 
 const dailyCheckinRef = ref(null);
 const luckyWheelRef = ref(null);
+
+// ✅ VibeBanner + VibeActionSheet handlers
+const handleClaimVibe = () => { /* TODO: Phase 2 gamification hook */ };
+const handleNavigate = () => {
+	if (!selectedShop.value) return;
+	const { lat, lng } = selectedShop.value;
+	window.open(`https://maps.google.com/?daddr=${lat},${lng}`, '_blank', 'noopener');
+};
 
 const resolveVenueId = (shopOrId) => {
 	const rawId =
@@ -1013,6 +1027,7 @@ const hasFilteredResults = computed(() => {
               class="absolute inset-0 pointer-events-none opacity-0"
               aria-hidden="true"
             ></div>
+            <VibeBanner :text="t('gamification.vibe_of_hour')" />
             <ErrorBoundary>
               <template #fallback>
                 <MapErrorFallback
@@ -1230,6 +1245,7 @@ const hasFilteredResults = computed(() => {
               class="absolute inset-0 pointer-events-none opacity-0"
               aria-hidden="true"
             ></div>
+            <VibeBanner :text="t('gamification.vibe_of_hour')" />
             <ErrorBoundary>
               <template #fallback>
                 <MapErrorFallback
@@ -1386,6 +1402,17 @@ const hasFilteredResults = computed(() => {
         :is-open="showAddShopModal"
         @close="showAddShopModal = false"
         @success="showAddShopModal = false"
+      />
+
+      <!-- ✅ Vibe Action Sheet (appears when a venue marker is selected) -->
+      <VibeActionSheet
+        :shop="selectedShop"
+        :visible="!!selectedShop"
+        :claimLabel="t('gamification.claim_vibe')"
+        :navigateLabel="t('gamification.take_me_there')"
+        @close="selectedShop = null"
+        @claim="handleClaimVibe"
+        @navigate="handleNavigate"
       />
 
       <!-- ✅ Common Modals & Overlays -->

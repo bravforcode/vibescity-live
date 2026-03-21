@@ -58,6 +58,9 @@ const inlineMessages = {
 			collect_coins: "สะสมเหรียญ",
 			congrats: "ยินดีด้วย!",
 			level_up: "เลเวลอัปเป็นระดับ {lvl}!",
+			claim_vibe: "รับไวบ์ของคุณ",
+			take_me_there: "พาฉันไปที่นั่น",
+			vibe_of_hour: "ไวบ์แห่งชั่วโมงนี้",
 		},
 	},
 	en: {
@@ -119,6 +122,9 @@ const inlineMessages = {
 			collect_coins: "Collect Coins",
 			congrats: "Congrats!",
 			level_up: "Leveled up to {lvl}!",
+			claim_vibe: "CLAIM YOUR VIBE",
+			take_me_there: "TAKE ME THERE",
+			vibe_of_hour: "VIBE OF THE HOUR",
 		},
 	},
 };
