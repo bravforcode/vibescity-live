@@ -1,12 +1,12 @@
 <script setup>
 defineProps({
-  shop:          { type: Object,  default: null },
-  visible:       { type: Boolean, default: false },
-  claimLabel:    { type: String,  default: 'CLAIM YOUR VIBE ✦✦' },
-  navigateLabel: { type: String,  default: 'TAKE ME THERE 🚗' },
+	shop: { type: Object, default: null },
+	visible: { type: Boolean, default: false },
+	claimLabel: { type: String, default: "CLAIM YOUR VIBE ✦✦" },
+	navigateLabel: { type: String, default: "TAKE ME THERE 🚗" },
 });
 
-const emit = defineEmits(['claim', 'navigate', 'close']);
+const emit = defineEmits(["claim", "navigate", "close"]);
 </script>
 
 <template>

@@ -73,9 +73,9 @@ import { createPopupHTML } from "../../utils/mapRenderer";
 import { applyOrderedNeonLayout } from "../../utils/neonLayoutEngine";
 import { isExpectedAbortError } from "../../utils/networkErrorUtils";
 import { calculateDistance, calculateShopStatus } from "../../utils/shopUtils";
+import YouAreHere from "../ui/YouAreHere.vue";
 import LiveActivityChips from "./LiveActivityChips.vue";
 import MapLoadingSkeleton from "./MapLoadingSkeleton.vue";
-import YouAreHere from "../ui/YouAreHere.vue";
 
 // MapLibre GL does not use mapbox:// style URLs — use env-driven or local neon fallback
 const NEON_STYLE_URL = isFrontendOnlyDevMode()

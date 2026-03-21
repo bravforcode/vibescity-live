@@ -28,28 +28,28 @@ const crowdKeyMap = {
 };
 
 const NEON_CATEGORY_COLORS = {
-	bar: '#ff00ff',
-	cocktail: '#ff00ff',
-	nightclub: '#ff00ff',
-	music: '#ff4444',
-	live: '#ff4444',
-	food: '#00ff88',
-	street: '#00ff88',
-	market: '#00ff88',
-	cannabis: '#44ff44',
-	edible: '#44ff44',
-	cafe: '#ffdd00',
-	gallery: '#ffdd00',
-	art: '#ffdd00',
-	spa: '#ffdd00',
+	bar: "#ff00ff",
+	cocktail: "#ff00ff",
+	nightclub: "#ff00ff",
+	music: "#ff4444",
+	live: "#ff4444",
+	food: "#00ff88",
+	street: "#00ff88",
+	market: "#00ff88",
+	cannabis: "#44ff44",
+	edible: "#44ff44",
+	cafe: "#ffdd00",
+	gallery: "#ffdd00",
+	art: "#ffdd00",
+	spa: "#ffdd00",
 };
 
 const getNeonColor = (category) => {
-	const lower = String(category || '').toLowerCase();
+	const lower = String(category || "").toLowerCase();
 	for (const [key, color] of Object.entries(NEON_CATEGORY_COLORS)) {
 		if (lower.includes(key)) return color;
 	}
-	return '#00e5ff';
+	return "#00e5ff";
 };
 
 export const escapeHtml = (value) =>
@@ -242,19 +242,21 @@ export const createMarkerElement = ({
 	hasCoins = true,
 }) => {
 	const el = document.createElement("div");
-	const neonColor = getNeonColor(item.category || item.type || '');
-	el.className = 'neon-sign-marker' + (isHighlighted ? ' neon-sign-selected' : '');
-	el.style.setProperty('--neon-color', neonColor);
+	const neonColor = getNeonColor(item.category || item.type || "");
+	el.className = `neon-sign-marker${isHighlighted ? " neon-sign-selected" : ""}`;
+	el.style.setProperty("--neon-color", neonColor);
 	el.dataset.shopId = sanitizeId(item.id);
 	el.style.pointerEvents = "auto";
 
 	// escapeHtml applied to all user-supplied strings before innerHTML insertion
-	const safeName = escapeHtml(item.name || 'VIBE');
+	const safeName = escapeHtml(item.name || "VIBE");
 	const truncated = safeName.length > 14 ? safeName.substring(0, 14) : safeName;
 
-	const coinHtml = hasCoins ? '<div class="neon-coin-float lottie-coin-target"></div>' : '';
-	const badgeHtml = isLive ? '<span class="neon-sign-badge">LIVE</span>' : '';
-	const textHtml = '<span class="neon-sign-text">' + truncated + '</span>';
+	const coinHtml = hasCoins
+		? '<div class="neon-coin-float lottie-coin-target"></div>'
+		: "";
+	const badgeHtml = isLive ? '<span class="neon-sign-badge">LIVE</span>' : "";
+	const textHtml = `<span class="neon-sign-text">${truncated}</span>`;
 
 	// All interpolated values are either static class strings or escapeHtml-sanitized
 	el.innerHTML = coinHtml + textHtml + badgeHtml;

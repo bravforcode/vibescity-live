@@ -151,68 +151,79 @@
 
 /* Neon Sign Markers */
 .neon-sign-marker {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  padding: 4px 10px;
-  border-radius: 4px;
-  border: 1.5px solid var(--neon-color, #00e5ff);
-  background: rgba(0, 0, 0, 0.85);
-  box-shadow: 0 0 6px var(--neon-color, #00e5ff), inset 0 0 4px rgba(0, 0, 0, 0.6);
-  cursor: pointer;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 44px;
+	padding: 4px 10px;
+	border-radius: 4px;
+	border: 1.5px solid var(--neon-color, #00e5ff);
+	background: rgba(0, 0, 0, 0.85);
+	box-shadow:
+		0 0 6px var(--neon-color, #00e5ff),
+		inset 0 0 4px rgba(0, 0, 0, 0.6);
+	cursor: pointer;
+	user-select: none;
+	-webkit-tap-highlight-color: transparent;
 }
 .neon-sign-marker .neon-sign-text {
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--neon-color, #00e5ff);
-  text-shadow: 0 0 4px var(--neon-color, #00e5ff), 0 0 10px var(--neon-color, #00e5ff);
-  white-space: nowrap;
-  max-width: 80px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.2;
+	font-size: 10px;
+	font-weight: 900;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--neon-color, #00e5ff);
+	text-shadow:
+		0 0 4px var(--neon-color, #00e5ff),
+		0 0 10px var(--neon-color, #00e5ff);
+	white-space: nowrap;
+	max-width: 80px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	line-height: 1.2;
 }
 .neon-sign-marker .neon-sign-badge {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  font-size: 8px;
-  font-weight: 900;
-  padding: 1px 4px;
-  border-radius: 99px;
-  background: #ff0033;
-  color: #fff;
-  letter-spacing: 0.05em;
-  line-height: 1.4;
-  pointer-events: none;
+	position: absolute;
+	top: -6px;
+	right: -6px;
+	font-size: 8px;
+	font-weight: 900;
+	padding: 1px 4px;
+	border-radius: 99px;
+	background: #ff0033;
+	color: #fff;
+	letter-spacing: 0.05em;
+	line-height: 1.4;
+	pointer-events: none;
 }
 .neon-sign-marker .neon-coin-float {
-  position: absolute;
-  top: -18px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 20px;
-  height: 20px;
-  pointer-events: none;
+	position: absolute;
+	top: -18px;
+	left: 50%;
+	transform: translateX(-50%);
+	width: 20px;
+	height: 20px;
+	pointer-events: none;
 }
 .neon-sign-selected {
-  will-change: transform;
-  animation: neon-sign-pulse 1.4s ease-in-out infinite;
-  z-index: 300 !important;
+	will-change: transform;
+	animation: neon-sign-pulse 1.4s ease-in-out infinite;
+	z-index: 300 !important;
 }
 @keyframes neon-sign-pulse {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50%       { transform: scale(1.08); opacity: 0.92; }
+	0%,
+	100% {
+		transform: scale(1);
+		opacity: 1;
+	}
+	50% {
+		transform: scale(1.08);
+		opacity: 0.92;
+	}
 }
 @media (prefers-reduced-motion: reduce) {
-  .neon-sign-selected {
-    animation: none;
-    will-change: auto;
-  }
+	.neon-sign-selected {
+		animation: none;
+		will-change: auto;
+	}
 }

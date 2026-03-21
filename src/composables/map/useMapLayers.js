@@ -157,7 +157,7 @@ export function useMapLayers(map, options = {}) {
 		}
 		if (map.value.getSource("neon-roads")) return;
 
-		map.value.once('idle', () => {
+		map.value.once("idle", () => {
 			if (!map.value) return;
 			if (map.value.getSource("neon-roads")) return; // double-check after idle
 			try {
@@ -182,7 +182,15 @@ export function useMapLayers(map, options = {}) {
 					source: "neon-roads",
 					paint: {
 						"line-color": "#22d3ee",
-						"line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 16, 1.5],
+						"line-width": [
+							"interpolate",
+							["linear"],
+							["zoom"],
+							12,
+							0.5,
+							16,
+							1.5,
+						],
 						"line-opacity": 0.6,
 					},
 				});

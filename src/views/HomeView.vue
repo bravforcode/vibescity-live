@@ -347,11 +347,17 @@ const dailyCheckinRef = ref(null);
 const luckyWheelRef = ref(null);
 
 // ✅ VibeBanner + VibeActionSheet handlers
-const handleClaimVibe = () => { /* TODO: Phase 2 gamification hook */ };
+const handleClaimVibe = () => {
+	/* TODO: Phase 2 gamification hook */
+};
 const handleNavigate = () => {
 	if (!selectedShop.value) return;
 	const { lat, lng } = selectedShop.value;
-	window.open(`https://maps.google.com/?daddr=${lat},${lng}`, '_blank', 'noopener');
+	window.open(
+		`https://maps.google.com/?daddr=${lat},${lng}`,
+		"_blank",
+		"noopener",
+	);
 };
 
 const resolveVenueId = (shopOrId) => {

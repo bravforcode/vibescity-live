@@ -1,7 +1,7 @@
 <script setup>
 defineProps({
-  text:    { type: String,  default: 'VIBE OF THE HOUR' },
-  visible: { type: Boolean, default: true },
+	text: { type: String, default: "VIBE OF THE HOUR" },
+	visible: { type: Boolean, default: true },
 });
 </script>
 
