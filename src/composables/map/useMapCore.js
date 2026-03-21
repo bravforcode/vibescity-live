@@ -108,8 +108,9 @@ export function useMapCore(containerRef, _options = {}) {
 			zoom: initialZoom,
 			pitch: 60, // Default pitch for 3D feel (stronger 3D)
 			bearing: 0,
-			antialias: true,
+			antialias: typeof navigator !== 'undefined' && (navigator.hardwareConcurrency ?? 4) > 4,
 			attributionControl: false,
+			fadeDuration: 0,
 		});
 
 		// Add Controls
