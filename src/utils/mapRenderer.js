@@ -27,6 +27,31 @@ const crowdKeyMap = {
 	1: "common.crowd.quiet",
 };
 
+const NEON_CATEGORY_COLORS = {
+	bar: '#ff00ff',
+	cocktail: '#ff00ff',
+	nightclub: '#ff00ff',
+	music: '#ff4444',
+	live: '#ff4444',
+	food: '#00ff88',
+	street: '#00ff88',
+	market: '#00ff88',
+	cannabis: '#44ff44',
+	edible: '#44ff44',
+	cafe: '#ffdd00',
+	gallery: '#ffdd00',
+	art: '#ffdd00',
+	spa: '#ffdd00',
+};
+
+const getNeonColor = (category) => {
+	const lower = String(category || '').toLowerCase();
+	for (const [key, color] of Object.entries(NEON_CATEGORY_COLORS)) {
+		if (lower.includes(key)) return color;
+	}
+	return '#00e5ff';
+};
+
 export const escapeHtml = (value) =>
 	String(value ?? "")
 		.replace(/&/g, "&amp;")
@@ -207,54 +232,32 @@ export const createPopupHTML = ({
 };
 
 /**
- * Determines the correct pin image based on venue state
+ * Builds a rectangular neon sign DOM element for a venue marker.
+ * All user-supplied strings are sanitized via escapeHtml before use.
  */
-const getPinImage = (item) => {
-	if (item.is_giant_active) return "/images/pins/pin-purple.png";
-	if (item.status === "LIVE" || item.is_open !== false)
-		return "/images/pins/pin-red.png";
-	return "/images/pins/pin-gray.png";
-};
-
 export const createMarkerElement = ({
 	item,
 	isHighlighted,
 	isLive,
-	hasCoins = false,
+	hasCoins = true,
 }) => {
 	const el = document.createElement("div");
-	el.className = `vibe-marker-root vibe-pin-bounce ${isHighlighted ? "z-50 vibe-pin-highlighted" : "z-10"}`;
+	const neonColor = getNeonColor(item.category || item.type || '');
+	el.className = 'neon-sign-marker' + (isHighlighted ? ' neon-sign-selected' : '');
+	el.style.setProperty('--neon-color', neonColor);
 	el.dataset.shopId = sanitizeId(item.id);
-	el.style.pointerEvents = "none"; // Fixes transparent hitbox blocking other markers
+	el.style.pointerEvents = "auto";
 
-	const isGiant = item.is_giant_active;
-	const pinSrc = getPinImage(item);
-	const pinW = isHighlighted ? 64 : isGiant ? 54 : 44;
-	const pinH = isHighlighted ? 84 : isGiant ? 74 : 64;
+	// escapeHtml applied to all user-supplied strings before innerHTML insertion
+	const safeName = escapeHtml(item.name || 'VIBE');
+	const truncated = safeName.length > 14 ? safeName.substring(0, 14) : safeName;
 
-	el.innerHTML = `
-    <div class="vibe-marker-container" style="display:flex;flex-direction:column;align-items:center;position:relative;">
-      <div class="vibe-marker-hitbox relative group" style="width:${pinW}px;height:${pinH}px;pointer-events:auto;">
-         ${isLive ? `<div class="vibe-live-glow"></div>` : ""}
-         ${isGiant ? `<div class="vibe-giant-glow"></div>` : ""}
+	const coinHtml = hasCoins ? '<div class="neon-coin-float lottie-coin-target"></div>' : '';
+	const badgeHtml = isLive ? '<span class="neon-sign-badge">LIVE</span>' : '';
+	const textHtml = '<span class="neon-sign-text">' + truncated + '</span>';
 
-         <img src="${pinSrc}" alt="" width="${pinW}" height="${pinH}"
-              class="vibe-pin-img" draggable="false"
-              style="width:${pinW}px;height:${pinH}px;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.3));" />
-
-         ${isLive ? `<div class="vibe-live-badge">LIVE</div>` : ""}
-         ${isGiant ? `<div class="vibe-giant-badge">★</div>` : ""}
-
-         ${
-						hasCoins
-							? `<div class="marker-float" style="position:absolute;top:-10px;right:-10px;z-index:20;pointer-events:none;">
-                ${COIN_FLIP_HTML}
-              </div>`
-							: ""
-					}
-       </div>
-     </div>
-   `;
+	// All interpolated values are either static class strings or escapeHtml-sanitized
+	el.innerHTML = coinHtml + textHtml + badgeHtml;
 
 	return el;
 };
@@ -266,19 +269,50 @@ export const createGiantPinElement = (event) => {
 	const el = document.createElement("div");
 	el.className = "giant-pin-marker";
 	el.dataset.eventId = sanitizeId(event.id);
+	const safeEventId = sanitizeId(event.id);
 	const safeLabel = escapeHtml(event.shortName || event.name || "Event");
+	const safeIconUrl = sanitizeUrl(event.icon);
 
-	// Purple pin marker with glow + label
+	// Premium SVG-based event marker
 	el.innerHTML = `
-    <div class="giant-pin-wrapper" style="pointer-events:auto; position:relative; transform-origin:bottom center;">
-      <div style="position:absolute; top:-8px; right:-8px; z-index:3; pointer-events:none;">
-        ${COIN_FLIP_HTML}
+    <div class="giant-pin-wrapper">
+      <svg class="giant-pin-svg" width="80" height="100" viewBox="0 0 80 100" fill="none">
+        <defs>
+          <linearGradient id="eventGrad-${safeEventId}" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#8B5CF6"/>
+            <stop offset="50%" stop-color="#EC4899"/>
+            <stop offset="100%" stop-color="#F43F5E"/>
+          </linearGradient>
+          <filter id="eventGlow-${safeEventId}" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="4" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+          <filter id="eventInner-${safeEventId}">
+            <feOffset dx="0" dy="2"/>
+            <feGaussianBlur stdDeviation="2"/>
+            <feComposite operator="out" in="SourceGraphic"/>
+            <feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.3 0"/>
+            <feBlend in="SourceGraphic"/>
+          </filter>
+        </defs>
+        <circle cx="40" cy="35" r="30" fill="none" stroke="url(#eventGrad-${safeEventId})" stroke-width="2" opacity="0.5" class="pulse-ring"/>
+        <circle cx="40" cy="35" r="28" fill="url(#eventGrad-${safeEventId})" filter="url(#eventGlow-${safeEventId})"/>
+        <ellipse cx="40" cy="28" rx="16" ry="10" fill="white" opacity="0.2"/>
+        <circle cx="40" cy="35" r="18" fill="rgba(255,255,255,0.15)"/>
+        <path d="M30 55 L40 75 L50 55" fill="url(#eventGrad-${safeEventId})" filter="url(#eventGlow-${safeEventId})"/>
+      </svg>
+      <div class="giant-pin-icon-overlay" style="display:flex;align-items:center;justify-content:center;height:100%;border-radius:50%;overflow:hidden;">
+        ${
+					event.coverImage || event.cover_image || event.Image_URL1
+						? `<img src="${event.coverImage || event.cover_image || event.Image_URL1}" class="w-full h-full object-cover" />`
+						: safeIconUrl
+							? `<img src="${safeIconUrl}" class="w-7 h-7 object-contain" />`
+							: `<span style="font-size: 24px;">${escapeHtml(event.icon || "🎪")}</span>`
+				}
       </div>
-      <div class="giant-pin-glow-ring"></div>
-      <img src="/images/pins/pin-purple.png" alt="" width="48" height="64"
-           draggable="false"
-           class="giant-pin-purple-img"
-           style="width:48px;height:64px;filter:drop-shadow(0 4px 12px rgba(147,51,234,0.5));position:relative;z-index:2;" />
       <div class="giant-pin-label-new">${safeLabel}</div>
     </div>
   `;

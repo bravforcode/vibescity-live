@@ -1,6 +1,9 @@
 import maplibregl from "maplibre-gl";
 import { shallowRef } from "vue";
-import { createGiantPinElement } from "@/utils/mapRenderer";
+import {
+	createGiantPinElement,
+	createMarkerElement,
+} from "@/utils/mapRenderer";
 import { useSmartMarkers } from "./useSmartMarkers";
 
 const COIN_CSS_INJECTED = { done: false };
@@ -52,26 +55,14 @@ const createCoinFlipHTML = () =>
 	`<div class="vibe-coin-flip"><div class="vibe-coin-flip-inner"><div class="vibe-coin-front">🪙</div><div class="vibe-coin-back">🪙</div></div></div>`;
 
 const createRegularPinElement = (shop) => {
-	const pinType = String(shop?.pin_type || "").toLowerCase();
-	const isBoost =
-		pinType === "boost" ||
-		shop?.is_boost_active === true ||
-		shop?.boostActive === true;
-	const el = document.createElement("button");
-	el.type = "button";
-	el.className = "vibe-e2e-pin-marker";
-	el.style.width = "18px";
-	el.style.height = "18px";
-	el.style.borderRadius = "999px";
-	el.style.border = "2px solid rgba(255,255,255,0.92)";
-	el.style.boxShadow = "0 3px 10px rgba(0,0,0,0.35)";
-	el.style.background = isBoost ? "#ef4444" : "#3b82f6";
-	el.style.cursor = "pointer";
-	el.style.padding = "0";
-	el.style.display = "block";
-	el.style.transform = "translateY(-2px)";
-	el.setAttribute("aria-label", String(shop?.name || "venue"));
-	return el;
+	return createMarkerElement({
+		item: shop,
+		isHighlighted: false,
+		isLive:
+			String(shop?.status || "").toUpperCase() === "LIVE" ||
+			Boolean(shop?.is_live),
+		hasCoins: true,
+	});
 };
 
 export function useMapMarkers(map) {
@@ -188,7 +179,14 @@ export function useMapMarkers(map) {
 			// Create marker element with enhanced styling
 			const el = isGiant
 				? createGiantPinElement(shop)
-				: createRegularPinElement(shop);
+				: createMarkerElement({
+						item: shop,
+						isHighlighted: isSelected,
+						isLive:
+							String(shop?.status || "").toUpperCase() === "LIVE" ||
+							Boolean(shop?.is_live),
+						hasCoins: true,
+					});
 
 			// Apply smart marker styles
 			const markerStyles = smartMarkers.getMarkerStyles(shop);
