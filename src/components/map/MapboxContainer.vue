@@ -4699,7 +4699,7 @@ defineExpose({
       role="status"
       aria-live="polite"
     >
-      {{ $t("common.offline") || "Offline mode" }}
+      {{ $t("app.you_are_offline") || "Offline mode" }}
     </div>
 
     <div

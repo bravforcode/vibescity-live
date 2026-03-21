@@ -37,7 +37,7 @@ export class SDFClusterLayer {
 
 	// ─── Mapbox Interface ────────────────────────────────────────
 
-	onAdd(map, gl) {
+	onAdd(_map, gl) {
 		if (!caps.webgl2 || !caps.floatTextures) return;
 
 		this._gl = gl;
@@ -83,7 +83,7 @@ export class SDFClusterLayer {
 		gl.bindTexture(gl.TEXTURE_2D, null);
 	}
 
-	render(gl, matrix) {
+	render(gl, _matrix) {
 		if (!this._program || !this._vao || this._pinCount === 0) return;
 
 		gl.useProgram(this._program);
@@ -129,7 +129,7 @@ export class SDFClusterLayer {
 		this._onRender?.();
 	}
 
-	onRemove(map, gl) {
+	onRemove(_map, gl) {
 		if (!this._gl) return;
 		gl.deleteProgram(this._program);
 		gl.deleteTexture(this._pinTexture);

@@ -333,7 +333,7 @@ const menuSections = computed(() => {
 	accountItems.push(
 		{
 			id: "invite",
-			label: t("profile.invite_friend") || "Invite Friend",
+			label: t("profile.invite_friend"),
 			icon: Share2,
 			color: "text-emerald-400",
 		},

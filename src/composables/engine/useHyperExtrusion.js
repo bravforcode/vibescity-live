@@ -65,7 +65,7 @@ export function useHyperExtrusion(map) {
 		}
 	};
 
-	const onZoomStart = (lngLat) => {
+	const onZoomStart = (_lngLat) => {
 		if (prefersReducedMotion || _active) return;
 		if (!ensureBuildingsLayer()) return;
 

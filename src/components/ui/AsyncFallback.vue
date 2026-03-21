@@ -33,7 +33,7 @@ const retry = () => {
 		role="alert"
 	>
 		<p class="text-sm text-white/60">
-			{{ t("auto.component_failed") }}
+			{{ t("error.component_failed") }}
 			<span v-if="retryCount > 0" class="block text-xs text-white/40 mt-1">
 				({{ retryCount }}/{{ maxRetries }})
 			</span>
@@ -43,7 +43,7 @@ const retry = () => {
 			@click="retry"
 		>
 			<RefreshCw class="h-4 w-4" />
-			{{ t("auto.retry") }}
+			{{ t("common.retry") }}
 		</button>
 	</div>
 </template>

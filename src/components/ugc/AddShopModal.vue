@@ -146,7 +146,7 @@
           >
             {{ t("ugc.cancel") }}
           </button>
-          <button :aria-label="$t('a11y.action')"
+          <button :aria-label="$t('ugc.submit')"
             @click="submit"
             :disabled="loading || !isFormValid"
             class="flex-1 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold hover:shadow-lg hover:shadow-purple-500/20 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"

@@ -70,8 +70,10 @@ export const frontendObservabilityService = {
 	 */
 	trackMapPerformance(metrics = {}) {
 		const payload = {
-			fcp_ms: typeof metrics.fcp === "number" ? Math.round(metrics.fcp) : undefined,
-			lcp_ms: typeof metrics.lcp === "number" ? Math.round(metrics.lcp) : undefined,
+			fcp_ms:
+				typeof metrics.fcp === "number" ? Math.round(metrics.fcp) : undefined,
+			lcp_ms:
+				typeof metrics.lcp === "number" ? Math.round(metrics.lcp) : undefined,
 			map_interactive_ms:
 				typeof metrics.mapInteractive === "number"
 					? Math.round(metrics.mapInteractive)

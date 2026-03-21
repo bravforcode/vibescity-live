@@ -175,13 +175,13 @@ if (mapPaddingApi) {
 		([id, shops, building]) => {
 			if (id && shops?.length) {
 				const shop = shops.find((s) => String(s.id) === String(id));
-				if (shop && shop.lat && shop.lng) {
+				if (shop?.lat != null && shop?.lng != null) {
 					mapPaddingApi.setActivePin([Number(shop.lng), Number(shop.lat)]);
 					mapPaddingApi.setActivePinId(id);
 					return;
 				}
 			}
-			if (building && building.lat && building.lng) {
+			if (building?.lat != null && building?.lng != null) {
 				mapPaddingApi.setActivePin([
 					Number(building.lng),
 					Number(building.lat),

@@ -565,7 +565,7 @@ onUnmounted(() => {
                     </span>
                   </div>
                   <!-- ✅ Ride Button -->
-                  <button :aria-label="$t('a11y.action')"
+                  <button :aria-label="$t('common.ride')"
                     @click.stop="handleRideClick(shop)"
                     class="px-2 py-1 rounded bg-blue-600/20 text-blue-400 text-[10px] font-bold border border-blue-500/30 hover:bg-blue-600 hover:text-white transition-colors flex items-center gap-1"
                   >
