@@ -10,7 +10,7 @@
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
         { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(self), payment=(self)" },
         { "key": "X-DNS-Prefetch-Control", "value": "on" },
-        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://*.supabase.co https://api.dicebear.com https://*.mapbox.com https://docs.mapbox.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co https://*.mapbox.com https://events.mapbox.com https://*.fly.dev https://api.stripe.com https://*.sentry.io https://*.clarity.ms; worker-src 'self' blob:; frame-src https://js.stripe.com; object-src 'none'; base-uri 'self'" }
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://*.supabase.co https://api.dicebear.com https://*.mapbox.com https://docs.mapbox.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co https://*.mapbox.com https://events.mapbox.com https://*.fly.dev https://api.stripe.com https://*.sentry.io https://*.clarity.ms; worker-src 'self' blob:; frame-src https://js.stripe.com; object-src 'none'; base-uri 'self'" }
       ]
     }
   ],
