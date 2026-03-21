@@ -216,7 +216,9 @@ export function useMapCore(containerRef, _options = {}) {
 				maxZoom: 22,
 				pitch: 70, // 3D perspective without showing beyond map world
 				bearing: 0,
-				antialias: false, // Saves ~50% VRAM on mobile/retina
+				antialias:
+					typeof navigator !== "undefined" &&
+					(navigator.hardwareConcurrency ?? 4) > 4,
 				attributionControl: false,
 				fadeDuration: 0, // Eliminate tile fade-in stutter on mobile
 				maxTileCacheSize: 100, // Limit memory for tile cache
