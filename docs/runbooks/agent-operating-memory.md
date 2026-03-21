@@ -2,8 +2,8 @@
 
 > Read this file before every work session in `C:\vibecity.live`.
 
-- Last updated: 2026-03-20
-- Current focus: Map/feed stability hardening remains active, and production Thailand venue data now has a completed curation + admin injection baseline with full code coverage (`77/77` provinces, `928/928` districts, `7425/7425` subdistricts) while default localhost Chromium stays preview-first
+- Last updated: 2026-03-21
+- Current focus: Vercel production for `https://www.vibescity.live` now points to `origin/main` at `67001fd` via deployment `dpl_3fgeDd6AutpTtusBcENPicA8Zh6R`; runtime fallback lanes for visitor bootstrap, directions, hot roads, and websocket are hardened, the OpenFreeMap style assets are now tracked on `main`, and a fresh production browser session loaded cleanly without console errors or failed requests
 - Canonical skill: `.agents/skills/vibecity-session-handoff/SKILL.md`
 
 ## Start Every Session
@@ -39,6 +39,7 @@
 
 - `rsbuild.config.ts`
 - `public/map-styles/vibecity-dev.json`
+- `public/map-styles/vibecity-neon.json`
 - `src/lib/runtimeConfig.js`
 - `src/main.js`
 - `src/services/visitorIdentity.js`
@@ -116,42 +117,44 @@
 - Treat the default localhost Chromium lane as solved: it should enter dev-safe preview mode with zero WebGL, HMR, and forced-reflow console noise.
 - If raw renderer investigation resumes, do it only in the explicit WebGL opt-in lane or a minimal upstream repro; do not regress the preview-first default.
 - If HMR is ever served through another origin or reverse proxy, use `RSBUILD_HMR_HOST` and `RSBUILD_HMR_PORT` as explicit overrides instead of hardcoding repo defaults.
+- Keep `@rspack/binding-linux-x64-gnu` pinned at `1.7.3` while `@rspack/core` remains `1.7.3`; upgrade them together only.
+- If deploying while `C:\vibecity.live` is dirty, build and deploy from a fresh tracked-only worktree of `origin/main` instead of the root workspace.
+- `scripts/ci/check-source-i18n-hardcoded.mjs` now exists on `main` and merges both JSON locales plus inline locale keys from `src/i18n.js`; if it fails again, inspect missing source keys before touching locale parity logic.
+- `.vercel/` is now ignored on `main`; keep Vercel metadata local-only.
+- Production should be promoted only from a clean worktree linked to the real Vercel project `vibecity`; an unlinked worktree can cause Vercel to auto-create a separate project from the folder name.
+- Keep checking browser-visible output after each production deploy; `HTTP 200` alone was not enough to catch stale alias drift.
+- Runtime lane cooldowns now live in `src/lib/runtimeLaneAvailability.js`; keep the known-missing `vibecity-api.fly.dev` lanes aligned with real backend capability, not guesswork.
+- Keep the tracked OpenFreeMap style assets on `main`; production currently loads `/map-styles/vibecity-neon.json` directly and a clean release worktree must include it.
+- If fresh production sessions start showing backend noise again, verify with a brand-new browser profile first to rule out stale service worker or cached bundle artifacts before changing the app code.
 
 ## Current Snapshot
 
-- Focus: `/th`, `/th/partner`, and `/th/merchant` now run in a quieter localhost lane with explicit local fallback labeling, and map/feed behavior aligns with centered-card auto-open + giant-pin aggregate config.
+- Focus: production runtime noise on the real `main` baseline was hardened and released. `https://www.vibescity.live` now points to `origin/main@67001fd` through `dpl_3fgeDd6AutpTtusBcENPicA8Zh6R`, with tracked OpenFreeMap styles and runtime cooldown/fallback guards for visitor bootstrap, directions, hot roads, and websocket lanes.
 - Files touched most recently before this memory file:
-  - `docs/runbooks/agent-operating-memory.md`
-  - `src/services/apiClient.js`
-  - `src/services/partnerService.js`
-  - `src/services/ownerService.js`
-  - `src/components/dashboard/OwnerDashboard.vue`
-  - `src/components/ui/FilterMenu.vue`
-  - `src/composables/useScrollSync.js`
-  - `src/composables/useAppLogic.js`
+  - `public/map-styles/vibecity-dev.json`
+  - `public/map-styles/vibecity-neon.json`
   - `src/components/map/MapboxContainer.vue`
-  - `src/locales/en.json`
-  - `src/locales/th.json`
-  - `tests/unit/apiClient.spec.js`
+  - `src/composables/map/useMapNavigation.js`
+  - `src/lib/runtimeLaneAvailability.js`
+  - `src/services/socketService.js`
+  - `src/services/visitorIdentity.js`
+  - `tests/unit/socketService.spec.js`
+  - `tests/unit/visitorIdentity.spec.js`
+  - `vercel.json`
+  - `docs/runbooks/agent-operating-memory.md`
 - Validation already confirmed:
-  - `npx biome check` on changed frontend/service/locale/test files passed (11 files).
-  - `npx vitest run tests/unit/socketService.spec.js tests/unit/apiClient.spec.js tests/unit/shopService.abort.spec.js tests/unit/visitorIdentity.spec.js` passed (`14/14` tests).
-  - `bun run build` passed.
-  - Playwright verification against `http://127.0.0.1:5173` confirmed:
-    - `/th/partner` and `/th/merchant` load with no console warnings/errors and show explicit fallback states.
-    - mobile carousel settle can push venue route and open detail flow, then does not reopen on repeated no-op settle for the same venue.
-    - filter menu interaction no longer reproduces the prior `aria-hidden` focus warning or non-cancelable `touchmove` prevent warning.
-  - Data curation + injection verification confirmed:
-    - applied migration `fix_venue_location_triggers_postgis_qualification` (qualifies PostGIS type/function references in venue location triggers under `search_path=''`)
-    - `node scripts/curate-thailand-production-dataset.mjs --mode=apply` quarantined `91,062` foreign/out-of-country rows
-    - `node scripts/inject-thailand-admin-coverage.mjs --mode=apply --level=both` inserted `2,657` coverage anchors
-    - `node scripts/report-thailand-admin-gaps.mjs --out=scripts/reports/thailand-admin-gaps-after-injection.json` reports `0` missing provinces/districts/subdistricts
-    - `node scripts/test_map_pins.mjs` passed, `node scripts/test_count_null_location.mjs` passed
-    - `node scripts/smoke-db-compat.mjs` still reports pre-existing missing RPCs: `get_venue_stats`, `get_partner_dashboard_metrics`
+  - `git ls-remote origin refs/heads/main` returned `67001fd1e5f4e800f864ce00293d930913e49044`.
+  - `bun install --frozen-lockfile` passed in `C:\vibecity.live\.vercel-main-runtime-67001fd`.
+  - `npx biome check src/components/map/MapboxContainer.vue src/composables/map/useMapNavigation.js src/services/socketService.js src/services/visitorIdentity.js src/lib/runtimeLaneAvailability.js tests/unit/socketService.spec.js tests/unit/visitorIdentity.spec.js vercel.json public/map-styles/vibecity-dev.json public/map-styles/vibecity-neon.json` passed.
+  - `npx vitest run tests/unit/socketService.spec.js tests/unit/visitorIdentity.spec.js` passed.
+  - `bun run build` passed in `C:\vibecity.live\.vercel-main-runtime-67001fd` on commit `67001fd`.
+  - `vercel deploy --prod --yes --scope phirawits-projects` from `C:\vibecity.live\.vercel-main-runtime-67001fd` completed and aliased production to `https://www.vibescity.live`.
+  - `vercel inspect https://www.vibescity.live` reports deployment `dpl_3fgeDd6AutpTtusBcENPicA8Zh6R` / `https://vibescity-lctwfhzj2-phirawits-projects.vercel.app`.
+  - Fresh browser verification with Playwright against `https://www.vibescity.live/th` returned title `VibeCity - Chiang Mai Entertainment`, zero console errors, and zero failed requests after load and opening a venue detail.
 - Residual note:
-  - The default localhost Chromium lane should stay on preview mode unless a developer explicitly opts into full WebGL for diagnostics.
-  - If raw WebGL/neon aggregation checks resume, first opt in intentionally (`sessionStorage['vibecity.dev.mapRenderer']='webgl'` or `VITE_LOCAL_DEV_MAP_RENDERER=webgl`) before concluding map-layer regressions.
-  - `tests/e2e/map-comprehensive.spec.ts` currently fails in default Chromium lane because it assumes raw MapLibre DOM selectors (`.maplibregl-map`) instead of preview-mode behavior.
+  - Original workspace remains a dirty tree with additional local changes; deployment work this round was executed from clean worktree `C:\vibecity.live\.vercel-main-runtime-67001fd`.
+  - `C:\vibecity.live\.vercel-main-707c4f2` still contains local-only `.gitignore` edits and verify screenshots that were intentionally excluded from the production release.
+  - A separate Vercel project named `.vercel-main-707c4f2` was created by an earlier unlinked deploy attempt; ignore it for release work and keep using the `vibecity` project.
 
 ## Update Protocol
 
