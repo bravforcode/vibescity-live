@@ -4,14 +4,14 @@
 
 - **Phase:** 01 — Neon Map Redesign + Performance
 - **Current Plan:** 04
-- **Status:** In progress
+- **Status:** Complete
 
 ## Progress
 
 - [x] Plan 01: Research + reference gathering
 - [x] Plan 02: Neon sign CSS classes (map-atmosphere.css)
 - [x] Plan 03: YouAreHere dot + atmosphere hardening
-- [ ] Plan 04: (next)
+- [x] Plan 04: Vibe banner + action sheet overlays
 
 ## Accumulated Context
 
@@ -30,6 +30,11 @@
 - Plan 03: YouAreHere positioned at left:50% top:65% (thumb zone) without map.project() — coordinate projection deferred to later plan
 - Plan 03: setCyberpunkAtmosphere added to handleMapStyleLoad so dark atmosphere fires on every style.load, including theme switches
 - Plan 03: YouAreHere is a sync import (not async) — zero loading delay for UI affordances
+- Plan 04: VibeBanner text is a prop not hardcoded — callers pass t('gamification.vibe_of_hour') for i18n
+- Plan 04: VibeActionSheet button labels are props (claimLabel, navigateLabel) — component is i18n-agnostic
+- Plan 04: CSS marquee via translateX(-50%) on doubled text spans — GPU-composited, zero JS overhead
+- Plan 04: VibeActionSheet bottom padding 80px accounts for BottomNav height
+- Plan 04: handleNavigate opens Google Maps daddr URL in new tab — no external SDK needed for MVP
 
 ### Performance Metrics
 
@@ -38,8 +43,9 @@
 | 01    | 01   | 8min     | 2     | 2     |
 | 01    | 02   | 4min     | 2     | 3     |
 | 01    | 03   | 10min    | 2     | 2     |
+| 01    | 04   | 12min    | 3     | 4     |
 
 ## Last Session
 
-- **Timestamp:** 2026-03-21T08:56:04Z
-- **Stopped At:** Completed 01-02-PLAN.md
+- **Timestamp:** 2026-03-21T09:20:00Z
+- **Stopped At:** Completed 01-04-PLAN.md — Phase 01 fully executed and human-approved
