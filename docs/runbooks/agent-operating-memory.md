@@ -3,7 +3,7 @@
 > Read this file before every work session in `C:\vibecity.live`.
 
 - Last updated: 2026-03-21
-- Current focus: Vercel production for `https://www.vibescity.live` now points to `origin/main` at `67001fd` via deployment `dpl_3fgeDd6AutpTtusBcENPicA8Zh6R`; runtime fallback lanes for visitor bootstrap, directions, hot roads, and websocket are hardened, the OpenFreeMap style assets are now tracked on `main`, and a fresh production browser session loaded cleanly without console errors or failed requests
+- Current focus: Vercel production for `https://www.vibescity.live` now points to `origin/main` at `db0b409` via deployment `dpl_GKUZq21h4fr7NMX6psUHvKgYibtb`; runtime fallback lanes for visitor bootstrap, directions, hot roads, and websocket are hardened, the OpenFreeMap style assets are now tracked on `main`, and fresh production browser sessions load without console errors
 - Canonical skill: `.agents/skills/vibecity-session-handoff/SKILL.md`
 
 ## Start Every Session
@@ -126,10 +126,11 @@
 - Runtime lane cooldowns now live in `src/lib/runtimeLaneAvailability.js`; keep the known-missing `vibecity-api.fly.dev` lanes aligned with real backend capability, not guesswork.
 - Keep the tracked OpenFreeMap style assets on `main`; production currently loads `/map-styles/vibecity-neon.json` directly and a clean release worktree must include it.
 - If fresh production sessions start showing backend noise again, verify with a brand-new browser profile first to rule out stale service worker or cached bundle artifacts before changing the app code.
+- Fresh production verification now shows low-signal `net::ERR_ABORTED` Supabase video requests during detail navigation; treat those as media cancellation/lazy-load follow-up work, not as proof that the backend/runtime lane fix regressed.
 
 ## Current Snapshot
 
-- Focus: production runtime noise on the real `main` baseline was hardened and released. `https://www.vibescity.live` now points to `origin/main@67001fd` through `dpl_3fgeDd6AutpTtusBcENPicA8Zh6R`, with tracked OpenFreeMap styles and runtime cooldown/fallback guards for visitor bootstrap, directions, hot roads, and websocket lanes.
+- Focus: production runtime noise on the real `main` baseline was hardened and released. `https://www.vibescity.live` now points to `origin/main@db0b409` through `dpl_GKUZq21h4fr7NMX6psUHvKgYibtb`, with tracked OpenFreeMap styles and runtime cooldown/fallback guards for visitor bootstrap, directions, hot roads, and websocket lanes.
 - Files touched most recently before this memory file:
   - `public/map-styles/vibecity-dev.json`
   - `public/map-styles/vibecity-neon.json`
@@ -143,14 +144,14 @@
   - `vercel.json`
   - `docs/runbooks/agent-operating-memory.md`
 - Validation already confirmed:
-  - `git ls-remote origin refs/heads/main` returned `67001fd1e5f4e800f864ce00293d930913e49044`.
+  - `git ls-remote origin refs/heads/main` returned `db0b4093ce90a8beaa5b472a503e6026faff40bb`.
   - `bun install --frozen-lockfile` passed in `C:\vibecity.live\.vercel-main-runtime-67001fd`.
   - `npx biome check src/components/map/MapboxContainer.vue src/composables/map/useMapNavigation.js src/services/socketService.js src/services/visitorIdentity.js src/lib/runtimeLaneAvailability.js tests/unit/socketService.spec.js tests/unit/visitorIdentity.spec.js vercel.json public/map-styles/vibecity-dev.json public/map-styles/vibecity-neon.json` passed.
   - `npx vitest run tests/unit/socketService.spec.js tests/unit/visitorIdentity.spec.js` passed.
   - `bun run build` passed in `C:\vibecity.live\.vercel-main-runtime-67001fd` on commit `67001fd`.
-  - `vercel deploy --prod --yes --scope phirawits-projects` from `C:\vibecity.live\.vercel-main-runtime-67001fd` completed and aliased production to `https://www.vibescity.live`.
-  - `vercel inspect https://www.vibescity.live` reports deployment `dpl_3fgeDd6AutpTtusBcENPicA8Zh6R` / `https://vibescity-lctwfhzj2-phirawits-projects.vercel.app`.
-  - Fresh browser verification with Playwright against `https://www.vibescity.live/th` returned title `VibeCity - Chiang Mai Entertainment`, zero console errors, and zero failed requests after load and opening a venue detail.
+  - `vercel deploy --prod --yes --scope phirawits-projects` from `C:\vibecity.live\.vercel-main-runtime-67001fd` completed and aliased production to `https://www.vibescity.live` on current `main`.
+  - `vercel inspect https://www.vibescity.live` reports deployment `dpl_GKUZq21h4fr7NMX6psUHvKgYibtb` / `https://vibescity-8xn5b9eux-phirawits-projects.vercel.app`.
+  - Fresh browser verification with Playwright against `https://www.vibescity.live/th` returned zero console errors after load and when opening a venue detail; the remaining failed requests were `net::ERR_ABORTED` video fetch cancellations from Supabase storage rather than HTTP 4xx/5xx runtime failures.
 - Residual note:
   - Original workspace remains a dirty tree with additional local changes; deployment work this round was executed from clean worktree `C:\vibecity.live\.vercel-main-runtime-67001fd`.
   - `C:\vibecity.live\.vercel-main-707c4f2` still contains local-only `.gitignore` edits and verify screenshots that were intentionally excluded from the production release.
