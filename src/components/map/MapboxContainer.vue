@@ -42,10 +42,18 @@ import { useNeonSignTheme } from "../../composables/map/useNeonSignTheme";
 import { useAudioSystem } from "../../composables/useAudioSystem";
 import { useHaptics } from "../../composables/useHaptics";
 import {
+	getApiV1BaseUrl,
 	getLocalDevMapRendererMode,
 	isFrontendOnlyDevMode,
 	persistLocalDevMapRendererMode,
 } from "../../lib/runtimeConfig";
+import {
+	clearRuntimeLaneUnavailable,
+	isKnownMissingRuntimeLane,
+	isRuntimeLaneUnavailable,
+	markRuntimeLaneUnavailable,
+	RUNTIME_LANES,
+} from "../../lib/runtimeLaneAvailability";
 // useWeather deferred — loaded after map idle (non-blocking)
 import { apiFetch } from "../../services/apiClient";
 import { frontendObservabilityService } from "../../services/frontendObservabilityService";
@@ -114,6 +122,7 @@ const HOT_ROADS_LOW_POWER_INTERVAL_MS = 60000;
 const HOT_ROADS_MAX_INTERVAL_MS = 120000;
 const HOT_ROADS_REQUEST_TIMEOUT_MS = 8000;
 const HOT_ROADS_MIN_ZOOM = 8;
+const API_V1_BASE_URL = getApiV1BaseUrl();
 const SHOULD_FETCH_ROUTE_PROXY =
 	!import.meta.env.DEV ||
 	import.meta.env.VITE_API_PROXY_DEV === "true" ||
@@ -1374,6 +1383,13 @@ const pollHotRoads = async () => {
 		scheduleHotRoadPoll();
 		return;
 	}
+	if (
+		isRuntimeLaneUnavailable(RUNTIME_LANES.hotRoads) ||
+		isKnownMissingRuntimeLane(RUNTIME_LANES.hotRoads, API_V1_BASE_URL)
+	) {
+		scheduleHotRoadPoll();
+		return;
+	}
 
 	const params = new URLSearchParams({ bbox });
 	if (hotRoadSnapshotId.value) {
@@ -1386,12 +1402,16 @@ const pollHotRoads = async () => {
 			timeoutMs: HOT_ROADS_REQUEST_TIMEOUT_MS,
 		});
 		if (!response.ok) {
+			if ([404, 405, 429, 500, 502, 503, 504].includes(response.status)) {
+				markRuntimeLaneUnavailable(RUNTIME_LANES.hotRoads);
+			}
 			throw new Error(String(response.status));
 		}
 		const payload = await response.json().catch(() => null);
 		if (!payload || typeof payload !== "object") {
 			throw new Error("HOT_ROADS_PAYLOAD_INVALID");
 		}
+		clearRuntimeLaneUnavailable(RUNTIME_LANES.hotRoads);
 		hotRoadSnapshotId.value =
 			typeof payload.snapshot_id === "string" ? payload.snapshot_id : "";
 		hotRoadPollFailures.value = 0;
@@ -1413,6 +1433,9 @@ const pollHotRoads = async () => {
 		// Fail silently ใน dev mode
 		if (!import.meta.env.DEV) {
 			hotRoadPollFailures.value = Math.min(3, hotRoadPollFailures.value + 1);
+			if (navigator.onLine) {
+				markRuntimeLaneUnavailable(RUNTIME_LANES.hotRoads);
+			}
 			void frontendObservabilityService.reportFrontendGuardrail(
 				"hot_roads_poll_error",
 				{
@@ -2501,6 +2524,17 @@ const updatePopupUi = (distance, duration) => {
 	}
 };
 
+const clearActiveRouteState = () => {
+	roadDistance.value = null;
+	roadDuration.value = null;
+	hasActiveRoute.value = false;
+	stopRouteTrailAnimation();
+	applySourceData(DISTANCE_LINE_SOURCE_ID, {
+		type: "FeatureCollection",
+		features: [],
+	});
+};
+
 const updateRoadDirections = async () => {
 	// 1. Validate Inputs
 	if (
@@ -2509,26 +2543,16 @@ const updateRoadDirections = async () => {
 		!props.selectedShopCoords ||
 		props.selectedShopCoords.length < 2
 	) {
-		roadDistance.value = null;
-		roadDuration.value = null;
-		hasActiveRoute.value = false;
-		stopRouteTrailAnimation();
-		applySourceData(DISTANCE_LINE_SOURCE_ID, {
-			type: "FeatureCollection",
-			features: [],
-		});
+		clearActiveRouteState();
 		return;
 	}
 
-	if (!SHOULD_FETCH_ROUTE_PROXY) {
-		roadDistance.value = null;
-		roadDuration.value = null;
-		hasActiveRoute.value = false;
-		stopRouteTrailAnimation();
-		applySourceData(DISTANCE_LINE_SOURCE_ID, {
-			type: "FeatureCollection",
-			features: [],
-		});
+	if (
+		!SHOULD_FETCH_ROUTE_PROXY ||
+		isRuntimeLaneUnavailable(RUNTIME_LANES.directionsProxy) ||
+		isKnownMissingRuntimeLane(RUNTIME_LANES.directionsProxy, API_V1_BASE_URL)
+	) {
+		clearActiveRouteState();
 		return;
 	}
 
@@ -2549,7 +2573,10 @@ const updateRoadDirections = async () => {
 		return;
 
 	try {
-		if (!navigator.onLine) return;
+		if (!navigator.onLine) {
+			clearActiveRouteState();
+			return;
+		}
 
 		if (routeAbortController) {
 			routeAbortController.abort();
@@ -2574,20 +2601,17 @@ const updateRoadDirections = async () => {
 		);
 
 		if (!res.ok) {
+			if ([404, 405, 429, 500, 502, 503, 504].includes(res.status)) {
+				markRuntimeLaneUnavailable(RUNTIME_LANES.directionsProxy);
+			}
 			if (!IS_E2E) mapDebugWarn("Route proxy request failed:", res.status);
-			roadDistance.value = null;
-			roadDuration.value = null;
-			hasActiveRoute.value = false;
-			stopRouteTrailAnimation();
-			applySourceData(DISTANCE_LINE_SOURCE_ID, {
-				type: "FeatureCollection",
-				features: [],
-			});
+			clearActiveRouteState();
 			return;
 		}
 
 		const data = await res.json();
 		if (data.routes?.[0]) {
+			clearRuntimeLaneUnavailable(RUNTIME_LANES.directionsProxy);
 			const route = data.routes[0].geometry;
 
 			// Update Map Source
@@ -2618,14 +2642,10 @@ const updateRoadDirections = async () => {
 		if (!IS_E2E) {
 			mapDebugWarn("Route fetch failed", err);
 		}
-		roadDistance.value = null;
-		roadDuration.value = null;
-		hasActiveRoute.value = false;
-		stopRouteTrailAnimation();
-		applySourceData(DISTANCE_LINE_SOURCE_ID, {
-			type: "FeatureCollection",
-			features: [],
-		});
+		if (navigator.onLine) {
+			markRuntimeLaneUnavailable(RUNTIME_LANES.directionsProxy);
+		}
+		clearActiveRouteState();
 	}
 };
 

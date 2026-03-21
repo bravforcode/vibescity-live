@@ -1,4 +1,11 @@
 import { getApiV1BaseUrl } from "../lib/runtimeConfig";
+import {
+	clearRuntimeLaneUnavailable,
+	isKnownMissingRuntimeLane,
+	isRuntimeLaneUnavailable,
+	markRuntimeLaneUnavailable,
+	RUNTIME_LANES,
+} from "../lib/runtimeLaneAvailability";
 
 const VISITOR_ID_KEY = "vibe_visitor_id";
 const VISITOR_TOKEN_KEY = "vibe_visitor_token";
@@ -31,6 +38,21 @@ const createFallbackToken = (visitorId, ttlSeconds = 3600) => {
 	return {
 		token: `${base64UrlEncode(JSON.stringify(fallbackPayload))}.legacy`,
 		expiresAt: fallbackPayload.exp,
+	};
+};
+
+const buildFallbackBootstrapResult = (
+	visitorId,
+	error = null,
+	ttlSeconds = 3600,
+) => {
+	const fallback = createFallbackToken(visitorId, ttlSeconds);
+	setVisitorToken(fallback.token);
+	return {
+		visitorId,
+		visitorToken: fallback.token,
+		expiresAt: fallback.expiresAt,
+		error,
 	};
 };
 
@@ -121,22 +143,31 @@ export const bootstrapVisitor = async ({ forceRefresh = false } = {}) => {
 		import.meta.env.VITE_E2E === "true" ||
 		import.meta.env.VITE_E2E_MAP_REQUIRED === "true" ||
 		import.meta.env.MODE === "e2e";
-	if (isE2E) {
-		const fallback = createFallbackToken(visitorId, 24 * 3600);
-		setVisitorToken(fallback.token);
-		return {
-			visitorId,
-			visitorToken: fallback.token,
-			expiresAt: fallback.expiresAt,
-			error: null,
-		};
-	}
-
 	const v1Base = getApiV1BaseUrl();
 	const legacyBase = v1Base.endsWith("/api/v1")
 		? `${v1Base.slice(0, -3)}`
 		: v1Base.replace("/v1", "");
 	const baseCandidates = [...new Set([legacyBase, v1Base])];
+
+	if (isE2E) {
+		return buildFallbackBootstrapResult(visitorId, null, 24 * 3600);
+	}
+
+	if (isKnownMissingRuntimeLane(RUNTIME_LANES.visitorBootstrap, v1Base)) {
+		markRuntimeLaneUnavailable(RUNTIME_LANES.visitorBootstrap);
+		return buildFallbackBootstrapResult(
+			visitorId,
+			"visitor bootstrap unavailable on this backend",
+		);
+	}
+
+	if (isRuntimeLaneUnavailable(RUNTIME_LANES.visitorBootstrap)) {
+		return buildFallbackBootstrapResult(
+			visitorId,
+			"visitor bootstrap temporarily unavailable",
+		);
+	}
+
 	let lastError = null;
 	let payload = null;
 
@@ -149,6 +180,7 @@ export const bootstrapVisitor = async ({ forceRefresh = false } = {}) => {
 			});
 			if (response.ok) {
 				payload = await response.json();
+				clearRuntimeLaneUnavailable(RUNTIME_LANES.visitorBootstrap);
 				break;
 			}
 			const errorPayload = await response.json().catch(() => ({}));
@@ -164,16 +196,11 @@ export const bootstrapVisitor = async ({ forceRefresh = false } = {}) => {
 
 	if (!payload?.visitor_token) {
 		// Compatibility fallback for older backends without visitor bootstrap.
-		const fallback = createFallbackToken(visitorId);
-		setVisitorToken(fallback.token);
-		return {
-			visitorId,
-			visitorToken: fallback.token,
-			expiresAt: fallback.expiresAt,
-			error: lastError?.message || null,
-		};
+		markRuntimeLaneUnavailable(RUNTIME_LANES.visitorBootstrap);
+		return buildFallbackBootstrapResult(visitorId, lastError?.message || null);
 	}
 
+	clearRuntimeLaneUnavailable(RUNTIME_LANES.visitorBootstrap);
 	setVisitorToken(payload.visitor_token);
 	return {
 		visitorId,

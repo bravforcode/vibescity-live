@@ -1,5 +1,15 @@
 import { ref } from "vue";
+import { getApiV1BaseUrl } from "../../lib/runtimeConfig";
+import {
+	clearRuntimeLaneUnavailable,
+	isKnownMissingRuntimeLane,
+	isRuntimeLaneUnavailable,
+	markRuntimeLaneUnavailable,
+	RUNTIME_LANES,
+} from "../../lib/runtimeLaneAvailability";
 import { apiFetch } from "../../services/apiClient";
+
+const API_V1_BASE_URL = getApiV1BaseUrl();
 
 export function useMapNavigation(map) {
 	const roadDistance = ref(null);
@@ -27,6 +37,11 @@ export function useMapNavigation(map) {
 
 	const fetchRoute = async (start, end, token) => {
 		if (!map.value || !start || !end) return;
+		if (
+			isRuntimeLaneUnavailable(RUNTIME_LANES.directionsProxy) ||
+			isKnownMissingRuntimeLane(RUNTIME_LANES.directionsProxy, API_V1_BASE_URL)
+		)
+			return;
 
 		try {
 			const params = new URLSearchParams({
@@ -44,10 +59,16 @@ export function useMapNavigation(map) {
 					headers: { "X-Mapbox-Token": String(token || "") },
 				},
 			);
-			if (!res.ok) return;
+			if (!res.ok) {
+				if ([404, 405, 429, 500, 502, 503, 504].includes(res.status)) {
+					markRuntimeLaneUnavailable(RUNTIME_LANES.directionsProxy);
+				}
+				return;
+			}
 			const data = await res.json();
 
 			if (data.routes?.[0]) {
+				clearRuntimeLaneUnavailable(RUNTIME_LANES.directionsProxy);
 				const route = data.routes[0];
 				roadDistance.value = route.distance;
 				roadDuration.value = route.duration;
@@ -61,6 +82,9 @@ export function useMapNavigation(map) {
 				}
 			}
 		} catch (e) {
+			if (navigator.onLine) {
+				markRuntimeLaneUnavailable(RUNTIME_LANES.directionsProxy);
+			}
 			console.error("Route fetch failed", e);
 		}
 	};

@@ -1,5 +1,11 @@
 import { ref } from "vue";
 import { getWebSocketUrl } from "../lib/runtimeConfig";
+import {
+	clearRuntimeLaneUnavailable,
+	isRuntimeLaneUnavailable,
+	markRuntimeLaneUnavailable,
+	RUNTIME_LANES,
+} from "../lib/runtimeLaneAvailability";
 
 class SocketService {
 	constructor() {
@@ -13,6 +19,27 @@ class SocketService {
 		this.shouldReconnect = true;
 		this.circuitBreakerTripped = false; // Tracks if we gave up
 		this.wsUrl = ""; // Resolved at connect time
+		this.hasConnectedOnce = false;
+		this.connectedAt = 0;
+	}
+
+	disableRealtimeForCurrentSession() {
+		markRuntimeLaneUnavailable(RUNTIME_LANES.websocket);
+		this.circuitBreakerTripped = true;
+		this.shouldReconnect = false;
+		if (this._retryTimer) {
+			clearTimeout(this._retryTimer);
+			this._retryTimer = null;
+		}
+		if (this.socket) {
+			try {
+				this.socket.close();
+			} catch {
+				// ignore
+			}
+		}
+		this.socket = null;
+		this.isConnected.value = false;
 	}
 
 	/**
@@ -30,6 +57,12 @@ class SocketService {
 			return false;
 		}
 
+		if (isRuntimeLaneUnavailable(RUNTIME_LANES.websocket)) {
+			this.circuitBreakerTripped = true;
+			this.isConnected.value = false;
+			return false;
+		}
+
 		if (this.socket && this.socket.readyState === WebSocket.OPEN) {
 			return true;
 		}
@@ -39,6 +72,7 @@ class SocketService {
 		}
 
 		this.shouldReconnect = true;
+		this.circuitBreakerTripped = false;
 
 		try {
 			if (import.meta.env.DEV) {
@@ -54,6 +88,9 @@ class SocketService {
 			if (import.meta.env.DEV) console.log("✅ VibeStream Connected");
 			this.isConnected.value = true;
 			this.reconnectAttempts = 0;
+			this.hasConnectedOnce = true;
+			this.connectedAt = Date.now();
+			clearRuntimeLaneUnavailable(RUNTIME_LANES.websocket);
 			// Request current online count from server
 			this.sendVibe({ action: "presence:join" });
 			if (this.pendingRoomIds.size > 0) {
@@ -81,13 +118,23 @@ class SocketService {
 
 		this.socket.onclose = () => {
 			if (import.meta.env.DEV) console.log("❌ VibeStream Disconnected");
+			const hadStableConnection =
+				this.hasConnectedOnce || this.isConnected.value;
 			this.isConnected.value = false;
+			if (!hadStableConnection) {
+				this.disableRealtimeForCurrentSession();
+				return;
+			}
 			if (this.shouldReconnect) {
 				this.retryConnection();
 			}
 		};
 
 		this.socket.onerror = () => {
+			if (!this.hasConnectedOnce) {
+				this.disableRealtimeForCurrentSession();
+				return;
+			}
 			if (import.meta.env.DEV)
 				console.warn("⚠️ VibeStream: Temporary connection drop, will retry...");
 		};
@@ -207,6 +254,9 @@ class SocketService {
 			configured: Boolean(this.wsUrl),
 			connected: this.isConnected.value,
 			reconnectAttempts: this.reconnectAttempts,
+			circuitBreakerTripped:
+				this.circuitBreakerTripped ||
+				isRuntimeLaneUnavailable(RUNTIME_LANES.websocket),
 		};
 	}
 }

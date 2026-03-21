@@ -1,54 +1,63 @@
 {
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
-        { "key": "Cross-Origin-Embedder-Policy", "value": "credentialless" },
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(self), payment=(self)" },
-        { "key": "X-DNS-Prefetch-Control", "value": "on" },
-        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://*.supabase.co https://api.dicebear.com https://*.mapbox.com https://docs.mapbox.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co https://*.mapbox.com https://events.mapbox.com https://*.fly.dev https://api.stripe.com https://*.sentry.io https://*.clarity.ms; worker-src 'self' blob:; frame-src https://js.stripe.com; object-src 'none'; base-uri 'self'" }
-      ]
-    }
-  ],
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index.py" },
-    { "source": "/", "destination": "/api/v1/seo/redirect/root" },
-    {
-      "source": "/r/:code([A-Za-z2-7]{7})",
-      "destination": "/api/v1/seo/redirect/venue/:code"
-    },
-    {
-      "source": "/v/:code([A-Z2-7]{7})",
-      "destination": "/api/v1/seo/redirect/venue/:code"
-    },
-    {
-      "source": "/v/:slug",
-      "destination": "/api/v1/seo/redirect/public?path=/v/:slug"
-    },
-    {
-      "source": "/venue/:id",
-      "destination": "/api/v1/seo/redirect/public?path=/venue/:id"
-    },
-    {
-      "source": "/c/:category",
-      "destination": "/api/v1/seo/redirect/public?path=/c/:category"
-    },
-    {
-      "source": "/privacy",
-      "destination": "/api/v1/seo/redirect/public?path=/privacy"
-    },
-    {
-      "source": "/terms",
-      "destination": "/api/v1/seo/redirect/public?path=/terms"
-    },
-    {
-      "source": "/sitemap.xml",
-      "destination": "https://nluuvnttweesnkrmgzsm.supabase.co/functions/v1/seo-sitemap"
-    },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
+	"headers": [
+		{
+			"source": "/(.*)",
+			"headers": [
+				{ "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
+				{ "key": "Cross-Origin-Embedder-Policy", "value": "credentialless" },
+				{ "key": "X-Content-Type-Options", "value": "nosniff" },
+				{ "key": "X-Frame-Options", "value": "DENY" },
+				{
+					"key": "Referrer-Policy",
+					"value": "strict-origin-when-cross-origin"
+				},
+				{
+					"key": "Permissions-Policy",
+					"value": "camera=(), microphone=(), geolocation=(self), payment=(self)"
+				},
+				{ "key": "X-DNS-Prefetch-Control", "value": "on" },
+				{
+					"key": "Content-Security-Policy",
+					"value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://*.supabase.co https://api.dicebear.com https://*.mapbox.com https://docs.mapbox.com; media-src 'self' data: blob: https://*.supabase.co; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co https://*.mapbox.com https://events.mapbox.com https://*.fly.dev wss://*.fly.dev https://api.stripe.com https://*.sentry.io https://*.clarity.ms https://tiles.openfreemap.org https://fonts.openmaptiles.org; worker-src 'self' blob:; frame-src https://js.stripe.com; object-src 'none'; base-uri 'self'"
+				}
+			]
+		}
+	],
+	"rewrites": [
+		{ "source": "/api/(.*)", "destination": "/api/index.py" },
+		{ "source": "/", "destination": "/api/v1/seo/redirect/root" },
+		{
+			"source": "/r/:code([A-Za-z2-7]{7})",
+			"destination": "/api/v1/seo/redirect/venue/:code"
+		},
+		{
+			"source": "/v/:code([A-Z2-7]{7})",
+			"destination": "/api/v1/seo/redirect/venue/:code"
+		},
+		{
+			"source": "/v/:slug",
+			"destination": "/api/v1/seo/redirect/public?path=/v/:slug"
+		},
+		{
+			"source": "/venue/:id",
+			"destination": "/api/v1/seo/redirect/public?path=/venue/:id"
+		},
+		{
+			"source": "/c/:category",
+			"destination": "/api/v1/seo/redirect/public?path=/c/:category"
+		},
+		{
+			"source": "/privacy",
+			"destination": "/api/v1/seo/redirect/public?path=/privacy"
+		},
+		{
+			"source": "/terms",
+			"destination": "/api/v1/seo/redirect/public?path=/terms"
+		},
+		{
+			"source": "/sitemap.xml",
+			"destination": "https://nluuvnttweesnkrmgzsm.supabase.co/functions/v1/seo-sitemap"
+		},
+		{ "source": "/(.*)", "destination": "/index.html" }
+	]
 }
