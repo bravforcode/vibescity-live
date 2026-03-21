@@ -405,17 +405,20 @@ export function useAppLogic() {
 	const handleMarkerClick = (shop) => {
 		if (!shop) {
 			activeShopId.value = null;
+			selectedShop.value = null;
 			return;
 		}
 		selectFeedback();
 		if (activeShopId.value == shop.id) {
 			activeShopId.value = null;
+			selectedShop.value = null;
 			return;
 		}
 		applyShopSelection(shop.id, false, {
 			trackEvent: true,
 			trackEventType: "view_venue",
 		});
+		selectedShop.value = shop;
 		socketService.joinRoom(shop.id);
 	};
 
