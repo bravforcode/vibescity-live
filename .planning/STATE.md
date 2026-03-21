@@ -21,6 +21,9 @@
 
 ### Decisions
 
+- Plan 02: --neon-color CSS var set via style.setProperty — avoids class explosion across 14+ categories
+- Plan 02: Static box-shadow only on .neon-sign-marker — no animation on box-shadow prevents known 100% CPU compositing bug
+- Plan 02: lottie-web removed from useMapMarkers.js — 80x concurrent SVG animations was primary CPU drain
 - Plan 01: fadeDuration:0 eliminates white-flash — complete elimination (not a small value) is correct for instant-feel map
 - Plan 01: antialias conditioned on hardwareConcurrency > 4 with ?? 4 fallback — defaults to disabled on unknown devices (safer)
 - Plan 01: neon roads deferred to map.once('idle') not 'style.load' — 3.9MB GeoJSON parse must not block map ready signal
@@ -33,9 +36,10 @@
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
 | 01    | 01   | 8min     | 2     | 2     |
+| 01    | 02   | 4min     | 2     | 3     |
 | 01    | 03   | 10min    | 2     | 2     |
 
 ## Last Session
 
-- **Timestamp:** 2026-03-21T09:00:00Z
-- **Stopped At:** Completed 01-01-PLAN.md
+- **Timestamp:** 2026-03-21T08:56:04Z
+- **Stopped At:** Completed 01-02-PLAN.md
