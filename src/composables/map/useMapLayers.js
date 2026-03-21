@@ -7,37 +7,41 @@ export function useMapLayers(map) {
 
 	const addNeonRoads = () => {
 		if (!map.value) return;
-		if (map.value.getSource("neon-roads")) return;
+		if (map.value.getSource("neon-roads")) return; // already added
 
-		try {
-			map.value.addSource("neon-roads", {
-				type: "geojson",
-				data: "/data/chiangmai-main-roads-lanes.geojson",
-			});
-			map.value.addLayer({
-				id: "neon-roads-outer",
-				type: "line",
-				source: "neon-roads",
-				paint: {
-					"line-color": "#06b6d4",
-					"line-width": ["interpolate", ["linear"], ["zoom"], 12, 1, 16, 4],
-					"line-opacity": 0.15,
-					"line-blur": 5,
-				},
-			});
-			map.value.addLayer({
-				id: "neon-roads-inner",
-				type: "line",
-				source: "neon-roads",
-				paint: {
-					"line-color": "#22d3ee",
-					"line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 16, 1.5],
-					"line-opacity": 0.6,
-				},
-			});
-		} catch (e) {
-			console.warn("Neon roads setup failed:", e);
-		}
+		map.value.once('idle', () => {
+			if (!map.value) return;
+			if (map.value.getSource("neon-roads")) return; // double-check after idle
+			try {
+				map.value.addSource("neon-roads", {
+					type: "geojson",
+					data: "/data/chiangmai-main-roads-lanes.geojson",
+				});
+				map.value.addLayer({
+					id: "neon-roads-outer",
+					type: "line",
+					source: "neon-roads",
+					paint: {
+						"line-color": "#06b6d4",
+						"line-width": ["interpolate", ["linear"], ["zoom"], 12, 1, 16, 4],
+						"line-opacity": 0.15,
+						"line-blur": 5,
+					},
+				});
+				map.value.addLayer({
+					id: "neon-roads-inner",
+					type: "line",
+					source: "neon-roads",
+					paint: {
+						"line-color": "#22d3ee",
+						"line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 16, 1.5],
+						"line-opacity": 0.6,
+					},
+				});
+			} catch (e) {
+				console.warn("Neon roads setup failed:", e);
+			}
+		});
 	};
 
 	const loadMapImages = (mapInstance) => {

@@ -3,7 +3,7 @@
 <script setup>
 import { DEFAULT_CITY } from "@/config/cityConfig";
 import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
+import "maplibre-gl/dist/maplibre-gl.css";
 import {
   computed,
   nextTick,
@@ -33,6 +33,7 @@ import { createPopupHTML } from "../../utils/mapRenderer";
 import { calculateDistance } from "../../utils/shopUtils";
 // import { WeatherLayer } from "./layers/WeatherLayer"; // Moved
 import LiveActivityChips from "./LiveActivityChips.vue";
+import YouAreHere from "../ui/YouAreHere.vue";
 
 const DARK_STYLE = "mapbox://styles/phirrr/cmlktq68u002601se295iazmm";
 const LIGHT_STYLE = "mapbox://styles/mapbox/light-v11";
@@ -1887,6 +1888,7 @@ const handleMapMoveEndForWeather = () => {
 };
 
 const handleMapStyleLoad = () => {
+  setCyberpunkAtmosphere(); // Ensure dark background on every style reload
   resetTrafficDashState();
   applyFogSettings();
   syncBuildingInfoPopupFromSelection();
@@ -2377,6 +2379,12 @@ defineExpose({
       v-if="prefs.isLiveChipsEnabled && liveActivityChips.length"
       :chips="liveActivityChips"
       class="absolute top-20 left-3 z-[25] pointer-events-none"
+    />
+
+    <YouAreHere
+      v-if="props.userLocation && props.userLocation.length === 2 && isMapReady"
+      :visible="true"
+      style="left: 50%; top: 65%;"
     />
 
     <!-- ✅ Token Error Overlay -->
