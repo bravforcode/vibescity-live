@@ -163,7 +163,7 @@
     "pinia-plugin-persistedstate": "^4.7.1",
     "playwright": "^1.58.2",
     "postcss": "^8.5.6",
-    "rollup-plugin-visualizer": "^6.0.5",
+    "rollup-plugin-visualizer": "^7.0.1",
     "storybook": "^10.2.0",
     "storybook-vue3-rsbuild": "^3.2.2",
     "tailwindcss": "^3.4.19",
