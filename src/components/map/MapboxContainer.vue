@@ -75,6 +75,7 @@ import { isExpectedAbortError } from "../../utils/networkErrorUtils";
 import { calculateDistance, calculateShopStatus } from "../../utils/shopUtils";
 import LiveActivityChips from "./LiveActivityChips.vue";
 import MapLoadingSkeleton from "./MapLoadingSkeleton.vue";
+import YouAreHere from "../ui/YouAreHere.vue";
 
 // MapLibre GL does not use mapbox:// style URLs — use env-driven or local neon fallback
 const NEON_STYLE_URL = isFrontendOnlyDevMode()
@@ -4081,6 +4082,7 @@ const handleTerrainSourceOnStyleLoad = () => {
 };
 
 const handleMapStyleLoad = () => {
+	setCyberpunkAtmosphere();
 	handleTerrainSourceOnStyleLoad();
 	resetTrafficDashState();
 	applyFogSettings();
@@ -4879,6 +4881,12 @@ defineExpose({
       v-if="prefs.isLiveChipsEnabled && liveActivityChips.length"
       :chips="liveActivityChips"
       class="absolute top-20 left-3 z-[25] pointer-events-none"
+    />
+
+    <YouAreHere
+      v-if="props.userLocation && props.userLocation.length === 2 && isMapReady"
+      :visible="true"
+      style="left: 50%; top: 65%;"
     />
 
     <!-- ✅ Token Error Overlay -->
