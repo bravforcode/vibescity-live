@@ -4,7 +4,6 @@ import { createPinia } from "pinia";
 import { createApp } from "vue";
 import { vTestId } from "./directives/testid.js";
 
-
 import "./assets/css/main.postcss";
 import App from "./App.vue";
 import i18n from "./i18n";
@@ -14,6 +13,7 @@ const app = createApp(App);
 
 // ✅ Microsoft Clarity
 import Clarity from "@microsoft/clarity";
+
 const clarityId = import.meta.env.VITE_CLARITY_PROJECT_ID;
 if (clarityId) {
 	Clarity.init(clarityId);
@@ -76,7 +76,6 @@ if (sentryDsn) {
 	});
 }
 
-
 app.use(createPinia());
 app.use(i18n);
 app.use(VueQueryPlugin, vueQueryOptions);
@@ -86,9 +85,40 @@ app.mount("#app");
 // ✅ Register Service Worker for PWA
 if ("serviceWorker" in navigator) {
 	window.addEventListener("load", () => {
+		let refreshing = false;
+
+		navigator.serviceWorker.addEventListener("controllerchange", () => {
+			if (refreshing) return;
+			refreshing = true;
+			window.location.reload();
+		});
+
 		navigator.serviceWorker
 			.register("/sw.js")
 			.then((registration) => {
+				const activateWorker = (worker) => {
+					if (worker) {
+						worker.postMessage({ type: "SKIP_WAITING" });
+					}
+				};
+
+				if (registration.waiting) {
+					activateWorker(registration.waiting);
+				}
+
+				registration.addEventListener("updatefound", () => {
+					const worker = registration.installing;
+					if (!worker) return;
+					worker.addEventListener("statechange", () => {
+						if (
+							worker.state === "installed" &&
+							navigator.serviceWorker.controller
+						) {
+							activateWorker(worker);
+						}
+					});
+				});
+
 				if (import.meta.env.DEV) {
 					console.log("✅ SW registered:", registration.scope);
 				}

@@ -1,104 +1,148 @@
 // Service Worker for VibeCity.live
-// Feature #24: Advanced PWA Caching (Workbox)
-importScripts('https://storage.googleapis.com/workbox-cdn/releases/6.4.1/workbox-sw.js');
+// Versioned caches prevent stale app shells from serving removed chunks after deploys.
+importScripts(
+	"https://storage.googleapis.com/workbox-cdn/releases/6.4.1/workbox-sw.js",
+);
+
+const CACHE_PREFIX = "vibecity-ui-redesign-20260321";
+const CACHE_NAMES = {
+	api: `${CACHE_PREFIX}-api-v1`,
+	data: `${CACHE_PREFIX}-data-v1`,
+	fonts: `${CACHE_PREFIX}-fonts-v1`,
+	images: `${CACHE_PREFIX}-images-v1`,
+	mapbox: `${CACHE_PREFIX}-mapbox-v1`,
+	navigation: `${CACHE_PREFIX}-nav-v1`,
+};
+
+const ACTIVE_CACHE_NAMES = new Set(Object.values(CACHE_NAMES));
+
+self.addEventListener("message", (event) => {
+	if (event?.data?.type === "SKIP_WAITING") {
+		self.skipWaiting();
+	}
+});
+
+self.addEventListener("activate", (event) => {
+	event.waitUntil(
+		(async () => {
+			const keys = await caches.keys();
+			await Promise.all(
+				keys.map((key) =>
+					ACTIVE_CACHE_NAMES.has(key) ? Promise.resolve() : caches.delete(key),
+				),
+			);
+			await self.clients.claim();
+		})(),
+	);
+});
 
 if (workbox) {
-  console.log('[SW] Workbox loaded successfully');
+	workbox.core.skipWaiting();
+	workbox.core.clientsClaim();
+	workbox.precaching.cleanupOutdatedCaches();
+	workbox.precaching.precacheAndRoute(self.__WB_MANIFEST || []);
 
-  // Skip waiting and claim clients for instant takeover
-  workbox.core.skipWaiting();
-  workbox.core.clientsClaim();
+	const cacheable200 = new workbox.cacheableResponse.CacheableResponsePlugin({
+		statuses: [200],
+	});
 
-  // 1. Mapbox Vector Tiles (Cache First - optimized for offline/repeat view)
-  workbox.routing.registerRoute(
-    ({ url }) =>
-      url.origin === 'https://api.mapbox.com' ||
-      url.origin === 'https://events.mapbox.com',
-    new workbox.strategies.CacheFirst({
-      cacheName: 'mapbox-tiles',
-      plugins: [
-        new workbox.expiration.ExpirationPlugin({
-          maxEntries: 1000,
-          maxAgeSeconds: 30 * 24 * 60 * 60, // 30 Days
-        }),
-        new workbox.cacheableResponse.CacheableResponsePlugin({
-          statuses: [0, 200],
-        }),
-      ],
-    })
-  );
+	const shortLived = new workbox.expiration.ExpirationPlugin({
+		maxEntries: 60,
+		maxAgeSeconds: 24 * 60 * 60,
+	});
 
-  // 2. Shop Metadata (Stale While Revalidate - instant load + background update)
-  workbox.routing.registerRoute(
-    ({ url }) => url.pathname.endsWith('.csv') || url.pathname.endsWith('.json'),
-    new workbox.strategies.StaleWhileRevalidate({
-      cacheName: 'vibe-data-v1',
-    })
-  );
+	const longLived = new workbox.expiration.ExpirationPlugin({
+		maxEntries: 300,
+		maxAgeSeconds: 30 * 24 * 60 * 60,
+	});
 
-  // 3. Static Assets (Fonts & Images)
-  workbox.routing.registerRoute(
-    ({ request }) =>
-      request.destination === 'font' || request.destination === 'image',
-    new workbox.strategies.CacheFirst({
-      cacheName: 'vibe-static-v1',
-      plugins: [
-        new workbox.expiration.ExpirationPlugin({
-          maxEntries: 50,
-          maxAgeSeconds: 60 * 60 * 24 * 30, // 30 Days
-        }),
-      ],
-    })
-  );
+	workbox.routing.registerRoute(
+		({ url }) =>
+			url.pathname.endsWith(".csv") || url.pathname.endsWith(".json"),
+		new workbox.strategies.StaleWhileRevalidate({
+			cacheName: CACHE_NAMES.data,
+			plugins: [cacheable200, shortLived],
+		}),
+	);
 
-  // 4. App Core (Navigation & Scripts)
-  workbox.routing.registerRoute(
-    ({ request }) => request.mode === 'navigate' || request.destination === 'script',
-    new workbox.strategies.NetworkFirst({
-      cacheName: 'vibe-core-v1',
-    })
-  );
+	workbox.routing.registerRoute(
+		({ url }) =>
+			url.origin === "https://api.mapbox.com" ||
+			url.origin === "https://events.mapbox.com",
+		new workbox.strategies.CacheFirst({
+			cacheName: CACHE_NAMES.mapbox,
+			plugins: [cacheable200, longLived],
+		}),
+	);
 
+	workbox.routing.registerRoute(
+		({ request, url }) =>
+			request.destination === "font" ||
+			url.origin === "https://fonts.gstatic.com" ||
+			url.origin === "https://fonts.googleapis.com",
+		new workbox.strategies.CacheFirst({
+			cacheName: CACHE_NAMES.fonts,
+			plugins: [cacheable200, longLived],
+		}),
+	);
+
+	workbox.routing.registerRoute(
+		({ request, url }) =>
+			request.destination === "image" &&
+			(url.origin === self.location.origin ||
+				url.origin.includes("supabase.co")),
+		new workbox.strategies.StaleWhileRevalidate({
+			cacheName: CACHE_NAMES.images,
+			fetchOptions: { mode: "cors", credentials: "omit" },
+			plugins: [cacheable200, longLived],
+		}),
+	);
+
+	// Always prefer a fresh shell so browsers do not keep executing removed chunks.
+	workbox.routing.registerRoute(
+		({ request }) => request.mode === "navigate",
+		new workbox.strategies.NetworkFirst({
+			cacheName: CACHE_NAMES.navigation,
+			networkTimeoutSeconds: 3,
+			plugins: [cacheable200, shortLived],
+		}),
+	);
+
+	// Do not cache JS bundles in the service worker. Immutable asset caching is handled
+	// by the browser/Vercel, which avoids stale chunk 404s across deploys.
+	workbox.routing.setDefaultHandler(new workbox.strategies.NetworkOnly());
 } else {
-  console.error('[SW] Workbox failed to load');
+	console.error("[SW] Workbox failed to load");
 }
 
-// ---------------------------------------------------------
-// ✅ Background Sync & Notifications (Legacy Support)
-// ---------------------------------------------------------
-
-self.addEventListener('sync', (event) => {
-  if (event.tag === 'sync-favorites') {
-    event.waitUntil(syncFavorites());
-  }
+self.addEventListener("sync", (event) => {
+	if (event.tag === "sync-favorites") {
+		event.waitUntil(Promise.resolve());
+	}
 });
 
-async function syncFavorites() {
-  console.log('[SW] Syncing favorites...');
-}
+self.addEventListener("push", (event) => {
+	const data = event.data?.json() || {};
+	const options = {
+		body: data.body || "Check out what's happening!",
+		icon: "/Vlive.svg",
+		badge: "/Vlive.svg",
+		vibrate: [100, 50, 100],
+		data: { url: data.url || "/" },
+		actions: [
+			{ action: "open", title: "Open" },
+			{ action: "dismiss", title: "Dismiss" },
+		],
+	};
 
-// Push notifications
-self.addEventListener('push', (event) => {
-  const data = event.data?.json() || {};
-  const options = {
-    body: data.body || "Check out what's happening!",
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/badge-72x72.png',
-    vibrate: [100, 50, 100],
-    data: { url: data.url || '/' },
-    actions: [
-      { action: 'open', title: 'Open' },
-      { action: 'dismiss', title: 'Dismiss' }
-    ]
-  };
-  event.waitUntil(
-    self.registration.showNotification(data.title || 'VibeCity', options)
-  );
+	event.waitUntil(
+		self.registration.showNotification(data.title || "VibeCity", options),
+	);
 });
 
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  if (event.action === 'open' || !event.action) {
-    event.waitUntil(clients.openWindow(event.notification.data.url));
-  }
+self.addEventListener("notificationclick", (event) => {
+	event.notification.close();
+	if (event.action === "open" || !event.action) {
+		event.waitUntil(clients.openWindow(event.notification.data?.url || "/"));
+	}
 });

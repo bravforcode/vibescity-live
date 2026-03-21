@@ -43,7 +43,9 @@ export const fetchRealTimeEvents = async () => {
 		if (error) throw error;
 		return (data || []).map(normalizeEvent);
 	} catch (error) {
-		console.error("Supabase Event fetching error:", error);
+		if (import.meta.env.DEV) {
+			console.error("Supabase Event fetching error:", error);
+		}
 		return [];
 	}
 };
