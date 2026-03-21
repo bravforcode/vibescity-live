@@ -3,7 +3,7 @@
 > Read this file before every work session in `C:\vibecity.live`.
 
 - Last updated: 2026-03-21
-- Current focus: Vercel production for `https://www.vibescity.live` now points to `origin/main` at `db0b409` via deployment `dpl_GKUZq21h4fr7NMX6psUHvKgYibtb`; runtime fallback lanes for visitor bootstrap, directions, hot roads, and websocket are hardened, the OpenFreeMap style assets are now tracked on `main`, and fresh production browser sessions load without console errors
+- Current focus: Vercel production for `https://www.vibescity.live` now points at `origin/main@b930d36` through deployment `dpl_FyAcSWNoJDLDt8wcFGjEjNFP3dMH`; the production-safe runtime hardening is still intact and the latest local neon UI sync is live, including `VibeBanner`, neon sign markers, `YouAreHere`, and `VibeActionSheet`
 - Canonical skill: `.agents/skills/vibecity-session-handoff/SKILL.md`
 
 ## Start Every Session
@@ -39,7 +39,6 @@
 
 - `rsbuild.config.ts`
 - `public/map-styles/vibecity-dev.json`
-- `public/map-styles/vibecity-neon.json`
 - `src/lib/runtimeConfig.js`
 - `src/main.js`
 - `src/services/visitorIdentity.js`
@@ -104,16 +103,6 @@
   - first settle on a not-yet-opened venue may open detail once
   - repeated settles on the same venue should not reopen automatically
 - Keep giant-pin aggregation tied to `MAP_CONFIG.zoom.giantPin.aggregate.max`; avoid hardcoded zoom caps in map container logic.
-- Thailand data baseline for production now includes:
-  - foreign-row quarantine via polygon curation: `91,062` rows soft-deleted (`deleted_at` + `is_deleted`)
-  - coverage-seed injection: `2,657` active anchors (`38` district + `2,619` subdistrict)
-  - post-injection active rows: `96,643`
-- Use the curation/injection scripts for future reruns and rollback:
-  - `scripts/curate-thailand-production-dataset.mjs`
-  - `scripts/inject-thailand-admin-coverage.mjs`
-  - `scripts/report-thailand-admin-gaps.mjs`
-  - `scripts/reports/thailand-admin-injection.json`
-  - `scripts/reports/thailand-admin-gaps-after-injection.json`
 - Treat the default localhost Chromium lane as solved: it should enter dev-safe preview mode with zero WebGL, HMR, and forced-reflow console noise.
 - If raw renderer investigation resumes, do it only in the explicit WebGL opt-in lane or a minimal upstream repro; do not regress the preview-first default.
 - If HMR is ever served through another origin or reverse proxy, use `RSBUILD_HMR_HOST` and `RSBUILD_HMR_PORT` as explicit overrides instead of hardcoding repo defaults.
@@ -121,41 +110,43 @@
 - If deploying while `C:\vibecity.live` is dirty, build and deploy from a fresh tracked-only worktree of `origin/main` instead of the root workspace.
 - `scripts/ci/check-source-i18n-hardcoded.mjs` now exists on `main` and merges both JSON locales plus inline locale keys from `src/i18n.js`; if it fails again, inspect missing source keys before touching locale parity logic.
 - `.vercel/` is now ignored on `main`; keep Vercel metadata local-only.
-- Production should be promoted only from a clean worktree linked to the real Vercel project `vibecity`; an unlinked worktree can cause Vercel to auto-create a separate project from the folder name.
-- Keep checking browser-visible output after each production deploy; `HTTP 200` alone was not enough to catch stale alias drift.
-- Runtime lane cooldowns now live in `src/lib/runtimeLaneAvailability.js`; keep the known-missing `vibecity-api.fly.dev` lanes aligned with real backend capability, not guesswork.
-- Keep the tracked OpenFreeMap style assets on `main`; production currently loads `/map-styles/vibecity-neon.json` directly and a clean release worktree must include it.
-- If fresh production sessions start showing backend noise again, verify with a brand-new browser profile first to rule out stale service worker or cached bundle artifacts before changing the app code.
-- Fresh production verification now shows low-signal `net::ERR_ABORTED` Supabase video requests during detail navigation; treat those as media cancellation/lazy-load follow-up work, not as proof that the backend/runtime lane fix regressed.
+- Production should be promoted only from a clean worktree linked to the real Vercel project `vibescity`; an unlinked worktree can cause Vercel to auto-create a separate project from the folder name.
+- Keep checking browser-visible output after each production deploy; `HTTP 200` alone was not enough to catch stale alias drift or missing local-only UI sync.
+- Keep `public/map-styles/vibecity-neon.json` and `public/map-styles/vibecity-dev.json` tracked; if either disappears, production will silently fall back to `index.html` and MapLibre will fail again.
+- If `vibecity-api.fly.dev` gains real support for `visitor/bootstrap`, `proxy/mapbox-directions`, or `hot-roads`, remove the host entry from `src/lib/runtimeLaneAvailability.js` and re-verify the live browser behavior before re-enabling those lanes.
+- Current non-blocking production noise to watch next:
+  - headless Chromium may still emit `GL_CLOSE_PATH_NV` / `ReadPixels` warnings during automation; treat those as browser/GPU noise unless they reproduce in user-visible sessions
+  - some Supabase video requests still end with `net::ERR_FAILED` or `net::ERR_ABORTED` when cards/media swap mid-load; confirm in a real user session before treating that as a production bug
 
 ## Current Snapshot
 
-- Focus: production runtime noise on the real `main` baseline was hardened and released. `https://www.vibescity.live` now points to `origin/main@db0b409` through `dpl_GKUZq21h4fr7NMX6psUHvKgYibtb`, with tracked OpenFreeMap styles and runtime cooldown/fallback guards for visitor bootstrap, directions, hot roads, and websocket lanes.
+- Focus: the latest local neon UI snapshot has been integrated onto the production-safe `main` baseline and is now live. `https://www.vibescity.live` resolves to `dpl_FyAcSWNoJDLDt8wcFGjEjNFP3dMH` / `https://vibescity-3dd0vaom9-phirawits-projects.vercel.app`.
 - Files touched most recently before this memory file:
-  - `public/map-styles/vibecity-dev.json`
-  - `public/map-styles/vibecity-neon.json`
   - `src/components/map/MapboxContainer.vue`
-  - `src/composables/map/useMapNavigation.js`
-  - `src/lib/runtimeLaneAvailability.js`
-  - `src/services/socketService.js`
-  - `src/services/visitorIdentity.js`
-  - `tests/unit/socketService.spec.js`
-  - `tests/unit/visitorIdentity.spec.js`
+  - `src/components/ui/VibeActionSheet.vue`
+  - `src/components/ui/VibeBanner.vue`
+  - `src/components/ui/YouAreHere.vue`
+  - `src/composables/map/useMapCore.js`
+  - `src/composables/map/useMapLayers.js`
+  - `src/composables/map/useMapMarkers.js`
+  - `src/styles/map-atmosphere.css`
+  - `src/utils/mapRenderer.js`
+  - `src/views/HomeView.vue`
+  - `src/i18n.js`
   - `vercel.json`
   - `docs/runbooks/agent-operating-memory.md`
 - Validation already confirmed:
-  - `git ls-remote origin refs/heads/main` returned `db0b4093ce90a8beaa5b472a503e6026faff40bb`.
-  - `bun install --frozen-lockfile` passed in `C:\vibecity.live\.vercel-main-runtime-67001fd`.
-  - `npx biome check src/components/map/MapboxContainer.vue src/composables/map/useMapNavigation.js src/services/socketService.js src/services/visitorIdentity.js src/lib/runtimeLaneAvailability.js tests/unit/socketService.spec.js tests/unit/visitorIdentity.spec.js vercel.json public/map-styles/vibecity-dev.json public/map-styles/vibecity-neon.json` passed.
-  - `npx vitest run tests/unit/socketService.spec.js tests/unit/visitorIdentity.spec.js` passed.
-  - `bun run build` passed in `C:\vibecity.live\.vercel-main-runtime-67001fd` on commit `67001fd`.
-  - `vercel deploy --prod --yes --scope phirawits-projects` from `C:\vibecity.live\.vercel-main-runtime-67001fd` completed and aliased production to `https://www.vibescity.live` on current `main`.
-  - `vercel inspect https://www.vibescity.live` reports deployment `dpl_GKUZq21h4fr7NMX6psUHvKgYibtb` / `https://vibescity-8xn5b9eux-phirawits-projects.vercel.app`.
-  - Fresh browser verification with Playwright against `https://www.vibescity.live/th` returned zero console errors after load and when opening a venue detail; the remaining failed requests were `net::ERR_ABORTED` video fetch cancellations from Supabase storage rather than HTTP 4xx/5xx runtime failures.
+  - `git ls-remote origin refs/heads/main` now resolves to `b930d36f393da111cad995d44347b16a03c698eb`.
+  - `npx biome check` on the 11 local UI sync files passes with one intentional warning for marker `z-index: ... !important`.
+  - `bun run build` passed in `C:\vibecity.live\.vercel-main-localui-8b159cc`.
+  - `git push origin HEAD:main` promoted the integrated snapshot from clean worktree branch `release/local-ui-sync-20260321` to `origin/main`.
+  - `vercel deploy --prod --yes --scope phirawits-projects` from `C:\vibecity.live\.vercel-main-localui-8b159cc` completed and aliased production to `https://www.vibescity.live`.
+  - `vercel inspect https://www.vibescity.live` now reports deployment `dpl_FyAcSWNoJDLDt8wcFGjEjNFP3dMH` / `https://vibescity-3dd0vaom9-phirawits-projects.vercel.app`.
+  - Fresh Playwright browser verification on production shows the local neon UI sync live: marquee `VibeBanner`, neon sign map markers, `YOU ARE HERE`, popup card actions, and `VibeActionSheet` buttons (`claim_vibe`, `take_me_there`) all render on `https://www.vibescity.live/th`.
 - Residual note:
-  - Original workspace remains a dirty tree with additional local changes; deployment work this round was executed from clean worktree `C:\vibecity.live\.vercel-main-runtime-67001fd`.
-  - `C:\vibecity.live\.vercel-main-707c4f2` still contains local-only `.gitignore` edits and verify screenshots that were intentionally excluded from the production release.
-  - A separate Vercel project named `.vercel-main-707c4f2` was created by an earlier unlinked deploy attempt; ignore it for release work and keep using the `vibecity` project.
+  - Original workspace remains a dirty tree; deployment work this round was executed from clean worktree `C:\vibecity.live\.vercel-main-localui-8b159cc`.
+  - Local `bun install --frozen-lockfile` in that worktree hit intermittent `EBUSY` cache-copy failures, but existing dependencies were sufficient for local build and Vercel’s install/build completed successfully.
+  - Fresh Playwright production verification still logged two non-blocking Supabase video `net::ERR_FAILED` requests for `ff1211bab14dd7f6aff392d09a0d15cec668081b.mp4` after venue detail opened; UI remained functional.
 
 ## Update Protocol
 
