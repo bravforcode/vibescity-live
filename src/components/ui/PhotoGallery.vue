@@ -4,6 +4,11 @@
  * Feature #22: Photo Gallery Light Box
  */
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import {
+	getUsableMediaUrl,
+	markMediaElementFailed,
+	markMediaUrlFailed,
+} from "../../utils/mediaSourceGuard.js";
 
 const props = defineProps({
 	images: {
@@ -26,6 +31,9 @@ const currentIndex = ref(props.initialIndex);
 const failedImageIndexes = ref(new Set());
 const FALLBACK_IMAGE =
 	"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 500'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%230b1020'/><stop offset='1' stop-color='%2311182c'/></linearGradient></defs><rect width='800' height='500' fill='url(%23g)'/></svg>";
+const normalizedImages = computed(() =>
+	props.images.map((image) => getUsableMediaUrl(image)),
+);
 
 watch(
 	() => props.initialIndex,
@@ -46,7 +54,7 @@ watch(
 const currentImage = computed(() => {
 	if (!props.images.length) return null;
 	if (failedImageIndexes.value.has(currentIndex.value)) return FALLBACK_IMAGE;
-	return props.images[currentIndex.value] || FALLBACK_IMAGE;
+	return normalizedImages.value[currentIndex.value] || FALLBACK_IMAGE;
 });
 
 const isVideo = (url) => {
@@ -63,6 +71,34 @@ const markImageFailed = (index) => {
 	const next = new Set(failedImageIndexes.value);
 	next.add(index);
 	failedImageIndexes.value = next;
+};
+
+const handleMediaError = (event, index) => {
+	if (!Number.isInteger(index)) return;
+	const source = normalizedImages.value[index] || props.images[index];
+	if (isVideo(source)) {
+		if (!markMediaElementFailed(event, source)) return;
+	} else {
+		markMediaUrlFailed(source);
+	}
+	markImageFailed(index);
+};
+
+const getThumbnailSource = (index) => {
+	if (failedImageIndexes.value.has(index)) return FALLBACK_IMAGE;
+	const source = normalizedImages.value[index] || props.images[index] || "";
+	if (!source || isVideo(source)) return FALLBACK_IMAGE;
+	return source;
+};
+
+const isVideoIndex = (index) =>
+	isVideo(normalizedImages.value[index] || props.images[index]);
+
+const handleThumbnailError = (index) => {
+	if (isVideoIndex(index)) return;
+	const source = normalizedImages.value[index] || props.images[index];
+	markMediaUrlFailed(source);
+	markImageFailed(index);
 };
 
 const next = () => {
@@ -177,7 +213,8 @@ onUnmounted(() => {
               controls
               autoplay
               playsinline
-              @error="markImageFailed(currentIndex)"
+              preload="metadata"
+              @error="handleMediaError($event, currentIndex)"
             />
             <img
               v-else
@@ -185,7 +222,7 @@ onUnmounted(() => {
               :src="currentImage"
               class="gallery-image max-h-[80vh]"
               :alt="`Gallery image ${currentIndex + 1}`"
-              @error="markImageFailed(currentIndex)"
+              @error="handleMediaError($event, currentIndex)"
             />
           </Transition>
         </div>
@@ -202,28 +239,24 @@ onUnmounted(() => {
             @click="currentIndex = i"
             :aria-label="`View image ${i + 1}`"
             :class="[
-              'w-12 h-12 rounded-lg overflow-hidden border-2 transition',
+              'relative w-12 h-12 rounded-lg overflow-hidden border-2 transition',
               i === currentIndex
                 ? 'border-white scale-110'
                 : 'border-transparent opacity-60 hover:opacity-100',
             ]"
           >
-            <video
-              v-if="isVideo(failedImageIndexes.has(i) ? FALLBACK_IMAGE : img)"
-              :src="img"
-              class="w-full h-full object-cover"
-              muted
-              playsinline
-              preload="metadata"
-              @error="markImageFailed(i)"
-            />
             <img
-              v-else
-              :src="failedImageIndexes.has(i) ? FALLBACK_IMAGE : img"
+              :src="getThumbnailSource(i)"
               alt="Thumbnail image"
               class="w-full h-full object-cover"
-              @error="markImageFailed(i)"
+              @error="handleThumbnailError(i)"
             />
+            <span
+              v-if="isVideoIndex(i)"
+              class="absolute inset-x-1 bottom-1 rounded bg-black/70 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white"
+            >
+              Video
+            </span>
           </button>
         </div>
       </div>

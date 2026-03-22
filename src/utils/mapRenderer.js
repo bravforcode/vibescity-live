@@ -80,7 +80,6 @@ const sanitizeUrl = (url) => {
 
 const sanitizeId = (value) =>
 	String(value ?? "").replace(/[^a-zA-Z0-9_-]/g, "");
-const VIDEO_EXT_RE = /\.(mp4|webm|ogg|mov|m3u8)(?:\?.*)?$/i;
 
 const COIN_FLIP_HTML = `<div class="vibe-coin-flip"><div class="vibe-coin-flip-inner">🪙</div></div>`;
 
@@ -159,16 +158,9 @@ export const createPopupHTML = ({
 
 	const openHours = item.open_hours || item.Open || "";
 	const safeOpenHours = escapeHtml(openHours);
-	const safeVideoUrl = sanitizeUrl(
-		media.videoUrl || item.videoUrl || item.video_url || item.Video_URL,
-	);
 	const safeImageUrl = sanitizeUrl(
 		media.primaryImage || item.Image_URL1 || item.cover_image,
 	);
-	const hasRenderableVideo =
-		Boolean(safeVideoUrl) &&
-		(VIDEO_EXT_RE.test(safeVideoUrl) ||
-			/youtube\.com|youtu\.be|vimeo\.com|stream|video/i.test(safeVideoUrl));
 	const safeShopId = sanitizeId(item.id);
 
 	return `
@@ -176,11 +168,9 @@ export const createPopupHTML = ({
      <div class="relative w-full aspect-[16/9] max-h-[180px] overflow-hidden">
         <div class="absolute inset-0 bg-gradient-to-br from-purple-700 via-pink-600 to-red-600"></div>
         ${
-					hasRenderableVideo
-						? `<video src="${safeVideoUrl}" poster="${safeImageUrl}" class="absolute inset-0 w-full h-full object-cover" autoplay muted loop playsinline crossorigin="anonymous"></video>`
-						: safeImageUrl
-							? `<img src="${safeImageUrl}" alt="${safeName}" class="absolute inset-0 w-full h-full object-cover" crossorigin="anonymous" />`
-							: ""
+					safeImageUrl
+						? `<img src="${safeImageUrl}" alt="${safeName}" class="absolute inset-0 w-full h-full object-cover" crossorigin="anonymous" />`
+						: ""
 				}
         <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
 

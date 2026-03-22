@@ -1,6 +1,6 @@
 <script setup>
 import { BarChart, Clock, Heart, MapPin, Share2, Star } from "lucide-vue-next";
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useNotifications } from "@/composables/useNotifications";
 import { useBlurUpImage } from "../../composables/useBlurUpImage";
@@ -8,6 +8,10 @@ import { useCardTilt } from "../../composables/useCardTilt";
 import { useSmartVideo } from "../../composables/useSmartVideo";
 import { useCoinStore } from "../../store/coinStore";
 import { openExternal } from "../../utils/browserUtils";
+import {
+	getUsableMediaUrl,
+	markMediaElementFailed,
+} from "../../utils/mediaSourceGuard.js";
 import { isFlashActive } from "../../utils/shopUtils";
 import VisitorCount from "../ui/VisitorCount.vue";
 import MerchantStats from "./MerchantStats.vue";
@@ -175,8 +179,46 @@ const { tiltStyle, glareStyle, onPointerMove, onPointerLeave } = useCardTilt({
 	scale: 1.015,
 });
 
+const videoError = ref(false);
+const resolvedVideoUrl = computed(() =>
+	getUsableMediaUrl(
+		props.shop?.Video_URL ||
+			props.shop?.video_url ||
+			props.shop?.videoUrl ||
+			"",
+	),
+);
+const shouldRenderVideo = computed(
+	() => props.isActive && Boolean(resolvedVideoUrl.value) && !videoError.value,
+);
+const resolvedImageUrl = computed(
+	() => blurUpSrc.value || getOptimizedUrl(props.shop?.Image_URL1, 600),
+);
+
 const cardAriaLabel = computed(
 	() => `Open venue card for ${props.shop?.name || "this venue"}`,
+);
+
+const handleVideoError = (event) => {
+	if (Number(event?.target?.error?.code || 0) === 1) return;
+	videoError.value = true;
+	markMediaElementFailed(event, resolvedVideoUrl.value);
+	if (videoRef.value) {
+		videoRef.value.pause();
+		videoRef.value.removeAttribute("src");
+		videoRef.value.load();
+	}
+};
+
+watch(
+	[() => props.shop?.id, resolvedVideoUrl],
+	() => {
+		videoError.value = false;
+		if (videoRef.value) {
+			videoRef.value.pause();
+		}
+	},
+	{ immediate: true },
 );
 </script>
 
@@ -214,19 +256,21 @@ const cardAriaLabel = computed(
     <div class="absolute inset-0 w-full h-full z-0 overflow-hidden">
       <!-- Background Image/Video -->
       <video
-        v-if="shop.Video_URL"
+        v-if="shouldRenderVideo"
         ref="videoRef"
-        :src="shop.Video_URL"
+        :src="resolvedVideoUrl"
         :poster="shop.Image_URL1"
         muted
         loop
         playsinline
         class="smart-video absolute inset-0 w-full h-full object-cover"
+        preload="none"
+        @error="handleVideoError"
       />
       <!-- Fallback Image if no video (or while loading handled by poster) -->
       <img
         v-else-if="shop.Image_URL1"
-        :src="blurUpSrc || getOptimizedUrl(shop.Image_URL1, 600)"
+        :src="resolvedImageUrl"
         :alt="shop.name || shop.title || 'Shop thumbnail'"
         class="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-[transform,filter] duration-700"
         :style="blurStyle"

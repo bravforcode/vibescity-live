@@ -1,3 +1,8 @@
+import {
+	getUsableMediaUrl,
+	mediaFailureVersion,
+} from "../../utils/mediaSourceGuard.js";
+
 const LIVE_STATUS_SET = new Set([
 	"live",
 	"active",
@@ -61,14 +66,7 @@ const uniqueStrings = (values) => {
 };
 
 const sanitizeUrl = (value) => {
-	const raw = cleanString(value);
-	if (!raw) return "";
-
-	if (raw.startsWith("data:image/")) return raw;
-	if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
-	if (raw.startsWith("/")) return raw;
-
-	return "";
+	return getUsableMediaUrl(value);
 };
 
 const parsePointWkt = (value) => {
@@ -233,6 +231,8 @@ const collectMediaCandidates = (venue) => {
 };
 
 export const resolveVenueMedia = (venue) => {
+	void mediaFailureVersion.value;
+
 	const videoCandidates = [
 		venue?.media?.videoUrl,
 		venue?.cinematic_video_url,

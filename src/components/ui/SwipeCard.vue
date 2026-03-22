@@ -39,6 +39,10 @@ import { useHaptics } from "@/composables/useHaptics";
 import { useHardwareInfo } from "@/composables/useHardwareInfo";
 import { useFavoritesStore } from "../../store/favoritesStore";
 import { useShopStore } from "../../store/shopStore";
+import {
+	getUsableMediaUrl,
+	markMediaElementFailed,
+} from "../../utils/mediaSourceGuard.js";
 
 const ImageLoader = defineAsyncComponent(() => import("./ImageLoader.vue"));
 
@@ -193,6 +197,32 @@ const videoEl = ref(null);
 const videoLoaded = ref(false);
 const videoError = ref(false);
 const isMuted = ref(true);
+const primaryImageUrl = computed(() => props.shop?.Image_URL1 || "");
+const resolvedVideoUrl = computed(() =>
+	getUsableMediaUrl(
+		props.shop?.Video_URL ||
+			props.shop?.video_url ||
+			props.shop?.videoUrl ||
+			"",
+	),
+);
+const canAutoPlayVideo = computed(
+	() => !isSlowNetwork.value && !isLowPowerMode.value,
+);
+const showVideo = computed(
+	() =>
+		props.isActive &&
+		Boolean(resolvedVideoUrl.value) &&
+		canAutoPlayVideo.value &&
+		!videoError.value,
+);
+const showImageFallback = computed(
+	() =>
+		Boolean(primaryImageUrl.value) && (!showVideo.value || !videoLoaded.value),
+);
+const showMediaPlaceholder = computed(
+	() => !primaryImageUrl.value && (!showVideo.value || !videoLoaded.value),
+);
 
 const toggleMute = () => {
 	if (!videoEl.value) return;
@@ -201,12 +231,38 @@ const toggleMute = () => {
 	selectFeedback();
 };
 
+const handleVideoError = (event) => {
+	if (Number(event?.target?.error?.code || 0) === 1) return;
+	videoError.value = true;
+	videoLoaded.value = false;
+	markMediaElementFailed(event, resolvedVideoUrl.value);
+	if (videoEl.value) {
+		videoEl.value.pause();
+		videoEl.value.removeAttribute("src");
+		videoEl.value.load();
+	}
+};
+
+watch(
+	[() => props.shop?.id, resolvedVideoUrl],
+	() => {
+		videoLoaded.value = false;
+		videoError.value = false;
+		isMuted.value = true;
+		if (videoEl.value) {
+			videoEl.value.pause();
+			videoEl.value.muted = true;
+		}
+	},
+	{ immediate: true },
+);
+
 watch(
 	() => props.isActive,
 	async (active) => {
 		if (active) {
 			if (props.shop?.id) shopStore.incrementView(props.shop.id);
-			if (videoEl.value && videoLoaded.value) {
+			if (showVideo.value && videoEl.value && videoLoaded.value) {
 				try {
 					await videoEl.value.play();
 				} catch {
@@ -427,14 +483,10 @@ const handleManualExpand = () => {
       <!-- ── Media Layer ─────────────────────────── -->
       <div class="sc-media">
         <video
-          v-if="
-            (shop?.Video_URL || shop?.video_url) &&
-            !isSlowNetwork &&
-            !isLowPowerMode
-          "
+          v-if="showVideo"
           ref="videoEl"
-          :src="shop?.Video_URL || shop?.video_url"
-          :poster="shop.Image_URL1"
+          :src="resolvedVideoUrl"
+          :poster="primaryImageUrl || undefined"
           class="sc-media-fill transition-opacity duration-500"
           :class="videoLoaded ? 'opacity-100' : 'opacity-0'"
           muted
@@ -442,24 +494,18 @@ const handleManualExpand = () => {
           playsinline
           preload="none"
           @loadeddata="videoLoaded = true"
-          @error="videoError = true"
+          @error="handleVideoError"
         />
         <ImageLoader
-          v-if="
-            !(shop?.Video_URL || shop?.video_url) ||
-            !videoLoaded ||
-            videoError ||
-            isSlowNetwork ||
-            isLowPowerMode
-          "
-          :src="shop?.Image_URL1"
+          v-if="showImageFallback"
+          :src="primaryImageUrl"
           :alt="displayName"
           img-class="sc-media-fill transition-transform duration-700 will-change-transform group-hover:scale-105"
           :class="!videoLoaded ? 'z-10' : ''"
         />
         <!-- No media placeholder -->
         <div
-          v-if="!shop?.Image_URL1 && !(shop?.Video_URL || shop?.video_url)"
+          v-if="showMediaPlaceholder"
           class="sc-media-fill flex items-center justify-center bg-gradient-to-br from-zinc-900 to-zinc-950"
         >
           <div class="flex flex-col items-center gap-3 text-zinc-600">
@@ -488,7 +534,7 @@ const handleManualExpand = () => {
       <!-- ── Volume Toggle ─────────────────────── -->
       <Transition name="fade">
         <button
-          v-if="(shop?.Video_URL || shop?.video_url) && isActive"
+          v-if="showVideo"
           class="sc-action-btn absolute top-3 right-[3.75rem] z-30"
           :aria-label="isMuted ? t('a11y.unmute_video') : t('a11y.mute_video')"
           @click.stop="toggleMute"

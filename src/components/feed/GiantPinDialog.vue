@@ -20,6 +20,11 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useDialogA11y } from "../../composables/useDialogA11y";
+import {
+	getUsableMediaUrl,
+	markMediaElementFailed,
+	markMediaUrlFailed,
+} from "../../utils/mediaSourceGuard.js";
 
 const VisitorCount = defineAsyncComponent(
 	() => import("../ui/VisitorCount.vue"),
@@ -72,11 +77,20 @@ const dialogBodyRef = ref(null);
 const closeButtonRef = ref(null);
 const videoRef = ref(null);
 const selectedImageBroken = ref(false);
+const selectedVideoBroken = ref(false);
 const isAnimatingIn = ref(false);
 const isAnimatingOut = ref(false);
 const activeTab = ref("info"); // 'info' | 'shops'
 
 const selectedTitle = computed(() => props.activeGiantPin?.name || "Venue");
+const resolvedSelectedImage = computed(() =>
+	selectedImageBroken.value ? "" : getUsableMediaUrl(props.selectedGiantImage),
+);
+const resolvedSelectedVideoUrl = computed(() =>
+	selectedVideoBroken.value
+		? ""
+		: getUsableMediaUrl(props.selectedGiantVideoUrl),
+);
 
 onMounted(async () => {
 	if (!props.isOpen || !dialogRef.value || dialogRef.value.open) return;
@@ -111,6 +125,13 @@ const handleNativeClose = () => {
 
 const handleImageError = () => {
 	selectedImageBroken.value = true;
+	markMediaUrlFailed(props.selectedGiantImage);
+};
+
+const handleVideoError = (event) => {
+	if (Number(event?.target?.error?.code || 0) === 1) return;
+	selectedVideoBroken.value = true;
+	markMediaElementFailed(event, props.selectedGiantVideoUrl);
 };
 
 const handleListImageError = (event) => {
@@ -118,9 +139,10 @@ const handleListImageError = (event) => {
 };
 
 watch(
-	() => props.selectedGiantImage,
+	() => [props.selectedGiantImage, props.selectedGiantVideoUrl],
 	() => {
 		selectedImageBroken.value = false;
+		selectedVideoBroken.value = false;
 	},
 	{ immediate: true },
 );
@@ -143,7 +165,7 @@ watch(
 );
 
 watch(
-	() => props.selectedGiantVideoUrl,
+	() => resolvedSelectedVideoUrl.value,
 	async (videoUrl) => {
 		if (!videoUrl) return;
 		await nextTick();
@@ -192,20 +214,22 @@ useDialogA11y({
         <!-- Media: video or image -->
         <div class="media-stage">
           <video
-            v-if="selectedGiantVideoUrl"
+            v-if="resolvedSelectedVideoUrl"
             ref="videoRef"
-            :src="selectedGiantVideoUrl"
-            :poster="selectedGiantImage || undefined"
+            :src="resolvedSelectedVideoUrl"
+            :poster="resolvedSelectedImage || undefined"
             muted
             loop
             playsinline
             class="media-asset"
+            preload="metadata"
+            @error="handleVideoError"
           >
             <track kind="captions" />
           </video>
           <img
-            v-else-if="selectedGiantImage && !selectedImageBroken"
-            :src="selectedGiantImage"
+            v-else-if="resolvedSelectedImage"
+            :src="resolvedSelectedImage"
             :alt="selectedGiantShop?.name || selectedTitle"
             class="media-asset ken-burns"
             @error="handleImageError"

@@ -17,6 +17,10 @@ import { useHaptics } from "../../composables/useHaptics";
 import { Z } from "../../constants/zIndex";
 import { resolveVenueMedia } from "../../domain/venue/viewModel";
 import { getMediaDetails } from "../../utils/linkHelper";
+import {
+	markMediaElementFailed,
+	markMediaUrlFailed,
+} from "../../utils/mediaSourceGuard.js";
 
 // ==========================================
 // ✅ LAZY LOADED COMPONENTS
@@ -177,9 +181,11 @@ const lastPointerTap = ref(0);
 // ✅ COMPUTED PROPERTIES
 // ==========================================
 
+const resolvedVenueMedia = computed(() => resolveVenueMedia(props.shop || {}));
+
 const media = computed(() => {
 	try {
-		const resolved = resolveVenueMedia(props.shop || {});
+		const resolved = resolvedVenueMedia.value;
 		const mediaUrl =
 			resolved.videoUrl || resolved.primaryImage || FALLBACK_IMAGE;
 		return getMediaDetails(mediaUrl);
@@ -195,8 +201,12 @@ const toFiniteCoord = (value) => {
 };
 
 const resolvedMediaUrl = computed(() => {
-	if (mediaLoadFailed.value) return FALLBACK_IMAGE;
-	return media.value?.url || FALLBACK_IMAGE;
+	if (mediaLoadFailed.value) {
+		return resolvedVenueMedia.value.primaryImage || FALLBACK_IMAGE;
+	}
+	return (
+		media.value?.url || resolvedVenueMedia.value.primaryImage || FALLBACK_IMAGE
+	);
 });
 
 const safeTopOffset = computed(
@@ -206,7 +216,7 @@ const safeTopOffset = computed(
 const processedImages = computed(() => {
 	try {
 		const items = [];
-		const resolved = resolveVenueMedia(props.shop || {});
+		const resolved = resolvedVenueMedia.value;
 		if (resolved.videoUrl) items.push(resolved.videoUrl);
 
 		const images = Array.isArray(resolved.images) ? resolved.images : [];
@@ -253,6 +263,24 @@ watch(
 	},
 	{ immediate: true },
 );
+
+const handlePrimaryVideoError = (event) => {
+	if (Number(event?.target?.error?.code || 0) === 1) return;
+	markMediaElementFailed(event, resolvedMediaUrl.value);
+	mediaLoadFailed.value = true;
+};
+
+const handlePrimaryImageError = () => {
+	markMediaUrlFailed(resolvedMediaUrl.value);
+	mediaLoadFailed.value = true;
+};
+
+const getGalleryThumbnailUrl = (url) => {
+	if (isVideo(url)) {
+		return resolvedVenueMedia.value.primaryImage || FALLBACK_IMAGE;
+	}
+	return url || FALLBACK_IMAGE;
+};
 
 // ==========================================
 // ✅ MOTION SYSTEM (iOS-STYLE)
@@ -1170,7 +1198,7 @@ onUnmounted(() => {
               muted
               playsinline
               class="w-full h-full object-cover"
-              @error="mediaLoadFailed = true"
+              @error="handlePrimaryVideoError"
             />
             <iframe
               v-else-if="media.type === 'youtube' && !mediaLoadFailed"
@@ -1187,7 +1215,7 @@ onUnmounted(() => {
               :alt="shop.name || 'Venue photo'"
               class="w-full h-full object-cover"
               loading="lazy"
-              @error="mediaLoadFailed = true"
+              @error="handlePrimaryImageError"
             />
           </template>
         </div>
@@ -1211,25 +1239,22 @@ onUnmounted(() => {
                 :key="`gallery-${idx}`"
                 type="button"
                 :aria-label="`Open gallery image ${idx + 1}`"
-                class="h-32 w-32 flex-shrink-0 cursor-pointer snap-start overflow-hidden rounded-2xl bg-gray-100 transition-transform active:scale-95 dark:bg-zinc-800"
+                class="relative h-32 w-32 flex-shrink-0 cursor-pointer snap-start overflow-hidden rounded-2xl bg-gray-100 transition-transform active:scale-95 dark:bg-zinc-800"
                 @click="openGalleryAt(idx)"
               >
-                <video
-                  v-if="isVideo(img)"
-                  :src="img"
-                  class="w-full h-full object-cover"
-                  muted
-                  playsinline
-                  preload="metadata"
-                />
                 <img
-                  v-else
-                  :src="img"
+                  :src="getGalleryThumbnailUrl(img)"
                   :alt="`${shop.name} gallery image ${idx + 1}`"
                   class="w-full h-full object-cover"
                   loading="lazy"
                   decoding="async"
                 />
+                <span
+                  v-if="isVideo(img)"
+                  class="absolute inset-x-2 bottom-2 rounded-lg bg-black/70 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white"
+                >
+                  Video
+                </span>
               </button>
             </div>
 
