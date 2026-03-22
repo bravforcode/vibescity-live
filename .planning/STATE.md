@@ -3,9 +3,9 @@
 ## Current Phase
 
 - **Phase:** 2 — Anonymous Identity + Claim Flow
-- **Plan:** Not started
-- **Status:** Roadmap created, ready for planning
-- **Last activity:** 2026-03-22 — Roadmap v1.1 created (3 phases, 21 requirements mapped)
+- **Plan:** 02 complete (backend gamification infrastructure)
+- **Status:** In progress — Plan 02 done, Plans 01/03/04 pending
+- **Last activity:** 2026-03-22 — Plan 02-02 complete (SQL migration + FastAPI gamification router)
 
 ## Project Reference
 
@@ -44,6 +44,9 @@ See: .planning/PROJECT.md (updated 2026-03-22)
 - SAFE-02 (vibe rating rate limit) ships in Phase 3 — VENUE-05 (emoji rating) cannot go live without it
 - GAME-07 (daily check-in) ships in Phase 3 — depends on working anonymous session from Phase 2
 - ADMIN-01 isolated in Phase 4 — standalone; data to display only exists after Phases 2+3
+- [02-02] Rate limit 20/hour (not 5/hour) for IP-based claim limiting — NAT/shared-IP in hotels/cafes per research pitfall #6
+- [02-02] GET DIAGNOSTICS ROW_COUNT used after INSERT ON CONFLICT DO NOTHING — more reliable than NOT FOUND across Postgres versions
+- [02-02] SECURITY DEFINER RPCs for all visitor data access — anon clients never touch tables directly
 
 ### Ops Prerequisites (Phase 2)
 
@@ -58,5 +61,5 @@ See: .planning/PROJECT.md (updated 2026-03-22)
 
 ## Last Session
 
-- **Timestamp:** 2026-03-22
-- **Stopped At:** Roadmap created — Phase 2 ready for `/gsd:plan-phase 2`
+- **Timestamp:** 2026-03-22T08:30:19Z
+- **Stopped At:** Completed 02-02-PLAN.md — backend gamification infrastructure (SQL migration + FastAPI router)
