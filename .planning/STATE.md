@@ -3,9 +3,9 @@
 ## Current Phase
 
 - **Phase:** 2 — Anonymous Identity + Claim Flow
-- **Plan:** 02 complete (backend gamification infrastructure)
-- **Status:** In progress — Plan 02 done, Plans 01/03/04 pending
-- **Last activity:** 2026-03-22 — Plan 02-02 complete (SQL migration + FastAPI gamification router)
+- **Plan:** 01 complete (PDPA consent banner + claim gate)
+- **Status:** In progress — Plans 01/02 done, Plans 03/04 pending
+- **Last activity:** 2026-03-22 — Plan 02-01 complete (ConsentBanner + HomeView consent gate)
 
 ## Project Reference
 
@@ -47,6 +47,8 @@ See: .planning/PROJECT.md (updated 2026-03-22)
 - [02-02] Rate limit 20/hour (not 5/hour) for IP-based claim limiting — NAT/shared-IP in hotels/cafes per research pitfall #6
 - [02-02] GET DIAGNOSTICS ROW_COUNT used after INSERT ON CONFLICT DO NOTHING — more reliable than NOT FOUND across Postgres versions
 - [02-02] SECURITY DEFINER RPCs for all visitor data access — anon clients never touch tables directly
+- [02-01] Sync import for ConsentBanner (not async) — must render without lazy-load delay before any claim interaction
+- [02-01] hasConsent initialized from localStorage at mount — returning visitors (pdpa_consent_ts set) never see banner
 
 ### Ops Prerequisites (Phase 2)
 
@@ -61,5 +63,5 @@ See: .planning/PROJECT.md (updated 2026-03-22)
 
 ## Last Session
 
-- **Timestamp:** 2026-03-22T08:30:19Z
-- **Stopped At:** Completed 02-02-PLAN.md — backend gamification infrastructure (SQL migration + FastAPI router)
+- **Timestamp:** 2026-03-22T08:31:48Z
+- **Stopped At:** Completed 02-01-PLAN.md — PDPA ConsentBanner + HomeView consent gate
