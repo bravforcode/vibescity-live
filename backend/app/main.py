@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 import logging
 import time
 import uuid
-from app.api.routers import vibes, rides, payments, shops, owner, ugc, emergency, admin, redemption, analytics, seo
+from app.api.routers import vibes, rides, payments, shops, owner, ugc, emergency, admin, redemption, analytics, seo, gamification
 
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -165,3 +165,4 @@ app.include_router(admin.router, prefix=settings.API_V1_STR + "/admin", tags=["a
 app.include_router(redemption.router, prefix=settings.API_V1_STR + "/redemption", tags=["redemption"])
 app.include_router(analytics.router, prefix=settings.API_V1_STR + "/analytics", tags=["analytics"])
 app.include_router(seo.router, prefix=settings.API_V1_STR + "/seo", tags=["seo"])
+app.include_router(gamification.router, prefix=settings.API_V1_STR + "/gamification", tags=["gamification"])
