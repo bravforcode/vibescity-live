@@ -83,6 +83,14 @@ jobs:
             npx playwright test --config=playwright.visual.config.ts
           fi
 
+      - name: Console Budget (visual regression)
+        if: ${{ always() }}
+        run: node scripts/ci/ui-console-budget.mjs
+
+      - name: Step Summary (visual regression)
+        if: ${{ always() }}
+        run: node scripts/ci/e2e-summary.mjs --lane visual-regression --junit reports/visual/junit.xml --console test-results/ui-console-events.ndjson
+
       - name: Upload run artifacts to GCS
         if: always()
         shell: bash
@@ -105,5 +113,6 @@ jobs:
           path: |
             playwright-report/**
             test-results/**
+            reports/visual/**
             tests/visual/critical.spec.ts-snapshots/**
           retention-days: 14

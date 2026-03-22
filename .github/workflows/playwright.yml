@@ -50,6 +50,14 @@ jobs:
             npm run test:e2e:smoke
           fi
 
+      - name: Console Budget (${{ inputs.lane }})
+        if: ${{ always() }}
+        run: node scripts/ci/ui-console-budget.mjs
+
+      - name: Step Summary (${{ inputs.lane }})
+        if: ${{ always() }}
+        run: node scripts/ci/e2e-summary.mjs --lane "${{ inputs.lane }}" --junit reports/e2e/junit.xml --console test-results/ui-console-events.ndjson
+
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:

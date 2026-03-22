@@ -39,6 +39,25 @@ function parseConsoleEntries(inputPath) {
 	return entries;
 }
 
+function describeConsoleSignal(consoleEntries, consolePath) {
+	if (!consoleEntries) {
+		return `- Console signal: unavailable (console dump not found at \`${consolePath}\`)`;
+	}
+
+	const warningOrError = consoleEntries.filter(
+		(entry) => entry?.severity === "warning" || entry?.severity === "error",
+	);
+	const suppressedEntries = warningOrError.filter(
+		(entry) => entry?.reportable === false,
+	);
+	const actionableEntries = warningOrError.filter(
+		(entry) => entry?.reportable !== false,
+	);
+	const unexpectedEntries = actionableEntries.filter((entry) => !entry?.ruleId);
+
+	return `- Console signal: ${actionableEntries.length} actionable (${unexpectedEntries.length} unexpected), ${suppressedEntries.length} suppressed headless/browser-noise`;
+}
+
 async function appendSummary(lines) {
 	if (!STEP_SUMMARY) return;
 	await appendFile(STEP_SUMMARY, `${lines.join("\n")}\n`);
@@ -91,6 +110,7 @@ async function main() {
 			header,
 			"- Status: unable to parse JUnit report",
 			`- Report path not found: \`${junitPath}\``,
+			describeConsoleSignal(parseConsoleEntries(consolePath), consolePath),
 		];
 		console.log(lines.join("\n"));
 		await appendSummary(lines);
@@ -112,26 +132,8 @@ async function main() {
 			`- Passed: ${passed}`,
 			`- Failed: ${failed}`,
 			`- Skipped: ${skipped}`,
+			describeConsoleSignal(consoleEntries, consolePath),
 		];
-
-		if (consoleEntries) {
-			const warningOrError = consoleEntries.filter(
-				(entry) => entry?.severity === "warning" || entry?.severity === "error",
-			);
-			const suppressedEntries = warningOrError.filter(
-				(entry) => entry?.reportable === false,
-			);
-			const actionableEntries = warningOrError.filter(
-				(entry) => entry?.reportable !== false,
-			);
-			const unexpectedEntries = actionableEntries.filter(
-				(entry) => !entry?.ruleId,
-			);
-
-			lines.push(
-				`- Console signal: ${actionableEntries.length} actionable (${unexpectedEntries.length} unexpected), ${suppressedEntries.length} suppressed headless/browser-noise`,
-			);
-		}
 
 		if (failed > 0) {
 			lines.push("", "### Failures");

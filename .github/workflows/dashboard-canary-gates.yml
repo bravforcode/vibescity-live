@@ -41,6 +41,14 @@ jobs:
       - name: Run dashboard canary E2E matrix
         run: npx playwright test tests/e2e/dashboard_canary_matrix.spec.ts
 
+      - name: Console Budget (dashboard canary e2e)
+        if: ${{ always() }}
+        run: node scripts/ci/ui-console-budget.mjs
+
+      - name: Step Summary (dashboard canary e2e)
+        if: ${{ always() }}
+        run: node scripts/ci/e2e-summary.mjs --lane dashboard-canary-e2e --junit reports/e2e/junit.xml --console test-results/ui-console-events.ndjson
+
       - name: Upload Playwright report (canary e2e)
         if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@v4
@@ -75,6 +83,14 @@ jobs:
       - name: Run dashboard visual regression
         run: npx playwright test tests/visual/dashboard.visual.spec.ts --config=playwright.visual.config.ts
 
+      - name: Console Budget (dashboard visual)
+        if: ${{ always() }}
+        run: node scripts/ci/ui-console-budget.mjs
+
+      - name: Step Summary (dashboard visual)
+        if: ${{ always() }}
+        run: node scripts/ci/e2e-summary.mjs --lane dashboard-visual-regression --junit reports/visual/junit.xml --console test-results/ui-console-events.ndjson
+
       - name: Upload Playwright report (dashboard visual)
         if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@v4
@@ -83,6 +99,7 @@ jobs:
           path: |
             playwright-report/**
             test-results/**
+            reports/visual/junit.xml
             tests/visual/dashboard.visual.spec.ts-snapshots/**
           if-no-files-found: warn
           retention-days: 14

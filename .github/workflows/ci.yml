@@ -136,6 +136,14 @@ jobs:
       - name: Run E2E smoke (low-mem)
         run: PW_LOW_MEM=1 PW_GREP=@smoke npx playwright test
 
+      - name: Console Budget (smoke)
+        if: ${{ always() }}
+        run: node scripts/ci/ui-console-budget.mjs
+
+      - name: Step Summary (smoke)
+        if: ${{ always() }}
+        run: node scripts/ci/e2e-summary.mjs --lane smoke --junit reports/e2e/junit.xml --console test-results/ui-console-events.ndjson
+
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
@@ -163,6 +171,14 @@ jobs:
 
       - name: Run E2E full matrix (exclude quarantine lane)
         run: PW_GREP_INVERT=@map-quarantine npx playwright test
+
+      - name: Console Budget (full)
+        if: ${{ always() }}
+        run: node scripts/ci/ui-console-budget.mjs
+
+      - name: Step Summary (full)
+        if: ${{ always() }}
+        run: node scripts/ci/e2e-summary.mjs --lane full --junit reports/e2e/junit.xml --console test-results/ui-console-events.ndjson
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
@@ -201,9 +217,13 @@ jobs:
           VITE_MAPBOX_TOKEN: ${{ secrets.MAPBOX_PUBLIC_TOKEN }}
         run: npm run test:e2e:map-required
 
+      - name: Console Budget (map-required)
+        if: ${{ always() }}
+        run: node scripts/ci/ui-console-budget.mjs
+
       - name: Step Summary (map-required)
         if: ${{ always() }}
-        run: node scripts/ci/e2e-summary.mjs --lane map-required --junit reports/e2e/junit.xml
+        run: node scripts/ci/e2e-summary.mjs --lane map-required --junit reports/e2e/junit.xml --console test-results/ui-console-events.ndjson
 
       - name: Upload Playwright report (map-required)
         if: ${{ always() && !cancelled() }}
@@ -242,9 +262,13 @@ jobs:
           VITE_MAPBOX_TOKEN: ${{ secrets.MAPBOX_PUBLIC_TOKEN }}
         run: npm run test:e2e:map-preflight
 
+      - name: Console Budget (map-preflight)
+        if: ${{ always() }}
+        run: node scripts/ci/ui-console-budget.mjs
+
       - name: Step Summary (map-preflight)
         if: ${{ always() }}
-        run: node scripts/ci/e2e-summary.mjs --lane map-preflight --junit reports/e2e/junit.xml
+        run: node scripts/ci/e2e-summary.mjs --lane map-preflight --junit reports/e2e/junit.xml --console test-results/ui-console-events.ndjson
 
       - name: Upload Playwright report (map-preflight)
         if: ${{ always() && !cancelled() }}
@@ -284,9 +308,13 @@ jobs:
           VITE_MAPBOX_TOKEN: ${{ secrets.MAPBOX_PUBLIC_TOKEN }}
         run: npm run test:e2e:map-quarantine
 
+      - name: Console Budget (map-quarantine)
+        if: ${{ always() }}
+        run: node scripts/ci/ui-console-budget.mjs
+
       - name: Step Summary (map-quarantine)
         if: ${{ always() }}
-        run: node scripts/ci/e2e-summary.mjs --lane map-quarantine --junit reports/e2e/junit.xml
+        run: node scripts/ci/e2e-summary.mjs --lane map-quarantine --junit reports/e2e/junit.xml --console test-results/ui-console-events.ndjson
 
       - name: Upload Playwright report (map-quarantine)
         if: ${{ always() && !cancelled() }}
@@ -315,6 +343,14 @@ jobs:
 
       - name: Run E2E fallback (low-mem)
         run: PW_LOW_MEM=1 npx playwright test
+
+      - name: Console Budget (fallback)
+        if: ${{ always() }}
+        run: node scripts/ci/ui-console-budget.mjs
+
+      - name: Step Summary (fallback)
+        if: ${{ always() }}
+        run: node scripts/ci/e2e-summary.mjs --lane fallback --junit reports/e2e/junit.xml --console test-results/ui-console-events.ndjson
 
       - name: Upload Playwright report (fallback)
         if: ${{ !cancelled() }}

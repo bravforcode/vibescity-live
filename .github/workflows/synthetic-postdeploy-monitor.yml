@@ -265,9 +265,13 @@ jobs:
           VITE_MAPBOX_TOKEN: "${{ secrets.MAPBOX_PUBLIC_TOKEN }}"
         run: bun run test:e2e:smoke-map-lite
 
+      - name: Console Budget (smoke-map-lite)
+        if: ${{ always() }}
+        run: node scripts/ci/ui-console-budget.mjs
+
       - name: Synthetic browser summary
         if: ${{ always() }}
-        run: node scripts/ci/e2e-summary.mjs --lane smoke-map-lite --junit reports/e2e/junit.xml
+        run: node scripts/ci/e2e-summary.mjs --lane smoke-map-lite --junit reports/e2e/junit.xml --console test-results/ui-console-events.ndjson
 
       - name: Upload Playwright report (smoke-map-lite)
         if: ${{ always() && !cancelled() }}

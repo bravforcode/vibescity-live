@@ -73,6 +73,14 @@ jobs:
           VITE_MAPBOX_TOKEN: ${{ secrets.VITE_MAPBOX_TOKEN }}
         run: npm run test:e2e
 
+      - name: Console Budget (sonar e2e)
+        if: ${{ always() }}
+        run: node scripts/ci/ui-console-budget.mjs
+
+      - name: Step Summary (sonar e2e)
+        if: ${{ always() }}
+        run: node scripts/ci/e2e-summary.mjs --lane sonar-e2e --junit reports/e2e/junit.xml --console test-results/ui-console-events.ndjson
+
       - name: Upload Playwright Report Artifact
         uses: actions/upload-artifact@v4
         if: always()

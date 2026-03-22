@@ -21,3 +21,11 @@ jobs:
 
       - name: Run E2E
         run: npx playwright test
+
+      - name: Console Budget (manual e2e)
+        if: ${{ always() }}
+        run: node scripts/ci/ui-console-budget.mjs
+
+      - name: Step Summary (manual e2e)
+        if: ${{ always() }}
+        run: node scripts/ci/e2e-summary.mjs --lane manual-e2e --junit reports/e2e/junit.xml --console test-results/ui-console-events.ndjson
