@@ -56,17 +56,17 @@
 
 ## v1.x Requirements (Deferred)
 
-### Gamification
+### Gamification (Deferred)
 
 - **GAME-08**: User can view their earned venue badges in a dedicated collection view (AchievementBadges.vue)
 - **GAME-09**: Streak shown as "nights this week" (weekly window, not consecutive-day model) — after daily check-in engagement validated
 - **GAME-10**: Lucky wheel coupon prize tier (venue discount) — blocked on merchant partnership data
 
-### Identity
+### Identity (Deferred)
 
 - **IDENT-03**: Optional account upgrade — user can link their anonymous session to an email for cross-device persistence
 
-### Venue Detail
+### Venue Detail (Deferred)
 
 - **VENUE-06**: Full review text (optional one-line comment with moderation queue) — deferred until emoji rating volume is measured
 
@@ -75,7 +75,7 @@
 ## Out of Scope
 
 | Feature | Reason |
-|---------|--------|
+| --- | --- |
 | Traditional sign-in / registration | No login system by design — anonymous-first is the product concept |
 | Public leaderboard | Alienates users not at the top; anti-feature at VibeCity's current scale |
 | Anonymous user photo upload | Content moderation requires account identity; defer until account upgrade path exists |
@@ -87,38 +87,37 @@
 
 ## Traceability
 
-*(Populated during roadmap creation)*
-
 | Requirement | Phase | Status |
-|-------------|-------|--------|
-| IDENT-01 | — | Pending |
-| IDENT-02 | — | Pending |
-| COMP-01 | — | Pending |
-| GAME-01 | — | Pending |
-| GAME-02 | — | Pending |
-| GAME-03 | — | Pending |
-| GAME-04 | — | Pending |
-| GAME-05 | — | Pending |
-| GAME-06 | — | Pending |
-| GAME-07 | — | Pending |
-| MAP-01 | — | Pending |
-| VENUE-01 | — | Pending |
-| VENUE-02 | — | Pending |
-| VENUE-03 | — | Pending |
-| VENUE-04 | — | Pending |
-| VENUE-05 | — | Pending |
-| MAP-02 | — | Pending |
-| UX-01 | — | Pending |
-| ADMIN-01 | — | Pending |
-| SAFE-01 | — | Pending |
-| SAFE-02 | — | Pending |
+| --- | --- | --- |
+| IDENT-01 | Phase 2 | Pending |
+| IDENT-02 | Phase 2 | Pending |
+| COMP-01 | Phase 2 | Pending |
+| GAME-01 | Phase 2 | Pending |
+| GAME-02 | Phase 2 | Pending |
+| GAME-03 | Phase 2 | Pending |
+| GAME-06 | Phase 2 | Pending |
+| SAFE-01 | Phase 2 | Pending |
+| MAP-02 | Phase 2 | Pending |
+| GAME-04 | Phase 3 | Pending |
+| GAME-05 | Phase 3 | Pending |
+| GAME-07 | Phase 3 | Pending |
+| MAP-01 | Phase 3 | Pending |
+| VENUE-01 | Phase 3 | Pending |
+| VENUE-02 | Phase 3 | Pending |
+| VENUE-03 | Phase 3 | Pending |
+| VENUE-04 | Phase 3 | Pending |
+| VENUE-05 | Phase 3 | Pending |
+| SAFE-02 | Phase 3 | Pending |
+| UX-01 | Phase 3 | Pending |
+| ADMIN-01 | Phase 4 | Pending |
 
 **Coverage:**
+
 - v1.1 requirements: 21 total
-- Mapped to phases: 0
-- Unmapped: 21 ⚠️
+- Mapped to phases: 21
+- Unmapped: 0
 
 ---
 
 *Requirements defined: 2026-03-22*
-*Last updated: 2026-03-22 after initial definition*
+*Last updated: 2026-03-22 — traceability populated by roadmap creation*
