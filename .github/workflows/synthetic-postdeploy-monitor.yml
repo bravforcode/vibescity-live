@@ -196,7 +196,7 @@ jobs:
         run: bun install --frozen-lockfile || bun install
 
       - name: Install Playwright browser (Chromium)
-        run: bunx playwright install --with-deps chromium
+        run: node scripts/run-playwright-cli.mjs install --with-deps chromium
 
       - name: Validate MAPBOX_PUBLIC_TOKEN (synthetic browser)
         run: |

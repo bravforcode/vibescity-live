@@ -65,7 +65,7 @@ jobs:
           key: ${{ runner.os }}-playwright-${{ hashFiles('bun.lock') }}
 
       - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+        run: node scripts/run-playwright-cli.mjs install --with-deps
 
       - name: Run Playwright E2E
         env:

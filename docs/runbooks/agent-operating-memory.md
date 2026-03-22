@@ -116,30 +116,33 @@
 - If `vibecity-api.fly.dev` gains real support for `visitor/bootstrap`, `proxy/mapbox-directions`, or `hot-roads`, remove the host entry from `src/lib/runtimeLaneAvailability.js` and re-verify the live browser behavior before re-enabling those lanes.
 - Current non-blocking production noise to watch next:
   - keep `ui-console-budget` wired into every Playwright lane so step summaries keep surfacing actionable vs suppressed console signal automatically
+  - keep Playwright commands routed through `scripts/run-playwright-cli.mjs` so nested worktrees do not fall back to a parent install and reintroduce the loader-context issue
   - app/runtime regressions must stay `reportable: true`; do not broaden suppression rules beyond clearly headless/browser-only cases
   - visual lanes now emit `reports/visual/junit.xml`; if those jobs ever change config, keep the summary path in sync instead of dropping console signal coverage
 
 ## Current Snapshot
 
-- Focus: production runtime is stable on `main@b603937`; current repo-side follow-up is workflow wiring so every Playwright lane publishes cleaned console signal into GitHub step summaries.
+- Focus: production runtime is stable on `main@b603937`; current repo-side follow-up fixed the visual Playwright loader issue by routing repo commands through a project-local CLI wrapper instead of ambiguous `npx` resolution.
 - Files touched most recently before this memory file:
+  - `scripts/run-playwright-cli.mjs`
+  - `package.json`
   - `.github/workflows/ci.yml`
-  - `.github/workflows/synthetic-postdeploy-monitor.yml`
-  - `.github/workflows/dashboard-canary-gates.yml`
   - `.github/workflows/e2e.yml`
   - `.github/workflows/playwright.yml`
   - `.github/workflows/sonarcloud.yml`
+  - `.github/workflows/synthetic-postdeploy-monitor.yml`
+  - `.github/workflows/dashboard-canary-gates.yml`
   - `.github/workflows/visual-regression.yml`
-  - `playwright.visual.config.ts`
-  - `scripts/ci/e2e-summary.mjs`
   - `docs/runbooks/agent-operating-memory.md`
 - Validation already confirmed:
-  - `npx biome check scripts/ci/e2e-summary.mjs playwright.visual.config.ts tests/e2e/console-warning-allowlist.ts tests/e2e/helpers/consoleGate.ts` passes.
-  - `node scripts/ci/e2e-summary.mjs --lane visual-regression --junit tmp-does-not-exist/junit.xml --console tmp-does-not-exist/ui-console-events.ndjson` now prints console-signal status even when reports are missing.
-  - Workflow grep confirms every Playwright-running workflow now invokes `node scripts/ci/ui-console-budget.mjs` and `node scripts/ci/e2e-summary.mjs ... --console test-results/ui-console-events.ndjson`.
+  - `npm run test:visual:list` now lists all 7 visual tests successfully from the clean worktree.
+  - `npm run test:visual -- tests/visual/dashboard.visual.spec.ts --list` now lists the targeted dashboard visual tests successfully.
+  - `npm run test:e2e -- --list` now lists the full E2E matrix successfully through the wrapper.
+  - `npx biome check scripts/run-playwright-cli.mjs package.json` passes.
+  - `git diff --check` passes.
 - Residual note:
   - Original workspace remains a dirty tree; deployment work this round was executed from clean worktree `C:\vibecity.live\.vercel-main-localui-8b159cc`.
-  - `npx playwright test --config=playwright.visual.config.ts --list` still hits the repo's existing visual-test loader issue (`Playwright Test did not expect test() to be called here`); that failure predates the JUnit reporter addition and remains separate from this workflow wiring.
+  - The old failure was caused by `npx playwright` resolving a different Playwright install than the one the clean worktree test files imported. The wrapper avoids that class of issue for local and CI commands that go through repo scripts/workflows.
   - The reporting cleanup is repo/CI-only; it does not require a Vercel redeploy to affect production runtime behavior.
 
 ## Update Protocol

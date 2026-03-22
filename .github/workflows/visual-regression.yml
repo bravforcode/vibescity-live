@@ -45,7 +45,7 @@ jobs:
         run: bun install --frozen-lockfile || bun install
 
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        run: node scripts/run-playwright-cli.mjs install --with-deps chromium
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -78,9 +78,9 @@ jobs:
         run: |
           UPDATE="${{ github.event.inputs.update_baseline || 'false' }}"
           if [[ "$UPDATE" == "true" ]]; then
-            npx playwright test --config=playwright.visual.config.ts --update-snapshots
+            npm run test:visual -- --update-snapshots
           else
-            npx playwright test --config=playwright.visual.config.ts
+            npm run test:visual
           fi
 
       - name: Console Budget (visual regression)

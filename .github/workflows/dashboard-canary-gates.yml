@@ -36,10 +36,10 @@ jobs:
         run: npm install
 
       - name: Install Playwright browsers (webkit + chromium)
-        run: npx playwright install --with-deps webkit chromium
+        run: node scripts/run-playwright-cli.mjs install --with-deps webkit chromium
 
       - name: Run dashboard canary E2E matrix
-        run: npx playwright test tests/e2e/dashboard_canary_matrix.spec.ts
+        run: node scripts/run-playwright-cli.mjs test tests/e2e/dashboard_canary_matrix.spec.ts
 
       - name: Console Budget (dashboard canary e2e)
         if: ${{ always() }}
@@ -78,10 +78,10 @@ jobs:
         run: npm install
 
       - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+        run: node scripts/run-playwright-cli.mjs install --with-deps chromium
 
       - name: Run dashboard visual regression
-        run: npx playwright test tests/visual/dashboard.visual.spec.ts --config=playwright.visual.config.ts
+        run: npm run test:visual -- tests/visual/dashboard.visual.spec.ts
 
       - name: Console Budget (dashboard visual)
         if: ${{ always() }}

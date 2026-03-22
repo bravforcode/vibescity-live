@@ -131,10 +131,10 @@ jobs:
         run: npm install
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps
+        run: node scripts/run-playwright-cli.mjs install --with-deps
 
       - name: Run E2E smoke (low-mem)
-        run: PW_LOW_MEM=1 PW_GREP=@smoke npx playwright test
+        run: PW_LOW_MEM=1 PW_GREP=@smoke node scripts/run-playwright-cli.mjs test
 
       - name: Console Budget (smoke)
         if: ${{ always() }}
@@ -167,10 +167,10 @@ jobs:
         run: npm install
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps
+        run: node scripts/run-playwright-cli.mjs install --with-deps
 
       - name: Run E2E full matrix (exclude quarantine lane)
-        run: PW_GREP_INVERT=@map-quarantine npx playwright test
+        run: PW_GREP_INVERT=@map-quarantine node scripts/run-playwright-cli.mjs test
 
       - name: Console Budget (full)
         if: ${{ always() }}
@@ -203,7 +203,7 @@ jobs:
         run: npm install
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: node scripts/run-playwright-cli.mjs install --with-deps chromium
 
       - name: Validate MAPBOX_PUBLIC_TOKEN (strict lane)
         run: |
@@ -248,7 +248,7 @@ jobs:
         run: npm install
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: node scripts/run-playwright-cli.mjs install --with-deps chromium
 
       - name: Validate MAPBOX_PUBLIC_TOKEN (preflight lane)
         run: |
@@ -294,7 +294,7 @@ jobs:
         run: npm install
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: node scripts/run-playwright-cli.mjs install --with-deps chromium
 
       - name: Validate MAPBOX_PUBLIC_TOKEN (quarantine lane)
         run: |
@@ -339,10 +339,10 @@ jobs:
         run: npm install
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps
+        run: node scripts/run-playwright-cli.mjs install --with-deps
 
       - name: Run E2E fallback (low-mem)
-        run: PW_LOW_MEM=1 npx playwright test
+        run: PW_LOW_MEM=1 node scripts/run-playwright-cli.mjs test
 
       - name: Console Budget (fallback)
         if: ${{ always() }}
