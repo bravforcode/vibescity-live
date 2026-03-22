@@ -3,9 +3,9 @@
 ## Current Phase
 
 - **Phase:** 2 — Anonymous Identity + Claim Flow
-- **Plan:** 01 complete (PDPA consent banner + claim gate)
-- **Status:** In progress — Plans 01/02 done, Plans 03/04 pending
-- **Last activity:** 2026-03-22 — Plan 02-01 complete (ConsentBanner + HomeView consent gate)
+- **Plan:** 03 complete (full claim flow + reward feedback)
+- **Status:** In progress — Plans 01/02/03 done, Plan 04 (checkpoint) pending
+- **Last activity:** 2026-03-22 — Plan 02-03 complete (gamificationService, ClaimFeedback, handleClaimVibe wired)
 
 ## Project Reference
 
@@ -32,7 +32,7 @@ See: .planning/PROJECT.md (updated 2026-03-22)
 ## Open Tech Debt
 
 - YouAreHere dot at fixed 50%/65% viewport — addressed in Phase 3 (MAP-01)
-- `handleClaimVibe` is a no-op stub — addressed in Phase 2 (GAME-01)
+- ~~`handleClaimVibe` is a no-op stub~~ — RESOLVED in 02-03 (full claim flow wired)
 
 ## Accumulated Context
 
@@ -49,6 +49,9 @@ See: .planning/PROJECT.md (updated 2026-03-22)
 - [02-02] SECURITY DEFINER RPCs for all visitor data access — anon clients never touch tables directly
 - [02-01] Sync import for ConsentBanner (not async) — must render without lazy-load delay before any claim interaction
 - [02-01] hasConsent initialized from localStorage at mount — returning visitors (pdpa_consent_ts set) never see banner
+- [02-03] claimVibe routes through FastAPI not direct Supabase — SAFE-01 IP-hash rate limit only enforceable server-side
+- [02-03] claimedVenueIds stored as reactive Set in coinStore — MAP-02 glow ring (02-04) watches it reactively
+- [02-03] canvas-confetti added (14kB) for reward animation — CSS-only confetti significantly more complex
 
 ### Ops Prerequisites (Phase 2)
 
@@ -63,5 +66,5 @@ See: .planning/PROJECT.md (updated 2026-03-22)
 
 ## Last Session
 
-- **Timestamp:** 2026-03-22T08:31:48Z
-- **Stopped At:** Completed 02-01-PLAN.md — PDPA ConsentBanner + HomeView consent gate
+- **Timestamp:** 2026-03-22
+- **Stopped At:** Completed 02-03-PLAN.md — full claim flow wired; 02-04 (MAP-02 glow ring) is a checkpoint plan awaiting execution
