@@ -9,7 +9,7 @@ export function useMapLayers(map) {
 		if (!map.value) return;
 		if (map.value.getSource("neon-roads")) return; // already added
 
-		map.value.once('idle', () => {
+		map.value.once("idle", () => {
 			if (!map.value) return;
 			if (map.value.getSource("neon-roads")) return; // double-check after idle
 			try {
@@ -34,7 +34,15 @@ export function useMapLayers(map) {
 					source: "neon-roads",
 					paint: {
 						"line-color": "#22d3ee",
-						"line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 16, 1.5],
+						"line-width": [
+							"interpolate",
+							["linear"],
+							["zoom"],
+							12,
+							0.5,
+							16,
+							1.5,
+						],
 						"line-opacity": 0.6,
 					},
 				});
@@ -348,6 +356,107 @@ export function useMapLayers(map) {
 		}
 	};
 
+	/**
+	 * MAP-02: Add claimed venue glow ring (below pin) + crown emoji (above pin).
+	 * Creates or updates a "claimed-venues" GeoJSON source from the provided
+	 * array of venue IDs and their coordinates (looked up from allShops).
+	 *
+	 * @param {string[]} claimedVenueIds - Array of claimed venue IDs
+	 * @param {Array}    allShops        - Full shop list (provides lat/lng)
+	 */
+	const addClaimedGlowLayer = (claimedVenueIds, allShops) => {
+		if (!map.value) return;
+
+		// Build GeoJSON from claimed venue IDs using shop coordinates
+		const features = [];
+		for (const venueId of claimedVenueIds) {
+			const shop = allShops.find((s) => String(s.id) === String(venueId));
+			if (shop && shop.lng && shop.lat) {
+				features.push({
+					type: "Feature",
+					geometry: { type: "Point", coordinates: [shop.lng, shop.lat] },
+					properties: { venue_id: String(venueId) },
+				});
+			}
+		}
+
+		const geojson = {
+			type: "FeatureCollection",
+			features,
+		};
+
+		try {
+			// Source: create or update
+			if (map.value.getSource("claimed-venues")) {
+				map.value.getSource("claimed-venues").setData(geojson);
+			} else {
+				map.value.addSource("claimed-venues", {
+					type: "geojson",
+					data: geojson,
+				});
+			}
+
+			// Glow ring layer — BELOW unclustered-pins (beforeId ensures render order)
+			if (!map.value.getLayer("claimed-glow")) {
+				map.value.addLayer(
+					{
+						id: "claimed-glow",
+						type: "circle",
+						source: "claimed-venues",
+						paint: {
+							"circle-radius": [
+								"interpolate",
+								["linear"],
+								["zoom"],
+								12,
+								12,
+								16,
+								22,
+								20,
+								30,
+							],
+							"circle-color": "transparent",
+							"circle-stroke-width": 3,
+							"circle-stroke-color": "#00c853",
+							"circle-stroke-opacity": 0.85,
+							"circle-blur": 0.5,
+						},
+					},
+					"unclustered-pins", // beforeId — inserts BELOW pin layer
+				);
+			}
+
+			// Crown overlay — ABOVE unclustered-pins
+			// Uses text-field emoji — no custom image asset needed.
+			if (!map.value.getLayer("claimed-crown")) {
+				map.value.addLayer({
+					id: "claimed-crown",
+					type: "symbol",
+					source: "claimed-venues",
+					layout: {
+						"text-field": "\u{1F451}", // crown emoji
+						"text-size": [
+							"interpolate",
+							["linear"],
+							["zoom"],
+							12,
+							10,
+							16,
+							16,
+							20,
+							22,
+						],
+						"text-offset": [0, -3.5], // above the pin
+						"text-allow-overlap": true,
+						"text-ignore-placement": true,
+					},
+				});
+			}
+		} catch (e) {
+			console.warn("[useMapLayers] Failed to add claimed glow layer:", e);
+		}
+	};
+
 	// Public API
 	return {
 		addNeonRoads,
@@ -355,5 +464,6 @@ export function useMapLayers(map) {
 		loadMapImages,
 		setCyberpunkAtmosphere,
 		addCyberpunkBuildings,
+		addClaimedGlowLayer, // MAP-02
 	};
 }
