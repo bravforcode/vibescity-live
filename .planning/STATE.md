@@ -3,9 +3,9 @@
 ## Current Phase
 
 - **Phase:** 2 — Anonymous Identity + Claim Flow
-- **Plan:** 03 complete (full claim flow + reward feedback)
-- **Status:** In progress — Plans 01/02/03 done, Plan 04 (checkpoint) pending
-- **Last activity:** 2026-03-22 — Plan 02-03 complete (gamificationService, ClaimFeedback, handleClaimVibe wired)
+- **Plan:** 04 auto-tasks complete (MAP-02 glow ring implemented), awaiting checkpoint: human verification
+- **Status:** In progress — Plans 01/02/03/04-auto done; checkpoint Task 3 (end-to-end verification) pending
+- **Last activity:** 2026-03-22 — Plan 02-04 auto-tasks complete (addClaimedGlowLayer + MapboxContainer wired)
 
 ## Project Reference
 
@@ -52,6 +52,9 @@ See: .planning/PROJECT.md (updated 2026-03-22)
 - [02-03] claimVibe routes through FastAPI not direct Supabase — SAFE-01 IP-hash rate limit only enforceable server-side
 - [02-03] claimedVenueIds stored as reactive Set in coinStore — MAP-02 glow ring (02-04) watches it reactively
 - [02-03] canvas-confetti added (14kB) for reward animation — CSS-only confetti significantly more complex
+- [02-04] beforeId 'unclustered-pins' used (not 'unclustered-point' from plan example) — PIN_LAYER_ID constant in MapboxContainer is 'unclustered-pins'
+- [02-04] Crown uses text-field emoji (no custom image) — avoids async loadImage race condition on style reload
+- [02-04] addClaimedGlowLayer called inside setupMapLayers() — ensures unclustered-pins exists as beforeId target on style switches
 
 ### Ops Prerequisites (Phase 2)
 
@@ -67,4 +70,4 @@ See: .planning/PROJECT.md (updated 2026-03-22)
 ## Last Session
 
 - **Timestamp:** 2026-03-22
-- **Stopped At:** Completed 02-03-PLAN.md — full claim flow wired; 02-04 (MAP-02 glow ring) is a checkpoint plan awaiting execution
+- **Stopped At:** Completed 02-04 auto-tasks (MAP-02 glow ring) — checkpoint Task 3 (end-to-end human verification) pending. User must commit files then verify full Phase 2 flow in browser.
