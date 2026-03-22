@@ -15,12 +15,13 @@ import { useRoute, useRouter } from "vue-router";
 import BottomFeed from "../components/feed/BottomFeed.vue";
 import SmartHeader from "../components/layout/SmartHeader.vue";
 import AppModals from "../components/system/AppModals.vue";
+import ConsentBanner from "../components/ui/ConsentBanner.vue"; // ✅ PDPA consent gate (Phase 2)
 import FilterMenuSync from "../components/ui/FilterMenu.vue";
 import SidebarDrawer from "../components/ui/SidebarDrawer.vue"; // ✅ Sync Import to fix loading
 import { useAppLogic } from "../composables/useAppLogic";
 import { useLocalAds } from "../composables/useLocalAds";
-import { getSiteOrigin } from "../lib/runtimeConfig";
 import { setClientCookie } from "../lib/cookies";
+import { getSiteOrigin } from "../lib/runtimeConfig";
 import { useFeatureFlagStore } from "../store/featureFlagStore";
 
 // ✅ Async Components (Preserved)
@@ -316,12 +317,29 @@ const onExitGiantView = () => {
 const dailyCheckinRef = ref(null);
 const luckyWheelRef = ref(null);
 
+// ✅ PDPA consent gate (Phase 2 — COMP-01, IDENT-01/02)
+const hasConsent = ref(!!localStorage.getItem("pdpa_consent_ts"));
+const onConsentGranted = () => {
+	hasConsent.value = true;
+};
+
 // ✅ VibeBanner + VibeActionSheet handlers
-const handleClaimVibe = () => { /* TODO: Phase 2 gamification hook */ };
+const handleClaimVibe = () => {
+	if (!hasConsent.value) {
+		// Show consent banner — cannot claim without PDPA consent
+		return;
+	}
+	// Claim logic will be wired in Plan 03
+	console.log("[Phase 2] Claim vibe — consent granted, awaiting claim service");
+};
 const handleNavigate = () => {
 	if (!selectedShop.value) return;
 	const { lat, lng } = selectedShop.value;
-	window.open(`https://maps.google.com/?daddr=${lat},${lng}`, '_blank', 'noopener');
+	window.open(
+		`https://maps.google.com/?daddr=${lat},${lng}`,
+		"_blank",
+		"noopener",
+	);
 };
 
 const resolveVenueId = (shopOrId) => {
@@ -1223,6 +1241,12 @@ if (import.meta.env.DEV) {
       @close="selectedShop = null"
       @claim="handleClaimVibe"
       @navigate="handleNavigate"
+    />
+
+    <!-- ✅ PDPA Consent Banner (Phase 2 — shown once to new visitors before any session data is written) -->
+    <ConsentBanner
+      v-if="!hasConsent"
+      @accepted="onConsentGranted"
     />
 
     <!-- ✅ Common Modals & Overlays -->
