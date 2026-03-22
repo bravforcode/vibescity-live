@@ -99,6 +99,7 @@ export const useCoinStore = defineStore(
 		const lastCheckInDate = ref(null);
 		const pendingRewards = ref([]); // Queue for displaying rewards
 		const isProcessing = ref(false);
+		const claimedVenueIds = ref([]); // Today's claimed venue IDs (from server, Phase 2 GAME-06 + MAP-02)
 
 		// ═══════════════════════════════════════════
 		// 📊 Computed
@@ -317,6 +318,43 @@ export const useCoinStore = defineStore(
 			}
 		};
 
+		/**
+		 * Sync coin balance and claimed venues from server (GAME-06).
+		 * Called on page load for anonymous visitors after consent is granted.
+		 */
+		const syncFromServer = async (serverBalance, serverClaimedIds) => {
+			if (typeof serverBalance === "number" && serverBalance >= 0) {
+				coins.value = serverBalance;
+			}
+			if (Array.isArray(serverClaimedIds)) {
+				claimedVenueIds.value = serverClaimedIds;
+				// Also merge into collectedVenues for legacy compatibility
+				for (const id of serverClaimedIds) {
+					if (!collectedSet.value.has(id)) {
+						collectedVenues.value = [...collectedVenues.value, id];
+					}
+				}
+			}
+		};
+
+		/**
+		 * Add a venue to today's claimed list (called after a successful claim).
+		 */
+		const addClaimedVenue = (venueId) => {
+			if (!claimedVenueIds.value.includes(venueId)) {
+				claimedVenueIds.value = [...claimedVenueIds.value, venueId];
+			}
+			if (!collectedSet.value.has(venueId)) {
+				collectedVenues.value = [...collectedVenues.value, venueId];
+			}
+		};
+
+		/**
+		 * Award coins alias for components that call awardCoins() instead of awardBonus().
+		 * Fixes existing bug in ShopCard.vue and ImmersiveFeed.vue (research pitfall #1).
+		 */
+		const awardCoins = (amount) => awardBonus(amount, "venue_interaction");
+
 		// Auto-fetch on auth
 		watch(
 			() => userStore.isAuthenticated,
@@ -336,6 +374,7 @@ export const useCoinStore = defineStore(
 			lastCheckInDate,
 			pendingRewards,
 			isProcessing,
+			claimedVenueIds,
 			// Computed
 			collectedSet,
 			achievementSet,
@@ -353,6 +392,10 @@ export const useCoinStore = defineStore(
 			awardBonus,
 			clearPendingReward,
 			fetchUserStats,
+			// Phase 2 additions (GAME-06, MAP-02, SAFE-01)
+			syncFromServer,
+			addClaimedVenue,
+			awardCoins,
 			// Legacy aliases
 			totalCoins: coins,
 			addCoin: checkIn,
@@ -373,6 +416,7 @@ export const useCoinStore = defineStore(
 				"achievements",
 				"dailyStreak",
 				"lastCheckInDate",
+				"claimedVenueIds",
 			],
 			key: "vibe-coins",
 		},
