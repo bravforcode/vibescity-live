@@ -5,7 +5,9 @@ const inputPath =
 	process.env.UI_CONSOLE_EVENTS_PATH ||
 	"test-results/ui-console-events.ndjson";
 const requireInput = process.env.UI_CONSOLE_REQUIRE_INPUT === "1";
-const unexpectedBudget = Number(process.env.UI_CONSOLE_UNEXPECTED_BUDGET ?? "0");
+const unexpectedBudget = Number(
+	process.env.UI_CONSOLE_UNEXPECTED_BUDGET ?? "0",
+);
 
 const FORBIDDEN_PATTERNS = [
 	/Not found 'app\.brand' key/i,
@@ -41,8 +43,14 @@ for (const line of lines) {
 const warningOrError = entries.filter(
 	(entry) => entry?.severity === "warning" || entry?.severity === "error",
 );
-const unexpectedEntries = warningOrError.filter((entry) => !entry?.ruleId);
-const forbiddenEntries = warningOrError.filter((entry) =>
+const suppressedEntries = warningOrError.filter(
+	(entry) => entry?.reportable === false,
+);
+const actionableEntries = warningOrError.filter(
+	(entry) => entry?.reportable !== false,
+);
+const unexpectedEntries = actionableEntries.filter((entry) => !entry?.ruleId);
+const forbiddenEntries = actionableEntries.filter((entry) =>
 	FORBIDDEN_PATTERNS.some((pattern) => pattern.test(String(entry?.text || ""))),
 );
 
@@ -69,5 +77,5 @@ if (unexpectedEntries.length > unexpectedBudget) {
 }
 
 console.log(
-	`[ui-console-budget] PASS: ${warningOrError.length} warnings/errors (${unexpectedEntries.length} unexpected, budget ${unexpectedBudget}).`,
+	`[ui-console-budget] PASS: ${actionableEntries.length} actionable warnings/errors (${unexpectedEntries.length} unexpected, budget ${unexpectedBudget}; ${suppressedEntries.length} suppressed headless/browser-noise entries).`,
 );

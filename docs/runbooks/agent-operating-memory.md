@@ -2,8 +2,8 @@
 
 > Read this file before every work session in `C:\vibecity.live`.
 
-- Last updated: 2026-03-21
-- Current focus: Vercel production for `https://www.vibescity.live` now points at `origin/main@b930d36` through deployment `dpl_FyAcSWNoJDLDt8wcFGjEjNFP3dMH`; the production-safe runtime hardening is still intact and the latest local neon UI sync is live, including `VibeBanner`, neon sign markers, `YouAreHere`, and `VibeActionSheet`
+- Last updated: 2026-03-22
+- Current focus: Vercel production for `https://www.vibescity.live` now points at `origin/main@b603937` through deployment `https://vibescity-nah74ore5-phirawits-projects.vercel.app`; latest follow-up work is cleaning Playwright/CI reporting so headless-only GPU and tile-cancel noise is suppressed from automation summaries while real console regressions remain actionable
 - Canonical skill: `.agents/skills/vibecity-session-handoff/SKILL.md`
 
 ## Start Every Session
@@ -115,38 +115,25 @@
 - Keep `public/map-styles/vibecity-neon.json` and `public/map-styles/vibecity-dev.json` tracked; if either disappears, production will silently fall back to `index.html` and MapLibre will fail again.
 - If `vibecity-api.fly.dev` gains real support for `visitor/bootstrap`, `proxy/mapbox-directions`, or `hot-roads`, remove the host entry from `src/lib/runtimeLaneAvailability.js` and re-verify the live browser behavior before re-enabling those lanes.
 - Current non-blocking production noise to watch next:
-  - headless Chromium may still emit `GL_CLOSE_PATH_NV` / `ReadPixels` warnings during automation; treat those as browser/GPU noise unless they reproduce in user-visible sessions
-  - some Supabase video requests still end with `net::ERR_FAILED` or `net::ERR_ABORTED` when cards/media swap mid-load; confirm in a real user session before treating that as a production bug
+  - headless Chromium GPU/tile noise should be tagged as `reportable: false` in console automation output and excluded from CI summary counts
+  - app/runtime regressions must stay `reportable: true`; do not broaden suppression rules beyond clearly headless/browser-only cases
 
 ## Current Snapshot
 
-- Focus: the latest local neon UI snapshot has been integrated onto the production-safe `main` baseline and is now live. `https://www.vibescity.live` resolves to `dpl_FyAcSWNoJDLDt8wcFGjEjNFP3dMH` / `https://vibescity-3dd0vaom9-phirawits-projects.vercel.app`.
+- Focus: production runtime is stable on `main@b603937`; current repo-side follow-up is CI/reporting cleanup for Playwright console noise.
 - Files touched most recently before this memory file:
-  - `src/components/map/MapboxContainer.vue`
-  - `src/components/ui/VibeActionSheet.vue`
-  - `src/components/ui/VibeBanner.vue`
-  - `src/components/ui/YouAreHere.vue`
-  - `src/composables/map/useMapCore.js`
-  - `src/composables/map/useMapLayers.js`
-  - `src/composables/map/useMapMarkers.js`
-  - `src/styles/map-atmosphere.css`
-  - `src/utils/mapRenderer.js`
-  - `src/views/HomeView.vue`
-  - `src/i18n.js`
-  - `vercel.json`
+  - `tests/e2e/console-warning-allowlist.ts`
+  - `tests/e2e/helpers/consoleGate.ts`
+  - `scripts/ci/ui-console-budget.mjs`
+  - `scripts/ci/e2e-summary.mjs`
   - `docs/runbooks/agent-operating-memory.md`
 - Validation already confirmed:
-  - `git ls-remote origin refs/heads/main` now resolves to `b930d36f393da111cad995d44347b16a03c698eb`.
-  - `npx biome check` on the 11 local UI sync files passes with one intentional warning for marker `z-index: ... !important`.
-  - `bun run build` passed in `C:\vibecity.live\.vercel-main-localui-8b159cc`.
-  - `git push origin HEAD:main` promoted the integrated snapshot from clean worktree branch `release/local-ui-sync-20260321` to `origin/main`.
-  - `vercel deploy --prod --yes --scope phirawits-projects` from `C:\vibecity.live\.vercel-main-localui-8b159cc` completed and aliased production to `https://www.vibescity.live`.
-  - `vercel inspect https://www.vibescity.live` now reports deployment `dpl_FyAcSWNoJDLDt8wcFGjEjNFP3dMH` / `https://vibescity-3dd0vaom9-phirawits-projects.vercel.app`.
-  - Fresh Playwright browser verification on production shows the local neon UI sync live: marquee `VibeBanner`, neon sign map markers, `YOU ARE HERE`, popup card actions, and `VibeActionSheet` buttons (`claim_vibe`, `take_me_there`) all render on `https://www.vibescity.live/th`.
+  - `npx biome check tests/e2e/console-warning-allowlist.ts tests/e2e/helpers/consoleGate.ts scripts/ci/ui-console-budget.mjs scripts/ci/e2e-summary.mjs` passes.
+  - Fixture validation shows `node scripts/ci/ui-console-budget.mjs` ignores suppressed GPU/tile entries and fails only on actionable regressions.
+  - Fixture validation shows `node scripts/ci/e2e-summary.mjs --lane fixture --junit <fixture> --console <fixture>` prints `Console signal: <actionable> actionable, <suppressed> suppressed headless/browser-noise`.
 - Residual note:
   - Original workspace remains a dirty tree; deployment work this round was executed from clean worktree `C:\vibecity.live\.vercel-main-localui-8b159cc`.
-  - Local `bun install --frozen-lockfile` in that worktree hit intermittent `EBUSY` cache-copy failures, but existing dependencies were sufficient for local build and Vercel’s install/build completed successfully.
-  - Fresh Playwright production verification still logged two non-blocking Supabase video `net::ERR_FAILED` requests for `ff1211bab14dd7f6aff392d09a0d15cec668081b.mp4` after venue detail opened; UI remained functional.
+  - The reporting cleanup is repo/CI-only; it does not require a Vercel redeploy to affect production runtime behavior.
 
 ## Update Protocol
 
