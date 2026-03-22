@@ -221,5 +221,12 @@
 		"message": "We use cookies and local storage to save your game progress and improve your experience.",
 		"accept": "Accept",
 		"learn_more": "Learn more"
+	},
+	"claim": {
+		"coins_awarded": "+{count} coins!",
+		"already_claimed": "Already claimed today!",
+		"rate_limited": "Too many claims. Try again later.",
+		"error": "Something went wrong. Try again.",
+		"nice": "Nice!"
 	}
 }

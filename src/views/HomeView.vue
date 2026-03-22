@@ -15,6 +15,7 @@ import { useRoute, useRouter } from "vue-router";
 import BottomFeed from "../components/feed/BottomFeed.vue";
 import SmartHeader from "../components/layout/SmartHeader.vue";
 import AppModals from "../components/system/AppModals.vue";
+import ClaimFeedback from "../components/ui/ClaimFeedback.vue"; // ✅ Claim confetti overlay (Phase 2 — GAME-03)
 import ConsentBanner from "../components/ui/ConsentBanner.vue"; // ✅ PDPA consent gate (Phase 2)
 import FilterMenuSync from "../components/ui/FilterMenu.vue";
 import SidebarDrawer from "../components/ui/SidebarDrawer.vue"; // ✅ Sync Import to fix loading
@@ -23,6 +24,8 @@ import { useLocalAds } from "../composables/useLocalAds";
 import { setClientCookie } from "../lib/cookies";
 import { getSiteOrigin } from "../lib/runtimeConfig";
 import { useFeatureFlagStore } from "../store/featureFlagStore";
+import { gamificationService } from "../services/gamificationService"; // ✅ Phase 2 claim flow (SAFE-01)
+import { useCoinStore } from "../store/coinStore"; // ✅ Phase 2 server-synced coin balance (GAME-06)
 
 // ✅ Async Components (Preserved)
 // E2E strict lane can flake if the map component chunk fails to load.
@@ -323,14 +326,96 @@ const onConsentGranted = () => {
 	hasConsent.value = true;
 };
 
+// ✅ Phase 2: Claim flow state (GAME-01, GAME-02, GAME-03, GAME-06, SAFE-01)
+const coinStore = useCoinStore();
+const claimFeedback = ref({ visible: false, coins: 0, venue: "" });
+const claimError = ref(null); // 'already_claimed' | 'rate_limited' | 'error' | null
+
+// ✅ Server sync on consent (GAME-06): load balance + claimed venues from FastAPI on page load
+watch(
+	hasConsent,
+	async (granted) => {
+		if (granted) {
+			try {
+				const claims = await gamificationService.getMyClaimsFromServer();
+				coinStore.syncFromServer(claims.balance, claims.venue_ids);
+			} catch (e) {
+				console.warn("[Phase 2] Failed to sync claims from server:", e);
+			}
+		}
+	},
+	{ immediate: true },
+);
+
 // ✅ VibeBanner + VibeActionSheet handlers
-const handleClaimVibe = () => {
+const handleClaimVibe = async () => {
 	if (!hasConsent.value) {
 		// Show consent banner — cannot claim without PDPA consent
 		return;
 	}
-	// Claim logic will be wired in Plan 03
-	console.log("[Phase 2] Claim vibe — consent granted, awaiting claim service");
+	if (!selectedShop.value) return;
+
+	const venueId = resolveVenueId(selectedShop.value);
+	if (!venueId) return;
+
+	// Optimistic check (client-side, not authoritative)
+	if (coinStore.hasCollected(venueId)) {
+		claimError.value = "already_claimed";
+		setTimeout(() => {
+			claimError.value = null;
+		}, 3000);
+		return;
+	}
+
+	try {
+		const result = await gamificationService.claimVibe(String(venueId));
+
+		if (result.rate_limited) {
+			claimError.value = "rate_limited";
+			setTimeout(() => {
+				claimError.value = null;
+			}, 3000);
+			return;
+		}
+
+		if (result.already_claimed) {
+			claimError.value = "already_claimed";
+			setTimeout(() => {
+				claimError.value = null;
+			}, 3000);
+			// Sync balance from server response
+			if (typeof result.balance === "number") {
+				coinStore.coins = result.balance;
+			}
+			return;
+		}
+
+		// Success — update local state
+		coinStore.addClaimedVenue(String(venueId));
+		if (typeof result.balance === "number") {
+			coinStore.coins = result.balance;
+		}
+		if (typeof result.total_earned === "number") {
+			coinStore.totalEarned = result.total_earned;
+		}
+
+		// Show confetti + haptic overlay (GAME-03)
+		claimFeedback.value = {
+			visible: true,
+			coins: result.coins_awarded || 10,
+			venue: selectedShop.value?.name || "",
+		};
+	} catch (e) {
+		console.error("[Phase 2] Claim failed:", e);
+		claimError.value = "error";
+		setTimeout(() => {
+			claimError.value = null;
+		}, 3000);
+	}
+};
+
+const dismissClaimFeedback = () => {
+	claimFeedback.value = { ...claimFeedback.value, visible: false };
 };
 const handleNavigate = () => {
 	if (!selectedShop.value) return;
@@ -1249,6 +1334,25 @@ if (import.meta.env.DEV) {
       @accepted="onConsentGranted"
     />
 
+    <!-- ✅ Phase 2: Claim success overlay — confetti + coin reward toast (GAME-03) -->
+    <ClaimFeedback
+      :visible="claimFeedback.visible"
+      :coins-awarded="claimFeedback.coins"
+      :venue-name="claimFeedback.venue"
+      @close="dismissClaimFeedback"
+    />
+
+    <!-- ✅ Phase 2: Claim error toast (already_claimed / rate_limited / error) (GAME-02) -->
+    <Transition name="fade">
+      <div
+        v-if="claimError"
+        class="claim-error-toast"
+        role="alert"
+      >
+        {{ t('claim.' + claimError) }}
+      </div>
+    </Transition>
+
     <!-- ✅ Common Modals & Overlays -->
     <AppModals
       :selectedShop="selectedShop"
@@ -1287,5 +1391,25 @@ if (import.meta.env.DEV) {
 .low-power {
   /* Optimize for low power mode */
   filter: contrast(0.9);
+}
+
+/* Phase 2: Claim error toast (GAME-02) */
+.claim-error-toast {
+  position: fixed;
+  bottom: 180px; /* above VibeActionSheet */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 910;
+  background: rgba(10, 10, 20, 0.95);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  border-radius: 12px;
+  padding: 12px 20px;
+  color: #fca5a5;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 </style>
