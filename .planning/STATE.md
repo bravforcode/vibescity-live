@@ -2,15 +2,17 @@
 
 ## Current Phase
 
-- **Phase:** — (between milestones)
-- **Status:** v1.0 archived, planning next milestone
+- **Phase:** Not started (defining requirements)
+- **Plan:** —
+- **Status:** Defining requirements for v1.1
+- **Last activity:** 2026-03-22 — Milestone v1.1 started
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-21)
+See: .planning/PROJECT.md (updated 2026-03-22)
 
 **Core value:** Discovering the city's vibe tonight feels instant, immersive, and fun — not like browsing a list.
-**Current focus:** Planning v1.1 — gamification claim flow + YouAreHere GPS accuracy
+**Current focus:** Planning v1.1 — Claim & Earn (gamification + venue detail + GPS fix)
 
 ## v1.0 Summary
 

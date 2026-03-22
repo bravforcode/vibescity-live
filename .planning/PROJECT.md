@@ -8,6 +8,18 @@ A real-time nightlife discovery map for Chiang Mai, Thailand. Users explore venu
 
 Discovering the city's vibe tonight feels instant, immersive, and fun — not like browsing a list.
 
+## Current Milestone: v1.1 Claim & Earn
+
+**Goal:** Turn venue discovery into a reward loop — users claim vibes, earn coins + badges, spin the lucky wheel, and see live venue detail.
+
+**Target features:**
+- Anonymous identity (session cookie + browser fingerprint, no sign-in required)
+- Venue claim flow: CLAIM YOUR VIBE → coins + badge + lucky wheel spin
+- Lucky wheel mechanic: spin for bonus coins or discounts
+- Venue detail drawer: photos, visitor count, anonymous vibe ratings, hours/info
+- YouAreHere GPS fix: real `map.project()` coordinates (not fixed offset)
+- Silent data collection: IP, country, device fingerprint → server-side analytics
+
 ## Requirements
 
 ### Validated
@@ -20,11 +32,13 @@ Discovering the city's vibe tonight feels instant, immersive, and fun — not li
 
 ### Active
 
-- [ ] Gamification claim flow — CLAIM YOUR VIBE button triggers real reward
-- [ ] YouAreHere dot tracks actual GPS coordinates (not fixed viewport offset)
-- [ ] Venue detail drawer with photos, reviews, visitor count
-- [ ] User authentication + profile
-- [ ] Daily check-in rewards system
+- [ ] Anonymous identity — session cookie + browser fingerprint, no registration required
+- [ ] Venue claim flow — CLAIM YOUR VIBE awards coins + venue badge + lucky wheel spin
+- [ ] Lucky wheel — animated spin mechanic awarding bonus coins or discounts
+- [ ] YouAreHere dot tracks actual GPS coordinates via map.project() (not fixed viewport offset)
+- [ ] Venue detail drawer — photos gallery, visitor count, vibe ratings, hours/info
+- [ ] Anonymous vibe ratings — users rate venues without logging in (tied to session)
+- [ ] Silent analytics collection — IP, country, device fingerprint stored server-side
 
 ### Out of Scope
 
@@ -59,4 +73,4 @@ GSD planning adopted at v1.0 — prior work existed without structured phases.
 - No animated `box-shadow` (CPU compositing bug on mobile)
 
 ---
-*Last updated: 2026-03-21 after v1.0 milestone*
+*Last updated: 2026-03-22 after v1.1 milestone start*
