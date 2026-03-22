@@ -23,6 +23,14 @@
 
 **Requirements:** IDENT-01, IDENT-02, COMP-01, GAME-01, GAME-02, GAME-03, GAME-06, SAFE-01, MAP-02
 
+**Plans:** 4 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Consent banner + identity gating (COMP-01, IDENT-01, IDENT-02)
+- [ ] 02-02-PLAN.md — Supabase migration + FastAPI gamification router (SAFE-01, GAME-02)
+- [ ] 02-03-PLAN.md — Full claim flow wiring + reward feedback (GAME-01, GAME-03, GAME-06)
+- [ ] 02-04-PLAN.md — Claimed marker glow + end-to-end verification (MAP-02)
+
 **Success Criteria:**
 
 1. A first-time visitor sees a one-time consent banner before any gamification data is written; dismissing it stores consent timestamp in localStorage and unblocks the claim flow.
@@ -81,7 +89,7 @@
 <details>
 <summary>🔄 v1.1 Claim & Earn (Phases 2–4) — IN PROGRESS</summary>
 
-- [ ] Phase 2: Anonymous Identity + Claim Flow
+- [ ] Phase 2: Anonymous Identity + Claim Flow (4 plans)
 - [ ] Phase 3: Lucky Wheel + Venue Detail + Discovery UX
 - [ ] Phase 4: Admin Dashboard
 
@@ -94,7 +102,7 @@
 | Phase | Name | Milestone | Plans Complete | Status | Completed |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Neon Map Redesign + Performance | v1.0 | 4/4 | Complete | 2026-03-21 |
-| 2 | Anonymous Identity + Claim Flow | v1.1 | 0/? | Pending | — |
+| 2 | Anonymous Identity + Claim Flow | v1.1 | 0/4 | Planned | — |
 | 3 | Lucky Wheel + Venue Detail + Discovery UX | v1.1 | 0/? | Pending | — |
 | 4 | Admin Dashboard | v1.1 | 0/? | Pending | — |
 
