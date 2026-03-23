@@ -116,14 +116,16 @@
 - If `vibecity-api.fly.dev` gains real support for `visitor/bootstrap`, `proxy/mapbox-directions`, or `hot-roads`, remove the host entry from `src/lib/runtimeLaneAvailability.js` and re-verify the live browser behavior before re-enabling those lanes.
 - Current non-blocking production noise to watch next:
   - keep `ui-console-budget` wired into every Playwright lane so step summaries keep surfacing actionable vs suppressed console signal automatically
-  - keep Playwright commands routed through `scripts/run-playwright-cli.mjs` so nested worktrees do not fall back to a parent install and reintroduce the loader-context issue
+  - keep Playwright commands routed through `scripts/run-playwright-cli.mjs` and invoked via `bun run ...` so nested worktrees do not fall back to a parent install and reintroduce the loader-context issue
+  - keep `@playwright/test` and `playwright` pinned to the same exact version; do not reintroduce caret drift between them
   - app/runtime regressions must stay `reportable: true`; do not broaden suppression rules beyond clearly headless/browser-only cases
   - visual lanes now emit `reports/visual/junit.xml`; if those jobs ever change config, keep the summary path in sync instead of dropping console signal coverage
 
 ## Current Snapshot
 
-- Focus: production runtime is stable on `main@b603937`; current repo-side follow-up fixed the visual Playwright loader issue by routing repo commands through a project-local CLI wrapper instead of ambiguous `npx` resolution.
+- Focus: production runtime is stable on `main@b603937`; current repo-side follow-up aligned Playwright package versions to `1.58.2` and moved Playwright package-manager paths to Bun while keeping the local CLI wrapper in place.
 - Files touched most recently before this memory file:
+  - `bun.lock`
   - `scripts/run-playwright-cli.mjs`
   - `package.json`
   - `.github/workflows/ci.yml`
@@ -135,14 +137,15 @@
   - `.github/workflows/visual-regression.yml`
   - `docs/runbooks/agent-operating-memory.md`
 - Validation already confirmed:
-  - `npm run test:visual:list` now lists all 7 visual tests successfully from the clean worktree.
-  - `npm run test:visual -- tests/visual/dashboard.visual.spec.ts --list` now lists the targeted dashboard visual tests successfully.
-  - `npm run test:e2e -- --list` now lists the full E2E matrix successfully through the wrapper.
-  - `npx biome check scripts/run-playwright-cli.mjs package.json` passes.
+  - `bun install --frozen-lockfile` passes after aligning Playwright versions.
+  - `bun run test:visual:list` now lists all 7 visual tests successfully from the clean worktree.
+  - `bun run test:visual -- tests/visual/dashboard.visual.spec.ts --list` now lists the targeted dashboard visual tests successfully.
+  - `bun run test:e2e -- --list` now lists the full E2E matrix successfully through the wrapper.
+  - `bunx biome check package.json scripts/run-playwright-cli.mjs` passes.
   - `git diff --check` passes.
 - Residual note:
   - Original workspace remains a dirty tree; deployment work this round was executed from clean worktree `C:\vibecity.live\.vercel-main-localui-8b159cc`.
-  - The old failure was caused by `npx playwright` resolving a different Playwright install than the one the clean worktree test files imported. The wrapper avoids that class of issue for local and CI commands that go through repo scripts/workflows.
+  - The old failure was caused by `npx playwright` resolving a different Playwright install than the one the clean worktree test files imported. The wrapper plus Bun-based repo commands avoid that class of issue for local and CI commands that go through repo scripts/workflows.
   - The reporting cleanup is repo/CI-only; it does not require a Vercel redeploy to affect production runtime behavior.
 
 ## Update Protocol
