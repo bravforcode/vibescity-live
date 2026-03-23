@@ -2,8 +2,8 @@
 
 > Read this file before every work session in `C:\vibecity.live`.
 
-- Last updated: 2026-03-20
-- Current focus: Map/feed stability hardening remains active, production Thailand venue coverage baseline remains intact, and the staging→production deploy lane is currently green after syncing missing runtime/map support modules plus rspack binding alignment
+- Last updated: 2026-03-23
+- Current focus: Local UI/runtime investigation is active alongside the existing map/feed hardening lane; current `main` remains the source-of-truth for the "Hardened" sidebar/filter/card UI while the deploy-facing `origin/main` line has diverged to a different sidebar/filter/card implementation
 - Canonical skill: `.agents/skills/vibecity-session-handoff/SKILL.md`
 
 ## Start Every Session
@@ -95,6 +95,17 @@
 ## Current Resume Items
 
 - Preserve the "quiet by default" logging policy unless the user explicitly asks for diagnostic verbosity.
+- If the browser appears to show reverted UI, first confirm the actual instance URL and serving folder before touching source files.
+- The currently observed Brave tab at `http://127.0.0.1:5175/` belongs to `C:\gosoft demo\frontend`, not `C:\vibecity.live`.
+- For this repo, use `http://localhost:5173/` when validating local UI from `C:\vibecity.live`.
+- Treat current `main` as the source-of-truth for the "Hardened" UI strings/components:
+  - `src/components/ui/SidebarDrawer.vue`
+  - `src/components/ui/FilterMenu.vue`
+  - `src/components/panel/ShopCard.vue`
+- Treat `origin/main` and worktree `release/local-ui-sync-20260321` as a different UI line:
+  - sidebar uses `Business`/`My Vibes` sections instead of the "Hardened" drawer
+  - filter menu is the bottom-sheet redesign, not the right-side "FILTER VIBE" panel
+  - shop card includes tilt/blur-up/pull-up affordances not present in local `main`
 - Keep weather/custom-map FX gated behind capability checks; do not reintroduce eager WebGL shader setup on every map boot.
 - Keep owner/partner fallback semantics split by mode:
   - frontend-only localhost: return `local_fallback` payloads directly to avoid 504/CORS/401 noise
@@ -121,7 +132,7 @@
 
 ## Current Snapshot
 
-- Focus: `/th`, `/th/partner`, and `/th/merchant` behavior stays aligned with quiet local-fallback + centered-card flow, and production deployment recovery has been completed from `staging`.
+- Focus: UI regression investigation determined the apparent rollback was caused by instance confusion first, and branch divergence second.
 - Files touched most recently before this memory file:
   - `docs/runbooks/agent-operating-memory.md`
   - `package.json`
@@ -144,13 +155,32 @@
   - `src/utils/networkErrorUtils.js`
   - `src/utils/retryPolicy.js`
   - `src/utils/supabaseReadPolicy.js`
+- Files touched in this session:
+  - `bun.lock`
+  - `docs/runbooks/agent-operating-memory.md`
+  - deploy-facing worktree `C:\vibecity.live\.vercel-main-localui-8b159cc\src\components\ui\SidebarDrawer.vue`
+  - deploy-facing worktree `C:\vibecity.live\.vercel-main-localui-8b159cc\src\components\ui\FilterMenu.vue`
+  - deploy-facing worktree `C:\vibecity.live\.vercel-main-localui-8b159cc\src\components\panel\ShopCard.vue`
 - Validation already confirmed:
   - `bun run build` passed in `C:\vibecity.live\.codex-clean-push-20260320`.
   - `staging` now contains deployment-fix commits `1bc3e2e` and `137ac3f` (after `f889752` map/feed fixes).
   - Vercel production deployment `dpl_XL9SypCCf913Tobn3Sc7DVNkmwv6` reached `Ready` with aliases attached to `https://www.vibescity.live`.
+- Validation confirmed in this session:
+  - `git worktree list --porcelain` confirmed the deploy-facing worktree `C:/vibecity.live/.vercel-main-localui-8b159cc` tracks branch `release/local-ui-sync-20260321`.
+  - `Get-CimInstance Win32_Process` confirmed the active Brave tab was opened at `http://127.0.0.1:5175/` from a Vite process in `C:\gosoft demo\frontend`.
+  - `bun install` restored missing local dependency resolution for `mapbox-gl` in this workspace and updated `bun.lock`.
+  - `bun run dev` on `C:\vibecity.live` now starts `rsbuild` on `http://localhost:5173/`.
+  - Comparing `main` vs `origin/main` confirmed the "Hardened" sidebar/filter/card UI lives on local `main`, while `origin/main` has a different sidebar/filter/card implementation.
+  - The deploy-facing worktree now has the local `main` "Hardened" UI ported into `SidebarDrawer.vue`, `FilterMenu.vue`, and `ShopCard.vue`, with the drawer adapted to preserve the existing `open-favorites` event contract.
+  - `npx biome format --write src/components/ui/SidebarDrawer.vue src/components/ui/FilterMenu.vue src/components/panel/ShopCard.vue` passed in `C:\vibecity.live\.vercel-main-localui-8b159cc`.
+  - `npx biome check --write src/components/ui/SidebarDrawer.vue src/components/ui/FilterMenu.vue src/components/panel/ShopCard.vue` passed in `C:\vibecity.live\.vercel-main-localui-8b159cc`.
+  - `bun run build` passed in `C:\vibecity.live\.vercel-main-localui-8b159cc` after the UI port.
+  - Searching the built output confirmed the deploy worktree bundle now contains the expected Hardened UI strings such as `Vibe Explorer`, `Daily Check-in`, `Lucky Wheel`, and the right-side filter panel label `FILTER VIBE`.
 - Residual note:
   - Original workspace remains a dirty tree with additional unpushed local changes; deploy-critical updates were shipped from clean clone `C:\vibecity.live\.codex-clean-push-20260320`.
   - Keep preview-first local Chromium behavior as default; only opt into raw WebGL intentionally for diagnostics.
+  - `public/index.html` still references `/static/js/index.js` plus `/src/main.js`; local UI validation should be done against the served bundle and the actual running URL, not by assuming the browser is pointed at this repo's source automatically.
+  - The deploy-facing worktree already had unrelated modified workflow/package files before this UI port; do not revert or bundle those blindly when preparing the UI sync commit.
 
 ## Update Protocol
 

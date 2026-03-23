@@ -3,8 +3,32 @@
 # Redundant Nested Project
 vibecity.live/
 
-# Git worktrees (contain .venv and other large dirs that break Vercel scan)
+# Git worktrees & agent-generated dirs
 .worktrees/
+.codex-*/
+.vercel-main-*/
+.vercel-prod-*/
+ux-ui-agent-skills/
+.loki/
+.ruff_cache/
+.planning/
+.agent/
+.storybook/
+storybook-static/
+k6-tests/
+demo/
+check_db/
+audit/
+reports/
+test-results/
+playwright-report*/
+e2e/
+tests/
+backend/
+supabase/
+docs/
+scripts/
+tmp/
 
 # Node Modules
 node_modules/

@@ -96,9 +96,6 @@ const LuckyWheel = defineAsyncComponent(
 const LocalAdBanner = defineAsyncComponent(
 	() => import("../components/ads/LocalAdBanner.vue"),
 );
-const VibeBanner = defineAsyncComponent(
-	() => import("../components/ui/VibeBanner.vue"),
-);
 const VibeActionSheet = defineAsyncComponent(
 	() => import("../components/ui/VibeActionSheet.vue"),
 );
@@ -1052,7 +1049,6 @@ if (import.meta.env.DEV) {
       <div v-if="!isMobileView" class="grid grid-cols-[65%_35%] h-full">
         <!-- Map Container -->
         <div data-testid="map-shell-wrapper" class="relative">
-          <VibeBanner :text="t('gamification.vibe_of_hour')" />
           <MapContainer
             ref="mapRef"
             :uiTopOffset="mapUiTopOffset"
@@ -1199,7 +1195,6 @@ if (import.meta.env.DEV) {
           class="absolute inset-0"
           v-show="!isImmersive"
         >
-          <VibeBanner :text="t('gamification.vibe_of_hour')" />
           <MapContainer
             ref="mapRef"
             :uiTopOffset="mapUiTopOffset"

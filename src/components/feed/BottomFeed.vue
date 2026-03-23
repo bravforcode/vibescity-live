@@ -275,7 +275,7 @@ const getItemSize = (index) => {
       <!-- Loading State -->
       <div
         v-if="isDataLoading"
-        class="flex items-end px-[calc(50vw-90px)] py-4 gap-4 no-scrollbar mb-0 h-[320px] overflow-x-hidden"
+        class="flex items-end px-[calc(50vw-80px)] py-4 gap-4 no-scrollbar mb-0 h-[260px] overflow-x-hidden"
       >
         <SkeletonCard
           v-for="i in 5"
@@ -283,7 +283,7 @@ const getItemSize = (index) => {
           variant="carousel"
           :isDarkMode="isDarkMode"
           class="pointer-events-auto"
-          style="width: 200px; height: 280px"
+          style="width: 160px; height: 200px"
         />
       </div>
 
@@ -370,7 +370,7 @@ const getItemSize = (index) => {
               'flex gap-3 no-scrollbar items-end transition-[transform,opacity,box-shadow,border-color,background-color] duration-300 snap-x snap-mandatory scroll-smooth',
               isImmersive
                 ? 'flex-col h-full overflow-y-auto overflow-x-hidden pt-0 pb-0 gap-0'
-                : 'flex-row overflow-x-auto overflow-y-visible px-2 py-8 mb-2 h-[420px] items-end',
+                : 'flex-row overflow-x-auto overflow-y-visible px-2 py-6 mb-2 h-[300px] items-end',
               'opacity-100',
               isDragging ? 'cursor-grabbing' : 'cursor-grab',
             ]"
@@ -389,7 +389,7 @@ const getItemSize = (index) => {
           >
             <div
               v-if="!isImmersive"
-              class="flex-shrink-0 w-[calc(50vw-110px)]"
+              class="flex-shrink-0 w-[calc(50vw-80px)]"
             ></div>
 
             <template v-if="isIndoorView">
@@ -397,7 +397,7 @@ const getItemSize = (index) => {
                 v-for="shop in mallShops.filter((s) => s.Floor === activeFloor)"
                 :key="`indoor-${shop.id}`"
                 :shop="shop"
-                class="flex-shrink-0 w-[340px] h-[400px] snap-center"
+                class="flex-shrink-0 w-[260px] h-[300px] snap-center"
               />
             </template>
 
@@ -427,12 +427,12 @@ const getItemSize = (index) => {
                 :class="[
                   isImmersive
                     ? 'w-full h-[100dvh] rounded-none scale-100 opacity-100'
-                    : 'w-[220px] h-[200px]',
+                    : 'w-[160px] h-[155px]',
                   !isImmersive && activeShopId === shop.id
-                    ? 'scale-100 z-20'
+                    ? 'scale-100 z-20 shadow-[0_0_24px_4px_rgba(139,92,246,0.55),0_0_8px_2px_rgba(236,72,153,0.35)]'
                     : '',
                   !isImmersive && activeShopId !== shop.id
-                    ? 'scale-90 opacity-70'
+                    ? 'scale-90 opacity-65'
                     : '',
                 ]"
               >
@@ -519,7 +519,7 @@ const getItemSize = (index) => {
 
             <div
               v-if="!isImmersive"
-              class="flex-shrink-0 w-[calc(50vw-110px)]"
+              class="flex-shrink-0 w-[calc(50vw-80px)]"
             ></div>
           </div>
         </PullToRefresh>

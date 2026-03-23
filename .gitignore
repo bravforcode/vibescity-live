@@ -164,15 +164,59 @@ playwright-report*/
 
 # Temporary files
 .tmp*
-
 nul
+
+# Playwright reports (all variants)
 playwright-report*/
+
+# Claude / Agent config (local only)
 AGENTS.md
 CLAUDE.md
 .claude/
-.tmp*
-# local notes / artifacts
+
+# Local notes / artifacts
 findings.md
 progress.md
 task_plan.md
 observability/
+
+# ----------------------------------------
+# 13. Dev Tooling & Worktrees (auto-generated)
+# ----------------------------------------
+# Old Codex / Vercel agent worktrees
+.codex-*/
+.vercel-main-*/
+.vercel-prod-*/
+
+# Visual regression snapshots
+.loki/
+
+# Python lint cache
+.ruff_cache/
+
+# Build / lint report txt files
+build_output.txt
+build_report.txt
+bundle_size_report.txt
+knip_report.txt
+lint_report.txt
+unit_test_report*.txt
+*_unit_full.log
+vibecity_zero_loss_patch.diff
+
+# UI / UX agent skills (local dev tool, not source code)
+ux-ui-agent-skills/
+
+# Storybook build
+storybook-static/
+.storybook/
+
+# k6 performance tests output
+k6-tests/
+
+# Demo / check scripts
+demo/
+check_db/
+
+# Coverage report file
+.coverage
