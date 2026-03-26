@@ -12,7 +12,11 @@ export default defineConfig({
 			maxDiffPixelRatio: 0.02,
 		},
 	},
-	reporter: [["list"], ["html", { outputFolder: "playwright-report", open: "never" }]],
+	reporter: [
+		["list"],
+		["html", { outputFolder: "playwright-report", open: "never" }],
+		["junit", { outputFile: "reports/visual/junit.xml" }],
+	],
 	outputDir: "test-results/visual",
 	use: {
 		baseURL,

@@ -6,14 +6,12 @@ Designed for cloud deployment with GitHub Actions
 """
 import json
 import os
-import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import List, Dict, Optional
 
 # Try to import supabase, handle gracefully if not available
 try:
-    from supabase import create_client, Client
+    from supabase import Client, create_client
     SUPABASE_AVAILABLE = True
 except ImportError:
     SUPABASE_AVAILABLE = False
@@ -52,7 +50,7 @@ CATEGORY_COLORS = {
 }
 
 
-def transform_venue(osm_venue: Dict) -> Dict:
+def transform_venue(osm_venue: dict) -> dict:
     """Transform OSM venue to Supabase venues table format"""
     category = osm_venue.get("category", "อื่นๆ")
 
@@ -87,11 +85,11 @@ def transform_venue(osm_venue: Dict) -> Dict:
         "source": "osm",
         "osm_id": osm_venue.get("osm_id", ""),
         "osm_type": osm_venue.get("osm_type", "node"),
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
     }
 
 
-def load_venue_data(filename: str = "thailand_venues.json") -> List[Dict]:
+def load_venue_data(filename: str = "thailand_venues.json") -> list[dict]:
     """Load scraped venue data from JSON file"""
     file_path = Path(__file__).parent / filename
 
@@ -100,13 +98,13 @@ def load_venue_data(filename: str = "thailand_venues.json") -> List[Dict]:
         print("   Run osm_scraper.py first!")
         return []
 
-    with open(file_path, "r", encoding="utf-8") as f:
+    with open(file_path, encoding="utf-8") as f:
         data = json.load(f)
 
     return data.get("venues", [])
 
 
-def import_to_supabase(venues: List[Dict], batch_size: int = 50):
+def import_to_supabase(venues: list[dict], batch_size: int = 50):
     """Import venues to Supabase with upsert (insert or update)"""
     if not SUPABASE_AVAILABLE:
         print("❌ Supabase library not available")
@@ -117,7 +115,7 @@ def import_to_supabase(venues: List[Dict], batch_size: int = 50):
         print("   Set them in .env or as environment variables")
         return
 
-    print(f"🔌 Connecting to Supabase...")
+    print("🔌 Connecting to Supabase...")
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
     # Transform all venues
@@ -141,7 +139,7 @@ def import_to_supabase(venues: List[Dict], batch_size: int = 50):
 
         try:
             # Upsert based on osm_id to avoid duplicates
-            result = supabase.table("venues").upsert(
+            supabase.table("venues").upsert(
                 batch,
                 on_conflict="osm_id"
             ).execute()
@@ -156,13 +154,13 @@ def import_to_supabase(venues: List[Dict], batch_size: int = 50):
 
     print()
     print("=" * 50)
-    print(f"📊 Import Summary:")
+    print("📊 Import Summary:")
     print(f"   ✅ Success: {success_count}")
     print(f"   ❌ Errors: {error_count}")
     print(f"   📍 Total processed: {success_count + error_count}")
 
 
-def generate_stats(venues: List[Dict]) -> Dict:
+def generate_stats(venues: list[dict]) -> dict:
     """Generate statistics from venue data"""
     stats = {
         "total": len(venues),
@@ -198,17 +196,17 @@ def main():
 
     # Generate and print stats
     stats = generate_stats(venues)
-    print(f"\n📊 Data Statistics:")
+    print("\n📊 Data Statistics:")
     print(f"   Total venues: {stats['total']}")
     print(f"   Provinces: {len(stats['by_province'])}")
     print(f"   Categories: {len(stats['by_category'])}")
 
-    print(f"\n📍 Top 10 Provinces:")
+    print("\n📍 Top 10 Provinces:")
     top_provinces = sorted(stats["by_province"].items(), key=lambda x: -x[1])[:10]
     for province, count in top_provinces:
         print(f"   {province}: {count}")
 
-    print(f"\n🏷️  Top 10 Categories:")
+    print("\n🏷️  Top 10 Categories:")
     top_categories = sorted(stats["by_category"].items(), key=lambda x: -x[1])[:10]
     for cat, count in top_categories:
         print(f"   {cat}: {count}")

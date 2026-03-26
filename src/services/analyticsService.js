@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from "uuid";
 import { supabase } from "../lib/supabase";
 
 const ANALYTICS_ENDPOINT = "analytics-ingest";
+const STORAGE_KEY_CONSENT = "vibe_analytics_consent";
 const STORAGE_KEY_VISITOR = "vibe_visitor_id";
 const INVOKE_TIMEOUT_MS = 2500;
 
@@ -59,9 +60,20 @@ export const analyticsService = {
 		}
 	},
 
+	hasConsent() {
+		try {
+			if (typeof navigator !== "undefined" && navigator.doNotTrack === "1") {
+				return false;
+			}
+			return localStorage.getItem(STORAGE_KEY_CONSENT) === "granted";
+		} catch {
+			return false;
+		}
+	},
+
 	async trackSession() {
 		if (!analyticsEnabled) return;
-		if (circuitOpen) return;
+		if (!this.hasConsent() || circuitOpen) return;
 
 		try {
 			const { error } = await supabase.functions.invoke(ANALYTICS_ENDPOINT, {
@@ -88,7 +100,7 @@ export const analyticsService = {
 
 	async trackEvent(eventType, metadata = {}, shopId = null) {
 		if (!analyticsEnabled) return;
-		if (circuitOpen) return;
+		if (!this.hasConsent() || circuitOpen) return;
 
 		try {
 			const normalizedVenueRef =
@@ -118,7 +130,7 @@ export const analyticsService = {
 
 	async trackWebVital(payload = {}) {
 		if (!analyticsEnabled) return;
-		if (circuitOpen) return;
+		if (!this.hasConsent() || circuitOpen) return;
 
 		try {
 			const metadata = {

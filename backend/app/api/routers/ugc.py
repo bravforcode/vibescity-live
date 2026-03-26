@@ -1,18 +1,21 @@
 """
 UGC Router - User Generated Content & Gamification
 """
-from datetime import datetime, timezone
-from typing import List, Optional
+from datetime import UTC, datetime
+from typing import Union
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from starlette.requests import Request
 
 from app.core.auth import verify_user
+from app.core.cache import user_profile_cache
 from app.core.rate_limit import limiter
 from app.core.supabase import supabase
 
 router = APIRouter()
+VenueIdInput = Union[str, int, UUID]
 
 
 class ShopSubmission(BaseModel):
@@ -20,20 +23,20 @@ class ShopSubmission(BaseModel):
     category: str
     latitude: float
     longitude: float
-    province: Optional[str] = "Unknown"
-    images: List[str] = Field(default_factory=list)
-    description: Optional[str] = ""
+    province: str | None = "Unknown"
+    images: list[str] = Field(default_factory=list)
+    description: str | None = ""
 
 
 class CheckInRequest(BaseModel):
-    venue_id: int
-    note: Optional[str] = ""
+    venue_id: VenueIdInput
+    note: str | None = ""
 
 
 class PhotoUploadRequest(BaseModel):
-    venue_id: int
+    venue_id: VenueIdInput
     image_url: str
-    caption: Optional[str] = ""
+    caption: str | None = ""
 
 
 REWARDS = {
@@ -46,10 +49,12 @@ REWARDS = {
 }
 
 
-def grant_rewards(user_id: str, action: str) -> None:
+def grant_rewards(user_id: str, action: str) -> dict | None:
     reward = REWARDS.get(action, {"coins": 0, "xp": 0})
+    # S5: invalidate cached profile so next read reflects new coin/xp balance
+    user_profile_cache.pop(user_id, None)
     try:
-        supabase.rpc(
+        result = supabase.rpc(
             "grant_rewards",
             {
                 "target_user_id": user_id,
@@ -58,9 +63,24 @@ def grant_rewards(user_id: str, action: str) -> None:
                 "action_name": action,
             },
         ).execute()
+        data = getattr(result, "data", None)
+        if isinstance(data, dict) and data.get("success"):
+            return data
+        return None
     except Exception:
         # Reward failures should not block the user action.
-        pass
+        return None
+
+
+def _normalize_venue_id(venue_id: VenueIdInput) -> tuple[str, str | None]:
+    venue_text = str(venue_id).strip()
+    if not venue_text:
+        raise HTTPException(status_code=422, detail="venue_id is required")
+    try:
+        venue_uuid = str(UUID(venue_text))
+    except ValueError:
+        venue_uuid = None
+    return venue_text, venue_uuid
 
 
 @router.post("/shops")
@@ -86,12 +106,17 @@ def submit_shop(
         if not result.data:
             raise HTTPException(status_code=500, detail="Failed to submit shop")
 
-        grant_rewards(user.id, "submit_shop")
+        reward_result = grant_rewards(user.id, "submit_shop")
+        rewarded = reward_result is not None
         return {
             "success": True,
-            "message": "Shop submitted successfully! +10 Coins, +50 XP earned.",
+            "message": (
+                "Shop submitted successfully! +10 Coins, +50 XP earned."
+                if rewarded
+                else "Shop submitted successfully, but daily reward limit reached."
+            ),
             "data": result.data[0],
-            "rewards": REWARDS["submit_shop"],
+            "rewards": REWARDS["submit_shop"] if rewarded else {"coins": 0, "xp": 0},
         }
     except HTTPException:
         raise
@@ -107,38 +132,67 @@ def check_in(
     user=Depends(verify_user),
 ):
     try:
-        today_start = datetime.now(timezone.utc).replace(
+        venue_text, venue_uuid = _normalize_venue_id(check_in_data.venue_id)
+        today_start = datetime.now(UTC).replace(
             hour=0,
             minute=0,
             second=0,
             microsecond=0,
         )
-        existing = (
-            supabase.table("check_ins")
-            .select("id")
-            .eq("user_id", user.id)
-            .eq("venue_id", check_in_data.venue_id)
-            .gte("created_at", today_start.isoformat())
-            .execute()
-        )
+        existing_query = supabase.table("check_ins").select("id").eq("user_id", user.id)
+        if venue_uuid:
+            try:
+                existing = (
+                    existing_query
+                    .or_(f"venue_id_uuid.eq.{venue_uuid},venue_id.eq.{venue_text}")
+                    .gte("created_at", today_start.isoformat())
+                    .execute()
+                )
+            except Exception:
+                existing = (
+                    supabase.table("check_ins")
+                    .select("id")
+                    .eq("user_id", user.id)
+                    .eq("venue_id", venue_text)
+                    .gte("created_at", today_start.isoformat())
+                    .execute()
+                )
+        else:
+            existing = (
+                existing_query
+                .eq("venue_id", venue_text)
+                .gte("created_at", today_start.isoformat())
+                .execute()
+            )
         if existing.data:
             raise HTTPException(status_code=429, detail="Check-in already recorded today")
 
         payload = {
             "user_id": user.id,
-            "venue_id": check_in_data.venue_id,
+            "venue_id": venue_text,
             "note": check_in_data.note,
         }
-        result = supabase.table("check_ins").insert(payload).execute()
+        if venue_uuid:
+            payload["venue_id_uuid"] = venue_uuid
+        try:
+            result = supabase.table("check_ins").insert(payload).execute()
+        except Exception:
+            payload.pop("venue_id_uuid", None)
+            result = supabase.table("check_ins").insert(payload).execute()
         if not result.data:
             raise HTTPException(status_code=500, detail="Check-in failed")
 
-        grant_rewards(user.id, "check_in")
+        reward_result = grant_rewards(user.id, "check_in")
+        rewarded = reward_result is not None
         return {
             "success": True,
-            "message": "Check-in successful! +5 Coins, +25 XP earned.",
+            "message": (
+                "Check-in successful! +5 Coins, +25 XP earned."
+                if rewarded
+                else "Check-in successful, but daily reward limit reached."
+            ),
             "data": result.data[0],
-            "rewards": REWARDS["check_in"],
+            "rewards": REWARDS["check_in"] if rewarded else {"coins": 0, "xp": 0},
         }
     except HTTPException:
         raise
@@ -154,23 +208,37 @@ def upload_photo(
     user=Depends(verify_user),
 ):
     try:
+        venue_text, venue_uuid = _normalize_venue_id(photo_data.venue_id)
         payload = {
             "user_id": user.id,
-            "venue_id": photo_data.venue_id,
+            "venue_id": venue_uuid or venue_text,
             "image_url": photo_data.image_url,
             "caption": photo_data.caption,
             "status": "pending",
         }
-        result = supabase.table("venue_photos").insert(payload).execute()
+        if venue_uuid:
+            payload["venue_id_uuid"] = venue_uuid
+        try:
+            result = supabase.table("venue_photos").insert(payload).execute()
+        except Exception:
+            payload.pop("venue_id_uuid", None)
+            if venue_uuid:
+                payload["venue_id"] = venue_text
+            result = supabase.table("venue_photos").insert(payload).execute()
         if not result.data:
             raise HTTPException(status_code=500, detail="Photo upload failed")
 
-        grant_rewards(user.id, "upload_photo")
+        reward_result = grant_rewards(user.id, "upload_photo")
+        rewarded = reward_result is not None
         return {
             "success": True,
-            "message": "Photo uploaded! +20 Coins, +100 XP earned.",
+            "message": (
+                "Photo uploaded! +20 Coins, +100 XP earned."
+                if rewarded
+                else "Photo uploaded, but daily reward limit reached."
+            ),
             "data": result.data[0],
-            "rewards": REWARDS["upload_photo"],
+            "rewards": REWARDS["upload_photo"] if rewarded else {"coins": 0, "xp": 0},
         }
     except HTTPException:
         raise
@@ -267,4 +335,3 @@ def get_user_submissions(user=Depends(verify_user)):
         return {"success": True, "submissions": result.data or []}
     except Exception:
         return {"success": True, "submissions": []}
-

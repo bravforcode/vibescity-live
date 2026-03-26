@@ -1,18 +1,42 @@
-export function useMapHeatmap(mapRef, allowHeatmapRef) {
+const IS_E2E = import.meta.env.VITE_E2E === "true";
+
+const prefersReducedMotion =
+	typeof window !== "undefined"
+		? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+		: false;
+
+// HSL color ramp: chill (violet) → warm (orange) → hype (crimson)
+const BREATH_COLORS = {
+	chill: "hsla(260, 65%, 55%, 0)",
+	low: "hsla(220, 70%, 60%, 1)",
+	mid: "hsla(30, 90%, 65%, 1)",
+	warm: "hsla(15, 85%, 55%, 1)",
+	hot: "hsla(350, 80%, 50%, 1)",
+	hype: "hsla(0, 90%, 45%, 1)",
+};
+
+export function useMapHeatmap(mapRef, allowHeatmapRef, shopsByIdRef) {
 	const heatmapGeoJson = {
 		type: "FeatureCollection",
 		features: [],
 	};
 
-	const updateHeatmapData = (densityData, shops) => {
+	let _breathRaf = null;
+	let _breathing = false;
+	let _observer = null;
+	let _isVisible = true;
+	let _maxDensity = 1;
+
+	const updateHeatmapData = (densityData) => {
 		if (!allowHeatmapRef.value) return;
-		// densityData: { shopId: count }
-		if (!shops) return;
+		if (!shopsByIdRef?.value || !densityData) return;
 
 		const features = [];
+		let maxD = 1;
 		Object.entries(densityData).forEach(([shopId, count]) => {
-			const shop = shops.find((s) => s.id == shopId);
+			const shop = shopsByIdRef.value.get(String(shopId));
 			if (shop?.lat && shop?.lng) {
+				if (count > maxD) maxD = count;
 				features.push({
 					type: "Feature",
 					geometry: {
@@ -26,9 +50,9 @@ export function useMapHeatmap(mapRef, allowHeatmapRef) {
 			}
 		});
 
+		_maxDensity = maxD;
 		heatmapGeoJson.features = features;
 
-		// Update Map Source
 		if (mapRef.value?.getSource("heatmap-source")) {
 			mapRef.value.getSource("heatmap-source").setData(heatmapGeoJson);
 		}
@@ -36,6 +60,7 @@ export function useMapHeatmap(mapRef, allowHeatmapRef) {
 
 	const removeHeatmapLayer = () => {
 		if (!mapRef.value) return;
+		stopBreathing();
 		if (mapRef.value.getLayer("heatmap-layer")) {
 			mapRef.value.removeLayer("heatmap-layer");
 		}
@@ -59,7 +84,6 @@ export function useMapHeatmap(mapRef, allowHeatmapRef) {
 			return;
 		}
 
-		// Source
 		if (!mapRef.value.getSource("heatmap-source")) {
 			mapRef.value.addSource("heatmap-source", {
 				type: "geojson",
@@ -67,7 +91,6 @@ export function useMapHeatmap(mapRef, allowHeatmapRef) {
 			});
 		}
 
-		// Layer
 		if (!mapRef.value.getLayer("heatmap-layer")) {
 			const beforeId = getFirstExistingLayerId([
 				"waterway-label",
@@ -82,7 +105,6 @@ export function useMapHeatmap(mapRef, allowHeatmapRef) {
 				source: "heatmap-source",
 				maxzoom: 15,
 				paint: {
-					// Increase weight based on density
 					"heatmap-weight": [
 						"interpolate",
 						["linear"],
@@ -92,7 +114,6 @@ export function useMapHeatmap(mapRef, allowHeatmapRef) {
 						10,
 						1,
 					],
-					// Increase intensity as zoom level increases
 					"heatmap-intensity": [
 						"interpolate",
 						["linear"],
@@ -102,25 +123,23 @@ export function useMapHeatmap(mapRef, allowHeatmapRef) {
 						15,
 						3,
 					],
-					// Color ramp
 					"heatmap-color": [
 						"interpolate",
 						["linear"],
 						["heatmap-density"],
 						0,
-						"rgba(33,102,172,0)",
+						BREATH_COLORS.chill,
 						0.2,
-						"rgb(103,169,207)",
+						BREATH_COLORS.low,
 						0.4,
-						"rgb(209,229,240)",
+						BREATH_COLORS.mid,
 						0.6,
-						"rgb(253,219,199)",
+						BREATH_COLORS.warm,
 						0.8,
-						"rgb(239,138,98)",
+						BREATH_COLORS.hot,
 						1,
-						"rgb(178,24,43)",
+						BREATH_COLORS.hype,
 					],
-					// Radius
 					"heatmap-radius": ["interpolate", ["linear"], ["zoom"], 0, 2, 15, 20],
 					"heatmap-opacity": 0.7,
 				},
@@ -132,8 +151,104 @@ export function useMapHeatmap(mapRef, allowHeatmapRef) {
 					mapRef.value.addLayer(layer);
 				}
 			} catch (e) {
-				console.warn("Heatmap layer insertion failed:", e);
+				if (!IS_E2E) {
+					console.warn("Heatmap layer insertion failed:", e);
+				}
 			}
+		}
+
+		startBreathing();
+		setupVisibilityObserver();
+	};
+
+	// ─── Breathing Animation ─────────────────────────────────────
+	const startBreathing = () => {
+		if (_breathing || prefersReducedMotion) return;
+		_breathing = true;
+
+		const startTime = performance.now();
+		const BASE_RADIUS_MIN = 15;
+		const BASE_RADIUS_MAX = 25;
+		const BASE_OPACITY = 0.7;
+
+		const breathe = () => {
+			if (!_breathing) return;
+			if (!_isVisible || document.hidden) {
+				_breathRaf = requestAnimationFrame(breathe);
+				return;
+			}
+
+			const map = mapRef.value;
+			if (!map || !map.getLayer("heatmap-layer")) {
+				_breathRaf = requestAnimationFrame(breathe);
+				return;
+			}
+
+			const t = (performance.now() - startTime) / 1000;
+
+			// Density-driven frequency: more people → faster breathing
+			const densityNorm = Math.min(_maxDensity / 20, 1);
+			const omega = 1.5 + densityNorm * 3; // 1.5Hz chill → 4.5Hz hype
+
+			// Sine-wave radius oscillation
+			const breathFactor = Math.sin(t * omega) * 0.5 + 0.5; // 0..1
+			const amplitude = 3 + densityNorm * 5; // 3px chill → 8px hype
+			const radiusBase =
+				BASE_RADIUS_MIN + (BASE_RADIUS_MAX - BASE_RADIUS_MIN) * densityNorm;
+			const radius = radiusBase + amplitude * breathFactor;
+
+			// Opacity pulse
+			const opacityPulse = BASE_OPACITY + 0.15 * Math.sin(t * omega * 0.8);
+
+			try {
+				map.setPaintProperty("heatmap-layer", "heatmap-radius", [
+					"interpolate",
+					["linear"],
+					["zoom"],
+					0,
+					2,
+					15,
+					radius,
+				]);
+				map.setPaintProperty("heatmap-layer", "heatmap-opacity", opacityPulse);
+			} catch {
+				// Layer might be removed mid-frame
+			}
+
+			_breathRaf = requestAnimationFrame(breathe);
+		};
+
+		_breathRaf = requestAnimationFrame(breathe);
+	};
+
+	const stopBreathing = () => {
+		_breathing = false;
+		if (_breathRaf) {
+			cancelAnimationFrame(_breathRaf);
+			_breathRaf = null;
+		}
+		destroyVisibilityObserver();
+	};
+
+	// ─── IntersectionObserver: pause when off-screen ─────────────
+	const setupVisibilityObserver = () => {
+		if (_observer || typeof IntersectionObserver === "undefined") return;
+		const mapContainer = mapRef.value?.getContainer?.();
+		if (!mapContainer) return;
+
+		_observer = new IntersectionObserver(
+			(entries) => {
+				_isVisible = entries[0]?.isIntersecting ?? true;
+			},
+			{ threshold: 0.1 },
+		);
+		_observer.observe(mapContainer);
+	};
+
+	const destroyVisibilityObserver = () => {
+		if (_observer) {
+			_observer.disconnect();
+			_observer = null;
 		}
 	};
 
@@ -141,5 +256,6 @@ export function useMapHeatmap(mapRef, allowHeatmapRef) {
 		updateHeatmapData,
 		addHeatmapLayer,
 		removeHeatmapLayer,
+		stopBreathing,
 	};
 }

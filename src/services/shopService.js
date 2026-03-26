@@ -1,4 +1,105 @@
-import { supabase } from "../lib/supabase";
+import i18n from "@/i18n.js";
+import { getApiV1BaseUrl, isFrontendOnlyDevMode } from "../lib/runtimeConfig";
+import { isSupabaseSchemaCacheError, supabase } from "../lib/supabase";
+import { isAppDebugLoggingEnabled } from "../utils/debugFlags";
+import {
+	isExpectedAbortError,
+	logUnexpectedNetworkError,
+} from "../utils/networkErrorUtils";
+import {
+	isSoftSupabaseReadError,
+	logUnexpectedSupabaseReadError,
+	runSupabaseReadPolicy,
+} from "../utils/supabaseReadPolicy";
+import { apiFetch } from "./apiClient";
+
+const VENUE_LIST_COLUMNS =
+	"id,name,slug,category,description,status,province,district,zone,building,floor,category_color,latitude,longitude,location,image_urls,image_url_1,image_url_2,video_url,social_links,is_promoted,rating,review_count,is_verified,pin_type,pin_metadata,visibility_score,open_time,close_time,golden_time,end_golden_time,vibe_info,crowd_info,promotion_info,promotion_endtime";
+
+let realMediaEndpointUnavailable = false;
+
+const normalizeMediaItem = (item) => {
+	if (!item || typeof item !== "object") return null;
+	const type = String(item.type || item.kind || "")
+		.trim()
+		.toLowerCase();
+	const url = String(item.url || item.src || "").trim();
+	if (!url || (type !== "image" && type !== "video" && type !== "photo")) {
+		return null;
+	}
+	return {
+		type: type === "photo" ? "image" : type,
+		url,
+		source: item.source || "",
+	};
+};
+
+const normalizeRealVenueMediaPayload = (payload) => {
+	const items = [];
+	const seen = new Set();
+	const push = (item) => {
+		const normalized = normalizeMediaItem(item);
+		if (!normalized || seen.has(normalized.url)) return;
+		seen.add(normalized.url);
+		items.push(normalized);
+	};
+
+	if (Array.isArray(payload)) {
+		payload.forEach(push);
+		return items;
+	}
+
+	if (!payload || typeof payload !== "object") {
+		return items;
+	}
+
+	if (Array.isArray(payload.media)) {
+		payload.media.forEach(push);
+	}
+
+	if (payload.video_url) {
+		push({
+			type: "video",
+			url: payload.video_url,
+			source: payload.source || "video_url",
+		});
+	}
+
+	if (Array.isArray(payload.images)) {
+		payload.images.forEach((url) => {
+			push({
+				type: "image",
+				url,
+				source: payload.source || "images",
+			});
+		});
+	}
+
+	return items;
+};
+
+const fetchVenuesWithFallback = async (mutateQuery) => {
+	const buildQuery = (select) => {
+		let query = supabase.from("venues").select(select);
+		if (typeof mutateQuery === "function") {
+			query = mutateQuery(query);
+		}
+		return query;
+	};
+
+	const { data } = await runSupabaseReadPolicy({
+		resourceType: "venueDiscovery",
+		run: async () => {
+			let result = await buildQuery(VENUE_LIST_COLUMNS);
+			if (result.error) {
+				result = await buildQuery("*");
+			}
+			if (result.error) throw result.error;
+			return { data: result.data || [] };
+		},
+	});
+	return data || [];
+};
 
 /**
  * Maps Supabase Postgres data to the internal shop object format.
@@ -72,20 +173,56 @@ const mapShopData = (item, index) => {
 
 export const getShops = async (province = "ทุกจังหวัด") => {
 	try {
-		let query = supabase.from("venues").select("*");
-
-		if (province && province !== "ทุกจังหวัด") {
-			query = query.eq("province", province);
-		}
-
-		const { data, error } = await query;
-
-		if (error) throw error;
-
-		return (data || []).map((item, index) => mapShopData(item, index));
+		const data = await fetchVenuesWithFallback((query) => {
+			if (province && province !== "ทุกจังหวัด") {
+				return query.eq("province", province);
+			}
+			return query;
+		});
+		return data.map((item, index) => mapShopData(item, index));
 	} catch (error) {
-		console.error("Error fetching shops from Supabase:", error);
-		throw new Error("Unable to load data from Supabase");
+		if (isSoftSupabaseReadError(error)) {
+			return [];
+		}
+		if (import.meta.env.DEV) {
+			logUnexpectedSupabaseReadError(
+				"[shopService] Error fetching shops from Supabase:",
+				error,
+			);
+		}
+		throw new Error(i18n.global.t("auto.k_236a9349"));
+	}
+};
+
+/**
+ * Fetch real media from the internal backend API scraper
+ */
+export const getRealVenueMedia = async (venueId) => {
+	if (!venueId || realMediaEndpointUnavailable || isFrontendOnlyDevMode()) {
+		return null;
+	}
+
+	try {
+		const response = await apiFetch(`/media/${venueId}/real`, {
+			headers: {
+				Accept: "application/json",
+			},
+		});
+		if (!response.ok) {
+			if (response.status === 404) {
+				realMediaEndpointUnavailable = true;
+			}
+			return null;
+		}
+		const data = await response.json();
+		const normalized = normalizeRealVenueMediaPayload(data);
+		return normalized.length > 0 ? normalized : null;
+	} catch (error) {
+		if (isExpectedAbortError(error)) {
+			return null;
+		}
+		logUnexpectedNetworkError("Error fetching real venue media:", error);
+		return null;
 	}
 };
 
@@ -94,15 +231,17 @@ export const getShops = async (province = "ทุกจังหวัด") => {
  */
 export const getLiveEverywhere = async () => {
 	try {
-		const { data, error } = await supabase
-			.from("venues")
-			.select("*")
-			.eq("status", "LIVE");
-
-		if (error) throw error;
-		return (data || []).map((item, index) => mapShopData(item, index));
+		const data = await fetchVenuesWithFallback((query) =>
+			query.eq("status", "active"),
+		);
+		return data.map((item, index) => mapShopData(item, index));
 	} catch (err) {
-		console.error("Error fetching live everywhere:", err);
+		if (import.meta.env.DEV) {
+			logUnexpectedSupabaseReadError(
+				"[shopService] Error fetching live everywhere:",
+				err,
+			);
+		}
 		return [];
 	}
 };
@@ -195,12 +334,18 @@ export const postReview = async (shopId, review) => {
  */
 export const getFeedCards = async (lat, lng) => {
 	try {
-		const { data, error } = await supabase.rpc("get_feed_cards", {
-			p_lat: lat,
-			p_lng: lng,
-		});
+		const data = await runSupabaseReadPolicy({
+			resourceType: "feed",
+			run: async () => {
+				const { data, error } = await supabase.rpc("get_feed_cards", {
+					p_lat: lat,
+					p_lng: lng,
+				});
 
-		if (error) throw error;
+				if (error) throw error;
+				return data || [];
+			},
+		});
 
 		return (data || []).map((item) => ({
 			...mapShopData(item),
@@ -213,33 +358,103 @@ export const getFeedCards = async (lat, lng) => {
 			giantActive: item.giant_active,
 		}));
 	} catch (error) {
-		console.error("Error fetching feed cards:", error);
+		if (import.meta.env.DEV) {
+			logUnexpectedSupabaseReadError(
+				"[shopService] Error fetching feed cards:",
+				error,
+			);
+		}
 		return [];
 	}
 };
 
 /**
  * RPC: Get Map Pins (Bounds + Zoom Rules)
+ * Includes an aggressive client timeout + circuit-breaker so the UI never hangs
+ * waiting for a slow PostGIS query.
  */
+const MAP_PINS_TIMEOUT_MS = 8_000;
+const MAP_PINS_WARN_INTERVAL_MS = 20_000;
+const MAP_PINS_CIRCUIT_BREAKER_THRESHOLD = 3;
+const MAP_PINS_CIRCUIT_BREAKER_BASE_COOLDOWN_MS = 8_000;
+const MAP_PINS_CIRCUIT_BREAKER_MAX_COOLDOWN_MS = 60_000;
+const MAP_PROVINCE_AGGREGATES_TIMEOUT_MS = 6_000;
+let mapPinsConsecutiveTimeouts = 0;
+let mapPinsCircuitOpenUntil = 0;
+let mapPinsCircuitCooldownMs = MAP_PINS_CIRCUIT_BREAKER_BASE_COOLDOWN_MS;
+let mapPinsLastWarningAt = 0;
+let mapPinsLastGoodPins = [];
+let mapProvinceLastGoodAggregates = [];
+
+const warnMapPins = (message) => {
+	// Quiet by default: map fallback behavior is expected in local dev and should
+	// not spam the console unless app-level debugging is explicitly enabled.
+	if (!isAppDebugLoggingEnabled()) return;
+	const now = Date.now();
+	if (now - mapPinsLastWarningAt < MAP_PINS_WARN_INTERVAL_MS) return;
+	mapPinsLastWarningAt = now;
+	console.debug(message);
+};
+
+const resetMapPinsCircuit = () => {
+	mapPinsConsecutiveTimeouts = 0;
+	mapPinsCircuitOpenUntil = 0;
+	mapPinsCircuitCooldownMs = MAP_PINS_CIRCUIT_BREAKER_BASE_COOLDOWN_MS;
+};
+
+const openMapPinsCircuit = () => {
+	const cooldownMs = mapPinsCircuitCooldownMs;
+	mapPinsCircuitOpenUntil = Date.now() + cooldownMs;
+	mapPinsCircuitCooldownMs = Math.min(
+		MAP_PINS_CIRCUIT_BREAKER_MAX_COOLDOWN_MS,
+		mapPinsCircuitCooldownMs * 2,
+	);
+	return cooldownMs;
+};
+
 export const getMapPins = async ({
 	p_min_lat,
 	p_min_lng,
 	p_max_lat,
 	p_max_lng,
 	p_zoom,
+	signal,
 }) => {
+	let timeoutId = null;
+	let timedOut = false;
+	const timeoutController = new AbortController();
+	let externalAbortListener = null;
+
 	try {
-		const { data, error } = await supabase.rpc("get_map_pins", {
+		const now = Date.now();
+		if (mapPinsCircuitOpenUntil > now) {
+			warnMapPins("Map pins RPC temporarily paused after repeated timeouts");
+			return mapPinsLastGoodPins;
+		}
+		if (signal?.aborted) {
+			timeoutController.abort();
+		} else if (signal) {
+			externalAbortListener = () => timeoutController.abort();
+			signal.addEventListener("abort", externalAbortListener, { once: true });
+		}
+		timeoutId = setTimeout(() => {
+			timedOut = true;
+			timeoutController.abort();
+		}, MAP_PINS_TIMEOUT_MS);
+
+		let rpcQuery = supabase.rpc("get_map_pins", {
 			p_min_lat,
 			p_min_lng,
 			p_max_lat,
 			p_max_lng,
 			p_zoom: Math.round(p_zoom),
 		});
+		rpcQuery = rpcQuery.abortSignal(timeoutController.signal);
+		const { data, error } = await rpcQuery;
 
 		if (error) throw error;
 
-		return (data || []).map((item) => ({
+		const mapped = (data || []).map((item) => ({
 			id: item.id,
 			name: item.name,
 			lat: item.lat,
@@ -250,11 +465,189 @@ export const getMapPins = async ({
 			glowActive: item.glow_active,
 			boostActive: item.boost_active,
 			giantActive: item.giant_active,
+			hasCoin:
+				typeof item.has_coin === "boolean"
+					? item.has_coin
+					: typeof item.hasCoin === "boolean"
+						? item.hasCoin
+						: null,
 			visibilityScore: item.visibility_score,
 			coverImage: item.cover_image,
 		}));
+		resetMapPinsCircuit();
+		if (mapped.length > 0) mapPinsLastGoodPins = mapped;
+		return mapped;
 	} catch (error) {
-		console.error("Error fetching map pins:", error);
+		const statusCode = Number(error?.status || error?.code || 0);
+		if (
+			isExpectedAbortError(error, { signal }) &&
+			signal?.aborted &&
+			!timedOut
+		) {
+			// Silently return cached pins when request was cancelled
+			return mapPinsLastGoodPins;
+		}
+		const isServerError = statusCode >= 500 && statusCode < 600;
+		const isSchemaCacheBusy = isSupabaseSchemaCacheError(error);
+		const isTimeoutLike =
+			timedOut ||
+			error?.message?.includes("client timeout") ||
+			String(error?.code) === "57014" ||
+			isSchemaCacheBusy;
+		if (isTimeoutLike || isServerError) {
+			mapPinsConsecutiveTimeouts += 1;
+			if (mapPinsConsecutiveTimeouts >= MAP_PINS_CIRCUIT_BREAKER_THRESHOLD) {
+				const cooldownMs = openMapPinsCircuit();
+				warnMapPins(
+					`Map pins RPC circuit open for ${Math.round(cooldownMs / 1000)}s after repeated failures`,
+				);
+			}
+			warnMapPins(
+				isSchemaCacheBusy
+					? "Map pins temporarily unavailable while Supabase schema cache reloads — using fallback data"
+					: "Map pins RPC or DB statement timed out — using fallback data",
+			);
+			if (mapPinsLastGoodPins.length > 0) return mapPinsLastGoodPins;
+		} else {
+			logUnexpectedNetworkError("Error fetching map pins:", error, {
+				signal,
+			});
+			if (mapPinsLastGoodPins.length > 0) return mapPinsLastGoodPins;
+		}
 		return [];
+	} finally {
+		if (timeoutId) {
+			clearTimeout(timeoutId);
+		}
+		if (signal && externalAbortListener) {
+			signal.removeEventListener("abort", externalAbortListener);
+		}
+	}
+};
+
+export const getMapProvinceAggregates = async ({
+	categories = null,
+	statuses = null,
+	searchQuery = null,
+	signal,
+} = {}) => {
+	let timeoutId = null;
+	let timedOut = false;
+	const timeoutController = new AbortController();
+	let externalAbortListener = null;
+
+	const normalizedCategories = Array.isArray(categories)
+		? categories.map((value) => String(value || "").trim()).filter(Boolean)
+		: [];
+	const normalizedStatuses = Array.isArray(statuses)
+		? statuses
+				.map((value) =>
+					String(value || "")
+						.trim()
+						.toLowerCase(),
+				)
+				.filter(Boolean)
+		: [];
+	const normalizedSearchQuery = String(searchQuery || "").trim();
+	const shouldUseV2 =
+		normalizedCategories.length > 0 ||
+		normalizedStatuses.length > 0 ||
+		normalizedSearchQuery.length > 0;
+
+	try {
+		if (signal?.aborted) {
+			timeoutController.abort();
+		} else if (signal) {
+			externalAbortListener = () => timeoutController.abort();
+			signal.addEventListener("abort", externalAbortListener, { once: true });
+		}
+
+		timeoutId = setTimeout(() => {
+			timedOut = true;
+			timeoutController.abort();
+		}, MAP_PROVINCE_AGGREGATES_TIMEOUT_MS);
+
+		let rpcQuery = shouldUseV2
+			? supabase.rpc("get_map_province_aggregates_v2", {
+					p_categories:
+						normalizedCategories.length > 0 ? normalizedCategories : null,
+					p_statuses: normalizedStatuses.length > 0 ? normalizedStatuses : null,
+					p_search_query: normalizedSearchQuery || null,
+				})
+			: supabase.rpc("get_map_province_aggregates", {
+					p_venue_ids: null,
+				});
+
+		rpcQuery = rpcQuery.abortSignal(timeoutController.signal);
+		const { data, error } = await rpcQuery;
+		if (error) throw error;
+
+		const mapped = (data || []).map((item) => ({
+			id: item.id,
+			name: item.name,
+			province: item.province,
+			lat: item.lat,
+			lng: item.lng,
+			pinType: item.pin_type,
+			pinState: item.pin_state,
+			aggregateLevel: item.aggregate_level,
+			aggregateShopCount: item.aggregate_shop_count,
+			aggregateDominantCount: item.aggregate_dominant_count,
+			promotionScore: item.promotion_score,
+			visibilityScore: item.visibility_score,
+			verifiedActive: item.verified_active,
+			glowActive: item.glow_active,
+			boostActive: item.boost_active,
+			giantActive: item.giant_active,
+			signScale: item.sign_scale,
+			coverImage: item.cover_image,
+			pinMetadata: item.pin_metadata,
+		}));
+
+		if (mapped.length > 0) {
+			mapProvinceLastGoodAggregates = mapped;
+		}
+		return mapped;
+	} catch (error) {
+		if (
+			isExpectedAbortError(error, { signal }) &&
+			signal?.aborted &&
+			!timedOut
+		) {
+			return mapProvinceLastGoodAggregates;
+		}
+
+		const statusCode = Number(error?.status || error?.code || 0);
+		const isServerError = statusCode >= 500 && statusCode < 600;
+		const isSchemaCacheBusy = isSupabaseSchemaCacheError(error);
+		const isTimeoutLike =
+			timedOut ||
+			error?.message?.includes("client timeout") ||
+			String(error?.code) === "57014" ||
+			isSchemaCacheBusy;
+
+		if (isTimeoutLike || isServerError) {
+			warnMapPins(
+				isSchemaCacheBusy
+					? "Province aggregates temporarily unavailable while Supabase schema cache reloads"
+					: "Province aggregates timed out — using cached aggregates",
+			);
+			if (mapProvinceLastGoodAggregates.length > 0) {
+				return mapProvinceLastGoodAggregates;
+			}
+			return [];
+		}
+
+		logUnexpectedNetworkError("Error fetching province aggregates:", error, {
+			signal,
+		});
+		return mapProvinceLastGoodAggregates;
+	} finally {
+		if (timeoutId) {
+			clearTimeout(timeoutId);
+		}
+		if (signal && externalAbortListener) {
+			signal.removeEventListener("abort", externalAbortListener);
+		}
 	}
 };

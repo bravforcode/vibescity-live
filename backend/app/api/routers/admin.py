@@ -1,17 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
-from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from app.core.supabase import supabase_admin
+
 from app.core.auth import verify_admin
-from app.core.rate_limit import limiter
-from app.services.notifications import notify_shop_approved
+from app.core.supabase import supabase_admin
 from app.services.venue_repository import VenueRepository
 
 router = APIRouter()
 
 # --- Schemas ---
 class ReviewAction(BaseModel):
-    reason: Optional[str] = None
+    reason: str | None = None
 
 # --- Endpoints ---
 
@@ -29,7 +28,7 @@ async def list_pending_shops(user: dict = Depends(verify_admin)):
 
         return {"success": True, "data": response.data}
     except Exception as e:
-        raise HTTPException(500, str(e))
+        raise HTTPException(500, str(e)) from e
 
 @router.post("/shops/{shop_id}/approve")
 async def approve_shop(shop_id: str, user: dict = Depends(verify_admin)):
@@ -76,7 +75,7 @@ async def approve_shop(shop_id: str, user: dict = Depends(verify_admin)):
         return {"success": True, "message": "Shop approved and rewards granted"}
 
     except Exception as e:
-        raise HTTPException(500, str(e))
+        raise HTTPException(500, str(e)) from e
 
 @router.post("/shops/{shop_id}/reject")
 async def reject_shop(shop_id: str, action: ReviewAction, user: dict = Depends(verify_admin)):
@@ -97,4 +96,4 @@ async def reject_shop(shop_id: str, action: ReviewAction, user: dict = Depends(v
         return {"success": True, "message": "Shop rejected"}
 
     except Exception as e:
-        raise HTTPException(500, str(e))
+        raise HTTPException(500, str(e)) from e

@@ -37,12 +37,18 @@ const activeTab = ref("overview");
 
 const tabs = [
 	{ id: "overview", label: "Overview", icon: BarChart3 },
-	{ id: "venues",   label: "My Venues", icon: MapPin },
+	{ id: "venues", label: "My Venues", icon: MapPin },
 ];
 
-const openPromote = (venue) => { promotingVenue.value = venue; };
-const closePromote = () => { promotingVenue.value = null; };
-const openEdit = (venue) => { editingVenue.value = venue; };
+const openPromote = (venue) => {
+	promotingVenue.value = venue;
+};
+const closePromote = () => {
+	promotingVenue.value = null;
+};
+const openEdit = (venue) => {
+	editingVenue.value = venue;
+};
 
 const safeExit = async () => {
 	try {
@@ -85,16 +91,19 @@ const fetchDashboardData = async () => {
 		let totalLive = 0;
 		let totalViews = 0;
 
-		for (const venue of venues.value) {
-			const { data: stat } = await supabase.rpc("get_venue_stats", {
-				p_shop_id: venue.id,
-			});
+		// Fetch all venue stats in parallel (was sequential N+1)
+		const statsResults = await Promise.all(
+			venues.value.map((venue) =>
+				supabase.rpc("get_venue_stats", { p_shop_id: venue.id }),
+			),
+		);
+		statsResults.forEach(({ data: stat }, i) => {
 			if (stat) {
-				totalLive += stat.live_visitors;
-				totalViews += stat.total_views;
-				venue.stats = stat;
+				totalLive += stat.live_visitors ?? 0;
+				totalViews += stat.total_views ?? 0;
+				venues.value[i].stats = stat;
 			}
-		}
+		});
 
 		stats.value = {
 			live_visitors: totalLive,
@@ -117,7 +126,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-950 text-white">
+  <div class="relative z-50 isolate min-h-screen overflow-x-hidden w-full bg-zinc-950 text-white">
 
     <!-- Top Bar -->
     <div class="sticky top-0 z-10 bg-zinc-950/90 backdrop-blur-xl border-b border-white/8 px-4 py-3 flex items-center gap-3">
@@ -143,12 +152,13 @@ onMounted(() => {
     </div>
 
     <!-- Tab Bar -->
-    <div class="flex gap-1 px-4 pt-4 pb-2">
+    <div class="relative z-10 pointer-events-auto flex gap-1 px-4 pt-4 pb-2">
       <button
         v-for="tab in tabs"
         :key="tab.id"
         @click="activeTab = tab.id"
-        class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all"
+        style="touch-action: manipulation"
+        class="touch-manipulation select-none flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all"
         :class="activeTab === tab.id
           ? 'bg-violet-600/30 text-violet-300 border border-violet-500/40'
           : 'text-white/40 hover:text-white/70 hover:bg-white/5'"
@@ -195,7 +205,7 @@ onMounted(() => {
         <!-- Stats Grid -->
         <div class="grid grid-cols-2 gap-3">
           <!-- Live Visitors -->
-          <div class="stat-card p-4 rounded-2xl relative overflow-hidden">
+          <div class="min-w-0 stat-card p-4 rounded-2xl relative overflow-hidden">
             <div class="absolute top-0 right-0 w-20 h-20 bg-green-500/15 rounded-full blur-xl -mr-4 -mt-4 pointer-events-none"></div>
             <div class="flex items-center gap-2 mb-2">
               <div class="w-7 h-7 rounded-lg bg-green-500/20 flex items-center justify-center">
@@ -211,7 +221,7 @@ onMounted(() => {
           </div>
 
           <!-- Total Views -->
-          <div class="stat-card p-4 rounded-2xl relative overflow-hidden">
+          <div class="min-w-0 stat-card p-4 rounded-2xl relative overflow-hidden">
             <div class="absolute top-0 right-0 w-20 h-20 bg-violet-500/15 rounded-full blur-xl -mr-4 -mt-4 pointer-events-none"></div>
             <div class="flex items-center gap-2 mb-2">
               <div class="w-7 h-7 rounded-lg bg-violet-500/20 flex items-center justify-center">
@@ -227,7 +237,7 @@ onMounted(() => {
           </div>
 
           <!-- Rating -->
-          <div class="stat-card p-4 rounded-2xl relative overflow-hidden">
+          <div class="min-w-0 stat-card p-4 rounded-2xl relative overflow-hidden">
             <div class="absolute top-0 right-0 w-20 h-20 bg-yellow-500/15 rounded-full blur-xl -mr-4 -mt-4 pointer-events-none"></div>
             <div class="flex items-center gap-2 mb-2">
               <div class="w-7 h-7 rounded-lg bg-yellow-500/20 flex items-center justify-center">
@@ -242,7 +252,7 @@ onMounted(() => {
           </div>
 
           <!-- Venues Count -->
-          <div class="stat-card p-4 rounded-2xl relative overflow-hidden">
+          <div class="min-w-0 stat-card p-4 rounded-2xl relative overflow-hidden">
             <div class="absolute top-0 right-0 w-20 h-20 bg-blue-500/15 rounded-full blur-xl -mr-4 -mt-4 pointer-events-none"></div>
             <div class="flex items-center gap-2 mb-2">
               <div class="w-7 h-7 rounded-lg bg-blue-500/20 flex items-center justify-center">
@@ -293,7 +303,7 @@ onMounted(() => {
         <div
           v-for="venue in venues"
           :key="venue.id"
-          class="venue-card p-4 rounded-2xl border border-white/6 hover:border-violet-500/30 transition-all group"
+          class="min-w-0 venue-card p-4 rounded-2xl border border-white/6 hover:border-violet-500/30 transition-all group"
         >
           <div class="flex items-center gap-3">
             <!-- Image -->
@@ -357,16 +367,17 @@ onMounted(() => {
     <!-- Buy Pins Modal -->
     <div
       v-if="promotingVenue"
-      class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/80 backdrop-blur-sm"
+      class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm"
       @click.self="closePromote"
     >
-      <div class="w-full max-w-5xl relative animate-fade-in">
-        <button
-          @click="closePromote"
-          class="absolute -top-10 right-0 text-white/40 hover:text-white text-sm font-bold transition-colors"
-        >
-          Close ✕
-        </button>
+      <div class="w-full max-h-[92dvh] sm:max-h-[90dvh] overflow-y-auto max-w-5xl relative animate-fade-in rounded-t-3xl sm:rounded-3xl sm:m-4">
+        <div class="sticky top-0 z-10 flex justify-end px-4 pt-3 pb-1 bg-gradient-to-b from-gray-900/90 to-transparent">
+          <button
+            @click="closePromote"
+            class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white/60 hover:text-white text-xs font-black flex items-center justify-center transition-all active:scale-90"
+            aria-label="Close"
+          >✕</button>
+        </div>
         <BuyPinsPanel :shop-id="promotingVenue.id" />
       </div>
     </div>

@@ -1,7 +1,8 @@
-import os
 import argparse
-from google.cloud import bigquery
+
 from google.api_core.exceptions import NotFound
+from google.cloud import bigquery
+
 
 def setup_bigquery(project_id, dataset_id, location="US"):
     client = bigquery.Client(project=project_id)

@@ -50,7 +50,8 @@ test.describe('VibeCity Core User Journey', () => {
     // Wait for results
     const firstResult = page.getByTestId("search-result").first();
     const resultVisible = await firstResult
-      .isVisible({ timeout: 15000 })
+      .waitFor({ state: "visible", timeout: 15000 })
+      .then(() => true)
       .catch(() => false);
     enforceMapConditionOrSkip(
       resultVisible,
@@ -66,7 +67,8 @@ test.describe('VibeCity Core User Journey', () => {
     // Verify Modal Opens using test id
     const modal = page.locator('[data-testid="vibe-modal"]');
     const modalVisible = await modal
-      .isVisible({ timeout: 15000 })
+      .waitFor({ state: "visible", timeout: 15000 })
+      .then(() => true)
       .catch(() => false);
     enforceMapConditionOrSkip(
       modalVisible,
@@ -86,7 +88,8 @@ test.describe('VibeCity Core User Journey', () => {
     await page.fill('[data-testid="search-input"]', "Vibe");
     const firstResult = page.getByTestId("search-result").first();
     const resultVisible = await firstResult
-      .isVisible({ timeout: 15000 })
+      .waitFor({ state: "visible", timeout: 15000 })
+      .then(() => true)
       .catch(() => false);
     if (!resultVisible) {
       test.skip(true, "Search results not visible in this environment");
@@ -105,7 +108,8 @@ test.describe('VibeCity Core User Journey', () => {
     // For now, let's verify the modal loads and we can close it
     const modal = page.locator('[data-testid="vibe-modal"]');
     const modalVisible = await modal
-      .isVisible({ timeout: 15000 })
+      .waitFor({ state: "visible", timeout: 15000 })
+      .then(() => true)
       .catch(() => false);
     if (!modalVisible) {
       test.skip(true, "Vibe modal did not open after search select");

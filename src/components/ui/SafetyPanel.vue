@@ -95,6 +95,9 @@ const iconMap = {
     >
       <div
         class="w-full max-w-md bg-zinc-900 rounded-t-3xl overflow-hidden shadow-2xl safe-area-bottom"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="safety-panel-title"
       >
         <!-- Header -->
         <div
@@ -104,9 +107,11 @@ const iconMap = {
             <div
               class="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center"
             >
-              <Shield class="w-5 h-5 text-red-400" />
+              <Shield class="w-5 h-5 text-red-400" aria-hidden="true" />
             </div>
-            <h2 class="text-lg font-bold text-white">Safety Center</h2>
+            <h2 id="safety-panel-title" class="text-lg font-bold text-white">
+              Safety Center
+            </h2>
           </div>
           <button
             @click="close"

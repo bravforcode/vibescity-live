@@ -2,21 +2,22 @@ name: VibeCity OSM Sync
 
 on:
   schedule:
-    # Run every 5 minutes for near-real-time updates.
-    - cron: '*/5 * * * *'
-  workflow_dispatch:
+    # Run every 2 hours — 120 min/month (well within GitHub free tier 2000 min)
+    # 15-min was 2160 min/month which exceeds free tier on private repos
+    - cron: '0 */2 * * *'
+  workflow_dispatch: # Allow manual trigger
 
 permissions:
   contents: read
 
 concurrency:
   group: osm-sync-prod
-  cancel-in-progress: true
+  cancel-in-progress: false  # Never cancel mid-sync (data integrity)
 
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,64 +27,38 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Preflight required secrets
-        id: preflight
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: |
-          set -euo pipefail
-          MISSING=()
-          [ -n "${SUPABASE_URL:-}" ] || MISSING+=("SUPABASE_URL")
-          [ -n "${SUPABASE_SERVICE_ROLE_KEY:-}" ] || MISSING+=("SUPABASE_SERVICE_ROLE_KEY")
-          if [ "${#MISSING[@]}" -gt 0 ]; then
-            echo "::warning::Skipping OSM sync. Missing required secrets: ${MISSING[*]}"
-            echo "can_run=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "can_run=true" >> "$GITHUB_OUTPUT"
-
       - name: Install dependencies
-        if: ${{ steps.preflight.outputs.can_run == 'true' }}
         run: |
           python -m pip install --upgrade pip
           pip install redis "h3>=4.0.0" supabase requests python-dotenv fakeredis asyncpg
 
       - name: Run OSM Sync (Short Batch)
-        if: ${{ steps.preflight.outputs.can_run == 'true' }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           REDIS_URL: ${{ secrets.REDIS_URL }}
           ALLOW_FAKE_REDIS: "false"
-          WORKERS: ${{ vars.OSM_SYNC_WORKERS || '6' }}
+          WORKERS: 6
           TILE_Z: 9
-          LOOP_ITERATIONS: ${{ vars.OSM_SYNC_LOOP_ITERATIONS || '3' }}
-        # Keep each run short; high cadence covers freshness.
+        # Run loop=8 to compensate for 15-min interval (more tiles per run)
+        # The script is incremental, so next run picks up where it left off.
         run: |
           set -euo pipefail
-          python backend/scripts/osm_sync_ultimate.py --loop="${LOOP_ITERATIONS}" | tee osm_sync.log
+          python backend/scripts/osm_sync_ultimate.py --loop=8 | tee osm_sync.log
 
       - name: Contract Validation
-        if: ${{ steps.preflight.outputs.can_run == 'true' }}
         env:
           SUPABASE_DIRECT_URL: ${{ secrets.SUPABASE_DIRECT_URL }}
         run: |
           set -euo pipefail
-          if [ -f scripts/ci/validate_osm_contract.py ]; then
-            python scripts/ci/validate_osm_contract.py | tee osm_contract_validation.log
-          else
-            echo "::warning::scripts/ci/validate_osm_contract.py not found. Skipping contract validation."
-            echo "SKIPPED: validate_osm_contract.py not found" | tee osm_contract_validation.log
-          fi
+          python scripts/ci/validate_osm_contract.py | tee osm_contract_validation.log
 
       - name: Verify OSM Ingestion (Workflow DB vs Production API)
-        if: ${{ steps.preflight.outputs.can_run == 'true' }}
-        continue-on-error: true
+        continue-on-error: true   # ⚠️ soft-fail: don't block the sync run
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          PROD_ANALYTICS_STATS_URL: ${{ vars.PROD_ANALYTICS_STATS_URL || 'https://vibecity-api.fly.dev/api/v1/analytics/dashboard/stats' }}
+          PROD_ANALYTICS_STATS_URL: ${{ vars.PROD_ANALYTICS_STATS_URL || 'https://vibescity-live.onrender.com/api/v1/analytics/dashboard/stats' }}
           PROD_ADMIN_BEARER_TOKEN: ${{ secrets.PROD_ADMIN_BEARER_TOKEN || '' }}
           COUNT_DRIFT_TOLERANCE: "500"
           MIN_EXPECTED_OSM_VENUES: "100"

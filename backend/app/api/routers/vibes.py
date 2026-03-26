@@ -5,7 +5,7 @@ import hashlib
 import json
 import logging
 import time
-from typing import Any, List
+from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
@@ -59,9 +59,9 @@ def _hotspot_snapshot(limit: int = 20) -> list[dict[str, Any]]:
 class ConnectionManager:
 	def __init__(self):
 		# Receives global stream payloads (Map / Home)
-		self.global_connections: List[WebSocket] = []
+		self.global_connections: list[WebSocket] = []
 		# Room presence channels (shop detail)
-		self.room_connections: dict[str, List[WebSocket]] = {}
+		self.room_connections: dict[str, list[WebSocket]] = {}
 
 	async def connect(self, websocket: WebSocket):
 		await websocket.accept()
@@ -177,6 +177,12 @@ class ConnectionManager:
 
 
 manager = ConnectionManager()
+
+# H4: Per-IP connection counter — prevents a single client from holding many sockets
+# Note: guarded by a lock to avoid race conditions on concurrent connect/disconnect.
+_per_ip_connections: dict[str, int] = {}
+_per_ip_lock = asyncio.Lock()
+_MAX_CONNECTIONS_PER_IP = 5
 
 _bg_tasks: list[asyncio.Task] = []
 _bg_stop_event = asyncio.Event()
@@ -304,28 +310,44 @@ async def stop_background_tasks():
 
 @router.websocket("/vibe-stream")
 async def vibe_stream(websocket: WebSocket):
-	await manager.connect(websocket)
-	last_msg_time = 0.0
+	# H4: Reject if this IP already holds too many connections
+	client_ip = (websocket.client.host if websocket.client else None) or "unknown"
+	async with _per_ip_lock:
+		if _per_ip_connections.get(client_ip, 0) >= _MAX_CONNECTIONS_PER_IP:
+			await websocket.close(code=1008)  # Policy Violation
+			return
 
+		_per_ip_connections[client_ip] = _per_ip_connections.get(client_ip, 0) + 1
 	try:
-		while True:
-			data = await websocket.receive_text()
-			now = time.time()
+		await manager.connect(websocket)
+		last_msg_time = 0.0
 
-			# Simple anti-spam guard
-			if now - last_msg_time < 0.35:
-				await manager._safe_send(
-					websocket,
-					{"type": "error", "content": "Too fast! Chill."},
-				)
-				continue
+		try:
+			while True:
+				data = await websocket.receive_text()
+				now = time.time()
 
-			last_msg_time = now
-			result = await manager.process_message(websocket, data)
-			if result:
-				await manager.broadcast_payload(result)
-	except WebSocketDisconnect:
-		await manager.handle_disconnect(websocket)
-	except Exception as exc:
-		logger.warning("vibe websocket error: %s", exc)
-		await manager.handle_disconnect(websocket)
+				# Simple anti-spam guard
+				if now - last_msg_time < 0.35:
+					await manager._safe_send(
+						websocket,
+						{"type": "error", "content": "Too fast! Chill."},
+					)
+					continue
+
+				last_msg_time = now
+				result = await manager.process_message(websocket, data)
+				if result:
+					await manager.broadcast_payload(result)
+		except WebSocketDisconnect:
+			await manager.handle_disconnect(websocket)
+		except Exception as exc:
+			logger.warning("vibe websocket error: %s", exc)
+			await manager.handle_disconnect(websocket)
+	finally:
+		async with _per_ip_lock:
+			_per_ip_connections[client_ip] = max(
+				0, _per_ip_connections.get(client_ip, 0) - 1
+			)
+			if _per_ip_connections.get(client_ip, 0) == 0:
+				_per_ip_connections.pop(client_ip, None)

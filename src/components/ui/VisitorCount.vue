@@ -3,7 +3,8 @@
  * VisitorCount.vue - Real-time visitor count display
  * Feature #36: Real-time Visitor Count UI
  */
-import { onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { useAnimatedCounter } from "../../composables/useAnimatedCounter";
 
 const props = defineProps({
 	shopId: {
@@ -81,6 +82,12 @@ const getCrowdLevel = () => {
 		return { label: "Moderate", color: "bg-yellow-500" };
 	return { label: "Quiet", color: "bg-green-500" };
 };
+
+// Animated counter for smooth digit roll-up
+const { displayValue: animatedCount } = useAnimatedCounter(
+	computed(() => visitorCount.value),
+	{ duration: 800 },
+);
 </script>
 
 <template>
@@ -103,8 +110,13 @@ const getCrowdLevel = () => {
     </div>
 
     <!-- Count -->
-    <span :class="['font-bold', isDarkMode ? 'text-white' : 'text-gray-900']">
-      {{ visitorCount }}
+    <span
+      :class="[
+        'font-bold tabular-nums',
+        isDarkMode ? 'text-white' : 'text-gray-900',
+      ]"
+    >
+      {{ animatedCount }}
     </span>
 
     <!-- Trend -->

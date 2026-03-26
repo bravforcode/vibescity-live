@@ -54,16 +54,16 @@
             <!-- Name -->
             <div>
               <label class="block text-xs font-medium text-gray-400 mb-1">{{ t("ugc.place_name") }}</label>
-              <input
+              <input :aria-label="$t('a11y.input_field')"
                 v-model="form.name"
                 type="text"
                 maxlength="200"
                 :placeholder="t('ugc.place_name_placeholder')"
-                class="w-full bg-black/40 border rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:border-purple-500 focus:outline-none transition"
+                class="w-full bg-black/40 border rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:border-purple-500 focus:focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 transition"
                 :class="touched.name && errors.name ? 'border-red-500' : 'border-white/10'"
                 @blur="touch('name')"
               />
-              <p v-if="touched.name && errors.name" class="text-red-400 text-xs mt-1">{{ errors.name }}</p>
+              <p v-if="touched.name && errors.name" role="alert" class="text-red-400 text-xs mt-1">{{ errors.name }}</p>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
@@ -72,7 +72,7 @@
                 <label class="block text-xs font-medium text-gray-400 mb-1">{{ t("ugc.category") }}</label>
                 <select
                   v-model="form.category"
-                  class="w-full bg-black/40 border rounded-lg px-4 py-2 text-white focus:border-purple-500 focus:outline-none transition"
+                  class="w-full bg-black/40 border rounded-lg px-4 py-2 text-white focus:border-purple-500 focus:focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 transition"
                   :class="touched.category && errors.category ? 'border-red-500' : 'border-white/10'"
                   @change="touch('category')"
                   @blur="touch('category')"
@@ -80,26 +80,26 @@
                   <option value="" disabled>{{ t("ugc.select_category") }}</option>
                   <option value="Cafe">Cafe</option>
                   <option value="Restaurant">Restaurant</option>
-                  <option value="Bar">Bar / Pub</option>
+                  <option value="Bar">{{ $t("auto.k_96adec58") }}</option>
                   <option value="Nightclub">Nightclub</option>
-                  <option value="Street Food">Street Food</option>
+                  <option value="Street Food">{{ $t("auto.k_bf917a6a") }}</option>
                   <option value="Attraction">Attraction</option>
                 </select>
-                <p v-if="touched.category && errors.category" class="text-red-400 text-xs mt-1">{{ errors.category }}</p>
+                <p v-if="touched.category && errors.category" role="alert" class="text-red-400 text-xs mt-1">{{ errors.category }}</p>
               </div>
 
               <!-- Province -->
               <div>
                 <label class="block text-xs font-medium text-gray-400 mb-1">{{ t("ugc.province") }}</label>
-                <input
+                <input :aria-label="$t('a11y.input_field')"
                   v-model="form.province"
                   type="text"
                   :placeholder="t('ugc.province_placeholder')"
-                  class="w-full bg-black/40 border rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:border-purple-500 focus:outline-none transition"
+                  class="w-full bg-black/40 border rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:border-purple-500 focus:focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 transition"
                   :class="touched.province && errors.province ? 'border-red-500' : 'border-white/10'"
                   @blur="touch('province')"
                 />
-                <p v-if="touched.province && errors.province" class="text-red-400 text-xs mt-1">{{ errors.province }}</p>
+                <p v-if="touched.province && errors.province" role="alert" class="text-red-400 text-xs mt-1">{{ errors.province }}</p>
               </div>
             </div>
 
@@ -118,22 +118,22 @@
                   <component :is="Crosshair" class="w-3 h-3" /> {{ t("ugc.detect") }}
                 </button>
               </div>
-              <p v-if="touched.location && errors.location" class="text-red-400 text-xs mt-1">{{ errors.location }}</p>
+              <p v-if="touched.location && errors.location" role="alert" class="text-red-400 text-xs mt-1">{{ errors.location }}</p>
               <div class="text-[10px] text-gray-500 mt-1">{{ t("ugc.gps_note") }}</div>
             </div>
 
             <!-- Image URL -->
             <div>
               <label class="block text-xs font-medium text-gray-400 mb-1">{{ t("ugc.image_url") }}</label>
-              <input
+              <input :aria-label="$t('a11y.input_field')"
                 v-model="form.imageUrl"
                 type="text"
                 placeholder="https://..."
-                class="w-full bg-black/40 border rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:border-purple-500 focus:outline-none transition"
+                class="w-full bg-black/40 border rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:border-purple-500 focus:focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 transition"
                 :class="touched.imageUrl && errors.imageUrl ? 'border-red-500' : 'border-white/10'"
                 @blur="touch('imageUrl')"
               />
-              <p v-if="touched.imageUrl && errors.imageUrl" class="text-red-400 text-xs mt-1">{{ errors.imageUrl }}</p>
+              <p v-if="touched.imageUrl && errors.imageUrl" role="alert" class="text-red-400 text-xs mt-1">{{ errors.imageUrl }}</p>
             </div>
           </div>
         </div>
@@ -146,7 +146,7 @@
           >
             {{ t("ugc.cancel") }}
           </button>
-          <button
+          <button :aria-label="$t('ugc.submit')"
             @click="submit"
             :disabled="loading || !isFormValid"
             class="flex-1 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold hover:shadow-lg hover:shadow-purple-500/20 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"

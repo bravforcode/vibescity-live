@@ -1,0 +1,123 @@
+name: Vercel Auto Deploy
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vercel-auto-deploy-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-preview:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch != 'main') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Deploy Preview
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "Missing required secret: VERCEL_TOKEN"
+            exit 1
+          fi
+
+          DEPLOY_OUTPUT=$(vercel deploy --yes --token "$VERCEL_TOKEN" 2>&1 | tee vercel-preview.log)
+          DEPLOY_URL=$(echo "$DEPLOY_OUTPUT" | grep -Eo 'https://[^[:space:]]+\.vercel\.app' | tail -n 1)
+          echo "Resolved preview URL: $DEPLOY_URL"
+
+          if [ -z "$DEPLOY_URL" ]; then
+            echo "Unable to parse preview deployment URL"
+            cat vercel-preview.log || true
+            exit 1
+          fi
+
+          echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Summary
+        if: ${{ always() }}
+        run: |
+          {
+            echo "## Vercel Preview Deploy"
+            echo "- Event: ${{ github.event_name }}"
+            echo "- Branch: ${{ github.event.workflow_run.head_branch || github.ref_name }}"
+            echo "- Commit: ${{ github.event.workflow_run.head_sha || github.sha }}"
+            if [ "${{ steps.deploy.outcome }}" = "success" ]; then
+              echo "- URL: ${{ steps.deploy.outputs.url }}"
+            else
+              echo "- URL: deployment failed"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-production:
+    if: ${{ github.event_name != 'workflow_dispatch' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Deploy Production
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "Missing required secret: VERCEL_TOKEN"
+            exit 1
+          fi
+
+          DEPLOY_OUTPUT=$(vercel deploy --prod --yes --token "$VERCEL_TOKEN" 2>&1 | tee vercel-production.log)
+          DEPLOY_URL=$(echo "$DEPLOY_OUTPUT" | grep -Eo 'https://[^[:space:]]+\.vercel\.app' | tail -n 1)
+          echo "Resolved production URL: $DEPLOY_URL"
+
+          if [ -z "$DEPLOY_URL" ]; then
+            echo "Unable to parse production deployment URL"
+            cat vercel-production.log || true
+            exit 1
+          fi
+
+          echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Summary
+        if: ${{ always() }}
+        run: |
+          {
+            echo "## Vercel Production Deploy"
+            echo "- Branch: main"
+            echo "- Commit: ${{ github.event.workflow_run.head_sha }}"
+            if [ "${{ steps.deploy.outcome }}" = "success" ]; then
+              echo "- URL: ${{ steps.deploy.outputs.url }}"
+            else
+              echo "- URL: deployment failed"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

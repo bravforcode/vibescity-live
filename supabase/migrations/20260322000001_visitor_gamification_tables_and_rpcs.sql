@@ -37,8 +37,11 @@ ALTER TABLE public.visitor_gamification ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.venue_claims ENABLE ROW LEVEL SECURITY;
 
 -- Allow service_role (used by FastAPI supabase_admin) full access
+DROP POLICY IF EXISTS "Service role full access" ON public.visitor_gamification;
 CREATE POLICY "Service role full access" ON public.visitor_gamification
   FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Service role full access" ON public.venue_claims;
 CREATE POLICY "Service role full access" ON public.venue_claims
   FOR ALL USING (true) WITH CHECK (true);
 

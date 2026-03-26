@@ -4,7 +4,7 @@ to Supabase in batches for performance.
 """
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ class AnalyticsBuffer:
             "event_type": event_type,
             "data": data or {},
             "user_id": user_id,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
         async with self._lock:
             self._buffer.append(event)
@@ -57,7 +57,10 @@ class AnalyticsBuffer:
             from app.core.supabase import supabase
 
             if supabase:
-                supabase.table("analytics_events").insert(events).execute()
+                # Run blocking supabase-py call in thread — event loop must not be blocked
+                await asyncio.to_thread(
+                    lambda: supabase.table("analytics_events").insert(events).execute()
+                )
                 logger.debug("Flushed %d analytics events", len(events))
             else:
                 logger.warning("Supabase not configured — dropping %d analytics events", len(events))

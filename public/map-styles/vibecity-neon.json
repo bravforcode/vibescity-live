@@ -1,0 +1,206 @@
+{
+	"version": 8,
+	"name": "VibeCity Neon 2D",
+	"id": "vibecity-neon",
+	"glyphs": "https://fonts.openmaptiles.org/{fontstack}/{range}.pbf",
+	"sources": {
+		"openmaptiles": {
+			"type": "vector",
+			"url": "https://tiles.openfreemap.org/planet/tiles.json"
+		}
+	},
+	"layers": [
+		{
+			"id": "background",
+			"type": "background",
+			"paint": {
+				"background-color": "#06080f"
+			}
+		},
+		{
+			"id": "landuse",
+			"type": "fill",
+			"source": "openmaptiles",
+			"source-layer": "landuse",
+			"paint": {
+				"fill-color": "#0d1320",
+				"fill-opacity": 0.56
+			}
+		},
+		{
+			"id": "water",
+			"type": "fill",
+			"source": "openmaptiles",
+			"source-layer": "water",
+			"paint": {
+				"fill-color": "#0b1733",
+				"fill-outline-color": "#10274e"
+			}
+		},
+		{
+			"id": "roads-minor",
+			"type": "line",
+			"source": "openmaptiles",
+			"source-layer": "transportation",
+			"filter": [
+				"all",
+				["==", ["geometry-type"], "LineString"],
+				[
+					"in",
+					["get", "class"],
+					["literal", ["minor", "minor_road", "service", "track", "path"]]
+				]
+			],
+			"layout": {
+				"line-join": "round",
+				"line-cap": "round"
+			},
+			"paint": {
+				"line-color": "#1f2f4a",
+				"line-width": [
+					"interpolate",
+					["linear"],
+					["zoom"],
+					8,
+					0.4,
+					14,
+					1.3,
+					18,
+					2.3
+				],
+				"line-opacity": 0.78
+			}
+		},
+		{
+			"id": "roads-major-glow",
+			"type": "line",
+			"source": "openmaptiles",
+			"source-layer": "transportation",
+			"filter": [
+				"all",
+				["==", ["geometry-type"], "LineString"],
+				[
+					"in",
+					["get", "class"],
+					["literal", ["primary", "secondary", "tertiary", "trunk", "motorway"]]
+				]
+			],
+			"layout": {
+				"line-join": "round",
+				"line-cap": "round"
+			},
+			"paint": {
+				"line-color": "#5ec9ff",
+				"line-width": [
+					"interpolate",
+					["linear"],
+					["zoom"],
+					8,
+					2.6,
+					14,
+					6.8,
+					18,
+					12
+				],
+				"line-blur": ["interpolate", ["linear"], ["zoom"], 8, 0.6, 16, 2.2],
+				"line-opacity": 0.34
+			}
+		},
+		{
+			"id": "roads-major",
+			"type": "line",
+			"source": "openmaptiles",
+			"source-layer": "transportation",
+			"filter": [
+				"all",
+				["==", ["geometry-type"], "LineString"],
+				[
+					"in",
+					["get", "class"],
+					["literal", ["primary", "secondary", "tertiary", "trunk", "motorway"]]
+				]
+			],
+			"layout": {
+				"line-join": "round",
+				"line-cap": "round"
+			},
+			"paint": {
+				"line-color": "#3f9dff",
+				"line-width": [
+					"interpolate",
+					["linear"],
+					["zoom"],
+					8,
+					0.9,
+					14,
+					2.7,
+					18,
+					5
+				],
+				"line-opacity": 0.96
+			}
+		},
+		{
+			"id": "buildings-fill",
+			"type": "fill",
+			"source": "openmaptiles",
+			"source-layer": "building",
+			"minzoom": 14,
+			"paint": {
+				"fill-color": "#1b2233",
+				"fill-opacity": 0.44
+			}
+		},
+		{
+			"id": "buildings-outline",
+			"type": "line",
+			"source": "openmaptiles",
+			"source-layer": "building",
+			"minzoom": 14,
+			"paint": {
+				"line-color": "#5ec9ff",
+				"line-width": ["interpolate", ["linear"], ["zoom"], 14, 0.18, 18, 0.7],
+				"line-opacity": 0.44
+			}
+		},
+		{
+			"id": "road-labels",
+			"type": "symbol",
+			"source": "openmaptiles",
+			"source-layer": "transportation_name",
+			"minzoom": 12,
+			"layout": {
+				"text-field": ["coalesce", ["get", "name:en"], ["get", "name"], ""],
+				"text-font": ["Open Sans Regular"],
+				"text-size": ["interpolate", ["linear"], ["zoom"], 12, 9, 16, 11],
+				"symbol-placement": "line"
+			},
+			"paint": {
+				"text-color": "#cbe7ff",
+				"text-halo-color": "#0a1020",
+				"text-halo-width": 1,
+				"text-opacity": 0.85
+			}
+		},
+		{
+			"id": "poi-labels",
+			"type": "symbol",
+			"source": "openmaptiles",
+			"source-layer": "poi",
+			"minzoom": 14,
+			"layout": {
+				"text-field": ["coalesce", ["get", "name:en"], ["get", "name"], ""],
+				"text-font": ["Open Sans Bold"],
+				"text-size": ["interpolate", ["linear"], ["zoom"], 14, 10, 18, 12],
+				"text-offset": [0, 0.8],
+				"text-anchor": "top"
+			},
+			"paint": {
+				"text-color": "#fff8c2",
+				"text-halo-color": "#41192b",
+				"text-halo-width": 1.2,
+				"text-opacity": 0.9
+			}
+		}
+	]
+}

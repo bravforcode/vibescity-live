@@ -4,7 +4,7 @@
  * Mobile-first with battery optimization
  */
 import { defineStore } from "pinia";
-import { computed, onUnmounted, ref, shallowRef } from "vue";
+import { computed, ref, shallowRef } from "vue";
 
 // Chiang Mai default coordinates
 const DEFAULT_LOCATION = { lat: 18.7883, lng: 98.9853 };
@@ -272,9 +272,6 @@ export const useLocationStore = defineStore(
 		const useDefaultLocation = () => {
 			setUserLocation(DEFAULT_LOCATION, true);
 		};
-
-		// Cleanup on unmount
-		onUnmounted(() => stopWatching());
 
 		return {
 			// State

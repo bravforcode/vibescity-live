@@ -3,15 +3,25 @@ import { useMotion } from "@vueuse/motion";
 import {
 	computed,
 	defineAsyncComponent,
+	inject,
 	nextTick,
 	onMounted,
 	onUnmounted,
 	ref,
+	watch,
 	watchEffect,
 } from "vue";
+import { useChromaticGlass } from "../../composables/engine/useChromaticGlass.js";
+import { useGranularAudio } from "../../composables/engine/useGranularAudio.js";
 import { useHaptics } from "../../composables/useHaptics";
 import { Z } from "../../constants/zIndex";
+import { resolveVenueMedia } from "../../domain/venue/viewModel";
+import { searchVenueVideo } from "../../services/youtubeService.js";
 import { getMediaDetails } from "../../utils/linkHelper";
+import {
+	markMediaElementFailed,
+	markMediaUrlFailed,
+} from "../../utils/mediaSourceGuard.js";
 
 // ==========================================
 // ✅ LAZY LOADED COMPONENTS
@@ -25,6 +35,12 @@ const VisitorCount = defineAsyncComponent({
 const ReviewSystem = defineAsyncComponent({
 	loader: () => import("../ui/ReviewSystem.vue"),
 	delay: 200,
+	timeout: 10000,
+});
+
+const PhotoGallery = defineAsyncComponent({
+	loader: () => import("../ui/PhotoGallery.vue"),
+	delay: 120,
 	timeout: 10000,
 });
 
@@ -64,7 +80,7 @@ import { getStatusColorClass } from "../../utils/shopUtils";
 // ✅ CONSTANTS
 // ==========================================
 const FALLBACK_IMAGE =
-	"https://images.unsplash.com/photo-1534531173927-aeb928d54385?w=800&q=80";
+	"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 1000'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%230b1020'/><stop offset='1' stop-color='%2311162a'/></linearGradient></defs><rect width='1600' height='1000' fill='url(%23g)'/></svg>";
 const DOUBLE_TAP_DELAY = 300;
 const MAX_FLASH_WINDOW = 1200000; // 20 minutes
 const DISMISS_THRESHOLD = {
@@ -78,7 +94,11 @@ const DISMISS_THRESHOLD = {
 // ==========================================
 const { t } = useI18n();
 const { selectFeedback, successFeedback, impactFeedback } = useHaptics();
-
+const {
+	onSwipe: audioSwipe,
+	onSnap: audioSnap,
+	onDismiss: audioDismiss,
+} = useGranularAudio();
 const props = defineProps({
 	shop: {
 		type: Object,
@@ -93,6 +113,10 @@ const props = defineProps({
 		type: Number,
 		default: null,
 	},
+	userLocation: {
+		type: Array,
+		default: null,
+	},
 });
 
 const emit = defineEmits(["close", "toggle-favorite"]);
@@ -103,6 +127,12 @@ const emit = defineEmits(["close", "toggle-favorite"]);
 
 // UI State
 const modalCard = ref(null);
+// Refractive glass panel — placed after modalCard so ref is captured
+const { enabled: glassEnabled, fallbackClass } = useChromaticGlass({
+	panelId: "vibe-modal",
+	panelRef: modalCard,
+	aberration: 0.006,
+});
 const scrollContentRef = ref(null);
 const imageCarouselRef = ref(null);
 const videoPlayer = ref(null);
@@ -117,6 +147,8 @@ const initialScrollTop = ref(0);
 // Gallery State
 const currentImageIndex = ref(0);
 const lastHapticIndex = ref(-1); // For dots snap haptics
+const isGalleryOpen = ref(false);
+const galleryInitialIndex = ref(0);
 
 // Ride App State
 const showRidePopup = ref(false);
@@ -124,6 +156,9 @@ const copyStatus = ref("");
 const rideLoading = ref("");
 const isMobile = ref(false);
 const modalTitleId = "vibe-modal-title";
+
+// --- Cinematic Spatial Physics: Dynamic Map Padding ---
+const mapPaddingApi = inject("mapPaddingApi", null);
 
 // Promotion State
 const timeLeft = ref("");
@@ -135,6 +170,8 @@ const isMediaVisible = ref(false);
 const isReviewsVisible = ref(false);
 const mediaObserver = ref(null);
 const reviewsObserver = ref(null);
+const mediaLoadFailed = ref(false);
+const primaryImageFailed = ref(false);
 
 // Visitor Count State
 const initialVisitorCount = ref(null);
@@ -146,32 +183,110 @@ const lastPointerTap = ref(0);
 // ✅ COMPUTED PROPERTIES
 // ==========================================
 
+const resolvedVenueMedia = computed(() => resolveVenueMedia(props.shop || {}));
+
+// YouTube video found via search (lazy-fetched when modal opens)
+const youtubeVideoUrl = ref(null);
+watch(
+	() => props.shop?.id,
+	async (shopId) => {
+		if (!shopId) {
+			youtubeVideoUrl.value = null;
+			return;
+		}
+		const base = resolvedVenueMedia.value;
+		// Only search YouTube if venue has no existing videoUrl
+		if (base.videoUrl) {
+			youtubeVideoUrl.value = null;
+			return;
+		}
+		youtubeVideoUrl.value = await searchVenueVideo(
+			props.shop?.name || "",
+			props.shop?.city || props.shop?.province || "",
+		);
+	},
+	{ immediate: true },
+);
+
 const media = computed(() => {
 	try {
-		return getMediaDetails(props.shop?.videoUrl);
+		const resolved = resolvedVenueMedia.value;
+		const mediaUrl =
+			resolved.videoUrl ||
+			youtubeVideoUrl.value ||
+			resolved.primaryImage ||
+			FALLBACK_IMAGE;
+		return getMediaDetails(mediaUrl);
 	} catch (error) {
 		console.error("Error processing media:", error);
 		return { type: "image", url: FALLBACK_IMAGE };
 	}
 });
 
+const toFiniteCoord = (value) => {
+	const num = Number(value);
+	return Number.isFinite(num) ? num : null;
+};
+
+const resolvedMediaUrl = computed(() => {
+	if (primaryImageFailed.value) {
+		return FALLBACK_IMAGE;
+	}
+	if (mediaLoadFailed.value) {
+		return resolvedVenueMedia.value.primaryImage || FALLBACK_IMAGE;
+	}
+	return (
+		media.value?.url || resolvedVenueMedia.value.primaryImage || FALLBACK_IMAGE
+	);
+});
+
+const fallbackPosterInitials = computed(
+	() =>
+		String(props.shop?.name || "VC")
+			.split(/\s+/)
+			.filter(Boolean)
+			.slice(0, 2)
+			.map((part) => part[0])
+			.join("")
+			.toUpperCase() || "VC",
+);
+const fallbackPosterCategory = computed(
+	() => props.shop?.category || t("vibe.atmosphere_default"),
+);
+
+const safeTopOffset = computed(
+	() => "calc(env(safe-area-inset-top) + 0.75rem)",
+);
+
 const processedImages = computed(() => {
 	try {
-		const images = props.shop?.images || [];
-		return images
-			.map((imgUrl) => {
-				try {
-					return getMediaDetails(imgUrl)?.url;
-				} catch {
-					return null;
-				}
-			})
-			.filter(Boolean);
+		const items = [];
+		const resolved = resolvedVenueMedia.value;
+		const videoSrc = resolved.videoUrl || youtubeVideoUrl.value;
+		if (videoSrc) items.push(videoSrc);
+
+		const images = Array.isArray(resolved.images) ? resolved.images : [];
+		images.forEach((img) => {
+			try {
+				const url = getMediaDetails(img)?.url;
+				if (url && !items.includes(url)) items.push(url);
+			} catch {}
+		});
+		return items;
 	} catch (error) {
-		console.error("Error processing images:", error);
+		console.error("Error processing media items:", error);
 		return [];
 	}
 });
+
+const isVideo = (url) => {
+	if (!url || typeof url !== "string") return false;
+	return (
+		/\.(mp4|webm|ogg|mov|m3u8)/i.test(url) ||
+		url.includes("video") ||
+		url.includes("stream")
+	);
+};
 
 const hasGallery = computed(() => processedImages.value.length > 0);
 
@@ -184,6 +299,36 @@ const shopStatus = computed(() => props.shop?.status || "UNKNOWN");
 const isPromoted = computed(
 	() => props.shop?.isPromoted || props.shop?.IsPromoted === "TRUE",
 );
+
+watch(
+	() => props.shop?.id,
+	() => {
+		mediaLoadFailed.value = false;
+		primaryImageFailed.value = false;
+		currentImageIndex.value = 0;
+		isGalleryOpen.value = false;
+	},
+	{ immediate: true },
+);
+
+const handlePrimaryVideoError = (event) => {
+	if (Number(event?.target?.error?.code || 0) === 1) return;
+	markMediaElementFailed(event, resolvedMediaUrl.value);
+	mediaLoadFailed.value = true;
+};
+
+const handlePrimaryImageError = () => {
+	markMediaUrlFailed(resolvedMediaUrl.value);
+	primaryImageFailed.value = true;
+	mediaLoadFailed.value = true;
+};
+
+const getGalleryThumbnailUrl = (url) => {
+	if (isVideo(url)) {
+		return resolvedVenueMedia.value.primaryImage || FALLBACK_IMAGE;
+	}
+	return url || FALLBACK_IMAGE;
+};
 
 // ==========================================
 // ✅ MOTION SYSTEM (iOS-STYLE)
@@ -259,6 +404,11 @@ const handleTouchMove = (e) => {
 			scale: 1 - deltaY / 3000,
 			opacity: 1,
 		});
+
+		const _dt = Date.now() - touchStart.value.t;
+		if (_dt > 0) {
+			audioSwipe(Math.abs(deltaY) / _dt);
+		}
 	}
 };
 
@@ -289,6 +439,7 @@ const handleTouchEnd = (e) => {
 	// Snap back
 	if (deltaY > 0) {
 		apply("enter");
+		audioSnap();
 	}
 
 	dragProgress.value = 0;
@@ -301,6 +452,7 @@ const handleTouchEnd = (e) => {
 const handleClose = () => {
 	try {
 		impactFeedback("medium");
+		audioDismiss();
 		apply("leave");
 		setTimeout(() => emit("close"), 300);
 	} catch (error) {
@@ -348,6 +500,32 @@ const lockBodyScroll = (locked) => {
 const fireSnapHaptic = (idx) => {
 	if (idx === lastHapticIndex.value) return;
 	lastHapticIndex.value = idx;
+	impactFeedback("light");
+};
+
+const openGalleryAt = (index) => {
+	if (!processedImages.value.length) return;
+	const safeIndex = Math.max(
+		0,
+		Math.min(Number(index) || 0, processedImages.value.length - 1),
+	);
+	galleryInitialIndex.value = safeIndex;
+	currentImageIndex.value = safeIndex;
+	isGalleryOpen.value = true;
+	impactFeedback("light");
+};
+
+const closeGallery = () => {
+	isGalleryOpen.value = false;
+};
+
+const jumpToImage = (index) => {
+	const safeIndex = Math.max(
+		0,
+		Math.min(Number(index) || 0, processedImages.value.length - 1),
+	);
+	currentImageIndex.value = safeIndex;
+	scrollToImage(safeIndex);
 	impactFeedback("light");
 };
 
@@ -408,12 +586,19 @@ const handleCarouselScrollRaf = () => {
 // ✅ POINTER DOUBLE TAP (iOS/Android/Desktop)
 // ==========================================
 
+let singleTapTimer = null;
+
 const handlePointerTap = (e) => {
 	// only primary pointer (avoid right click / secondary)
 	if (e.pointerType === "mouse" && e.button !== 0) return;
 
 	const now = Date.now();
 	if (now - lastPointerTap.value < DOUBLE_TAP_DELAY) {
+		// Double tap → favorite
+		if (singleTapTimer) {
+			clearTimeout(singleTapTimer);
+			singleTapTimer = null;
+		}
 		emit("toggle-favorite", props.shop?.id);
 		showHeartAnim.value = true;
 		successFeedback();
@@ -421,8 +606,18 @@ const handlePointerTap = (e) => {
 		setTimeout(() => {
 			showHeartAnim.value = false;
 		}, 900);
+		lastPointerTap.value = 0;
+	} else {
+		// Potential single tap → open gallery after delay
+		lastPointerTap.value = now;
+		if (singleTapTimer) clearTimeout(singleTapTimer);
+		singleTapTimer = setTimeout(() => {
+			singleTapTimer = null;
+			if (processedImages.value.length > 0) {
+				openGalleryAt(0);
+			}
+		}, DOUBLE_TAP_DELAY);
 	}
-	lastPointerTap.value = now;
 };
 
 // ==========================================
@@ -431,14 +626,39 @@ const handlePointerTap = (e) => {
 
 const openRide = async (appName) => {
 	if (!appName || !props.shop?.name) return;
+	const latNum = Number(props.shop?.lat ?? props.shop?.latitude);
+	const lngNum = Number(props.shop?.lng ?? props.shop?.longitude);
+	const hasCoords = Number.isFinite(latNum) && Number.isFinite(lngNum);
 
 	rideLoading.value = appName;
 	impactFeedback("medium");
 
 	try {
+		// Cinematic Route Unveiling: Fly to destination before switching apps
+		if (hasCoords && mapPaddingApi?.map) {
+			try {
+				const mapInstance = mapPaddingApi.map.value || mapPaddingApi.map;
+				if (typeof mapInstance.flyTo === "function") {
+					mapInstance.flyTo({
+						center: [lngNum, latNum],
+						zoom: 16,
+						duration: 800, // Longer duration for smooth cinematic effect
+						essential: true,
+					});
+				}
+			} catch (err) {
+				console.warn("Cinematic flyTo failed:", err);
+			}
+		}
+
+		// Wait 400ms for the animation to be visible before thread blocks / app switches
+		await new Promise((resolve) => setTimeout(resolve, 400));
+
 		// Copy shop name to clipboard
 		await copyToClipboard(props.shop.name);
-		copyStatus.value = "📋 Copied!";
+		copyStatus.value = hasCoords
+			? "📋 Copied!"
+			: "📋 Copied! Opening provider website (no coordinates).";
 
 		// Open appropriate app
 		let success = false;
@@ -460,11 +680,11 @@ const openRide = async (appName) => {
 		if (success) {
 			copyStatus.value = `🚗 Opening ${appName}…`;
 		} else {
-			copyStatus.value = "❌ App not found";
+			copyStatus.value = "🌐 Opening provider website…";
 		}
 	} catch (error) {
 		console.error("Error opening ride app:", error);
-		copyStatus.value = "❌ Failed to open app";
+		copyStatus.value = "🌐 Opening provider website…";
 	} finally {
 		setTimeout(() => {
 			showRidePopup.value = false;
@@ -539,14 +759,22 @@ const updateCountdown = () => {
 // ==========================================
 
 const handleShare = async () => {
-	if (!props.shop?.name || !props.shop?.lat || !props.shop?.lng) return;
+	const lat = toFiniteCoord(props.shop?.lat ?? props.shop?.latitude);
+	const lng = toFiniteCoord(props.shop?.lng ?? props.shop?.longitude);
+	if (!props.shop?.name || lat === null || lng === null) return;
+	const origin =
+		Array.isArray(props.userLocation) && props.userLocation.length >= 2
+			? {
+					lat: toFiniteCoord(props.userLocation[0]),
+					lng: toFiniteCoord(props.userLocation[1]),
+				}
+			: null;
 
 	try {
 		impactFeedback("medium");
 		const success = await shareLocation(
-			props.shop.name,
-			props.shop.lat,
-			props.shop.lng,
+			{ name: props.shop.name, lat, lng },
+			origin,
 		);
 
 		if (success) {
@@ -566,11 +794,17 @@ const handleShare = async () => {
 };
 
 const openGoogleMaps = () => {
-	if (!props.shop?.lat || !props.shop?.lng) return;
+	const lat = toFiniteCoord(props.shop?.lat ?? props.shop?.latitude);
+	const lng = toFiniteCoord(props.shop?.lng ?? props.shop?.longitude);
+	if (lat === null || lng === null) return;
+	const origin =
+		Array.isArray(props.userLocation) && props.userLocation.length >= 2
+			? props.userLocation
+			: null;
 
 	try {
 		impactFeedback("medium");
-		openGoogleMapsDir(props.shop.lat, props.shop.lng);
+		openGoogleMapsDir(lat, lng, origin);
 	} catch (error) {
 		console.error("Error opening Google Maps:", error);
 	}
@@ -697,6 +931,7 @@ onMounted(() => {
 onUnmounted(() => {
 	try {
 		if (timerInterval) clearInterval(timerInterval);
+		if (singleTapTimer) clearTimeout(singleTapTimer);
 
 		if (mediaObserver.value) mediaObserver.value.disconnect();
 		if (reviewsObserver.value) reviewsObserver.value.disconnect();
@@ -738,11 +973,13 @@ onUnmounted(() => {
       @touchstart.stop="handleTouchStart"
       @touchmove.stop="handleTouchMove"
       @touchend.stop="handleTouchEnd"
-      class="relative w-full md:max-w-5xl bg-white dark:bg-zinc-900 md:rounded-[2rem] rounded-t-[2rem] flex flex-col shadow-[0_-10px_80px_rgba(0,0,0,0.3)] max-h-[94vh] md:max-h-[90vh] pointer-events-auto overflow-hidden"
+      class="relative w-full md:max-w-5xl bg-white dark:bg-[#0a0a12] md:rounded-[2rem] rounded-t-[2rem] flex flex-col shadow-[0_-8px_48px_rgba(0,0,0,0.5)] max-h-[72vh] md:max-h-[76vh] pointer-events-auto overflow-hidden"
+      :class="fallbackClass"
       :style="{
         zIndex: Z.MODAL,
         '--safe-area-top': 'env(safe-area-inset-top)',
         '--safe-area-bottom': 'env(safe-area-inset-bottom)',
+        background: glassEnabled ? 'rgba(8,8,16,0.88)' : undefined,
       }"
       role="dialog"
       aria-modal="true"
@@ -766,7 +1003,8 @@ onUnmounted(() => {
       <button
         @click="handleClose"
         aria-label="Close details"
-        class="absolute top-4 right-4 z-50 w-8 h-8 flex items-center justify-center rounded-full bg-black/10 dark:bg-white/10 backdrop-blur-xl border border-white/20 active:scale-90 transition-colors transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+        class="absolute right-4 z-50 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/10 backdrop-blur-xl transition active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 dark:bg-white/10"
+        :style="{ top: safeTopOffset }"
       >
         <X class="w-5 h-5 text-gray-700 dark:text-white" />
       </button>
@@ -777,7 +1015,7 @@ onUnmounted(() => {
         class="flex-1 overflow-y-auto overflow-x-hidden -webkit-overflow-scrolling-touch"
       >
         <!-- Header Section -->
-        <div class="px-5 py-4 space-y-3">
+        <div class="px-4 py-3 space-y-2">
           <!-- Title Row -->
           <div class="flex items-start justify-between gap-3">
             <div class="flex-1 min-w-0">
@@ -798,7 +1036,7 @@ onUnmounted(() => {
             </div>
 
             <!-- Status Badges -->
-            <div class="flex flex-col gap-1.5 shrink-0">
+            <div class="mr-10 flex shrink-0 flex-col gap-1.5">
               <transition name="scale">
                 <div
                   v-if="isPromoActive"
@@ -841,9 +1079,9 @@ onUnmounted(() => {
           />
 
           <!-- Stats Grid -->
-          <div class="grid grid-cols-4 gap-2 mt-4">
+          <div class="mt-2 grid grid-cols-4 gap-2">
             <div
-              class="flex flex-col items-center bg-gray-50 dark:bg-zinc-800/50 rounded-xl p-2 backdrop-blur-sm border border-black/5 dark:border-white/5"
+              class="flex min-h-[74px] flex-col items-center justify-between rounded-xl border border-black/5 bg-gray-50 p-2 backdrop-blur-sm dark:border-white/5 dark:bg-zinc-800/50"
             >
               <span
                 class="text-[10px] font-semibold text-gray-500 dark:text-gray-400"
@@ -859,7 +1097,7 @@ onUnmounted(() => {
             </div>
 
             <div
-              class="flex flex-col items-center bg-gray-50 dark:bg-zinc-800/50 rounded-xl p-2 backdrop-blur-sm border border-black/5 dark:border-white/5"
+              class="flex min-h-[74px] flex-col items-center justify-between rounded-xl border border-black/5 bg-gray-50 p-2 backdrop-blur-sm dark:border-white/5 dark:bg-zinc-800/50"
             >
               <span
                 class="text-[10px] font-semibold text-gray-500 dark:text-gray-400"
@@ -874,7 +1112,7 @@ onUnmounted(() => {
             </div>
 
             <div
-              class="flex flex-col items-center bg-gray-50 dark:bg-zinc-800/50 rounded-xl p-2 backdrop-blur-sm border border-black/5 dark:border-white/5"
+              class="flex min-h-[74px] flex-col items-center justify-between rounded-xl border border-black/5 bg-gray-50 p-2 backdrop-blur-sm dark:border-white/5 dark:bg-zinc-800/50"
             >
               <span
                 class="text-[10px] font-semibold text-gray-500 dark:text-gray-400"
@@ -889,7 +1127,7 @@ onUnmounted(() => {
             </div>
 
             <div
-              class="flex flex-col items-center bg-gray-50 dark:bg-zinc-800/50 rounded-xl p-2 backdrop-blur-sm border border-black/5 dark:border-white/5"
+              class="flex min-h-[74px] flex-col items-center justify-between rounded-xl border border-black/5 bg-gray-50 p-2 backdrop-blur-sm dark:border-white/5 dark:bg-zinc-800/50"
             >
               <span
                 class="text-[10px] font-semibold text-gray-500 dark:text-gray-400"
@@ -905,31 +1143,23 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- Media Section (Hero + Particles) -->
+        <!-- Media Section (Hero) -->
         <div
           id="media-container"
-          class="relative w-full aspect-[16/10] bg-gray-900 overflow-hidden group"
+          data-testid="vibe-modal-media"
+          class="group relative w-full overflow-hidden bg-zinc-950 aspect-[4/3] max-h-[200px]"
           @pointerdown.stop="handlePointerTap"
         >
-          <!-- ✅ Cinematic Blooms (Hero Glow) -->
-          <div class="absolute inset-0 pointer-events-none z-[5]">
-            <div
-              class="absolute -top-24 -left-24 w-72 h-72 rounded-full blur-3xl opacity-40 bg-pink-500/40"
-            />
-            <div
-              class="absolute -bottom-28 -right-28 w-80 h-80 rounded-full blur-3xl opacity-40 bg-cyan-400/40"
-            />
-          </div>
 
           <!-- Cinematic Gradients -->
           <div
-            class="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-black/60 to-transparent pointer-events-none z-10"
+            class="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-black/35 to-transparent pointer-events-none z-10"
           />
           <div
-            class="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-t from-black/80 to-transparent pointer-events-none z-10"
+            class="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-t from-black/35 to-transparent pointer-events-none z-10"
           />
           <div
-            class="absolute inset-0 shadow-[inset_0_0_100px_rgba(0,0,0,0.5)] pointer-events-none z-10"
+            class="absolute inset-0 shadow-[inset_0_0_80px_rgba(0,0,0,0.35)] pointer-events-none z-10"
           />
 
           <!-- Floating Particles -->
@@ -1000,18 +1230,19 @@ onUnmounted(() => {
           <!-- Media Content -->
           <template v-if="isMediaVisible">
             <video
-              v-if="media.type === 'video'"
+              v-if="media.type === 'video' && !mediaLoadFailed"
               ref="videoPlayer"
-              :src="media.url"
+              :src="resolvedMediaUrl"
               autoplay
               loop
               muted
               playsinline
               class="w-full h-full object-cover"
+              @error="handlePrimaryVideoError"
             />
             <iframe
-              v-else-if="media.type === 'youtube'"
-              :src="media.url"
+              v-else-if="media.type === 'youtube' && !mediaLoadFailed"
+              :src="resolvedMediaUrl"
               class="w-full h-full"
               title="Venue Video"
               allow="autoplay; encrypted-media; picture-in-picture"
@@ -1019,12 +1250,34 @@ onUnmounted(() => {
               loading="lazy"
             />
             <img
-              v-else
-              :src="media.url || FALLBACK_IMAGE"
+              v-else-if="resolvedMediaUrl && resolvedMediaUrl !== FALLBACK_IMAGE"
+              :src="resolvedMediaUrl"
               :alt="shop.name || 'Venue photo'"
               class="w-full h-full object-cover"
               loading="lazy"
+              @error="handlePrimaryImageError"
             />
+            <div
+              v-else
+              data-testid="vibe-modal-fallback"
+              class="absolute inset-0 flex items-end overflow-hidden"
+            >
+              <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.35),_transparent_42%),linear-gradient(135deg,_rgba(15,23,42,1),_rgba(17,24,39,0.96)_45%,_rgba(8,47,73,0.9)_100%)]" />
+              <div class="absolute -right-8 top-4 h-20 w-20 rounded-full border border-cyan-300/20 bg-cyan-300/10 blur-sm" />
+              <div class="absolute bottom-4 left-4 flex items-center gap-3">
+                <div class="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-lg font-black text-white shadow-lg">
+                  {{ fallbackPosterInitials }}
+                </div>
+                <div>
+                  <p class="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200/75">
+                    {{ fallbackPosterCategory }}
+                  </p>
+                  <p class="mt-1 text-sm font-black text-white">
+                    {{ shop.name || "Venue media loading" }}
+                  </p>
+                </div>
+              </div>
+            </div>
           </template>
         </div>
 
@@ -1042,25 +1295,28 @@ onUnmounted(() => {
               ref="imageCarouselRef"
               class="flex gap-3 overflow-x-auto snap-x snap-mandatory no-scrollbar scroll-smooth"
             >
-              <div
+              <button
                 v-for="(img, idx) in processedImages"
                 :key="`gallery-${idx}`"
-                class="flex-shrink-0 w-32 h-32 rounded-2xl overflow-hidden bg-gray-100 dark:bg-zinc-800 snap-start cursor-pointer active:scale-95 transition-transform"
-                @click="
-                  () => {
-                    currentImageIndex = idx;
-                    scrollToImage(idx);
-                    impactFeedback('light');
-                  }
-                "
+                type="button"
+                :aria-label="`Open gallery image ${idx + 1}`"
+                class="relative h-32 w-32 flex-shrink-0 cursor-pointer snap-start overflow-hidden rounded-2xl bg-gray-100 transition-transform active:scale-95 dark:bg-zinc-800"
+                @click="openGalleryAt(idx)"
               >
                 <img
-                  :src="img"
+                  :src="getGalleryThumbnailUrl(img)"
                   :alt="`${shop.name} gallery image ${idx + 1}`"
                   class="w-full h-full object-cover"
                   loading="lazy"
+                  decoding="async"
                 />
-              </div>
+                <span
+                  v-if="isVideo(img)"
+                  class="absolute inset-x-2 bottom-2 rounded-lg bg-black/70 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white"
+                >
+                  Video
+                </span>
+              </button>
             </div>
 
             <!-- ✅ Dots Indicator -->
@@ -1075,13 +1331,7 @@ onUnmounted(() => {
                     : 'w-1.5 bg-gray-300 dark:bg-white/20'
                 "
                 :aria-label="`Go to image ${i + 1}`"
-                @click="
-                  () => {
-                    currentImageIndex = i;
-                    scrollToImage(i);
-                    impactFeedback('light');
-                  }
-                "
+                @click="jumpToImage(i)"
               />
             </div>
 
@@ -1090,7 +1340,7 @@ onUnmounted(() => {
               v-if="currentImageIndex > 0"
               @click="prevImage"
               aria-label="Previous image"
-              class="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 dark:bg-black/50 backdrop-blur-md shadow-lg active:scale-90 transition-colors transition-transform z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+              class="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 dark:bg-black/50 backdrop-blur-md shadow-lg active:scale-90 transition z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
             >
               <ChevronLeft class="w-5 h-5 text-gray-700 dark:text-white" />
             </button>
@@ -1099,7 +1349,7 @@ onUnmounted(() => {
               v-if="currentImageIndex < processedImages.length - 1"
               @click="nextImage"
               aria-label="Next image"
-              class="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 dark:bg-black/50 backdrop-blur-md shadow-lg active:scale-90 transition-colors transition-transform z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+              class="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 dark:bg-black/50 backdrop-blur-md shadow-lg active:scale-90 transition z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
             >
               <ChevronRight class="w-5 h-5 text-gray-700 dark:text-white" />
             </button>
@@ -1125,9 +1375,13 @@ onUnmounted(() => {
                   {{ t("vibe.crowd_vibe") }}
                 </h5>
                 <p
-                  class="text-sm font-medium text-gray-900 dark:text-white leading-relaxed"
+                  class="text-sm font-medium text-gray-900 dark:text-white leading-relaxed line-clamp-3"
                 >
-                  {{ shop.crowdInfo || t("vibe.crowd_default") }}
+                  {{
+                    shop.description ||
+                    shop.crowdInfo ||
+                    t("vibe.crowd_default")
+                  }}
                 </p>
               </div>
             </div>
@@ -1154,7 +1408,11 @@ onUnmounted(() => {
                 <p
                   class="text-sm font-medium text-gray-900 dark:text-white leading-relaxed"
                 >
-                  {{ shop.vibeTag || t("vibe.atmosphere_default") }}
+                  {{
+                    shop.category ||
+                    shop.vibeTag ||
+                    t("vibe.atmosphere_default")
+                  }}
                 </p>
               </div>
             </div>
@@ -1231,9 +1489,9 @@ onUnmounted(() => {
 
       <!-- iOS-Style Action Bar (Sticky Bottom) -->
       <div
-        class="border-t border-gray-200 dark:border-zinc-700 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl"
+        class="border-t border-white/10 dark:border-white/10 bg-white/80 dark:bg-[#0a0a12]/90 backdrop-blur-xl"
       >
-        <div class="px-5 py-3 grid grid-cols-3 gap-2">
+        <div class="px-4 py-2.5 grid grid-cols-3 gap-2">
           <!-- Share -->
           <button
             @click="handleShare"
@@ -1241,7 +1499,7 @@ onUnmounted(() => {
           >
             <Share2 class="w-5 h-5 text-white" />
             <span
-              class="text-[10px] font-bold text-white uppercase tracking-wide"
+              class="text-[10px] sm:text-[11px] font-bold text-white uppercase tracking-wide leading-tight px-1 text-center"
             >
               {{ t("vibe.share") }}
             </span>
@@ -1254,7 +1512,7 @@ onUnmounted(() => {
           >
             <Navigation class="w-5 h-5 text-white" />
             <span
-              class="text-[10px] font-bold text-white uppercase tracking-wide"
+              class="text-[10px] sm:text-[11px] font-bold text-white uppercase tracking-wide leading-tight px-1 text-center"
             >
               {{ t("vibe.navigate") }}
             </span>
@@ -1270,7 +1528,7 @@ onUnmounted(() => {
           >
             <Car class="w-5 h-5 text-white" />
             <span
-              class="text-[10px] font-bold text-white uppercase tracking-wide"
+              class="text-[10px] sm:text-[11px] font-bold text-white uppercase tracking-wide leading-tight px-1 text-center"
             >
               {{ t("vibe.ride") }}
             </span>
@@ -1329,7 +1587,9 @@ onUnmounted(() => {
                   <span class="text-lg font-black text-[#00B14F]">G</span>
                 </div>
                 <span class="flex-1 text-left font-bold text-white text-lg">
-                  {{ rideLoading === "grab" ? t("vibe.opening") : t("vibe.grab") }}
+                  {{
+                    rideLoading === "grab" ? t("vibe.opening") : t("vibe.grab")
+                  }}
                 </span>
                 <ChevronRight class="w-5 h-5 text-white/70" />
               </button>
@@ -1347,7 +1607,9 @@ onUnmounted(() => {
                   <span class="text-lg font-black text-[#34D186]">B</span>
                 </div>
                 <span class="flex-1 text-left font-bold text-white text-lg">
-                  {{ rideLoading === "bolt" ? t("vibe.opening") : t("vibe.bolt") }}
+                  {{
+                    rideLoading === "bolt" ? t("vibe.opening") : t("vibe.bolt")
+                  }}
                 </span>
                 <ChevronRight class="w-5 h-5 text-white/70" />
               </button>
@@ -1365,7 +1627,11 @@ onUnmounted(() => {
                   <span class="text-lg font-black text-[#00B14F]">L</span>
                 </div>
                 <span class="flex-1 text-left font-bold text-white text-lg">
-                  {{ rideLoading === "lineman" ? t("vibe.opening") : t("vibe.lineman") }}
+                  {{
+                    rideLoading === "lineman"
+                      ? t("vibe.opening")
+                      : t("vibe.lineman")
+                  }}
                 </span>
                 <ChevronRight class="w-5 h-5 text-white/70" />
               </button>
@@ -1399,6 +1665,13 @@ onUnmounted(() => {
         </div>
       </div>
     </transition>
+
+    <PhotoGallery
+      :images="processedImages"
+      :initial-index="galleryInitialIndex"
+      :is-open="isGalleryOpen"
+      @close="closeGallery"
+    />
 
     <div class="sr-only" role="status" aria-live="polite">
       {{ copyStatus || (rideLoading ? `Opening ${rideLoading}…` : "") }}

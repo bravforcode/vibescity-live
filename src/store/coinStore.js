@@ -4,8 +4,10 @@
  * Features: XP System, Achievements, Streaks, Leaderboard
  */
 import { defineStore } from "pinia";
-import { computed, ref, watch } from "vue";
-import { supabase } from "../lib/supabase";
+import { computed, onScopeDispose, ref, shallowRef, watch } from "vue";
+import { isSupabaseSchemaCacheError, supabase } from "../lib/supabase";
+import { gamificationService } from "../services/gamificationService";
+import { bootstrapVisitor } from "../services/visitorIdentity";
 import { useUserStore } from "./userStore";
 
 // ═══════════════════════════════════════════
@@ -93,7 +95,7 @@ export const useCoinStore = defineStore(
 		// ═══════════════════════════════════════════
 		const coins = ref(0);
 		const totalEarned = ref(0);
-		const collectedVenues = ref([]); // Array of venue IDs checked in
+		const collectedVenues = shallowRef([]); // shallowRef: IDs only, no deep proxy needed
 		const achievements = ref([]); // Array of achievement IDs unlocked
 		const dailyStreak = ref(0);
 		const lastCheckInDate = ref(null);
@@ -299,22 +301,32 @@ export const useCoinStore = defineStore(
 		 * Fetch user stats from backend
 		 */
 		const fetchUserStats = async () => {
-			if (!userStore.isAuthenticated) return;
-
 			try {
-				const { data } = await supabase
-					.from("user_stats")
-					.select("*")
-					.eq("user_id", userStore.userId)
-					.single();
-
-				if (data) {
-					coins.value = data.coins || 0;
-					totalEarned.value = data.total_earned || 0;
-					dailyStreak.value = data.daily_streak || 0;
+				// Always use gamification service (works for both auth + anonymous)
+				await bootstrapVisitor({ forceRefresh: false }).catch(() => {});
+				const status = await gamificationService.getDailyCheckinStatus();
+				const balance = Number(status?.balance ?? 0);
+				const streak = Number(status?.streak ?? 0);
+				if (Number.isFinite(balance)) {
+					const safeBalance = Math.max(0, Math.round(balance));
+					coins.value = safeBalance;
+					totalEarned.value = Math.max(totalEarned.value, safeBalance);
+				}
+				if (Number.isFinite(streak)) {
+					dailyStreak.value = Math.max(0, Math.round(streak));
 				}
 			} catch (e) {
-				console.error("❌ Failed to fetch stats:", e);
+				if (isSupabaseSchemaCacheError(e)) {
+					if (import.meta.env.DEV) {
+						console.warn(
+							"⚠️ user_stats temporarily unavailable (schema cache retrying)",
+						);
+					}
+					return;
+				}
+				if (import.meta.env.DEV) {
+					console.warn("⚠️ Failed to fetch stats:", e?.message || e);
+				}
 			}
 		};
 
@@ -358,11 +370,26 @@ export const useCoinStore = defineStore(
 		// Auto-fetch on auth
 		watch(
 			() => userStore.isAuthenticated,
-			(isAuth) => {
-				if (isAuth) fetchUserStats();
+			() => {
+				void fetchUserStats();
 			},
 			{ immediate: true },
 		);
+
+		if (typeof window !== "undefined") {
+			const syncOnReturn = () => {
+				if (document.visibilityState === "hidden") return;
+				void fetchUserStats();
+			};
+			window.addEventListener("focus", syncOnReturn, { passive: true });
+			document.addEventListener("visibilitychange", syncOnReturn, {
+				passive: true,
+			});
+			onScopeDispose(() => {
+				window.removeEventListener("focus", syncOnReturn);
+				document.removeEventListener("visibilitychange", syncOnReturn);
+			});
+		}
 
 		return {
 			// State

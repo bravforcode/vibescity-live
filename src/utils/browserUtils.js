@@ -62,30 +62,57 @@ export const copyToClipboard = async (text) => {
  * @param {number} lng - Destination longitude
  * @returns {boolean} - Whether the operation was successful
  */
-export const openGoogleMapsDir = (lat, lng) => {
-	if (!lat || !lng) {
+export const openGoogleMapsDir = (lat, lng, originArg = null) => {
+	const latNum = Number(lat);
+	const lngNum = Number(lng);
+	if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
 		console.error("Invalid coordinates:", lat, lng);
 		return false;
 	}
-
 	// สร้าง URL สำหรับอุปกรณ์ต่างๆ
 	const userAgent = navigator.userAgent || navigator.vendor || window.opera;
 	const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
 	const isAndroid = /android/i.test(userAgent);
 
 	// Encode ชื่อปลายทาง
-	const destination = encodeURIComponent(`${lat},${lng}`);
+	const destination = encodeURIComponent(`${latNum},${lngNum}`);
+	const parseOrigin = (value) => {
+		if (Array.isArray(value) && value.length >= 2) {
+			const oLat = Number(value[0]);
+			const oLng = Number(value[1]);
+			if (Number.isFinite(oLat) && Number.isFinite(oLng)) {
+				return { lat: oLat, lng: oLng };
+			}
+			return null;
+		}
+		if (value && typeof value === "object") {
+			const oLat = Number(value.lat ?? value.latitude);
+			const oLng = Number(value.lng ?? value.longitude ?? value.lon);
+			if (Number.isFinite(oLat) && Number.isFinite(oLng)) {
+				return { lat: oLat, lng: oLng };
+			}
+		}
+		return null;
+	};
+	const origin = parseOrigin(originArg);
+	const originParam = origin
+		? `&origin=${encodeURIComponent(`${origin.lat},${origin.lng}`)}`
+		: "";
+	const webUrl = `https://www.google.com/maps/dir/?api=1${originParam}&destination=${destination}&travelmode=driving`;
 
 	try {
 		if (isIOS) {
 			// สำหรับ iOS - พยายามเปิดแอพ Google Maps
-			const iosUrl = `maps://maps.google.com/maps?daddr=${destination}&directionsmode=driving`;
+			const iosSource = origin
+				? encodeURIComponent(`${origin.lat},${origin.lng}`)
+				: "Current+Location";
+			const iosUrl = `maps://maps.google.com/maps?saddr=${iosSource}&daddr=${destination}&directionsmode=driving`;
 			window.location.href = iosUrl;
 
 			// Fallback หลังจาก 500ms
 			setTimeout(() => {
 				if (document.visibilityState === "visible") {
-					openExternal(`https://maps.apple.com/?daddr=${destination}`);
+					openExternal(webUrl);
 				}
 			}, 500);
 		} else if (isAndroid) {
@@ -96,25 +123,19 @@ export const openGoogleMapsDir = (lat, lng) => {
 			// Fallback หลังจาก 500ms
 			setTimeout(() => {
 				if (document.visibilityState === "visible") {
-					openExternal(
-						`https://www.google.com/maps/dir/?api=1&destination=${destination}`,
-					);
+					openExternal(webUrl);
 				}
 			}, 500);
 		} else {
 			// สำหรับ Desktop/Browser อื่นๆ
-			openExternal(
-				`https://www.google.com/maps/dir/?api=1&destination=${destination}`,
-			);
+			openExternal(webUrl);
 		}
 
 		return true;
 	} catch (error) {
 		console.error("Failed to open Google Maps:", error);
 		// Fallback มาตรฐาน
-		openExternal(
-			`https://www.google.com/maps/dir/?api=1&destination=${destination}`,
-		);
+		openExternal(webUrl);
 		return false;
 	}
 };
@@ -132,27 +153,75 @@ export const openExternal = (url, features = "") => {
 // ฟังก์ชันเช็คว่าอยู่บนมือถือหรือไม่
 export const isMobileDevice = () => {
 	const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-	return (
-		/android/i.test(userAgent) ||
-		/iPad|iPhone|iPod/.test(userAgent) ||
-		(window.innerWidth <= 768 && window.innerHeight <= 1024)
-	);
+	return /android/i.test(userAgent) || /iPad|iPhone|iPod/.test(userAgent);
 };
 
 // ฟังก์ชันแชร์ตำแหน่ง
-export const shareLocation = (shop) => {
-	if (navigator.share && isMobileDevice()) {
-		const shareData = {
-			title: shop.name,
-			text: `ไปร้าน ${shop.name} กัน!\nตำแหน่ง: https://maps.google.com/?q=${shop.lat},${shop.lng}`,
-			url: window.location.href,
-		};
+export const shareLocation = async (
+	shopOrName,
+	latOrOrigin = null,
+	lngArg = null,
+	originArg = null,
+) => {
+	const toCoord = (lat, lng) => {
+		const latNum = Number(lat);
+		const lngNum = Number(lng);
+		if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) return null;
+		return { lat: latNum, lng: lngNum };
+	};
+	const parseOrigin = (value) => {
+		if (Array.isArray(value) && value.length >= 2) {
+			return toCoord(value[0], value[1]);
+		}
+		if (value && typeof value === "object") {
+			return toCoord(value.lat ?? value.latitude, value.lng ?? value.longitude);
+		}
+		return null;
+	};
 
-		return navigator.share(shareData).catch(console.error);
+	let destination = null;
+	let name = "";
+	let origin = null;
+
+	if (shopOrName && typeof shopOrName === "object") {
+		name = String(shopOrName.name || shopOrName.Name || "VibeCity Place");
+		destination = toCoord(
+			shopOrName.lat ?? shopOrName.latitude,
+			shopOrName.lng ?? shopOrName.longitude,
+		);
+		origin = parseOrigin(latOrOrigin);
 	} else {
-		// Fallback สำหรับ Desktop หรือเบราว์เซอร์ที่ไม่รองรับ
-		const shareUrl = `https://maps.google.com/?q=${shop.lat},${shop.lng}`;
-		copyToClipboard(shareUrl);
-		return true;
+		name = String(shopOrName || "VibeCity Place");
+		destination = toCoord(latOrOrigin, lngArg);
+		origin = parseOrigin(originArg);
 	}
+
+	if (!destination) return false;
+
+	const destinationText = `${destination.lat},${destination.lng}`;
+	const originPart = origin
+		? `&origin=${encodeURIComponent(`${origin.lat},${origin.lng}`)}`
+		: "";
+	const shareUrl = `https://www.google.com/maps/dir/?api=1${originPart}&destination=${encodeURIComponent(destinationText)}&travelmode=driving`;
+	const textLines = [`ไปร้าน ${name} กัน!`, `ตำแหน่งร้าน: ${destinationText}`];
+	if (origin) {
+		textLines.push(`เริ่มจากตำแหน่งผู้ใช้: ${origin.lat},${origin.lng}`);
+	}
+
+	if (navigator.share) {
+		try {
+			await navigator.share({
+				title: name,
+				text: textLines.join("\n"),
+				url: shareUrl,
+			});
+			return true;
+		} catch (error) {
+			if (error?.name !== "AbortError") {
+				console.error("Share failed:", error);
+			}
+		}
+	}
+
+	return copyToClipboard(shareUrl);
 };

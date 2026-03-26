@@ -1,5 +1,8 @@
 <script setup>
 import { Heart, MapPin, Send, Share2 } from "lucide-vue-next";
+import { computed, ref, watch } from "vue";
+import { resolveVenueMedia } from "../../domain/venue/viewModel";
+import { markMediaElementFailed } from "../../utils/mediaSourceGuard.js";
 
 const props = defineProps({
 	shop: {
@@ -21,6 +24,29 @@ const emit = defineEmits([
 	"share-shop",
 	"select-shop",
 ]);
+
+const mediaLoadFailed = ref(false);
+const resolvedMedia = computed(() => resolveVenueMedia(props.shop || {}));
+const expandedVideoUrl = computed(() =>
+	mediaLoadFailed.value ? "" : resolvedMedia.value.videoUrl,
+);
+const expandedImageUrl = computed(
+	() => resolvedMedia.value.primaryImage || props.shop?.Image_URL1 || "",
+);
+
+const handleVideoError = (event) => {
+	if (Number(event?.target?.error?.code || 0) === 1) return;
+	mediaLoadFailed.value = true;
+	markMediaElementFailed(event, expandedVideoUrl.value);
+};
+
+watch(
+	() => props.shop?.id,
+	() => {
+		mediaLoadFailed.value = false;
+	},
+	{ immediate: true },
+);
 </script>
 
 <template>
@@ -30,21 +56,23 @@ const emit = defineEmits([
     <!-- Video/Image Container -->
     <div class="absolute inset-0 video-ken-burns">
       <video
-        v-if="shop.Video_URL"
+        v-if="expandedVideoUrl"
         :ref="videoRef"
-        :src="shop.Video_URL"
-        :poster="shop.Image_URL1"
+        :src="expandedVideoUrl"
+        :poster="expandedImageUrl || undefined"
         muted
         loop
         playsinline
         autoplay
         class="w-full h-full object-cover opacity-80"
+        preload="metadata"
+        @error="handleVideoError"
       >
         <track kind="captions" />
       </video>
       <img
-        v-else-if="shop.Image_URL1"
-        :src="shop.Image_URL1"
+        v-else-if="expandedImageUrl"
+        :src="expandedImageUrl"
         :alt="shop.name"
         class="w-full h-full object-cover opacity-80"
       />

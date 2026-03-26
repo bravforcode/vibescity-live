@@ -3,128 +3,101 @@
 import {
 	computed,
 	defineAsyncComponent,
-	defineComponent,
-	h,
 	nextTick,
 	onMounted,
+	provide,
 	ref,
 	watch,
 } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
-// ✅ Import New Modular Components
 import BottomFeed from "../components/feed/BottomFeed.vue";
 import SmartHeader from "../components/layout/SmartHeader.vue";
 import AppModals from "../components/system/AppModals.vue";
-import ClaimFeedback from "../components/ui/ClaimFeedback.vue"; // ✅ Claim confetti overlay (Phase 2 — GAME-03)
-import ConsentBanner from "../components/ui/ConsentBanner.vue"; // ✅ PDPA consent gate (Phase 2)
+import EmptyState from "../components/ui/EmptyState.vue";
+import ErrorBoundary from "../components/ui/ErrorBoundary.vue"; // C4: prevents blank-screen on render crash
 import FilterMenuSync from "../components/ui/FilterMenu.vue";
-import SidebarDrawer from "../components/ui/SidebarDrawer.vue"; // ✅ Sync Import to fix loading
+// FilterPills removed — FilterMenu modal handles category selection
+import MapErrorFallback from "../components/ui/MapErrorFallback.vue";
+import SidebarDrawer from "../components/ui/SidebarDrawer.vue";
+import { useMapPadding } from "../composables/map/useMapPadding";
 import { useAppLogic } from "../composables/useAppLogic";
 import { useLocalAds } from "../composables/useLocalAds";
 import { setClientCookie } from "../lib/cookies";
 import { getSiteOrigin } from "../lib/runtimeConfig";
 import { useFeatureFlagStore } from "../store/featureFlagStore";
-import { gamificationService } from "../services/gamificationService"; // ✅ Phase 2 claim flow (SAFE-01)
-import { useCoinStore } from "../store/coinStore"; // ✅ Phase 2 server-synced coin balance (GAME-06)
+import { useUserStore } from "../store/userStore";
+import { defineResilientAsync } from "../utils/asyncComponentFactory";
 
-// ✅ Async Components (Preserved)
-// E2E strict lane can flake if the map component chunk fails to load.
-// Use eager mode + a loading shell in strict map E2E to remove async chunk races
-// (Playwright checks map-shell immediately after DOMContentLoaded).
 const IS_STRICT_MAP_E2E = import.meta.env.VITE_E2E_MAP_REQUIRED === "true";
-const MapE2ELoadingShell = defineComponent({
-	name: "MapE2ELoadingShell",
-	setup() {
-		return () =>
-			h(
-				"div",
-				{
-					"data-testid": "map-shell",
-					"data-map-ready": "false",
-					class: "relative w-full h-full z-0 bg-[#09090b]",
-				},
-				[
-					h("div", {
-						"data-testid": "map-canvas",
-						class: "w-full h-full absolute inset-0",
-					}),
-				],
-			);
-	},
+// Lazy-load the map component (444 kB gzipped) to unblock initial parse.
+// Shows VibeSkeleton while map loads (45s timeout for slow networks).
+const MapContainer = defineAsyncComponent({
+	loader: () => import("../components/map/MapLibreContainer.vue"),
+	loadingComponent: defineAsyncComponent(
+		() => import("../components/ui/VibeSkeleton.vue"),
+	),
+	errorComponent: MapErrorFallback,
+	timeout: 45000,
 });
-const MapContainer = defineAsyncComponent(
-	IS_STRICT_MAP_E2E
-		? {
-				loader: () =>
-					import(
-						/* webpackMode: "eager" */ "../components/map/MapboxContainer.vue"
-					),
-				loadingComponent: MapE2ELoadingShell,
-				delay: 0,
-				suspensible: false,
-			}
-		: () => import("../components/map/MapboxContainer.vue"),
-);
-const VideoPanel = defineAsyncComponent(
+const VideoPanel = defineResilientAsync(
 	() => import("../components/panel/VideoPanel.vue"),
 );
 // SidebarDrawer moved to sync above
-const VibeError = defineAsyncComponent(
+const VibeError = defineResilientAsync(
 	() => import("../components/ui/VibeError.vue"),
 );
-const VibeSkeleton = defineAsyncComponent(
+const VibeSkeleton = defineResilientAsync(
 	() => import("../components/ui/VibeSkeleton.vue"),
 );
-const SwipeCard = defineAsyncComponent(
+const SwipeCard = defineResilientAsync(
 	() => import("../components/ui/SwipeCard.vue"),
 );
-const ImmersiveFeed = defineAsyncComponent(
+const ImmersiveFeed = defineResilientAsync(
 	() => import("../components/feed/ImmersiveFeed.vue"),
 );
-const MerchantRegister = defineAsyncComponent(
+const MerchantRegister = defineResilientAsync(
 	() => import("../components/panel/MerchantRegister.vue"),
 );
-const AddShopModal = defineAsyncComponent(
+const AddShopModal = defineResilientAsync(
 	() => import("../components/ugc/AddShopModal.vue"),
 );
-const DailyCheckin = defineAsyncComponent(
+const DailyCheckin = defineResilientAsync(
 	() => import("../components/ui/DailyCheckin.vue"),
 );
-const LuckyWheel = defineAsyncComponent(
+const LuckyWheel = defineResilientAsync(
 	() => import("../components/ui/LuckyWheel.vue"),
 );
-const LocalAdBanner = defineAsyncComponent(
+const LocalAdBanner = defineResilientAsync(
 	() => import("../components/ads/LocalAdBanner.vue"),
-);
-const VibeActionSheet = defineAsyncComponent(
-	() => import("../components/ui/VibeActionSheet.vue"),
 );
 
 const showMerchantModal = ref(false);
 const showAddShopModal = ref(false);
 
-// ✅ Geofenced Local Ads
 const { visibleAds, dismissAd } = useLocalAds();
 const currentAd = computed(() => visibleAds.value?.[0] ?? null);
 
 const FilterMenu = IS_STRICT_MAP_E2E
 	? FilterMenuSync
-	: defineAsyncComponent(() => import("../components/ui/FilterMenu.vue"));
-const RelatedShopsDrawer = defineAsyncComponent(
+	: defineResilientAsync(() => import("../components/ui/FilterMenu.vue"));
+const RelatedShopsDrawer = defineResilientAsync(
 	() => import("../components/ui/RelatedShopsDrawer.vue"),
 );
-// ✅ Safety & Favorites Modals
-const SafetyPanel = defineAsyncComponent(
+const SafetyPanel = defineResilientAsync(
 	() => import("../components/ui/SafetyPanel.vue"),
 );
-const FavoritesModal = defineAsyncComponent(
+const FavoritesModal = defineResilientAsync(
 	() => import("../components/modal/FavoritesModal.vue"),
 );
 const showFilterMenu = ref(false);
 const showRelatedDrawer = ref(false); // Stack View Logic
+const mapReadySignal = ref(false);
 const route = useRoute();
 const router = useRouter();
+const { t } = useI18n();
 const featureFlagStore = useFeatureFlagStore();
+const userStore = useUserStore();
 const SITE_ORIGIN = getSiteOrigin({ allowDevWindowFallback: true });
 
 import { useHead } from "@unhead/vue";
@@ -142,16 +115,32 @@ const getStoredLocale = () => {
 		localStorage.getItem("locale") || localStorage.getItem("vibe_locale") || "";
 	return normalizeLocale(stored);
 };
+const detectBrowserLocale = () => {
+	return "en";
+};
 const currentLocale = computed(() => {
 	const fromRoute = normalizeLocale(route.params.locale);
-	return fromRoute || getStoredLocale() || "th";
+	return fromRoute || getStoredLocale() || detectBrowserLocale();
 });
-const isPartnerProgramEnabled = computed(() =>
-	featureFlagStore.isEnabled("enable_partner_program"),
-);
+const isPartnerProgramEnabled = computed(() => true);
 const isCinemaExplorerEnabled = computed(() =>
 	featureFlagStore.isEnabled("enable_cinema_mall_explorer"),
 );
+const isHeaderLayoutGuardV2Enabled = computed(() =>
+	featureFlagStore.isEnabled("enable_header_layout_guard_v2"),
+);
+const isSearchOverlayGuardV2Enabled = computed(() =>
+	featureFlagStore.isEnabled("enable_search_overlay_guard_v2"),
+);
+const shouldUseSplitHeader = computed(
+	() =>
+		isHeaderLayoutGuardV2Enabled.value &&
+		(isDesktopView.value || isLandscape.value),
+);
+const splitHeaderWidth = computed(() => {
+	if (!shouldUseSplitHeader.value) return null;
+	return isDesktopView.value ? "68vw" : "60vw";
+});
 const buildLocalePath = (basePath, locale) => {
 	const safe = basePath === "/" ? "" : basePath;
 	return `/${locale}${safe}`;
@@ -169,6 +158,13 @@ const resolveCategoryParam = (value) => {
 	return slug || null;
 };
 
+const isDashboardOpen = computed(
+	() =>
+		route.name === "partner-dashboard" ||
+		route.name === "owner-dashboard" ||
+		route.name === "merchant-portal",
+);
+
 const clampText = (value, maxLen) => {
 	const s = String(value || "")
 		.replace(/\s+/g, " ")
@@ -181,7 +177,6 @@ const clampText = (value, maxLen) => {
 	return `${s.slice(0, Math.max(0, limit - 3)).trim()}...`;
 };
 
-// ✅ Initialize Logic
 const {
 	// Refs
 	mapRef,
@@ -189,6 +184,7 @@ const {
 	mobileCardScrollRef,
 	isMobileView,
 	isLandscape,
+	isDesktopView,
 	isDarkMode,
 	isDataLoading,
 	isInitialLoad,
@@ -235,6 +231,7 @@ const {
 	filteredShops,
 	carouselShops,
 	carouselShopIds,
+	nearbyPins,
 	suggestedShops,
 	mallShops,
 	activeEvents,
@@ -244,7 +241,6 @@ const {
 	liveCount,
 
 	// Methods
-	t,
 	toggleLanguage,
 	handleMarkerClick,
 	handleCardClick,
@@ -273,11 +269,11 @@ const {
 	// Haptics
 	tapFeedback,
 	selectFeedback,
-	isUiVisible, // ✅ Auto-hide UI
-	wakeUi, // ✅ Manual wake
-	isMuted, // ✅ Audio
-	toggleMute, // ✅ Audio
-	loadMoreVibes, // ✅ Infinite Scroll
+	isUiVisible,
+	wakeUi,
+	isMuted,
+	toggleMute,
+	loadMoreVibes,
 
 	// Safety Features
 	handleTakeMeHome,
@@ -295,15 +291,54 @@ const {
 	handleExitGiantView,
 } = useAppLogic();
 
-// ✅ Ref Forwarding Helpers
+// --- Cinematic Spatial Physics: Dynamic Map Padding ---
+const mapInstanceRef = computed(() => mapRef.value?.map);
+const mapPaddingApi = useMapPadding(mapInstanceRef, {
+	defaultTop: mapUiTopOffset,
+	defaultBottom: mapUiBottomOffset,
+	mobileBottom: 60,
+	isSidebarOpen: computed(() => isPanelOpen.value),
+});
+provide("mapPaddingApi", mapPaddingApi);
+
+// Auth removed — app uses anonymous visitor identity only
+
+watch(globalSearchQuery, (q) => {
+	showSearchResults.value = Boolean(q && q.length >= 1);
+});
+
 const setBottomUiRef = (el) => {
 	bottomUiRef.value = el;
 };
 const setMobileCardScrollRef = (el) => {
 	mobileCardScrollRef.value = el;
 };
+const handleSearchQueryUpdate = (val) => {
+	globalSearchQuery.value = val;
+};
+const handleSearchResultsVisibility = (val) => {
+	showSearchResults.value = val;
+};
+const handleOpenFilterMenu = () => {
+	showSearchResults.value = false;
+	showFilterMenu.value = true;
+};
+const handleCardSelect = (shop) => {
+	handleCardClick(shop);
+	handleOpenDetail(shop);
+};
+const handleMapReadyChange = (ready) => {
+	mapReadySignal.value = Boolean(ready);
+};
 
-// ✅ Giant Pin State Sync
+watch(isImmersive, (immersive) => {
+	if (immersive) return;
+	nextTick(() => {
+		mapRef.value?.resize?.();
+		window.setTimeout(() => mapRef.value?.resize?.(), 120);
+	});
+});
+
 const isGiantPinView = ref(false);
 const onEnterGiantView = (shop) => {
 	isGiantPinView.value = true;
@@ -316,113 +351,6 @@ const onExitGiantView = () => {
 
 const dailyCheckinRef = ref(null);
 const luckyWheelRef = ref(null);
-
-// ✅ PDPA consent gate (Phase 2 — COMP-01, IDENT-01/02)
-const hasConsent = ref(!!localStorage.getItem("pdpa_consent_ts"));
-const onConsentGranted = () => {
-	hasConsent.value = true;
-};
-
-// ✅ Phase 2: Claim flow state (GAME-01, GAME-02, GAME-03, GAME-06, SAFE-01)
-const coinStore = useCoinStore();
-const claimFeedback = ref({ visible: false, coins: 0, venue: "" });
-const claimError = ref(null); // 'already_claimed' | 'rate_limited' | 'error' | null
-
-// ✅ Server sync on consent (GAME-06): load balance + claimed venues from FastAPI on page load
-watch(
-	hasConsent,
-	async (granted) => {
-		if (granted) {
-			try {
-				const claims = await gamificationService.getMyClaimsFromServer();
-				coinStore.syncFromServer(claims.balance, claims.venue_ids);
-			} catch (e) {
-				console.warn("[Phase 2] Failed to sync claims from server:", e);
-			}
-		}
-	},
-	{ immediate: true },
-);
-
-// ✅ VibeBanner + VibeActionSheet handlers
-const handleClaimVibe = async () => {
-	if (!hasConsent.value) {
-		// Show consent banner — cannot claim without PDPA consent
-		return;
-	}
-	if (!selectedShop.value) return;
-
-	const venueId = resolveVenueId(selectedShop.value);
-	if (!venueId) return;
-
-	// Optimistic check (client-side, not authoritative)
-	if (coinStore.hasCollected(venueId)) {
-		claimError.value = "already_claimed";
-		setTimeout(() => {
-			claimError.value = null;
-		}, 3000);
-		return;
-	}
-
-	try {
-		const result = await gamificationService.claimVibe(String(venueId));
-
-		if (result.rate_limited) {
-			claimError.value = "rate_limited";
-			setTimeout(() => {
-				claimError.value = null;
-			}, 3000);
-			return;
-		}
-
-		if (result.already_claimed) {
-			claimError.value = "already_claimed";
-			setTimeout(() => {
-				claimError.value = null;
-			}, 3000);
-			// Sync balance from server response
-			if (typeof result.balance === "number") {
-				coinStore.coins = result.balance;
-			}
-			return;
-		}
-
-		// Success — update local state
-		coinStore.addClaimedVenue(String(venueId));
-		if (typeof result.balance === "number") {
-			coinStore.coins = result.balance;
-		}
-		if (typeof result.total_earned === "number") {
-			coinStore.totalEarned = result.total_earned;
-		}
-
-		// Show confetti + haptic overlay (GAME-03)
-		claimFeedback.value = {
-			visible: true,
-			coins: result.coins_awarded || 10,
-			venue: selectedShop.value?.name || "",
-		};
-	} catch (e) {
-		console.error("[Phase 2] Claim failed:", e);
-		claimError.value = "error";
-		setTimeout(() => {
-			claimError.value = null;
-		}, 3000);
-	}
-};
-
-const dismissClaimFeedback = () => {
-	claimFeedback.value = { ...claimFeedback.value, visible: false };
-};
-const handleNavigate = () => {
-	if (!selectedShop.value) return;
-	const { lat, lng } = selectedShop.value;
-	window.open(
-		`https://maps.google.com/?daddr=${lat},${lng}`,
-		"_blank",
-		"noopener",
-	);
-};
 
 const resolveVenueId = (shopOrId) => {
 	const rawId =
@@ -497,8 +425,8 @@ const resolveVenueUrl = (shopOrId) => {
 
 const activeVenue = computed(() => {
 	const targetSlug = resolveVenueSlug(route.params.slug);
-	const targetId =
-		resolveVenueId(route.params.id) || resolveVenueId(activeShopId.value);
+	const routeIdParam = resolveVenueId(route.params.id);
+	const targetId = routeIdParam || resolveVenueId(activeShopId.value);
 
 	const candidates = [
 		...(filteredShops.value || []),
@@ -514,9 +442,16 @@ const activeVenue = computed(() => {
 	}
 
 	if (targetId) {
-		return (
-			candidates.find((shop) => resolveVenueId(shop?.id) === targetId) || null
-		);
+		const byId =
+			candidates.find((shop) => resolveVenueId(shop?.id) === targetId) || null;
+		if (byId) return byId;
+		if (routeIdParam) {
+			const asSlug = routeIdParam.toLowerCase();
+			return (
+				candidates.find((shop) => resolveVenueSlug(shop?.slug) === asSlug) ||
+				null
+			);
+		}
 	}
 
 	return null;
@@ -726,7 +661,7 @@ const hreflangLinks = computed(() => {
 		{
 			rel: "alternate",
 			hreflang: "x-default",
-			href: `${SITE_ORIGIN}${buildLocalePath(base, "th")}`,
+			href: `${SITE_ORIGIN}${buildLocalePath(base, "en")}`,
 		},
 	];
 });
@@ -755,7 +690,7 @@ const ogLocaleAlternate = computed(() =>
 	currentLocale.value === "en" ? "th_TH" : "en_US",
 );
 
-const ogType = computed(() => (isVenueRoute.value ? "place" : "website"));
+const ogType = computed(() => "website");
 
 useHead(() => ({
 	title: seoTitle.value,
@@ -777,11 +712,13 @@ useHead(() => ({
 		{ property: "og:locale", content: ogLocale.value },
 		{ property: "og:locale:alternate", content: ogLocaleAlternate.value },
 		{ property: "og:image", content: seoOgImageUrl.value },
+		{ property: "og:image:alt", content: seoDescription.value },
 
 		{ name: "twitter:card", content: "summary_large_image" },
 		{ name: "twitter:title", content: seoTitle.value },
 		{ name: "twitter:description", content: seoDescription.value },
 		{ name: "twitter:image", content: seoOgImageUrl.value },
+		{ name: "twitter:site", content: "@vibecitylive" },
 	],
 	script:
 		venueJsonLd.value || categoryJsonLd.value
@@ -881,6 +818,7 @@ const syncRewards = async () => {
 };
 
 onMounted(() => {
+	if (import.meta.env.VITE_E2E === "true") return;
 	void featureFlagStore.refreshFlags().catch(() => {});
 });
 
@@ -894,491 +832,616 @@ if (import.meta.env.DEV) {
 		console.log("🔍 [HomeView] carouselShops:", carouselShops.value?.length);
 	});
 }
+const handleReloadMap = () => {
+	mapReadySignal.value = false;
+	nextTick(() => mapRef.value?.initMapOnce?.());
+};
+const handleResetFilters = () => {
+	activeCategories.value = [];
+	activeStatus.value = "ALL";
+};
+
+const hasFilteredResults = computed(() => {
+	if (isDataLoading.value || isInitialLoad.value) return true; // still loading
+	return (filteredShops.value?.length ?? 0) > 0;
+});
 </script>
 
 <template>
-  <main
-    id="main-content"
-    :class="[
-      'relative w-full h-[100dvh] overflow-hidden font-sans transition-colors duration-500',
-      isDarkMode ? 'bg-void' : 'bg-gray-100',
-      { 'low-power': isLowPowerMode },
-    ]"
-  >
-    <!-- Note: isLowPowerMode is exported from useAppLogic -->
-
-    <!-- ✅ Global Error State -->
-    <VibeError v-if="errorMessage" :message="errorMessage" @retry="retryLoad" />
-
-    <!-- ✅ Loading State (Initial) -->
-    <div
-      v-if="isDataLoading && !realTimeEvents.length"
-      class="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xl"
+  <ErrorBoundary>
+    <a href="#main-content" class="skip-link"> {{ $t("auto.k_fc0dd480") }} </a>
+    <main
+      id="main-content"
+      :class="[
+        'relative w-full h-[100dvh] overflow-hidden font-sans transition-colors duration-500',
+        isDarkMode ? 'bg-void' : 'bg-gray-100',
+        { 'low-power': isLowPowerMode },
+      ]"
     >
-      <div class="flex flex-col items-center gap-4">
-        <VibeSkeleton variant="circle" height="60px" width="60px" />
-        <VibeSkeleton variant="text" height="20px" width="150px" />
+      <!-- Note: isLowPowerMode is exported from useAppLogic -->
+      <!-- ✅ Global Error State -->
+      <VibeError
+        v-if="errorMessage"
+        :message="errorMessage"
+        @retry="retryLoad"
+      />
+
+      <!-- ✅ Loading State (Initial) -->
+      <div
+        v-if="isDataLoading && !realTimeEvents.length"
+        class="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xl"
+      >
+        <div class="flex flex-col items-center gap-4">
+          <VibeSkeleton variant="circle" height="60px" width="60px" />
+          <VibeSkeleton variant="text" height="20px" width="150px" />
+        </div>
       </div>
-    </div>
 
-    <!-- ✅ Sidebar Drawer -->
-    <div data-testid="drawer-shell">
-      <SidebarDrawer
-        :is-open="showSidebar"
-        :show-partner-program="isPartnerProgramEnabled"
-        :user-stats="{
-          name: 'Vibe Explorer',
-          level: Math.floor(totalCoins / 100) + 1,
-          coins: totalCoins,
-          avatar: null,
-        }"
-        :is-muted="isMuted"
-        :current-language="$i18n?.locale || 'en'"
-        @close="showSidebar = false"
-        @navigate="
-          (id) => {
-            /* Navigation Logic */
-          }
-        "
-        @open-merchant="
-          showSidebar = false;
-          showMerchantModal = true;
-        "
-        @toggle-mute="toggleMute"
-        @toggle-language="toggleLanguage"
-        @take-me-home="handleTakeMeHome"
-        @open-sos="handleOpenSOS"
-        @open-daily-checkin="openDailyCheckin"
-        @open-lucky-wheel="openLuckyWheel"
-        @open-dashboard="
-          showSidebar = false;
-          router.push('/merchant');
-        "
-        @open-partner="
-          showSidebar = false;
-          router.push('/partner');
-        "
-      />
+      <!-- ✅ Sidebar Drawer -->
+      <div data-testid="drawer-shell">
+        <SidebarDrawer
+          :is-open="showSidebar"
+          :show-partner-program="isPartnerProgramEnabled"
+          :user-stats="{
+            name: 'Vibe Explorer',
+            level: Math.floor(totalCoins / 100) + 1,
+            coins: totalCoins,
+            avatar: null,
+          }"
+          :is-muted="isMuted"
+          :current-language="$i18n?.locale || 'en'"
+          @close="showSidebar = false"
+          @navigate="
+            (id) => {
+              /* Navigation Logic */
+            }
+          "
+          @open-merchant="
+            showSidebar = false;
+            showMerchantModal = true;
+          "
+          @toggle-mute="toggleMute"
+          @toggle-language="toggleLanguage"
+          @take-me-home="handleTakeMeHome"
+          @open-sos="handleOpenSOS"
+          @open-daily-checkin="openDailyCheckin"
+          @open-lucky-wheel="openLuckyWheel"
+          @open-favorites="handleOpenFavorites"
+          @open-dashboard="
+            showSidebar = false;
+            router.push('/merchant');
+          "
+          @open-partner="
+            showSidebar = false;
+            router.push('/partner');
+          "
+        />
 
-      <MerchantRegister
-        v-if="showMerchantModal"
-        :is-open="showMerchantModal"
-        @close="showMerchantModal = false"
-      />
+        <MerchantRegister
+          v-if="showMerchantModal"
+          :is-open="showMerchantModal"
+          @close="showMerchantModal = false"
+        />
 
-      <FilterMenu
-        v-if="showFilterMenu"
-        :is-open="showFilterMenu"
-        :selected-categories="activeFilters"
-        @close="showFilterMenu = false"
-        @apply="handleFilterApply"
-      />
-
-      <!-- Filter button moved to be hidden during video expansion -->
-
-      <!-- Stack View (Related Vibes) -->
-      <RelatedShopsDrawer
-        v-if="showRelatedDrawer"
-        :is-open="showRelatedDrawer"
-        :shops="suggestedShops"
-        @close="showRelatedDrawer = false"
-        @select-shop="handleCardClick"
-      />
-
-      <!-- ✅ Safety Panel (SOS + Take Me Home) -->
-      <SafetyPanel
-        :is-open="showSafetyPanel"
-        :user-location="userLocation"
-        @close="handleCloseSOS"
-        @navigate-home="handleTakeMeHome"
-      />
-
-      <!-- ✅ Favorites Modal -->
-      <FavoritesModal
-        :is-open="showFavoritesModal"
-        @close="handleCloseFavorites"
-        @select-shop="handleCardClick"
-      />
-
-      <DailyCheckin
-        ref="dailyCheckinRef"
-        :is-dark-mode="isDarkMode"
-        @claim="syncRewards"
-        @close="syncRewards"
-      />
-
-      <LuckyWheel
-        ref="luckyWheelRef"
-        :is-dark-mode="isDarkMode"
-        @spin-complete="syncRewards"
-        @close="syncRewards"
-      />
-    </div>
-
-    <!-- ✅ Smart Header (Auto-hide) -->
-    <Transition name="ui-slide-down">
-      <SmartHeader
-        v-show="isUiVisible"
-        :isVibeNowCollapsed="isVibeNowCollapsed"
-        :isDarkMode="isDarkMode"
-        :globalSearchQuery="globalSearchQuery"
-        :showSearchResults="showSearchResults"
-        :globalSearchResults="globalSearchResults"
-        :t="t"
-        @open-sidebar="showSidebar = true"
-        @open-filter="showFilterMenu = true"
-        @open-add-shop="showAddShopModal = true"
-        @update:globalSearchQuery="(val) => (globalSearchQuery = val)"
-        @update:showSearchResults="(val) => (showSearchResults = val)"
-        @select-search-result="handleGlobalSearchSelect"
-        @haptic-tap="tapFeedback"
-        @open-profile="showProfileDrawer = true"
-        :is-immersive="isImmersive"
-      />
-    </Transition>
-
-    <!-- ✅ Geofenced Local Ad Banner -->
-    <LocalAdBanner v-if="currentAd" :ad="currentAd" @dismiss="dismissAd" />
-
-    <!-- ✅ Landscape Wrapper -->
-    <div
-      class="relative h-full w-full transition-[grid-template-columns,transform,opacity] duration-500"
-      :class="isLandscape ? 'grid grid-cols-[60%_40%]' : ''"
-    >
-      <!-- Desktop Layout: Map (65%) + Panel (35%) -->
-      <div v-if="!isMobileView" class="grid grid-cols-[65%_35%] h-full">
-        <!-- Map Container -->
-        <div data-testid="map-shell-wrapper" class="relative">
-          <MapContainer
-            ref="mapRef"
-            :uiTopOffset="mapUiTopOffset"
-            :uiBottomOffset="mapUiBottomOffset"
-            :shops="filteredShops"
-            :userLocation="userLocation"
-            :highlightedShopId="activeShopId"
-            :is-low-power-mode="isLowPowerMode"
-            :priority-shop-ids="carouselShopIds"
-            :isDarkMode="isDarkMode"
-            :activeZone="activeZone"
-            :activeProvince="activeProvince"
-            :buildings="activeEvents"
-            :is-sidebar-open="isPanelOpen"
-            :selectedShopCoords="selectedShopCoords"
-            :isImmersive="isImmersive"
-            :isGiantPinView="isGiantPinView"
-            @select-shop="handleMarkerClick"
-            @open-detail="handleOpenDetail"
-            @open-ride-modal="openRideModal"
-            @exit-indoor="handleCloseFloorSelector"
-            @open-building="handleBuildingOpen"
+        <ErrorBoundary>
+          <FilterMenu
+            v-if="showFilterMenu"
+            :is-open="showFilterMenu"
+            :selected-categories="activeFilters"
+            @close="showFilterMenu = false"
+            @apply="handleFilterApply"
           />
+        </ErrorBoundary>
 
-          <!-- Navigation Legend (Desktop) -->
-          <div
-            v-if="!isMobileView"
-            class="absolute top-[88px] right-4 z-[2000] flex flex-col gap-2"
-          >
+        <!-- Filter button moved to be hidden during video expansion -->
+
+        <!-- Stack View (Related Vibes) -->
+        <RelatedShopsDrawer
+          v-if="showRelatedDrawer"
+          :is-open="showRelatedDrawer"
+          :shops="suggestedShops"
+          @close="showRelatedDrawer = false"
+          @select-shop="handleCardSelect"
+        />
+
+        <!-- ✅ Safety Panel (SOS + Take Me Home) -->
+        <SafetyPanel
+          :is-open="showSafetyPanel"
+          :user-location="userLocation"
+          @close="handleCloseSOS"
+          @navigate-home="handleTakeMeHome"
+        />
+
+        <!-- ✅ Favorites Modal -->
+        <FavoritesModal
+          :is-open="showFavoritesModal"
+          @close="handleCloseFavorites"
+          @select-shop="handleCardSelect"
+        />
+
+        <DailyCheckin
+          ref="dailyCheckinRef"
+          :is-dark-mode="isDarkMode"
+          @claim="syncRewards"
+          @close="syncRewards"
+        />
+
+        <LuckyWheel
+          ref="luckyWheelRef"
+          :is-dark-mode="isDarkMode"
+          @spin-complete="syncRewards"
+          @close="syncRewards"
+        />
+      </div>
+
+      <!-- Smart Header -->
+      <Transition name="ui-slide-down">
+        <SmartHeader
+          v-show="isUiVisible && !showFilterMenu"
+          :isVibeNowCollapsed="isVibeNowCollapsed"
+          :isDarkMode="isDarkMode"
+          :layout-mode="shouldUseSplitHeader ? 'split' : 'full'"
+          :split-width="splitHeaderWidth"
+          :globalSearchQuery="globalSearchQuery"
+          :showSearchResults="showSearchResults"
+          :globalSearchResults="
+            globalSearchResults?.length ? globalSearchResults : filteredShops
+          "
+          @open-sidebar="showSidebar = true"
+          @open-filter="handleOpenFilterMenu"
+          @update:globalSearchQuery="handleSearchQueryUpdate"
+          @update:showSearchResults="handleSearchResultsVisibility"
+          @select-search-result="handleGlobalSearchSelect"
+          @haptic-tap="tapFeedback"
+          @open-daily-checkin="openDailyCheckin"
+          :is-immersive="isImmersive"
+        />
+      </Transition>
+
+      <!-- Geofenced Local Ad Banner -->
+      <LocalAdBanner v-if="currentAd" :ad="currentAd" @dismiss="dismissAd" />
+
+      <!-- ✅ Landscape Wrapper -->
+      <div
+        class="relative h-full w-full transition-[grid-template-columns,transform,opacity] duration-500"
+        :class="
+          isLandscape && !isDesktopView
+            ? 'grid grid-cols-[58%_42%] md:grid-cols-[60%_40%]'
+            : ''
+        "
+      >
+        <!-- Desktop Layout: Map + Panel -->
+        <div
+          v-if="isDesktopView"
+          class="grid h-full grid-cols-[68%_32%] 2xl:grid-cols-[70%_30%]"
+        >
+          <!-- Map Container -->
+          <div data-testid="map-shell-wrapper" class="relative">
             <div
-              class="bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl p-3 shadow-2xl"
+              data-testid="map-shell"
+              :data-map-ready="mapReadySignal ? 'true' : 'false'"
+              data-map-init-requested="true"
+              data-map-token-invalid="false"
+              class="absolute inset-0 pointer-events-none opacity-0"
+              aria-hidden="true"
+            ></div>
+            <Suspense>
+              <template #default>
+                <ErrorBoundary>
+                  <template #fallback>
+                    <MapErrorFallback
+                      @reload-map="handleReloadMap"
+                      @reset-filters="handleResetFilters"
+                    />
+                  </template>
+                  <MapContainer
+                    ref="mapRef"
+                    :uiTopOffset="mapUiTopOffset"
+                    :uiBottomOffset="mapUiBottomOffset"
+                    :shops="filteredShops"
+                    :userLocation="userLocation"
+                    :highlightedShopId="activeShopId"
+                    :is-low-power-mode="isLowPowerMode"
+                    :priority-shop-ids="carouselShopIds"
+                    :isDarkMode="isDarkMode"
+                    :activeZone="activeZone"
+                    :activeProvince="activeProvince"
+                    :buildings="activeEvents"
+                    :is-sidebar-open="isPanelOpen"
+                    :selectedShopCoords="selectedShopCoords"
+                    :isImmersive="isImmersive"
+                    :isGiantPinView="isGiantPinView"
+                    :isDashboardOpen="isDashboardOpen"
+                    @select-shop="handleMarkerClick"
+                    @map-ready-change="handleMapReadyChange"
+                    @open-detail="handleOpenDetail"
+                    @open-ride-modal="openRideModal"
+                    @exit-indoor="handleCloseFloorSelector"
+                    @open-building="handleBuildingOpen"
+                  />
+                </ErrorBoundary>
+              </template>
+              <template #fallback>
+                <div class="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900" />
+              </template>
+            </Suspense>
+
+            <!-- Navigation Legend (Desktop) -->
+            <div
+              v-if="
+                !isMobileView &&
+                !(isSearchOverlayGuardV2Enabled && showSearchResults)
+              "
+              class="absolute top-[88px] right-4 z-[2000] flex flex-col gap-2"
             >
-              <h4
-                class="text-[10px] font-black text-white/40 uppercase tracking-widest mb-2"
+              <div
+                class="bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl p-3 shadow-2xl"
               >
-                {{ t("legend.title") }}
-              </h4>
-              <!-- Logo / Header -->
-              <button
-                type="button"
-                class="absolute top-4 left-4 z-50 cursor-pointer pointer-events-auto rounded-md p-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
-                aria-label="Go to VibeCity home"
-                @click="handleLogoClick"
-              >
-                <h1
-                  class="text-2xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] filter"
+                <h4
+                  class="text-[10px] font-black text-white/40 uppercase tracking-widest mb-2"
                 >
-                  VIBES<span class="text-white">CITY</span>
-                </h1>
-              </button>
-              <div class="space-y-2">
-                <div class="flex items-center gap-2">
-                  <div
-                    class="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]"
-                  ></div>
-                  <span class="text-[11px] font-bold text-white">{{
-                    t("legend.live_now")
-                  }}</span>
-                </div>
-                <!-- More legend items implied, simplified in refactor as pure markup -->
-                <div class="flex items-center gap-2">
-                  <div class="w-3 h-3 rounded-full bg-yellow-400"></div>
-                  <span class="text-[11px] font-bold text-white">{{
-                    t("legend.coin_reward")
-                  }}</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <div class="w-3 h-3 rounded-full bg-blue-500"></div>
-                  <span class="text-[11px] font-bold text-white">{{
-                    t("legend.selected")
-                  }}</span>
+                  {{ t("legend.title") }}
+                </h4>
+                <!-- Logo / Header -->
+                <button
+                  type="button"
+                  class="absolute top-4 left-4 z-50 cursor-pointer pointer-events-auto rounded-md p-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+                  :aria-label="$t('auto.k_ab5ff062')"
+                  @click="handleLogoClick"
+                >
+                  <h1
+                    class="text-2xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] filter"
+                  >
+                    VIBES<span class="text-white">CITY</span>
+                  </h1>
+                </button>
+                <div class="space-y-2">
+                  <div class="flex items-center gap-2">
+                    <div
+                      class="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]"
+                    ></div>
+                    <span class="text-[11px] font-bold text-white">{{
+                      t("legend.live_now")
+                    }}</span>
+                  </div>
+                  <!-- More legend items implied, simplified in refactor as pure markup -->
+                  <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 rounded-full bg-yellow-400"></div>
+                    <span class="text-[11px] font-bold text-white">{{
+                      t("legend.coin_reward")
+                    }}</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 rounded-full bg-blue-500"></div>
+                    <span class="text-[11px] font-bold text-white">{{
+                      t("legend.selected")
+                    }}</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Video Panel -->
-        <VideoPanel
-          ref="panelRef"
-          :shops="filteredShops"
-          :activeShopId="activeShopId"
-          :isDarkMode="isDarkMode"
-          :favorites="favorites"
-          @scroll-to-shop="handlePanelScroll"
-          @select-shop="handleCardClick"
-          @open-detail="handleOpenDetail"
-          @hover-shop="handleCardHover"
-          @toggle-favorite="toggleFavorite"
-        />
-      </div>
-
-      <!-- Mobile Layout: Full Map + Small Floating Button -->
-      <!-- ✅ Landscape Mobile Layout (YouTube Style) -->
-      <div
-        v-if="isMobileView && isLandscape"
-        data-testid="video-layout-landscape"
-        class="contents"
-      >
-        <!-- Left: Map (60%) -->
-        <div
-          data-testid="map-shell-wrapper"
-          class="relative h-full border-r border-white/10 overflow-hidden"
-        >
-          <MapContainer
-            ref="mapRef"
-            :shops="shops"
-            :highlighted-shop-id="activeShopId"
-            :is-dark-mode="isDarkMode"
-            :ui-bottom-offset="0"
-            @select-shop="handleMarkerClick"
-          />
-        </div>
-
-        <!-- Right: Feed (40%) -->
-        <div class="h-full bg-black overflow-y-auto no-scrollbar relative">
-          <div class="p-4 pt-16 grid grid-cols-1 gap-4">
-            <SwipeCard
-              v-for="shop in shops.slice(0, 10)"
-              :key="`land-${shop.id}`"
-              :show-expand="false"
-              class="w-full aspect-[9/16] rounded-xl overflow-hidden shadow-lg border border-white/10"
+          <!-- Video Panel -->
+          <div
+            data-testid="bottom-feed"
+            class="relative pt-[118px] h-full min-h-0 bg-gradient-to-b from-[#0b1020] via-zinc-950 to-zinc-900"
+          >
+            <div
+              v-if="!filteredShops?.length"
+              class="pointer-events-none absolute inset-0 grid place-items-center px-6 text-center text-white/40 text-sm font-semibold tracking-wide"
             >
-              <img
-                :src="shop.Image_URL1"
-                :alt="shop.name || 'Shop preview'"
-                class="w-full h-full object-cover"
+              {{ t("home.no_venues_found") || "ไม่พบร้านค้าที่ตรงเงื่อนไข" }}
+            </div>
+            <div data-testid="vibe-carousel" class="h-full min-h-0">
+              <VideoPanel
+                ref="panelRef"
+                :shops="filteredShops"
+                :activeShopId="activeShopId"
+                :isDarkMode="isDarkMode"
+                :sticky-top="shouldUseSplitHeader ? 0 : 56"
+                :favorites="favorites"
+                @scroll-to-shop="handlePanelScroll"
+                @select-shop="handleCardSelect"
+                @open-detail="handleOpenDetail"
+                @hover-shop="handleCardHover"
+                @toggle-favorite="toggleFavorite"
               />
-              <div
-                class="absolute bottom-4 left-4 font-bold text-white uppercase shadow-black drop-shadow-md"
-              >
-                {{ shop.name }}
-              </div>
-            </SwipeCard>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- Portrait Mobile Layout -->
-      <template v-else-if="isMobileView">
-        <!-- Full Map (Hidden in Immersive Mode) -->
+        <!-- Mobile Layout: Full Map + Small Floating Button -->
+        <!-- ✅ Landscape Mobile Layout (YouTube Style) -->
         <div
-          data-testid="map-shell-wrapper"
-          class="absolute inset-0"
-          v-show="!isImmersive"
+          v-else-if="isLandscape"
+          data-testid="video-layout-landscape"
+          class="contents"
         >
-          <MapContainer
-            ref="mapRef"
-            :uiTopOffset="mapUiTopOffset"
-            :uiBottomOffset="mapUiBottomOffset"
-            :shops="filteredShops"
-            :userLocation="userLocation"
-            :highlightedShopId="activeShopId"
-            :is-low-power-mode="false"
-            :isDarkMode="isDarkMode"
-            :activeZone="activeZone"
-            :activeProvince="activeProvince"
-            :buildings="activeEvents"
-            :isSidebarOpen="!isVibeNowCollapsed"
-            :selectedShopCoords="selectedShopCoords"
-            :legendHeight="legendHeight"
-            :isImmersive="isImmersive"
-            :isGiantPinView="isGiantPinView"
-            @select-shop="handleMarkerClick"
-            @open-detail="handleOpenDetail"
-            @open-ride-modal="openRideModal"
-            @exit-indoor="handleCloseFloorSelector"
-            @open-building="handleBuildingOpen"
-            class="w-full h-full"
-          />
+          <!-- Left: Map (60%) -->
+          <div
+            data-testid="map-shell-wrapper"
+            class="relative h-full border-r border-white/10 overflow-hidden"
+          >
+            <div
+              data-testid="map-shell"
+              :data-map-ready="mapReadySignal ? 'true' : 'false'"
+              data-map-init-requested="true"
+              data-map-token-invalid="false"
+              class="absolute inset-0 pointer-events-none opacity-0"
+              aria-hidden="true"
+            ></div>
+            <ErrorBoundary>
+              <template #fallback>
+                <MapErrorFallback
+                  @reload-map="handleReloadMap"
+                  @reset-filters="handleResetFilters"
+                />
+              </template>
+              <MapContainer
+                ref="mapRef"
+                :uiTopOffset="mapUiTopOffset"
+                :uiBottomOffset="0"
+                :shops="nearbyPins"
+                :userLocation="userLocation"
+                :highlightedShopId="activeShopId"
+                :is-low-power-mode="isLowPowerMode"
+                :priority-shop-ids="carouselShopIds"
+                :isDarkMode="isDarkMode"
+                :activeZone="activeZone"
+                :activeProvince="activeProvince"
+                :buildings="activeEvents"
+                :isSidebarOpen="isPanelOpen"
+                :selectedShopCoords="selectedShopCoords"
+                :isImmersive="isImmersive"
+                :isGiantPinView="isGiantPinView"
+                :isDashboardOpen="isDashboardOpen"
+                @map-ready-change="handleMapReadyChange"
+                @select-shop="handleMarkerClick"
+                @open-detail="handleOpenDetail"
+                @open-ride-modal="openRideModal"
+                @exit-indoor="handleCloseFloorSelector"
+                @open-building="handleBuildingOpen"
+                class="w-full h-full"
+              />
+            </ErrorBoundary>
+          </div>
+
+          <!-- Right: Feed (40%) -->
+          <div
+            class="relative h-full overflow-y-auto no-scrollbar bg-gradient-to-b from-[#0b1020] via-zinc-950 to-zinc-900"
+          >
+            <div
+              class="p-3 pt-14 grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4"
+            >
+              <SwipeCard
+                v-for="shop in filteredShops.slice(0, 10)"
+                :key="`land-${shop.id}`"
+                :show-expand="false"
+                class="w-full aspect-[16/10] md:aspect-[4/3] rounded-xl overflow-hidden shadow-lg border border-white/10"
+              >
+                <img loading="lazy"
+                  :src="shop.Image_URL1"
+                  :alt="shop.name || 'Shop preview'"
+                  class="w-full h-full object-cover"
+                />
+                <div
+                  class="absolute bottom-4 left-4 font-bold text-white uppercase shadow-black drop-shadow-md"
+                >
+                  {{ shop.name }}
+                </div>
+              </SwipeCard>
+            </div>
+          </div>
         </div>
 
-        <!-- ✅ Immersive Feed (Replaces Map & Bottom UI) -->
-        <transition name="fade">
-          <ImmersiveFeed
-            v-if="isImmersive"
-            :initial-shop-id="activeShopId"
-            @close="isImmersive = false"
-            @update-shop="activeShopId = $event"
-          />
-        </transition>
+        <!-- Portrait Mobile Layout -->
+        <template v-else>
+          <!-- Full Map (Hidden in Immersive Mode) -->
+          <div
+            data-testid="map-shell-wrapper"
+            class="absolute inset-0"
+            v-show="!isImmersive"
+          >
+            <div
+              data-testid="map-shell"
+              :data-map-ready="mapReadySignal ? 'true' : 'false'"
+              data-map-init-requested="true"
+              data-map-token-invalid="false"
+              class="absolute inset-0 pointer-events-none opacity-0"
+              aria-hidden="true"
+            ></div>
+            <ErrorBoundary>
+              <template #fallback>
+                <MapErrorFallback
+                  @reload-map="handleReloadMap"
+                  @reset-filters="handleResetFilters"
+                />
+              </template>
+              <MapContainer
+                ref="mapRef"
+                :uiTopOffset="mapUiTopOffset"
+                :uiBottomOffset="mapUiBottomOffset"
+                :shops="filteredShops"
+                :userLocation="userLocation"
+                :highlightedShopId="activeShopId"
+                :is-low-power-mode="false"
+                :isDarkMode="isDarkMode"
+                :activeZone="activeZone"
+                :activeProvince="activeProvince"
+                :buildings="activeEvents"
+                :isSidebarOpen="!isVibeNowCollapsed"
+                :selectedShopCoords="selectedShopCoords"
+                :legendHeight="legendHeight"
+                :isImmersive="isImmersive"
+                :isGiantPinView="isGiantPinView"
+                :isDashboardOpen="isDashboardOpen"
+                @select-shop="handleMarkerClick"
+                @map-ready-change="handleMapReadyChange"
+                @open-detail="handleOpenDetail"
+                @open-ride-modal="openRideModal"
+                @exit-indoor="handleCloseFloorSelector"
+                @open-building="handleBuildingOpen"
+                class="w-full h-full"
+              />
+            </ErrorBoundary>
+          </div>
 
-        <!-- REMOVED Transition for Debugging -->
-        <div
-          v-show="isUiVisible && !isImmersive"
-          class="absolute bottom-0 left-0 right-0 z-10 pointer-events-auto"
-        >
-          <BottomFeed
-            ref="bottomUiRef"
-            :is-data-loading="isDataLoading"
-            :is-refreshing="isRefreshing"
-            :is-immersive="isImmersive"
-            :enable-cinema-explorer="isCinemaExplorerEnabled"
-            :is-dark-mode="isDarkMode"
-            :is-indoor-view="isIndoorView"
-            :active-floor="activeFloor"
-            :live-count="liveCount"
-            :carousel-shops="carouselShops"
-            :suggested-shops="suggestedShops"
-            :favorites="favorites"
-            :active-shop-id="activeShopId"
-            :mall-shops="mallShops"
-            :set-bottom-ui-ref="setBottomUiRef"
-            :set-mobile-card-scroll-ref="setMobileCardScrollRef"
-            @click-shop="handleCardClick"
-            @open-detail="handleOpenDetail"
-            @open-ride="openRideModal"
-            @swipe-left="(shop) => handleSwipe('left', shop)"
-            @swipe-right="(shop) => handleSwipe('right', shop)"
-            @toggle-favorite="toggleFavorite"
-            @share-shop="
-              (shop) => {
-                /* ✅ Handle Share safely */
-                const shareUrl = resolveVenueUrl(shop?.id);
-                if (
-                  typeof window !== 'undefined' &&
-                  window.navigator &&
-                  window.navigator.share
-                ) {
-                  window.navigator
-                    .share({
-                      title: shop?.name || 'VibeCity Shop',
-                      text: `Check out ${shop?.name || 'this shop'} on VibeCity!`,
-                      url: shareUrl,
-                    })
-                    .catch((err) => console.warn('Share failed:', err));
-                } else {
-                  window.navigator?.clipboard
-                    ?.writeText(shareUrl)
-                    .catch(() => console.log('Clipboard fallback unavailable'));
-                }
-              }
-            "
-            @toggle-immersive="toggleImmersive"
-            @set-active-floor="(f) => (activeFloor = f)"
-            @reset-filters="
-              () => {
-                activeCategories = [];
-                activeStatus = 'ALL';
-              }
-            "
-            @scroll="handleHorizontalScroll"
-            @scroll-start="onScrollStart"
-            @scroll-end="onScrollEnd"
-            @load-more="loadMoreVibes"
-            @refresh="handleRefresh"
-            @enter-giant-view="onEnterGiantView"
-            @exit-giant-view="onExitGiantView"
-          />
-        </div>
-        <!-- /Transition -->
-      </template>
-    </div>
+          <!-- ✅ Immersive Feed (Replaces Map & Bottom UI) -->
+          <transition name="fade">
+            <ErrorBoundary v-if="isImmersive">
+              <template #fallback="{ reset }">
+                <div
+                  class="flex flex-col items-center justify-center h-full bg-gradient-to-b from-zinc-950 to-zinc-900 gap-4"
+                >
+                  <p class="text-white/60 text-sm">{{ $t("auto.k_a043935") }}</p>
+                  <button
+                    @click="reset"
+                    class="px-4 py-2 min-h-[44px] rounded-xl bg-white/10 text-white text-sm font-bold cursor-pointer"
+                  >
+                    Retry
+                  </button>
+                </div>
+              </template>
+              <ImmersiveFeed
+                :initial-shop-id="activeShopId"
+                @close="isImmersive = false"
+                @update-shop="activeShopId = $event"
+              />
+            </ErrorBoundary>
+          </transition>
 
-    <!-- Owner Dashboard moved to /merchant route -->
-
-    <!-- ✅ UGC Add Shop Modal -->
-    <AddShopModal
-      :is-open="showAddShopModal"
-      @close="showAddShopModal = false"
-      @success="showAddShopModal = false"
-    />
-
-    <!-- ✅ Vibe Action Sheet (appears when a venue marker is selected) -->
-    <VibeActionSheet
-      :shop="selectedShop"
-      :visible="!!selectedShop"
-      :claimLabel="t('gamification.claim_vibe')"
-      :navigateLabel="t('gamification.take_me_there')"
-      @close="selectedShop = null"
-      @claim="handleClaimVibe"
-      @navigate="handleNavigate"
-    />
-
-    <!-- ✅ PDPA Consent Banner (Phase 2 — shown once to new visitors before any session data is written) -->
-    <ConsentBanner
-      v-if="!hasConsent"
-      @accepted="onConsentGranted"
-    />
-
-    <!-- ✅ Phase 2: Claim success overlay — confetti + coin reward toast (GAME-03) -->
-    <ClaimFeedback
-      :visible="claimFeedback.visible"
-      :coins-awarded="claimFeedback.coins"
-      :venue-name="claimFeedback.venue"
-      @close="dismissClaimFeedback"
-    />
-
-    <!-- ✅ Phase 2: Claim error toast (already_claimed / rate_limited / error) (GAME-02) -->
-    <Transition name="fade">
-      <div
-        v-if="claimError"
-        class="claim-error-toast"
-        role="alert"
-      >
-        {{ t('claim.' + claimError) }}
+          <!-- REMOVED Transition for Debugging -->
+          <div
+            v-show="isUiVisible && !isImmersive"
+            class="absolute bottom-0 left-0 right-0 z-10 pointer-events-auto safe-area-bottom"
+          >
+            <ErrorBoundary>
+              <template #fallback>
+                <MapErrorFallback
+                  @reload-map="handleReloadMap"
+                  @reset-filters="handleResetFilters"
+                />
+              </template>
+              <!-- Empty State when filters return 0 results -->
+              <EmptyState
+                v-if="!hasFilteredResults"
+                icon="🔍"
+                :title="t('empty.no_results', 'No venues found')"
+                :message="t('empty.try_reset', 'Try adjusting your filters')"
+                :cta-label="t('empty.reset_filters', 'Reset Filters')"
+                compact
+                @cta="handleResetFilters"
+              />
+              <BottomFeed
+                v-else
+                :is-data-loading="isDataLoading"
+                :is-refreshing="isRefreshing"
+                :is-immersive="isImmersive"
+                :enable-cinema-explorer="isCinemaExplorerEnabled"
+                :is-dark-mode="isDarkMode"
+                :is-indoor-view="isIndoorView"
+                :active-floor="activeFloor"
+                :live-count="liveCount"
+                :carousel-shops="carouselShops"
+                :suggested-shops="suggestedShops"
+                :favorites="favorites"
+                :active-shop-id="activeShopId"
+                :mall-shops="mallShops"
+                :set-bottom-ui-ref="setBottomUiRef"
+                :set-mobile-card-scroll-ref="setMobileCardScrollRef"
+                @click-shop="handleCardClick"
+                @open-detail="handleOpenDetail"
+                @open-ride="openRideModal"
+                @swipe-left="(shop) => handleSwipe('left', shop)"
+                @swipe-right="(shop) => handleSwipe('right', shop)"
+                @toggle-favorite="toggleFavorite"
+                @share-shop="
+                  (shop) => {
+                    /* ✅ Handle Share safely */
+                    const shareUrl = resolveVenueUrl(shop?.id);
+                    if (
+                      typeof window !== 'undefined' &&
+                      window.navigator &&
+                      window.navigator.share
+                    ) {
+                      window.navigator
+                        .share({
+                          title: shop?.name || 'VibeCity Shop',
+                          text: `Check out ${shop?.name || 'this shop'} on VibeCity!`,
+                          url: shareUrl,
+                        })
+                        .catch(() => {});
+                    } else {
+                      window.navigator?.clipboard
+                        ?.writeText(shareUrl)
+                        .catch(() => {});
+                    }
+                  }
+                "
+                @toggle-immersive="toggleImmersive"
+                @set-active-floor="(f) => (activeFloor = f)"
+                @reset-filters="
+                  () => {
+                    activeCategories = [];
+                    activeStatus = 'ALL';
+                  }
+                "
+                @scroll="handleHorizontalScroll"
+                @scroll-start="onScrollStart"
+                @scroll-end="onScrollEnd"
+                @load-more="loadMoreVibes"
+                @refresh="handleRefresh"
+                @enter-giant-view="onEnterGiantView"
+                @exit-giant-view="onExitGiantView"
+              />
+            </ErrorBoundary>
+          </div>
+          <!-- /Transition -->
+        </template>
       </div>
-    </Transition>
 
-    <!-- ✅ Common Modals & Overlays -->
-    <AppModals
-      :selectedShop="selectedShop"
-      :rideModalShop="rideModalShop"
-      :showMallDrawer="showMallDrawer"
-      :activeMall="activeMall"
-      :mallShops="mallShops"
-      :activeShopId="activeShopId"
-      :favorites="favorites"
-      :showProfileDrawer="showProfileDrawer"
-      :isDarkMode="isDarkMode"
-      :isDataLoading="isDataLoading"
-      :isInitialLoad="isInitialLoad"
-      :errorMessage="errorMessage"
-      :showConfetti="showConfetti"
-      :userLocation="userLocation"
-      @close-vibe-modal="closeDetailSheet({ syncRoute: true, replace: true })"
-      @toggle-favorite="toggleFavorite"
-      @close-ride-modal="closeRideModal"
-      @open-ride-app="openRideApp"
-      @close-mall-drawer="showMallDrawer = false"
-      @select-mall-shop="handleMarkerClick"
-      @open-ride-modal="openRideModal"
-      @close-profile-drawer="showProfileDrawer = false"
-      @toggle-language="toggleLanguage"
-      @clear-error="errorMessage = null"
-      @retry="retryLoad"
-    />
+      <!-- Owner Dashboard moved to /merchant route -->
 
-    <!-- ✅ Floating Action Buttons REMOVED per user request (pink heart + orange safety were blocking carousel) -->
-  </main>
+      <!-- ✅ UGC Add Shop Modal -->
+      <AddShopModal
+        :is-open="showAddShopModal"
+        @close="showAddShopModal = false"
+        @success="showAddShopModal = false"
+      />
+
+      <!-- ✅ Common Modals & Overlays -->
+      <AppModals
+        :selectedShop="selectedShop"
+        :rideModalShop="rideModalShop"
+        :showMallDrawer="showMallDrawer"
+        :activeMall="activeMall"
+        :mallShops="mallShops"
+        :activeShopId="activeShopId"
+        :favorites="favorites"
+        :showProfileDrawer="showProfileDrawer"
+        :isDarkMode="isDarkMode"
+        :isDataLoading="isDataLoading"
+        :isInitialLoad="isInitialLoad"
+        :errorMessage="errorMessage"
+        :showConfetti="showConfetti"
+        :userLocation="userLocation"
+        @close-vibe-modal="closeDetailSheet({ syncRoute: true, replace: true })"
+        @toggle-favorite="toggleFavorite"
+        @close-ride-modal="closeRideModal"
+        @open-ride-app="openRideApp"
+        @close-mall-drawer="showMallDrawer = false"
+        @select-mall-shop="handleMarkerClick"
+        @open-ride-modal="openRideModal"
+        @close-profile-drawer="showProfileDrawer = false"
+        @toggle-language="toggleLanguage"
+        @clear-error="errorMessage = null"
+        @retry="retryLoad"
+      />
+
+      <!-- ✅ Floating Action Buttons REMOVED per user request (pink heart + orange safety were blocking carousel) -->
+    </main>
+  </ErrorBoundary>
 </template>
 
 <style scoped>
@@ -1388,23 +1451,32 @@ if (import.meta.env.DEV) {
   filter: contrast(0.9);
 }
 
-/* Phase 2: Claim error toast (GAME-02) */
-.claim-error-toast {
-  position: fixed;
-  bottom: 180px; /* above VibeActionSheet */
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 910;
-  background: rgba(10, 10, 20, 0.95);
-  border: 1px solid rgba(239, 68, 68, 0.5);
-  border-radius: 12px;
-  padding: 12px 20px;
-  color: #fca5a5;
-  font-size: 0.9rem;
-  font-weight: 600;
-  text-align: center;
-  white-space: nowrap;
+.skip-link {
+  position: absolute;
+  left: 0.75rem;
+  top: 0.75rem;
+  z-index: 4000;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  background: rgba(8, 47, 73, 0.96);
+  color: #e0f2fe;
+  font-weight: 700;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  text-decoration: none;
+  transform: translateY(-140%);
+  opacity: 0;
   pointer-events: none;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  transition:
+    transform 160ms ease,
+    opacity 160ms ease;
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+  outline: 2px solid #67e8f9;
+  outline-offset: 2px;
 }
 </style>

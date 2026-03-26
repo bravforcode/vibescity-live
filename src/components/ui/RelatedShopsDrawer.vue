@@ -1,5 +1,6 @@
 <script setup>
 import { ChevronRight, Heart, MapPin, Share2, X } from "lucide-vue-next";
+import { resolveVenueMedia } from "@/domain/venue/viewModel";
 
 const props = defineProps({
 	isOpen: Boolean,
@@ -7,6 +8,11 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["close", "select-shop"]);
+
+const getShopImage = (shop) => {
+	const media = resolveVenueMedia(shop || {});
+	return media.primaryImage || shop?.Image_URL1 || shop?.cover_image || "";
+};
 </script>
 
 <template>
@@ -69,15 +75,15 @@ const emit = defineEmits(["close", "select-shop"]);
               $emit('select-shop', shop);
               $emit('close');
             "
-            class="flex gap-3 p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 active:scale-95 transition-all cursor-pointer"
+            class="flex gap-3 p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 active:scale-95 transition cursor-pointer"
           >
             <!-- Thumbnail -->
             <div
               class="w-16 h-16 rounded-lg bg-gray-800 flex-shrink-0 overflow-hidden"
             >
               <img
-                v-if="shop.Image_URL1"
-                :src="shop.Image_URL1"
+                v-if="getShopImage(shop)"
+                :src="getShopImage(shop)"
                 :alt="shop.name || 'Shop image'"
                 class="w-full h-full object-cover"
               />

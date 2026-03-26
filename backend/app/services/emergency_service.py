@@ -2,12 +2,11 @@
 Emergency Service - Find nearby hospitals, police stations using OpenStreetMap
 Uses Overpass API (free, no API key required)
 """
-import httpx
-from typing import List, Dict, Optional
-from dataclasses import dataclass
-import math
-from functools import lru_cache
 import asyncio
+import math
+from dataclasses import dataclass
+
+import httpx
 
 # Overpass API endpoint (public, free)
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
@@ -19,9 +18,9 @@ class EmergencyLocation:
     lat: float
     lng: float
     type: str  # hospital, police, fire_station
-    phone: Optional[str] = None
-    distance_km: Optional[float] = None
-    opening_hours: Optional[str] = None
+    phone: str | None = None
+    distance_km: float | None = None
+    opening_hours: str | None = None
     emergency: bool = True
 
 # Thailand emergency contacts by type
@@ -52,7 +51,7 @@ class EmergencyService:
     """
 
     def __init__(self):
-        self._cache: Dict[str, List[EmergencyLocation]] = {}
+        self._cache: dict[str, list[EmergencyLocation]] = {}
         self._cache_ttl = 3600  # 1 hour
 
     def _build_overpass_query(self, lat: float, lng: float, radius_m: int, amenity_type: str) -> str:
@@ -66,7 +65,7 @@ class EmergencyService:
         out center body;
         """
 
-    async def _fetch_from_overpass(self, query: str) -> List[Dict]:
+    async def _fetch_from_overpass(self, query: str) -> list[dict]:
         """Execute Overpass API query"""
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -82,7 +81,7 @@ class EmergencyService:
             print(f"Overpass API error: {e}")
             return []
 
-    def _parse_osm_element(self, element: Dict, location_type: str, user_lat: float, user_lng: float) -> EmergencyLocation:
+    def _parse_osm_element(self, element: dict, location_type: str, user_lat: float, user_lng: float) -> EmergencyLocation:
         """Parse OSM element into EmergencyLocation"""
         tags = element.get("tags", {})
 
@@ -114,7 +113,7 @@ class EmergencyService:
         lng: float,
         radius_m: int = 10000,
         limit: int = 5
-    ) -> List[EmergencyLocation]:
+    ) -> list[EmergencyLocation]:
         """
         Find nearby hospitals from OpenStreetMap.
         Searches within radius_m meters.
@@ -137,7 +136,7 @@ class EmergencyService:
         lng: float,
         radius_m: int = 10000,
         limit: int = 5
-    ) -> List[EmergencyLocation]:
+    ) -> list[EmergencyLocation]:
         """Find nearby police stations from OpenStreetMap."""
         query = self._build_overpass_query(lat, lng, radius_m, "police")
         elements = await self._fetch_from_overpass(query)
@@ -156,7 +155,7 @@ class EmergencyService:
         lng: float,
         radius_m: int = 15000,
         limit: int = 3
-    ) -> List[EmergencyLocation]:
+    ) -> list[EmergencyLocation]:
         """Find nearby fire stations from OpenStreetMap."""
         query = self._build_overpass_query(lat, lng, radius_m, "fire_station")
         elements = await self._fetch_from_overpass(query)
@@ -174,7 +173,7 @@ class EmergencyService:
         lat: float,
         lng: float,
         radius_m: int = 10000
-    ) -> Dict[str, List[EmergencyLocation]]:
+    ) -> dict[str, list[EmergencyLocation]]:
         """
         Get all nearby emergency services in parallel.
         Returns hospitals, police, and fire stations.
@@ -192,7 +191,7 @@ class EmergencyService:
             "emergency_contacts": list(EMERGENCY_CONTACTS.values())
         }
 
-    def get_emergency_contacts(self) -> List[Dict]:
+    def get_emergency_contacts(self) -> list[dict]:
         """Get list of emergency phone numbers for Thailand."""
         return [
             {**v, "type": k}

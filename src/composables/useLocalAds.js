@@ -1,4 +1,5 @@
 import { computed, onUnmounted, ref, watch } from "vue";
+import { isSupabaseSchemaCacheError } from "@/lib/supabase";
 import { localAdService } from "@/services/localAdService";
 import { useLocationStore } from "@/store/locationStore";
 
@@ -9,6 +10,10 @@ const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // also refresh every 5 min
  * Composable that loads geofenced ads for the current user position.
  */
 export function useLocalAds() {
+	const isE2E =
+		import.meta.env.VITE_E2E === "true" ||
+		import.meta.env.VITE_E2E_MAP_REQUIRED === "true" ||
+		import.meta.env.MODE === "e2e";
 	const locationStore = useLocationStore();
 	const coords = computed(() => locationStore.locationObject);
 
@@ -42,6 +47,10 @@ export function useLocalAds() {
 	}
 
 	async function fetchAds() {
+		if (isE2E) {
+			ads.value = [];
+			return;
+		}
 		if (!coords.value) return;
 		const { lat, lng } = coords.value;
 		if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
@@ -52,7 +61,18 @@ export function useLocalAds() {
 			ads.value = result;
 			lastFetchCoords = { lat, lng };
 		} catch (e) {
-			console.error("[useLocalAds] fetch failed", e);
+			if (isSupabaseSchemaCacheError(e)) {
+				if (import.meta.env.DEV) {
+					console.warn(
+						"[useLocalAds] schema cache unavailable, keeping previous ads",
+					);
+				}
+				error.value = null;
+				return;
+			}
+			if (import.meta.env.DEV) {
+				console.warn("[useLocalAds] fetch failed", e?.message || e);
+			}
 			error.value = e.message || "Failed to load ads";
 		} finally {
 			loading.value = false;
@@ -81,7 +101,9 @@ export function useLocalAds() {
 		{ immediate: true },
 	);
 
-	refreshTimer = setInterval(fetchAds, REFRESH_INTERVAL_MS);
+	if (!isE2E) {
+		refreshTimer = setInterval(fetchAds, REFRESH_INTERVAL_MS);
+	}
 
 	onUnmounted(() => {
 		if (refreshTimer) clearInterval(refreshTimer);

@@ -51,7 +51,8 @@ test.describe("Map User Flow", () => {
 
     const drawer = page.locator('[data-testid="vibe-modal"]');
     const drawerVisible = await drawer
-      .isVisible({ timeout: 10_000 })
+      .waitFor({ state: "visible", timeout: 10_000 })
+      .then(() => true)
       .catch(() => false);
     enforceMapConditionOrSkip(
       drawerVisible,

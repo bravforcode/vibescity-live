@@ -2,10 +2,10 @@
 Ride Service - Aggregates multiple ride-hailing providers
 Generates deep links and price estimates for Grab, Bolt, Lineman, Maxim
 """
-from typing import Dict, List, Optional
-from dataclasses import dataclass
 import math
+from dataclasses import dataclass
 from urllib.parse import urlencode
+
 
 @dataclass
 class Location:
@@ -127,7 +127,7 @@ class RideService:
         origin: Location,
         destination: Location,
         province: str = "กรุงเทพมหานคร"
-    ) -> List[RideEstimate]:
+    ) -> list[RideEstimate]:
         """
         Get ride estimates from all available providers.
         Returns sorted list by price (cheapest first).

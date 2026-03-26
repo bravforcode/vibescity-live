@@ -232,6 +232,22 @@
 	}
 }
 
+@media (prefers-reduced-motion: reduce) {
+	.traffic-particle,
+	.cloud-particle,
+	.rain-drop,
+	.ripple-effect,
+	.spotlight,
+	.music-note {
+		animation: none;
+	}
+
+	.ambient-overlay,
+	.province-mask-blur {
+		transition-duration: 0.01ms;
+	}
+}
+
 .music-note {
 	position: absolute;
 	font-size: 24px;

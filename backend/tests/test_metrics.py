@@ -2,10 +2,15 @@ from app.core.config import settings
 
 
 def test_metrics_endpoint(client):
-    client.get("/health")
-    response = client.get("/metrics")
-    assert response.status_code == 200
-    assert "http_requests_total" in response.text
+    original = settings.METRICS_AUTH_TOKEN
+    settings.METRICS_AUTH_TOKEN = ""
+    try:
+        client.get("/health")
+        response = client.get("/metrics")
+        assert response.status_code == 200
+        assert "http_requests_total" in response.text
+    finally:
+        settings.METRICS_AUTH_TOKEN = original
 
 
 def test_metrics_auth_token(client):

@@ -12,7 +12,7 @@ export function useNotifications() {
 		type = "info",
 		actionLabel,
 		action,
-		duration = 3500,
+		duration = 5000,
 	}) => {
 		const id = ++state.counter;
 		state.queue.push({

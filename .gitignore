@@ -220,3 +220,46 @@ check_db/
 
 # Coverage report file
 .coverage
+
+# ----------------------------------------
+# 14. Debug / Error Output Files (never commit these)
+# ----------------------------------------
+# Push/migration error logs
+push_err*.txt
+supabase_push_error*.txt
+supabase_db_push_error*.txt
+
+# Ruff / lint / TSC debug outputs
+*-ruff-errors*.txt
+ruff-errors*.txt
+lint-errors*.txt
+lint_output*.txt
+tsc-errors*.txt
+tsc-output*.txt
+*_output.txt
+*_errors.txt
+
+# Doctor / diagnostics
+doctor_output*.txt
+
+# One-off debug scripts that should never be committed
+fix_ruff*.py
+upgrade_settings.py
+db_check.cjs
+test-rpc.cjs
+
+# Temporary test/schema files in root
+test.js
+test.sql
+test_enums.sql
+test_out*.txt
+test_output*.txt
+tmp_*.json
+tmp_*.sql
+
+# Stale/leftover files
+oldest_header.vue
+*_commit.txt
+*_diff.txt
+review-decisions.auto.json
+mig_list.txt

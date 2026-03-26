@@ -1,17 +1,31 @@
 {
   "name": "VibeCity - Chiang Mai Entertainment",
   "short_name": "VibeCity",
-  "start_url": "/",
+  "start_url": "/th",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
   "background_color": "#0f0f1a",
   "theme_color": "#8B5CF6",
   "orientation": "portrait-primary",
   "icons": [
     {
+      "src": "/images/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
       "src": "/images/pins/Vlive.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }

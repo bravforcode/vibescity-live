@@ -15,6 +15,7 @@ import { useShopStore } from "../store/shopStore";
 import { useUserPreferencesStore } from "../store/userPreferencesStore";
 import { useUserStore } from "../store/userStore";
 import { openExternal } from "../utils/browserUtils";
+import { isAppDebugLoggingEnabled } from "../utils/debugFlags";
 import { calculateDistance } from "../utils/shopUtils";
 import {
 	loadFavoritesWithTTL,
@@ -28,12 +29,49 @@ import { useEdgeSwipe } from "./useGestures";
 import { useHaptics } from "./useHaptics";
 import { useHomeBase } from "./useHomeBase"; // ✅ Correct Import Placement
 import { useIdle } from "./useIdle";
+import { useIntentPredictor } from "./useIntentPredictor";
 import { useMapLogic } from "./useMapLogic";
 import { useNotifications } from "./useNotifications";
 import { usePerformance } from "./usePerformance";
+import { usePrefetchEngine } from "./usePrefetchEngine";
 import { useScrollSync } from "./useScrollSync";
 import { useShopFilters } from "./useShopFilters";
+import { useThrottledAction } from "./useThrottledAction";
 import { useUILogic } from "./useUILogic";
+
+const IS_STRICT_MAP_E2E = import.meta.env.VITE_E2E_MAP_REQUIRED === "true";
+const DEEPLINK_NOT_FOUND_DEDUPE_MS = 3500;
+let lastDeepLinkNotFoundKey = "";
+let lastDeepLinkNotFoundAt = 0;
+
+const shouldNotifyDeepLinkNotFound = (key) => {
+	const safeKey = String(key || "").trim();
+	const now = Date.now();
+	if (
+		safeKey &&
+		lastDeepLinkNotFoundKey === safeKey &&
+		now - lastDeepLinkNotFoundAt < DEEPLINK_NOT_FOUND_DEDUPE_MS
+	) {
+		return false;
+	}
+	lastDeepLinkNotFoundKey = safeKey;
+	lastDeepLinkNotFoundAt = now;
+	return true;
+};
+
+const looksLikeVenueId = (value) => {
+	const raw = String(value || "").trim();
+	if (!raw) return false;
+	if (/^\d+$/.test(raw)) return true;
+	if (
+		/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+			raw,
+		)
+	) {
+		return true;
+	}
+	return /^[0-9a-f-]{12,}$/i.test(raw);
+};
 
 export function useAppLogic() {
 	const { t, locale } = useI18n();
@@ -78,7 +116,7 @@ export function useAppLogic() {
 	const { totalCoins, userLevel, nextLevelXP, levelProgress } =
 		storeToRefs(coinStore);
 	const userPrefsStore = useUserPreferencesStore(); // ✅ Take Me Home
-	const { notifyError } = useNotifications();
+	const { notify, notifyError } = useNotifications();
 	// Snapshot the initial URL early so internal URL syncing (e.g. carousel scroll sync)
 	// cannot accidentally trigger "deep link" behaviors.
 	const initialUrlSnapshot =
@@ -91,6 +129,8 @@ export function useAppLogic() {
 	const { getDirectionsUrl, hasHomeBase } = useHomeBase(); // ✅ Correct Destructuring
 	const {
 		isMobileView,
+		isTabletView,
+		isDesktopView,
 		bottomUiHeight,
 		mobileCardScrollRef,
 		showSidebar, // Used in isUiVisible
@@ -118,7 +158,7 @@ export function useAppLogic() {
 	});
 
 	watch(visibleShops, (val) => {
-		if (import.meta.env.DEV) {
+		if (isAppDebugLoggingEnabled()) {
 			console.log(`🔍 [useAppLogic] visibleShops changed: ${val?.length}`);
 		}
 	});
@@ -129,10 +169,12 @@ export function useAppLogic() {
 	// --- 3. Init Map Logic ---
 	const mapLogic = useMapLogic({
 		isMobileView,
+		isTabletView,
+		isDesktopView,
 		bottomUiHeight,
 		userLocation, // Now reactive from locationStore
 	});
-	const { mapRef, smoothFlyTo, handleLocateMe } = mapLogic;
+	const { mapRef, smoothFlyTo, handleLocateMe, getNearbyPins } = mapLogic;
 
 	// --- 4. Init Event Logic ---
 	const eventLogic = useEventLogic();
@@ -145,7 +187,9 @@ export function useAppLogic() {
 	} = eventLogic;
 
 	// --- 5. Init Utils (Audio, Haptics, Perf) ---
-	const { tapFeedback, selectFeedback, successFeedback } = useHaptics();
+	const { tapFeedback, selectFeedback, successFeedback, microFeedback } =
+		useHaptics();
+	const { createThrottledAction } = useThrottledAction({ delayMs: 1000 });
 	const { isIdle, kick: wakeUi } = useIdle(300000);
 	const { isMuted, toggleMute, setZone } = useAudioSystem();
 	const { initPerformanceMonitoring, isLowPowerMode } = usePerformance();
@@ -164,6 +208,8 @@ export function useAppLogic() {
 	const isRefreshing = ref(false);
 	const legendHeight = computed(() => bottomUiHeight.value || 0);
 	const activeFilters = computed(() => [...activeCategories.value]);
+	const openedDetailShopIds = new Set();
+	let handleCenteredShopCommit = null;
 
 	const isUiVisible = computed(() => {
 		if (import.meta.env.VITE_E2E === "true") return true;
@@ -183,7 +229,10 @@ export function useAppLogic() {
 		return !isIdle.value;
 	});
 
-	// --- 6. Init Scroll Sync ---
+	// --- 5.5. Spatial Intent Predictor & Prefetch ---
+	const intentPredictor = useIntentPredictor();
+	const prefetchEngine = usePrefetchEngine();
+
 	const scrollSync = useScrollSync({
 		activeShopId,
 		shops: computed(() => shopStore.visibleShops),
@@ -191,9 +240,16 @@ export function useAppLogic() {
 		smoothFlyTo,
 		selectFeedback,
 		mobileCardScrollRef,
+		onScrollDecelerate: intentPredictor.recordCarouselDeceleration,
+		onCenteredShopCommit: (payload) => handleCenteredShopCommit?.(payload),
 	});
-	const { handleHorizontalScroll, scrollToCard, onScrollStart, onScrollEnd } =
-		scrollSync;
+	const {
+		handleHorizontalScroll,
+		scrollToCard,
+		onScrollStart,
+		onScrollEnd,
+		isCenteredCard,
+	} = scrollSync;
 
 	// --- 7. Local State & Glue Logic ---
 	// --- REFACTORED: Computed Base for Logic ---
@@ -201,51 +257,203 @@ export function useAppLogic() {
 
 	// Search Logic (Kept here as it spans multiple domains)
 	const globalSearchQuery = ref("");
-
-	const globalSearchResults = computed(() => {
-		if (!globalSearchQuery.value || globalSearchQuery.value.length < 2)
-			return [];
-
-		const emojiMap = {
-			"☕": "cafe",
-			"🍽️": "restaurant",
-			"🍜": "food",
-			"🍺": "bar",
-			"🍷": "wine",
-			"💃": "club",
-			"🎵": "live music",
-			"🎨": "art",
-			"🛍️": "fashion",
-			"🏢": "mall",
-		};
-
-		let searchQuery = globalSearchQuery.value.toLowerCase();
-		for (const [emoji, term] of Object.entries(emojiMap)) {
-			if (searchQuery.includes(emoji)) {
-				searchQuery = searchQuery.replace(emoji, term);
+	const normalizeSearchText = (value) =>
+		String(value || "")
+			.normalize("NFKC")
+			.toLowerCase()
+			.replace(/[\u200B-\u200D\uFEFF]/g, "")
+			.replace(/[^a-z0-9\u0E00-\u0E7F\s]/gi, " ")
+			.replace(/\s+/g, " ")
+			.trim();
+	const emojiAliasMap = {
+		"☕": "cafe coffee",
+		"🍽️": "restaurant dining",
+		"🍜": "food noodle",
+		"🍺": "bar beer",
+		"🍷": "wine cocktail",
+		"💃": "club nightlife dance",
+		"🎵": "live music",
+		"🎨": "art gallery",
+		"🛍️": "fashion shopping",
+		"🏢": "mall shopping center",
+		"🏨": "hotel accommodation",
+		"🛏️": "hostel accommodation",
+		"🕌": "temple",
+	};
+	const expandEmojiAliases = (value) => {
+		let next = String(value || "");
+		for (const [emoji, alias] of Object.entries(emojiAliasMap)) {
+			if (next.includes(emoji)) {
+				next = next.split(emoji).join(` ${alias} `);
 			}
 		}
-
-		const matches = processedShops.value.filter(
-			(s) =>
-				(s.name || "").toLowerCase().includes(searchQuery) ||
-				(s.category || "").toLowerCase().includes(searchQuery),
-		);
-
-		if (userLocation.value) {
-			const [uLat, uLng] = userLocation.value;
-			return matches
-				.map((s) => ({
-					...s,
-					distance:
-						s.lat && s.lng
-							? calculateDistance(uLat, uLng, s.lat, s.lng)
-							: Infinity,
-				}))
-				.sort((a, b) => a.distance - b.distance)
-				.slice(0, 10);
+		return next;
+	};
+	const tokenizeSearchText = (value) =>
+		normalizeSearchText(value).split(" ").filter(Boolean);
+	const editDistanceWithin = (a, b, maxDistance = 2) => {
+		const left = String(a || "");
+		const right = String(b || "");
+		if (!left || !right) return Number.POSITIVE_INFINITY;
+		if (Math.abs(left.length - right.length) > maxDistance) {
+			return Number.POSITIVE_INFINITY;
 		}
-		return matches.slice(0, 10);
+
+		const rows = left.length + 1;
+		const cols = right.length + 1;
+		const dp = Array.from({ length: rows }, () => Array(cols).fill(0));
+		for (let i = 0; i < rows; i += 1) dp[i][0] = i;
+		for (let j = 0; j < cols; j += 1) dp[0][j] = j;
+
+		for (let i = 1; i < rows; i += 1) {
+			let rowMin = Number.POSITIVE_INFINITY;
+			for (let j = 1; j < cols; j += 1) {
+				const cost = left[i - 1] === right[j - 1] ? 0 : 1;
+				dp[i][j] = Math.min(
+					dp[i - 1][j] + 1,
+					dp[i][j - 1] + 1,
+					dp[i - 1][j - 1] + cost,
+				);
+				rowMin = Math.min(rowMin, dp[i][j]);
+			}
+			if (rowMin > maxDistance) return Number.POSITIVE_INFINITY;
+		}
+		return dp[rows - 1][cols - 1];
+	};
+	const tokenMatchesWord = (token, word) => {
+		if (!token || !word) return false;
+		if (word.startsWith(token) || word.includes(token)) return true;
+		if (token.length < 4) return false;
+		const maxDistance = token.length >= 7 ? 2 : 1;
+		return editDistanceWithin(token, word, maxDistance) <= maxDistance;
+	};
+	const scoreSearchMatch = (shop, normalizedQuery, queryTokens) => {
+		const name = normalizeSearchText(shop?.name || "");
+		const category = normalizeSearchText(shop?.category || "");
+		const description = normalizeSearchText(
+			shop?.description || shop?.vibeTag || shop?.crowdInfo || "",
+		);
+		const locationMeta = normalizeSearchText(
+			[
+				shop?.zone || shop?.Zone,
+				shop?.district || shop?.District,
+				shop?.province || shop?.Province,
+				shop?.building || shop?.Building,
+				shop?.floor || shop?.Floor,
+				shop?.slug,
+			]
+				.filter(Boolean)
+				.join(" "),
+		);
+		const corpus = normalizeSearchText(
+			[name, category, description, locationMeta].filter(Boolean).join(" "),
+		);
+		if (!corpus) return null;
+
+		let score = 0;
+		let matchedTokens = 0;
+		let unmatchedTokens = 0;
+		const corpusWords = corpus.split(" ").filter(Boolean);
+
+		if (name.includes(normalizedQuery)) score += 220;
+		else if (corpus.includes(normalizedQuery)) score += 120;
+
+		for (const token of queryTokens) {
+			if (!token) continue;
+			let matched = false;
+
+			if (name.includes(token)) {
+				score += name.startsWith(token) ? 100 : 88;
+				matched = true;
+			} else if (category.includes(token)) {
+				score += 70;
+				matched = true;
+			} else if (description.includes(token)) {
+				score += 48;
+				matched = true;
+			} else if (locationMeta.includes(token)) {
+				score += 52;
+				matched = true;
+			} else if (corpusWords.some((word) => tokenMatchesWord(token, word))) {
+				score += 30;
+				matched = true;
+			}
+
+			if (matched) matchedTokens += 1;
+			else if (token.length > 1) unmatchedTokens += 1;
+		}
+
+		const mismatchThreshold = Math.ceil(queryTokens.length * 0.5);
+		if (matchedTokens === 0 || unmatchedTokens > mismatchThreshold) return null;
+		if (String(shop?.status || "").toUpperCase() === "LIVE") score += 12;
+		if (shop?.is_verified || shop?.verifiedActive) score += 8;
+
+		return {
+			score,
+			matchedTokens,
+		};
+	};
+
+	const globalSearchResults = computed(() => {
+		const expandedQuery = expandEmojiAliases(globalSearchQuery.value);
+		const normalizedQuery = normalizeSearchText(expandedQuery);
+		if (!normalizedQuery) return [];
+
+		const queryTokens = tokenizeSearchText(normalizedQuery);
+		if (!queryTokens.length) return [];
+
+		let userLat = null;
+		let userLng = null;
+		if (
+			Array.isArray(userLocation.value) &&
+			Number.isFinite(Number(userLocation.value[0])) &&
+			Number.isFinite(Number(userLocation.value[1]))
+		) {
+			userLat = Number(userLocation.value[0]);
+			userLng = Number(userLocation.value[1]);
+		}
+
+		const scored = processedShops.value
+			.map((shop) => {
+				const match = scoreSearchMatch(shop, normalizedQuery, queryTokens);
+				if (!match) return null;
+
+				let distance = Number.POSITIVE_INFINITY;
+				if (
+					userLat !== null &&
+					userLng !== null &&
+					Number.isFinite(Number(shop?.lat)) &&
+					Number.isFinite(Number(shop?.lng))
+				) {
+					distance = calculateDistance(
+						userLat,
+						userLng,
+						Number(shop.lat),
+						Number(shop.lng),
+					);
+				}
+				const proximityBoost = Number.isFinite(distance)
+					? Math.max(0, 24 - Math.min(distance, 24))
+					: 0;
+
+				return {
+					...shop,
+					distance,
+					searchScore: match.score + proximityBoost,
+					searchMatchedTokens: match.matchedTokens,
+				};
+			})
+			.filter(Boolean);
+
+		return scored
+			.sort((a, b) => {
+				if (b.searchScore !== a.searchScore) {
+					return b.searchScore - a.searchScore;
+				}
+				if (a.distance !== b.distance) return a.distance - b.distance;
+				return (a.name || "").localeCompare(b.name || "");
+			})
+			.slice(0, 30);
 	});
 
 	// --- 8. Core Coordinator Functions ---
@@ -280,6 +488,11 @@ export function useAppLogic() {
 		if (value === null || value === undefined) return null;
 		const str = String(value).trim();
 		return str ? str : null;
+	};
+	const markDetailOpened = (shopId) => {
+		const normalizedId = normalizeVenueId(shopId);
+		if (normalizedId) openedDetailShopIds.add(normalizedId);
+		return normalizedId;
 	};
 	const normalizeVenueSlug = (value) => {
 		if (value === null || value === undefined) return null;
@@ -324,8 +537,12 @@ export function useAppLogic() {
 		else window.history.pushState({}, "", targetPath);
 	};
 	const redirectToHome = () => {
-		if (typeof window === "undefined") return;
-		window.history.replaceState({}, "", withLocalePrefix("/"));
+		if (typeof window === "undefined") return false;
+		const targetPath = withLocalePrefix("/");
+		const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+		if (currentPath === targetPath) return false;
+		window.history.replaceState({}, "", targetPath);
+		return true;
 	};
 	const closeDetailSheet = ({ syncRoute = true, replace = true } = {}) => {
 		selectedShop.value = null;
@@ -359,6 +576,9 @@ export function useAppLogic() {
 			syncRouteMode = "replace",
 			trackEvent = false,
 			trackEventType = "view_venue",
+			shouldFly = true,
+			shouldSyncCarousel = true,
+			flyOffsetY,
 		} = {},
 	) => {
 		const normalizedId = normalizeVenueId(shopId);
@@ -376,12 +596,12 @@ export function useAppLogic() {
 
 		const shop = shopStore.getShopById(normalizedId); // ✅ Use getShopById for accuracy
 		if (shop) {
-			if (shop.lat && shop.lng) {
-				smoothFlyTo([shop.lat, shop.lng]);
+			if (shouldFly && shop.lat && shop.lng) {
+				smoothFlyTo([shop.lat, shop.lng], { offsetY: flyOffsetY });
 			}
 
 			// Sync Carousel
-			if (isMobileView.value) {
+			if (shouldSyncCarousel && isMobileView.value) {
 				scrollToCard(shopId);
 			}
 
@@ -405,21 +625,16 @@ export function useAppLogic() {
 	const handleMarkerClick = (shop) => {
 		if (!shop) {
 			activeShopId.value = null;
-			selectedShop.value = null;
 			return;
 		}
 		selectFeedback();
-		if (activeShopId.value == shop.id) {
-			activeShopId.value = null;
-			selectedShop.value = null;
-			return;
-		}
-		applyShopSelection(shop.id, false, {
-			trackEvent: true,
-			trackEventType: "view_venue",
-		});
-		selectedShop.value = shop;
+		microFeedback();
 		socketService.joinRoom(shop.id);
+		handleOpenDetail(shop, {
+			trackEvent: true,
+			trackEventType: "open_detail",
+			routeMode: "replace",
+		});
 	};
 
 	const handleOpenDetail = (
@@ -434,14 +649,27 @@ export function useAppLogic() {
 			closeDetailSheet({ syncRoute: false });
 			return;
 		}
+		markDetailOpened(shop.id);
+
+		// When opening detail sheet, the modal covers ~85-90vh of the screen on mobile,
+		// so we need a much larger offsetY (e.g. 40%) to ensure the pin flies into the visible top 10%.
+		const viewportHeight =
+			typeof window !== "undefined" ? window.innerHeight : 800;
 
 		applyShopSelection(shop.id, false, {
 			syncRoute: true,
 			syncRouteMode: routeMode,
 			trackEvent,
 			trackEventType,
+			flyOffsetY: Math.round(viewportHeight * 0.48),
 		});
-		selectedShop.value = shop;
+
+		// Stagger the heavy Vue modal mount slightly to let Mapbox lock into WebGL animation first
+		requestAnimationFrame(() => {
+			requestAnimationFrame(() => {
+				selectedShop.value = shop;
+			});
+		});
 
 		// Progressive enhancement: fetch full venue details lazily.
 		// Must not block UI or navigation.
@@ -467,16 +695,47 @@ export function useAppLogic() {
 		}
 	};
 
+	handleCenteredShopCommit = ({ shop, shopId }) => {
+		const normalizedId = normalizeVenueId(shopId || shop?.id);
+		if (!shop || !normalizedId) return;
+		if (openedDetailShopIds.has(normalizedId)) return;
+		if (
+			selectedShop.value &&
+			normalizeVenueId(selectedShop.value.id) === normalizedId
+		) {
+			markDetailOpened(normalizedId);
+			return;
+		}
+		handleOpenDetail(shop, {
+			trackEvent: false,
+			routeMode: "replace",
+		});
+	};
+
 	const handleCardClick = (shop) => {
 		if (!shop) return;
 
 		// Stop user scroll processing
 		scrollSync.isUserScrolling.value = false;
 
-		applyShopSelection(shop.id, false, {
-			trackEvent: true,
-			trackEventType: "view_venue",
-		});
+		const shouldSettleCardFirst =
+			isMobileView.value && !isCenteredCard(normalizeVenueId(shop.id));
+
+		if (shouldSettleCardFirst) {
+			scrollToCard(shop.id);
+			cardClickTimer = window.setTimeout(() => {
+				applyShopSelection(shop.id, false, {
+					trackEvent: true,
+					trackEventType: "view_venue",
+					shouldSyncCarousel: false,
+				});
+			}, 260);
+		} else {
+			applyShopSelection(shop.id, false, {
+				trackEvent: true,
+				trackEventType: "view_venue",
+			});
+		}
 
 		// Video sync logic
 		const videoEl = document.querySelector(
@@ -484,6 +743,14 @@ export function useAppLogic() {
 		);
 		if (videoEl) {
 			shop.initialTime = videoEl.currentTime;
+		}
+
+		if (IS_STRICT_MAP_E2E) {
+			handleOpenDetail(shop, {
+				trackEvent: true,
+				trackEventType: "open_detail",
+				routeMode: "replace",
+			});
 		}
 	};
 
@@ -550,6 +817,47 @@ export function useAppLogic() {
 		}
 	});
 
+	// Map Breathe Settle Animation
+	const triggerMapBreathe = () => {
+		if (!mapRef.value || !mapRef.value.isZooming || !mapRef.value.isMoving)
+			return;
+		// Safe check: no active map drag, no cinematic fly
+		if (mapRef.value.isZooming() || mapRef.value.isMoving()) return;
+
+		const prefersReducedMotion =
+			typeof window !== "undefined"
+				? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+				: false;
+		if (prefersReducedMotion) return;
+
+		const currentZoom = mapRef.value.getZoom();
+
+		mapRef.value.easeTo({
+			zoom: currentZoom - 0.1,
+			duration: 400,
+			easing: (t) => t * (2 - t),
+		});
+		setTimeout(() => {
+			if (mapRef.value && !mapRef.value.isMoving()) {
+				mapRef.value.easeTo({
+					zoom: currentZoom,
+					duration: 400,
+					easing: (t) => t * (2 - t),
+				});
+			}
+		}, 400);
+	};
+
+	watch(
+		[() => uiLogic.showProfileDrawer?.value, showMallDrawer],
+		([newProf, newMall], [oldProf, oldMall]) => {
+			if ((oldProf && !newProf) || (oldMall && !newMall)) {
+				// Wait slightly for drawer to clear viewport visually
+				setTimeout(() => triggerMapBreathe(), 100);
+			}
+		},
+	);
+
 	// Gestures (Must be called in setup, not inside onMounted)
 	useEdgeSwipe(() => {
 		showSidebar.value = true;
@@ -561,6 +869,10 @@ export function useAppLogic() {
 	// Local Interval for time update
 	let timeInterval = null;
 	let popStateHandler = null;
+	let deepLinkTimer = null;
+	let cardClickTimer = null;
+	let searchBlurTimer = null;
+	let initRunSeq = 0;
 
 	// --- Initialization Logic ---
 	const handleSocketEvent = (data) => {
@@ -585,10 +897,30 @@ export function useAppLogic() {
 	const initApp = async () => {
 		// Clean up previous interval if exists
 		if (timeInterval) clearInterval(timeInterval);
+		if (deepLinkTimer) {
+			clearTimeout(deepLinkTimer);
+			deepLinkTimer = null;
+		}
+		const runSeq = ++initRunSeq;
 
 		isDataLoading.value = true;
 		try {
 			initPerformanceMonitoring();
+
+			// One-time toast if hardware low-power mode was auto-detected this session
+			if (
+				isLowPowerMode.value &&
+				!sessionStorage.getItem("vibe_lpm_notified")
+			) {
+				sessionStorage.setItem("vibe_lpm_notified", "1");
+				notify({
+					title: "⚡ Performance Mode",
+					message:
+						"Visual effects reduced for this device. Re-enable in Settings anytime.",
+					type: "info",
+					duration: 7000,
+				});
+			}
 
 			setLocaleValue(userStore.preferences.language || "en");
 			favorites.value = loadFavoritesWithTTL();
@@ -696,27 +1028,95 @@ export function useAppLogic() {
 				return null;
 			};
 
+			const resolveVenueIdFromDb = async (ref) => {
+				if (!ref) return null;
+				try {
+					if (ref.kind === "id") {
+						const normalized = normalizeVenueId(ref.value);
+						if (!normalized) return null;
+						const { data, error } = await supabase
+							.from("venues")
+							.select("id")
+							.eq("id", normalized)
+							.maybeSingle();
+						if (!error && data?.id) return normalizeVenueId(data.id);
+						return null;
+					}
+
+					if (ref.kind !== "slug") return null;
+					const slug = normalizeVenueSlug(ref.value);
+					if (!slug) return null;
+
+					const { data, error } = await supabase
+						.from("venues")
+						.select("id")
+						.eq("slug", slug)
+						.maybeSingle();
+					if (!error && data?.id) return normalizeVenueId(data.id);
+				} catch {
+					// ignore
+				}
+				return null;
+			};
+
 			const queryRef = (() => {
-				const normalized = normalizeVenueId(queryVenueRaw);
+				const raw = String(queryVenueRaw || "").trim();
+				const normalized = normalizeVenueId(raw);
 				if (!normalized) return null;
 				const byId = shopStore.getShopById(normalized);
 				if (byId) return { kind: "id", value: normalizeVenueId(byId.id) };
 				const bySlug = shopStore.getShopBySlug(normalized);
 				if (bySlug) return { kind: "id", value: normalizeVenueId(bySlug.id) };
-				// Fall back: treat it as an id-like value (may be not found).
-				return { kind: "id", value: normalized };
+				return looksLikeVenueId(normalized)
+					? { kind: "id", value: normalized }
+					: { kind: "slug", value: normalizeVenueSlug(normalized) };
 			})();
 
+			const deepLinkRef = pathVenue ?? queryRef;
 			const initialVenueId =
 				(await resolveVenueIdFromRef(pathVenue)) ??
-				(await resolveVenueIdFromRef(queryRef));
+				(await resolveVenueIdFromRef(queryRef)) ??
+				(await resolveVenueIdFromDb(deepLinkRef));
 
 			if (initialVenueId) {
-				setTimeout(() => {
-					const shop = shopStore.getShopById(initialVenueId);
+				deepLinkTimer = setTimeout(async () => {
+					if (runSeq !== initRunSeq) return;
+					let shop = shopStore.getShopById(initialVenueId);
+					if (!shop && typeof shopStore.fetchVenueDetail === "function") {
+						try {
+							const hydrated = await shopStore.fetchVenueDetail(initialVenueId);
+							if (runSeq !== initRunSeq) return;
+							shop = hydrated || shopStore.getShopById(initialVenueId);
+						} catch {
+							// ignore
+						}
+					}
+					if (!shop && deepLinkRef) {
+						const lateResolvedId = await resolveVenueIdFromDb(deepLinkRef);
+						if (lateResolvedId && lateResolvedId !== initialVenueId) {
+							shop = shopStore.getShopById(lateResolvedId);
+							if (!shop && typeof shopStore.fetchVenueDetail === "function") {
+								try {
+									const hydrated =
+										await shopStore.fetchVenueDetail(lateResolvedId);
+									if (runSeq !== initRunSeq) return;
+									shop = hydrated || shopStore.getShopById(lateResolvedId);
+								} catch {
+									// ignore
+								}
+							}
+						}
+					}
 					if (!shop) {
-						notifyError("Venue not found. Redirected to home.");
-						redirectToHome();
+						const redirected = redirectToHome();
+						if (
+							redirected &&
+							shouldNotifyDeepLinkNotFound(
+								`venue:${initialVenueId}:${deepLinkRef?.kind || "unknown"}`,
+							)
+						) {
+							notifyError("Venue not found. Redirected to home.");
+						}
 						return;
 					}
 					handleOpenDetail(shop, {
@@ -724,7 +1124,7 @@ export function useAppLogic() {
 						trackEventType: "deeplink_open",
 						routeMode: "replace",
 					});
-				}, 300);
+				}, 650);
 			}
 
 			// Intervals
@@ -741,6 +1141,9 @@ export function useAppLogic() {
 
 	onMounted(() => {
 		initApp();
+		intentPredictor.observeCards();
+		prefetchEngine.startEngine();
+
 		if (typeof window !== "undefined") {
 			popStateHandler = () => {
 				const venueRef = getVenueRefFromPath(window.location.pathname);
@@ -753,9 +1156,22 @@ export function useAppLogic() {
 	});
 
 	onUnmounted(() => {
+		prefetchEngine.stopEngine();
 		if (timeInterval) {
 			clearInterval(timeInterval);
 			timeInterval = null;
+		}
+		if (deepLinkTimer) {
+			clearTimeout(deepLinkTimer);
+			deepLinkTimer = null;
+		}
+		if (cardClickTimer) {
+			clearTimeout(cardClickTimer);
+			cardClickTimer = null;
+		}
+		if (searchBlurTimer) {
+			clearTimeout(searchBlurTimer);
+			searchBlurTimer = null;
 		}
 		socketService.removeListener(handleSocketEvent);
 		socketService.disconnect?.();
@@ -766,7 +1182,7 @@ export function useAppLogic() {
 	});
 
 	// Wrapper for favorites
-	const toggleFavorite = (shopId) => {
+	const runToggleFavorite = (shopId) => {
 		const id = normalizeVenueId(shopId);
 		if (!id) return;
 		const index = favorites.value.findIndex((x) => String(x) === id);
@@ -774,12 +1190,17 @@ export function useAppLogic() {
 			favorites.value.push(id);
 			saveFavoriteItem(id);
 			successFeedback();
-		} else {
-			favorites.value.splice(index, 1);
-			removeFavoriteItem(id);
-			selectFeedback();
+			microFeedback();
+			return;
 		}
+		favorites.value.splice(index, 1);
+		removeFavoriteItem(id);
+		selectFeedback();
+		microFeedback();
 	};
+	const toggleFavorite = createThrottledAction((shopId) => {
+		runToggleFavorite(shopId);
+	});
 	const isFavorited = (id) => {
 		const normalized = normalizeVenueId(id);
 		if (!normalized) return false;
@@ -1027,14 +1448,16 @@ export function useAppLogic() {
 			globalSearchQuery.value = "";
 			uiLogic.showSearchResults.value = false;
 		},
-		handleSearchBlur: () =>
-			setTimeout(() => {
+		handleSearchBlur: () => {
+			searchBlurTimer = setTimeout(() => {
 				uiLogic.showSearchResults.value = false;
-			}, 200),
+			}, 200);
+		},
 
 		// Misc
 		carouselShops: computed(() => shopStore.visibleShops),
 		carouselShopIds: computed(() => shopStore.visibleShops.map((s) => s.id)),
+		nearbyPins: computed(() => getNearbyPins(filteredShops.value)),
 		loadMoreVibes: () => {}, // Infinite scroll placeholder
 		retryLoad: () => globalThis.location.reload(),
 

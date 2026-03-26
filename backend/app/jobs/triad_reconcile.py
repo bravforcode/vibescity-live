@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +93,7 @@ async def _reconcile_once() -> None:
         return
 
     # 3. Stamp last_vector_sync on successfully synced venues
-    now_iso = datetime.now(tz=timezone.utc).isoformat()
+    now_iso = datetime.now(tz=UTC).isoformat()
     try:
         await asyncio.to_thread(
             lambda: supabase_admin.table("venues")

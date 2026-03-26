@@ -1,12 +1,11 @@
-import * as Sentry from "@sentry/vue";
 import { VueQueryPlugin } from "@tanstack/vue-query";
 import { createPinia } from "pinia";
 import piniaPluginPersistedstate from "pinia-plugin-persistedstate";
 import { createApp } from "vue";
 import App from "./App.vue";
-import "./design-system/tokens.css";
 import "./assets/css/main.postcss";
 import "./assets/vibe-animations.css";
+import "./design-system/tokens.css";
 
 import { headSymbol } from "@unhead/vue";
 import { createHead } from "@unhead/vue/client";
@@ -15,7 +14,7 @@ import i18n from "./i18n.js";
 import { vueQueryOptions } from "./plugins/queryClient";
 import router from "./router"; // ✅ Import Router
 import { useFeatureFlagStore } from "./store/featureFlagStore";
-import { useUserStore } from "./store/userStore";
+import { cleanupStores } from "./store/index";
 
 const app = createApp(App);
 const head = createHead();
@@ -28,9 +27,6 @@ if (!head.install) {
 }
 
 app.use(head);
-
-// ✅ Microsoft Clarity
-import Clarity from "@microsoft/clarity";
 
 const clarityId = import.meta.env.VITE_CLARITY_PROJECT_ID;
 const parseEnvBool = (value) => {
@@ -50,15 +46,18 @@ const analyticsEnabled = analyticsDisabledByEnv
 	? false
 	: (parseEnvBool(import.meta.env.VITE_ANALYTICS_ENABLED) ??
 		!import.meta.env.DEV);
-const maybeInitClarity = () => {
-	if (!analyticsEnabled) return;
-	if (!clarityId) return;
-	if (globalThis.__vibecity_clarity_inited) return;
-	globalThis.__vibecity_clarity_inited = true;
-	Clarity.init(clarityId);
+const hasAnalyticsConsent = () => {
+	try {
+		// Respect Do Not Track as a hard deny.
+		if (typeof navigator !== "undefined" && navigator.doNotTrack === "1")
+			return false;
+		return localStorage.getItem("vibe_analytics_consent") === "granted";
+	} catch {
+		return false;
+	}
 };
 
-// Defer Clarity initialization to after main-thread critical work.
+// Defer task execution to idle time to keep TTI low.
 const deferTask = (fn) => {
 	if (typeof requestIdleCallback === "function") {
 		requestIdleCallback(fn, { timeout: 3000 });
@@ -67,99 +66,134 @@ const deferTask = (fn) => {
 	}
 };
 
+// Dynamically import and initialize Clarity to keep initial parse small.
+const maybeInitClarity = async () => {
+	if (!analyticsEnabled) return;
+	if (!clarityId) return;
+	if (!hasAnalyticsConsent()) return;
+	if (globalThis.__vibecity_clarity_inited) return;
+	try {
+		const { default: Clarity } = await import("@microsoft/clarity");
+		globalThis.__vibecity_clarity_inited = true;
+		Clarity.init(clarityId);
+	} catch {
+		// fail-open
+	}
+};
+
 deferTask(() => {
-	maybeInitClarity();
+	maybeInitClarity().catch(() => {});
 });
 if (typeof window !== "undefined") {
 	window.addEventListener("vibecity:consent", (evt) => {
 		if (evt?.detail?.analytics === "granted") {
-			maybeInitClarity();
+			maybeInitClarity().catch(() => {});
 		}
 	});
 }
 
-// ✅ Initialize Sentry only when configured
-const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
-const sentryEnabledInDev = import.meta.env.VITE_SENTRY_ENABLE_DEV === "true";
-if (sentryDsn && (!import.meta.env.DEV || sentryEnabledInDev)) {
-	const tracesSampleRate = Number(
-		import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE ?? 0.1,
-	);
-	const replaysSessionSampleRate = Number(
-		import.meta.env.VITE_SENTRY_REPLAYS_SESSION_SAMPLE_RATE ?? 0,
-	);
-	const replaysOnErrorSampleRate = Number(
-		import.meta.env.VITE_SENTRY_REPLAYS_ON_ERROR_SAMPLE_RATE ?? 0,
-	);
+// Dynamically import and initialize Sentry to keep initial parse small.
+const initSentryDeferred = async () => {
+	try {
+		const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
+		const sentryEnabledInDev =
+			import.meta.env.VITE_SENTRY_ENABLE_DEV === "true";
+		if (!sentryDsn || (import.meta.env.DEV && !sentryEnabledInDev)) return;
+		if (analyticsDisabledByEnv) return;
 
-	Sentry.init({
-		app,
-		dsn: sentryDsn,
+		const { default: Sentry } = await import("@sentry/vue");
 
-		// Privacy-first defaults
-		sendDefaultPii: false,
-		beforeSend(event) {
-			// Scrub URL query params to avoid leaking user context
-			if (event.request?.url) {
-				try {
-					const url = new URL(event.request.url);
-					url.search = "";
-					event.request.url = url.toString();
-				} catch {
-					// ignore
+		const tracesSampleRate = Number(
+			import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE ?? 0.1,
+		);
+		const replaysSessionSampleRate = Number(
+			import.meta.env.VITE_SENTRY_REPLAYS_SESSION_SAMPLE_RATE ?? 0,
+		);
+		const replaysOnErrorSampleRate = Number(
+			import.meta.env.VITE_SENTRY_REPLAYS_ON_ERROR_SAMPLE_RATE ?? 0,
+		);
+
+		Sentry.init({
+			app,
+			dsn: sentryDsn,
+
+			// Privacy-first defaults
+			sendDefaultPii: false,
+			beforeSend(event) {
+				// Scrub URL query params to avoid leaking user context
+				if (event.request?.url) {
+					try {
+						const url = new URL(event.request.url);
+						url.search = "";
+						event.request.url = url.toString();
+					} catch {
+						// ignore
+					}
 				}
-			}
-			return event;
-		},
+				return event;
+			},
 
-		integrations: [
-			Sentry.browserTracingIntegration(),
-			// Replay can be heavy; keep it opt-in via env sample rates
-			Sentry.replayIntegration({
-				maskAllText: true,
-				blockAllMedia: true,
-			}),
-		],
+			integrations: [
+				Sentry.browserTracingIntegration(),
+				// Replay can be heavy; keep it opt-in via env sample rates
+				Sentry.replayIntegration({
+					maskAllText: true,
+					blockAllMedia: true,
+				}),
+			],
 
-		// Performance Monitoring
-		tracesSampleRate: Number.isFinite(tracesSampleRate)
-			? tracesSampleRate
-			: 0.1,
+			// Performance Monitoring
+			tracesSampleRate: Number.isFinite(tracesSampleRate)
+				? tracesSampleRate
+				: 0.1,
 
-		// Session Replay
-		replaysSessionSampleRate: Number.isFinite(replaysSessionSampleRate)
-			? replaysSessionSampleRate
-			: 0,
-		replaysOnErrorSampleRate: Number.isFinite(replaysOnErrorSampleRate)
-			? replaysOnErrorSampleRate
-			: 0,
-	});
-}
+			// Session Replay
+			replaysSessionSampleRate: Number.isFinite(replaysSessionSampleRate)
+				? replaysSessionSampleRate
+				: 0,
+			replaysOnErrorSampleRate: Number.isFinite(replaysOnErrorSampleRate)
+				? replaysOnErrorSampleRate
+				: 0,
+		});
+	} catch {
+		// fail-open
+	}
+};
+
+// Defer Sentry init to idle time
+deferTask(() => {
+	initSentryDeferred().catch(() => {});
+});
 
 const pinia = createPinia();
 pinia.use(piniaPluginPersistedstate);
 
 app.use(pinia);
-// Ensure auth state is available for route guards and admin UI.
-try {
-	useUserStore(pinia).initAuth?.();
-} catch {
-	// ignore
-}
+
+const isE2E =
+	import.meta.env.VITE_E2E === "true" ||
+	import.meta.env.VITE_E2E_MAP_REQUIRED === "true" ||
+	import.meta.env.MODE === "e2e";
 
 // Initialize remote feature flags in the background.
 const featureFlagStore = useFeatureFlagStore(pinia);
-void featureFlagStore.refreshFlags().catch(() => {});
+if (!isE2E) {
+	void featureFlagStore.refreshFlags().catch(() => {});
+}
 
 const maybeInitWebVitals = async () => {
 	try {
+		if (isE2E) return;
 		await featureFlagStore.refreshFlags();
 		const forced = parseEnvBool(import.meta.env.VITE_WEB_VITALS_ENABLED);
 		const enabled = forced ?? featureFlagStore.isEnabled("enable_web_vitals");
 		if (!enabled) return;
-		if (!analyticsEnabled) return;
+		if (!analyticsEnabled || !hasAnalyticsConsent()) return;
 		const { webVitalsService } = await import("./services/webVitalsService");
 		webVitalsService.init();
+		webVitalsService.setContext({
+			route: window.location.pathname || "/",
+		});
 	} catch {
 		// fail-open
 	}
@@ -172,14 +206,22 @@ router.afterEach((to) => {
 	try {
 		// PII audit (raw IP) is handled by a separate Edge function and is not consent-gated.
 		// Fail-open and throttle client pings to avoid noise.
-		void import("./services/piiAuditService")
-			.then(({ piiAuditService }) => piiAuditService.ping("route_change"))
-			.catch(() => {});
+		if (!import.meta.env.DEV) {
+			void import("./services/piiAuditService")
+				.then(({ piiAuditService }) => piiAuditService.ping("route_change"))
+				.catch(() => {});
+		}
 
 		if (!analyticsEnabled) return;
+		if (!hasAnalyticsConsent()) return;
 		const path =
 			typeof to?.path === "string" ? to.path : window.location.pathname;
 		const normalized = path?.startsWith("/") ? path : `/${path}`;
+		void import("./services/webVitalsService")
+			.then(({ webVitalsService }) =>
+				webVitalsService.setContext({ route: normalized }),
+			)
+			.catch(() => {});
 		// Lazy import to keep initial bundle lean and avoid CORS noise in dev.
 		void import("./services/analyticsService")
 			.then(({ analyticsService }) =>
@@ -202,12 +244,26 @@ import vHaptic from "./directives/vHaptic.js";
 
 app.directive("haptic", vHaptic);
 
-// ✅ Register Lottie
-import Vue3Lottie from "vue3-lottie";
-
-app.use(Vue3Lottie);
-
 app.mount("#app");
+
+// ✅ Cleanup Supabase Realtime channels and store subscriptions on page unload
+if (typeof window !== "undefined") {
+	window.addEventListener("beforeunload", () => {
+		cleanupStores().catch(() => {});
+	});
+}
+
+// ✅ Global unhandled promise rejection logger (dev + prod safe)
+if (typeof window !== "undefined") {
+	window.addEventListener("unhandledrejection", (event) => {
+		const reason = event?.reason;
+		console.error(
+			"[VibeCity] Unhandled promise rejection:",
+			reason instanceof Error ? reason : String(reason ?? "unknown"),
+		);
+		// Don't prevent default — let Sentry / browser devtools also see it
+	});
+}
 
 // Start web-vitals collection after initial paint to avoid startup contention.
 try {
@@ -219,21 +275,22 @@ try {
 }
 
 // Initial PII audit ping after first paint.
-try {
-	requestAnimationFrame(() => {
+if (!import.meta.env.DEV) {
+	try {
+		requestAnimationFrame(() => {
+			void import("./services/piiAuditService")
+				.then(({ piiAuditService }) => piiAuditService.ping("app_start"))
+				.catch(() => {});
+		});
+	} catch {
 		void import("./services/piiAuditService")
 			.then(({ piiAuditService }) => piiAuditService.ping("app_start"))
 			.catch(() => {});
-	});
-} catch {
-	void import("./services/piiAuditService")
-		.then(({ piiAuditService }) => piiAuditService.ping("app_start"))
-		.catch(() => {});
+	}
 }
 
 // ✅ Register Service Worker for PWA
 // In E2E runs, service worker caching can make script/chunk loading flaky.
-const isE2E = import.meta.env.VITE_E2E === "true";
 const swDevEnabled = parseEnvBool(import.meta.env.VITE_SW_DEV) === true;
 
 // Dev-only warning when a SW is already controlling the page (can cause "CSS missing" / stale chunks).

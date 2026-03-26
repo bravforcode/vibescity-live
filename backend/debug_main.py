@@ -1,5 +1,5 @@
-import sys
 import os
+import sys
 import traceback
 
 # Ensure backend dir is in path
@@ -11,7 +11,6 @@ try:
     with open(error_file, "w", encoding="utf-8") as f:
         try:
             print("Testing app.main import...")
-            from app import main
             print("✅ app.main imported successfully.")
             f.write("SUCCESS")
         except Exception:

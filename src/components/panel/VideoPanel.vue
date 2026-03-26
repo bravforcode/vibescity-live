@@ -18,6 +18,10 @@ const props = defineProps({
 		type: Boolean,
 		default: true,
 	},
+	stickyTop: {
+		type: Number,
+		default: 0,
+	},
 	favorites: {
 		type: Array,
 		default: () => [],
@@ -157,16 +161,17 @@ defineExpose({ scrollToShop });
     <!-- Header -->
     <div
       :class="[
-        'sticky top-0 z-20 backdrop-blur-xl border-b p-4',
+        'sticky z-20 border-b p-4 backdrop-blur-xl',
         isDarkMode
-          ? 'bg-zinc-950/95 border-white/10'
+          ? 'bg-gradient-to-r from-zinc-950/95 to-zinc-900/95 border-white/10'
           : 'bg-white/95 border-gray-200',
       ]"
+      :style="{ top: `${Math.max(0, stickyTop)}px` }"
     >
-      <div class="flex items-center justify-between">
+      <div class="flex min-h-[44px] items-center justify-between">
         <h2
           :class="[
-            'text-lg font-semibold',
+            'text-lg font-black tracking-tight',
             isDarkMode ? 'text-white' : 'text-gray-900',
           ]"
         >
@@ -174,7 +179,7 @@ defineExpose({ scrollToShop });
         </h2>
         <div class="flex items-center gap-2">
           <div class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-          <span class="text-xs text-red-500 font-medium">
+          <span class="text-xs text-red-500 font-semibold">
             {{ liveCount }} {{ t("status.live") }}
           </span>
         </div>
@@ -189,7 +194,7 @@ defineExpose({ scrollToShop });
         :ref="(el) => setCardRef(el, shop.id)"
         :data-shop-id="shop.id"
         :class="[
-          'transition-all duration-300',
+          'transition duration-300',
           activeShopId === shop.id ? 'scale-[1.02]' : '',
         ]"
       >
@@ -213,7 +218,9 @@ defineExpose({ scrollToShop });
           isDarkMode ? 'text-white/30' : 'text-gray-400',
         ]"
       >
-        <p class="text-sm">{{ t("status.no_shops") || "ไม่พบร้านค้า" }}</p>
+        <p class="text-sm font-semibold">
+          {{ t("status.no_shops") || "ไม่พบร้านค้า" }}
+        </p>
       </div>
     </div>
 

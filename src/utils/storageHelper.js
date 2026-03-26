@@ -84,5 +84,49 @@ const loadRawFavorites = () => {
 };
 
 const saveFavorites = (items) => {
-	localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+	try {
+		localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+	} catch {
+		// Private browsing or storage quota exceeded
+	}
+};
+
+// ---------------------------------------------------------------------------
+// Generic safe localStorage wrappers — always use these instead of raw access
+// ---------------------------------------------------------------------------
+
+/**
+ * @param {string} key
+ * @param {*} fallback - returned when key is missing or storage is unavailable
+ */
+export const getStorageItem = (key, fallback = null) => {
+	try {
+		const raw = localStorage.getItem(key);
+		return raw !== null ? raw : fallback;
+	} catch {
+		return fallback;
+	}
+};
+
+/**
+ * @param {string} key
+ * @param {string} value
+ */
+export const setStorageItem = (key, value) => {
+	try {
+		localStorage.setItem(key, value);
+	} catch {
+		// Private browsing or quota exceeded — fail silently
+	}
+};
+
+/**
+ * @param {string} key
+ */
+export const removeStorageItem = (key) => {
+	try {
+		localStorage.removeItem(key);
+	} catch {
+		// ignore
+	}
 };

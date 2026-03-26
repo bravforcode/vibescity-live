@@ -2,10 +2,13 @@
 import { ArrowLeft, Heart, Share2, User } from "lucide-vue-next";
 import { computed, defineAsyncComponent, ref } from "vue";
 import { useHaptics } from "../../composables/useHaptics";
+import { useThrottledAction } from "../../composables/useThrottledAction";
 import { useCoinStore } from "../../store/coinStore";
 import { useShopStore } from "../../store/shopStore";
 
 const coinStore = useCoinStore();
+const IMMERSIVE_FALLBACK_IMAGE =
+	"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 1000'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%230b1020'/><stop offset='1' stop-color='%2311162a'/></linearGradient></defs><rect width='1600' height='1000' fill='url(%23g)'/></svg>";
 
 // Async Components (Lazy Load)
 const SmartHeader = defineAsyncComponent(
@@ -33,6 +36,7 @@ const emit = defineEmits([
 
 const shopStore = useShopStore();
 const { selectFeedback } = useHaptics();
+const { createThrottledAction } = useThrottledAction({ delayMs: 1000 });
 
 // Current Active Shop Logic
 const activeShopIndex = ref(0);
@@ -69,11 +73,26 @@ const isFavorited = (shopId) => {
 	return (props.favorites || []).some((fav) => normalizeId(fav) === id);
 };
 
-const handleFavorite = (shopId) => {
+const runHandleFavorite = (shopId) => {
+	if (!shopId) return;
 	selectFeedback();
-	shopStore.toggleFavorite(shopId);
-	coinStore.awardCoins(1);
+	try {
+		shopStore.toggleFavorite(shopId);
+		if (typeof coinStore.awardCoins === "function") {
+			coinStore.awardCoins(1);
+		} else if (typeof coinStore.awardBonus === "function") {
+			void coinStore.awardBonus(1, "favorite");
+		}
+	} catch (error) {
+		if (import.meta.env.DEV) {
+			console.error("[ImmersiveFeed] Favorite action failed", error);
+		}
+	}
 };
+
+const handleFavorite = createThrottledAction((shopId) => {
+	runHandleFavorite(shopId);
+});
 
 const handleShare = async (shop) => {
 	selectFeedback();
@@ -89,7 +108,7 @@ const handleShare = async (shop) => {
 			console.error(err);
 		}
 	} else {
-		console.log("Web Share API not supported");
+		if (import.meta.env.DEV) console.log("Web Share API not supported");
 	}
 };
 
@@ -122,7 +141,7 @@ const getDistance = (shop) => {
           <img
             :src="
               activeShop?.Image_URL1 ||
-              'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1000&auto=format&fit=crop'
+              IMMERSIVE_FALLBACK_IMAGE
             "
             class="w-full h-full object-cover"
             alt=""
@@ -139,6 +158,7 @@ const getDistance = (shop) => {
     <!-- We repurpose the existing SmartHeader but force immersive props -->
     <SmartHeader
       :is-immersive="true"
+      layout-mode="full"
       :globalSearchQuery="''"
       @open-sidebar="$emit('open-sidebar')"
       @haptic-tap="selectFeedback"

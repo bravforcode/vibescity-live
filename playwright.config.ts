@@ -66,6 +66,7 @@ export default defineConfig({
     ["list"],
     ["html", { outputFolder: "playwright-report", open: "never" }],
     ["junit", { outputFile: "reports/e2e/junit.xml" }],
+    ["./tests/e2e/sentry-reporter.ts"],
   ],
 
   // ✅ output ชัด ๆ (screenshots/videos/traces ไปใน test-results)

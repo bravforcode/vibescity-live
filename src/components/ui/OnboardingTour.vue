@@ -96,7 +96,18 @@ defineExpose({ reset });
 <template>
   <Teleport to="body">
     <Transition name="fade">
-      <div v-if="isVisible" class="onboarding-overlay" @click.self="skip">
+      <div
+        v-if="isVisible"
+        class="onboarding-overlay"
+        @click.self="skip"
+        tabindex="0"
+        @keydown.enter.self="skip"
+        @keydown.space.self="skip"
+        @keydown.esc="skip"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Onboarding Tour"
+      >
         <div
           :class="['onboarding-modal', isDarkMode ? 'bg-zinc-900' : 'bg-white']"
         >
@@ -106,7 +117,7 @@ defineExpose({ reset });
               v-for="(_, i) in steps"
               :key="i"
               :class="[
-                'w-2 h-2 rounded-full transition-all duration-300',
+                'w-2 h-2 rounded-full transition duration-300',
                 i === currentStep
                   ? 'w-6 bg-gradient-to-r from-purple-500 to-pink-500'
                   : i < currentStep
@@ -147,7 +158,7 @@ defineExpose({ reset });
               v-if="currentStep > 0"
               @click="prevStep"
               :class="[
-                'flex-1 py-3 rounded-xl font-bold transition-all',
+                'flex-1 py-3 rounded-xl font-bold transition',
                 isDarkMode
                   ? 'bg-zinc-800 text-white hover:bg-zinc-700'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
@@ -159,7 +170,7 @@ defineExpose({ reset });
               v-else
               @click="skip"
               :class="[
-                'flex-1 py-3 rounded-xl font-bold transition-all',
+                'flex-1 py-3 rounded-xl font-bold transition',
                 isDarkMode
                   ? 'bg-zinc-800 text-white/50 hover:bg-zinc-700'
                   : 'bg-gray-100 text-gray-400 hover:bg-gray-200',
@@ -170,7 +181,7 @@ defineExpose({ reset });
 
             <button
               @click="nextStep"
-              class="flex-1 py-3 rounded-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 transition-all active:scale-95"
+              class="flex-1 py-3 rounded-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 transition active:scale-95"
             >
               {{ currentStep === steps.length - 1 ? "Let's Go!" : "Next" }}
             </button>

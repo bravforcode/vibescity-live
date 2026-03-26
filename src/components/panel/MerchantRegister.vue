@@ -284,8 +284,8 @@
 </template>
 
 <script setup>
-import { ChevronLeft, MapPin, Upload, X } from "lucide-vue-next";
 import confetti from "canvas-confetti";
+import { ChevronLeft, MapPin, Upload, X } from "lucide-vue-next";
 import generatePayload from "promptpay-qr";
 import QrcodeVue from "qrcode.vue";
 import { computed, ref, watch } from "vue";
@@ -306,35 +306,124 @@ const currentStep = ref(1);
 const stepTitles = ["Shop Details", "Location", "Package", "Payment"];
 
 const canProceed = computed(() => {
-	if (currentStep.value === 1) return form.value.name.trim() && form.value.category;
+	if (currentStep.value === 1)
+		return form.value.name.trim() && form.value.category;
 	if (currentStep.value === 2) return !!form.value.lat;
 	return true;
 });
 
 const packageCatalog = [
-	{ id: "normal_pin_1d",  pinType: "normal", label: "Normal Pin · 1 Day",   desc: "Standard map pin for quick visibility",         price: 150,   durationDays: 1,  icon: "📍", badge: "Starter"    },
-	{ id: "normal_pin_3d",  pinType: "normal", label: "Normal Pin · 3 Days",  desc: "Stable exposure across weekend traffic",          price: 390,   durationDays: 3,  icon: "📍", badge: "Save 13%"   },
-	{ id: "normal_pin_7d",  pinType: "normal", label: "Normal Pin · 7 Days",  desc: "Weekly campaign with better map presence",        price: 840,   durationDays: 7,  icon: "📍", badge: "Popular"    },
-	{ id: "normal_pin_14d", pinType: "normal", label: "Normal Pin · 14 Days", desc: "Two-week campaign for sustained reach",           price: 1590,  durationDays: 14, icon: "📍"                    },
-	{ id: "normal_pin_30d", pinType: "normal", label: "Normal Pin · 30 Days", desc: "Monthly presence for stable traffic",            price: 2990,  durationDays: 30, icon: "📍", badge: "Best Value"  },
-	{ id: "giant_pin_1d",   pinType: "giant",  label: "Giant Pin · 1 Day",    desc: "Large featured pin with premium visibility",      price: 3000,  durationDays: 1,  icon: "🔥", badge: "Premium"    },
-	{ id: "giant_pin_3d",   pinType: "giant",  label: "Giant Pin · 3 Days",   desc: "Extended giant campaign for event weekends",      price: 8500,  durationDays: 3,  icon: "🔥", badge: "Hot"        },
-	{ id: "giant_pin_7d",   pinType: "giant",  label: "Giant Pin · 7 Days",   desc: "Weekly hero placement for high conversion",       price: 18900, durationDays: 7,  icon: "🔥"                    },
-	{ id: "giant_pin_14d",  pinType: "giant",  label: "Giant Pin · 14 Days",  desc: "Two-week giant promo for major campaigns",        price: 34900, durationDays: 14, icon: "🔥", badge: "Scale"      },
-	{ id: "giant_pin_30d",  pinType: "giant",  label: "Giant Pin · 30 Days",  desc: "Monthly hero spotlight for top brands",          price: 69900, durationDays: 30, icon: "🔥", badge: "Enterprise"  },
+	{
+		id: "normal_pin_1d",
+		pinType: "normal",
+		label: "Normal Pin · 1 Day",
+		desc: "Standard map pin for quick visibility",
+		price: 150,
+		durationDays: 1,
+		icon: "📍",
+		badge: "Starter",
+	},
+	{
+		id: "normal_pin_3d",
+		pinType: "normal",
+		label: "Normal Pin · 3 Days",
+		desc: "Stable exposure across weekend traffic",
+		price: 390,
+		durationDays: 3,
+		icon: "📍",
+		badge: "Save 13%",
+	},
+	{
+		id: "normal_pin_7d",
+		pinType: "normal",
+		label: "Normal Pin · 7 Days",
+		desc: "Weekly campaign with better map presence",
+		price: 840,
+		durationDays: 7,
+		icon: "📍",
+		badge: "Popular",
+	},
+	{
+		id: "normal_pin_14d",
+		pinType: "normal",
+		label: "Normal Pin · 14 Days",
+		desc: "Two-week campaign for sustained reach",
+		price: 1590,
+		durationDays: 14,
+		icon: "📍",
+	},
+	{
+		id: "normal_pin_30d",
+		pinType: "normal",
+		label: "Normal Pin · 30 Days",
+		desc: "Monthly presence for stable traffic",
+		price: 2990,
+		durationDays: 30,
+		icon: "📍",
+		badge: "Best Value",
+	},
+	{
+		id: "giant_pin_1d",
+		pinType: "giant",
+		label: "Giant Pin · 1 Day",
+		desc: "Large featured pin with premium visibility",
+		price: 3000,
+		durationDays: 1,
+		icon: "🔥",
+		badge: "Premium",
+	},
+	{
+		id: "giant_pin_3d",
+		pinType: "giant",
+		label: "Giant Pin · 3 Days",
+		desc: "Extended giant campaign for event weekends",
+		price: 8500,
+		durationDays: 3,
+		icon: "🔥",
+		badge: "Hot",
+	},
+	{
+		id: "giant_pin_7d",
+		pinType: "giant",
+		label: "Giant Pin · 7 Days",
+		desc: "Weekly hero placement for high conversion",
+		price: 18900,
+		durationDays: 7,
+		icon: "🔥",
+	},
+	{
+		id: "giant_pin_14d",
+		pinType: "giant",
+		label: "Giant Pin · 14 Days",
+		desc: "Two-week giant promo for major campaigns",
+		price: 34900,
+		durationDays: 14,
+		icon: "🔥",
+		badge: "Scale",
+	},
+	{
+		id: "giant_pin_30d",
+		pinType: "giant",
+		label: "Giant Pin · 30 Days",
+		desc: "Monthly hero spotlight for top brands",
+		price: 69900,
+		durationDays: 30,
+		icon: "🔥",
+		badge: "Enterprise",
+	},
 ];
 
 const addOnCatalog = [
-	{ id: "glow",                label: "Glow",              price: 190  },
-	{ id: "animated_pin",        label: "Animated Pin",      price: 390  },
-	{ id: "neon_trail",          label: "Neon Trail",        price: 290  },
-	{ id: "spotlight",           label: "Spotlight",         price: 450  },
-	{ id: "boost_feed",          label: "Boost Feed",        price: 650  },
-	{ id: "verified_badge",      label: "Verified Badge",    price: 490  },
-	{ id: "featured_explore",    label: "Featured Explore",  price: 890  },
-	{ id: "priority_placement",  label: "Priority",          price: 1200 },
-	{ id: "story_banner",        label: "Story Banner",      price: 550  },
-	{ id: "night_mode_glow",     label: "Night Glow",        price: 320  },
+	{ id: "glow", label: "Glow", price: 190 },
+	{ id: "animated_pin", label: "Animated Pin", price: 390 },
+	{ id: "neon_trail", label: "Neon Trail", price: 290 },
+	{ id: "spotlight", label: "Spotlight", price: 450 },
+	{ id: "boost_feed", label: "Boost Feed", price: 650 },
+	{ id: "verified_badge", label: "Verified Badge", price: 490 },
+	{ id: "featured_explore", label: "Featured Explore", price: 890 },
+	{ id: "priority_placement", label: "Priority", price: 1200 },
+	{ id: "story_banner", label: "Story Banner", price: 550 },
+	{ id: "night_mode_glow", label: "Night Glow", price: 320 },
 ];
 
 const form = ref({
@@ -368,7 +457,9 @@ watch(
 );
 
 const selectedPackage = computed(
-	() => packageCatalog.find((pkg) => pkg.id === form.value.selectedPackageId) || null,
+	() =>
+		packageCatalog.find((pkg) => pkg.id === form.value.selectedPackageId) ||
+		null,
 );
 
 const selectedAddOnObjects = computed(() =>
@@ -377,7 +468,10 @@ const selectedAddOnObjects = computed(() =>
 
 const totalPrice = computed(() => {
 	const packagePrice = selectedPackage.value?.price || 0;
-	const addOnPrice = selectedAddOnObjects.value.reduce((sum, addon) => sum + addon.price, 0);
+	const addOnPrice = selectedAddOnObjects.value.reduce(
+		(sum, addon) => sum + addon.price,
+		0,
+	);
 	return packagePrice + addOnPrice;
 });
 
@@ -414,9 +508,12 @@ const getCurrentLocation = () => {
 		},
 		(error) => {
 			let message = "Could not get your location";
-			if (error.code === error.PERMISSION_DENIED) message = "Location access denied.";
-			else if (error.code === error.POSITION_UNAVAILABLE) message = "Location unavailable.";
-			else if (error.code === error.TIMEOUT) message = "Location request timed out.";
+			if (error.code === error.PERMISSION_DENIED)
+				message = "Location access denied.";
+			else if (error.code === error.POSITION_UNAVAILABLE)
+				message = "Location unavailable.";
+			else if (error.code === error.TIMEOUT)
+				message = "Location request timed out.";
 			notifyError(message);
 		},
 	);
@@ -425,19 +522,33 @@ const getCurrentLocation = () => {
 const handleSlipUpload = (e) => {
 	const file = e.target.files?.[0];
 	if (!file) return;
-	if (!file.type.startsWith("image/")) { notifyError("กรุณาอัปโหลดไฟล์รูปภาพเท่านั้น"); return; }
-	if (file.size > 5 * 1024 * 1024) { notifyError("ไฟล์ใหญ่เกิน 5MB"); return; }
+	if (!file.type.startsWith("image/")) {
+		notifyError("กรุณาอัปโหลดไฟล์รูปภาพเท่านั้น");
+		return;
+	}
+	if (file.size > 5 * 1024 * 1024) {
+		notifyError("ไฟล์ใหญ่เกิน 5MB");
+		return;
+	}
 	if (previewUrl.value) URL.revokeObjectURL(previewUrl.value);
 	previewUrl.value = URL.createObjectURL(file);
 	slipFile.value = file;
 };
 
 const submitForm = async () => {
-	if (!form.value.name || !form.value.category || !form.value.lat || !slipFile.value) {
+	if (
+		!form.value.name ||
+		!form.value.category ||
+		!form.value.lat ||
+		!slipFile.value
+	) {
 		notifyError("Please complete all fields and upload payment slip");
 		return;
 	}
-	if (!selectedPackage.value) { notifyError("Please select package"); return; }
+	if (!selectedPackage.value) {
+		notifyError("Please select package");
+		return;
+	}
 
 	isSubmitting.value = true;
 	uploadProgress.value = 10;
@@ -450,8 +561,10 @@ const submitForm = async () => {
 		if (uploadError) throw uploadError;
 		uploadProgress.value = 70;
 
-		const visitorId = localStorage.getItem("vibe_visitor_id") || `anon_${Date.now()}`;
-		if (!localStorage.getItem("vibe_visitor_id")) localStorage.setItem("vibe_visitor_id", visitorId);
+		const visitorId =
+			localStorage.getItem("vibe_visitor_id") || `anon_${Date.now()}`;
+		if (!localStorage.getItem("vibe_visitor_id"))
+			localStorage.setItem("vibe_visitor_id", visitorId);
 
 		const pinType = form.value.pinType === "giant" ? "giant" : "standard";
 		const pinMetadata = {
@@ -460,7 +573,11 @@ const submitForm = async () => {
 			duration_days: selectedPackage.value.durationDays,
 			pin_type: pinType,
 			payment_tab: paymentTab.value,
-			addons: selectedAddOnObjects.value.map((addon) => ({ id: addon.id, label: addon.label, price: addon.price })),
+			addons: selectedAddOnObjects.value.map((addon) => ({
+				id: addon.id,
+				label: addon.label,
+				price: addon.price,
+			})),
 			features: {
 				glow: selectedAddOns.value.includes("glow"),
 				animated_pin: selectedAddOns.value.includes("animated_pin"),
@@ -497,7 +614,9 @@ const submitForm = async () => {
 		notifyError(`Error: ${err.message}`);
 	} finally {
 		isSubmitting.value = false;
-		setTimeout(() => { uploadProgress.value = 0; }, 800);
+		setTimeout(() => {
+			uploadProgress.value = 0;
+		}, 800);
 	}
 };
 </script>

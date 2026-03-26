@@ -1,7 +1,7 @@
 <script setup>
 defineProps({
-  visible: { type: Boolean, default: true },
-  label: { type: String, default: 'YOU ARE HERE' },
+	visible: { type: Boolean, default: true },
+	label: { type: String, default: "YOU ARE HERE" },
 });
 </script>
 

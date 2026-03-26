@@ -1,5 +1,11 @@
 import { ref } from "vue";
 import { getWebSocketUrl } from "../lib/runtimeConfig";
+import {
+	clearRuntimeLaneUnavailable,
+	isRuntimeLaneUnavailable,
+	markRuntimeLaneUnavailable,
+	RUNTIME_LANES,
+} from "../lib/runtimeLaneAvailability";
 
 class SocketService {
 	constructor() {
@@ -9,9 +15,31 @@ class SocketService {
 		this.reconnectAttempts = 0;
 		this.maxReconnects = 10; // Circuit breaker: stop after 10 attempts
 		this.listeners = new Set();
+		this.pendingRoomIds = new Set();
 		this.shouldReconnect = true;
 		this.circuitBreakerTripped = false; // Tracks if we gave up
 		this.wsUrl = ""; // Resolved at connect time
+		this.hasConnectedOnce = false;
+		this.connectedAt = 0;
+	}
+
+	disableRealtimeForCurrentSession() {
+		markRuntimeLaneUnavailable(RUNTIME_LANES.websocket);
+		this.circuitBreakerTripped = true;
+		this.shouldReconnect = false;
+		if (this._retryTimer) {
+			clearTimeout(this._retryTimer);
+			this._retryTimer = null;
+		}
+		if (this.socket) {
+			try {
+				this.socket.close();
+			} catch {
+				// ignore
+			}
+		}
+		this.socket = null;
+		this.isConnected.value = false;
 	}
 
 	/**
@@ -29,6 +57,12 @@ class SocketService {
 			return false;
 		}
 
+		if (isRuntimeLaneUnavailable(RUNTIME_LANES.websocket)) {
+			this.circuitBreakerTripped = true;
+			this.isConnected.value = false;
+			return false;
+		}
+
 		if (this.socket && this.socket.readyState === WebSocket.OPEN) {
 			return true;
 		}
@@ -38,6 +72,7 @@ class SocketService {
 		}
 
 		this.shouldReconnect = true;
+		this.circuitBreakerTripped = false;
 
 		try {
 			if (import.meta.env.DEV) {
@@ -53,8 +88,17 @@ class SocketService {
 			if (import.meta.env.DEV) console.log("✅ VibeStream Connected");
 			this.isConnected.value = true;
 			this.reconnectAttempts = 0;
+			this.hasConnectedOnce = true;
+			this.connectedAt = Date.now();
+			clearRuntimeLaneUnavailable(RUNTIME_LANES.websocket);
 			// Request current online count from server
 			this.sendVibe({ action: "presence:join" });
+			if (this.pendingRoomIds.size > 0) {
+				for (const shopId of this.pendingRoomIds) {
+					this.sendVibe({ action: "subscribe", shopId });
+				}
+				this.pendingRoomIds.clear();
+			}
 		};
 
 		this.socket.onmessage = (event) => {
@@ -74,14 +118,25 @@ class SocketService {
 
 		this.socket.onclose = () => {
 			if (import.meta.env.DEV) console.log("❌ VibeStream Disconnected");
+			const hadStableConnection =
+				this.hasConnectedOnce || this.isConnected.value;
 			this.isConnected.value = false;
+			if (!hadStableConnection) {
+				this.disableRealtimeForCurrentSession();
+				return;
+			}
 			if (this.shouldReconnect) {
 				this.retryConnection();
 			}
 		};
 
-		this.socket.onerror = (err) => {
-			if (import.meta.env.DEV) console.error("⚠️ VibeStream Error:", err);
+		this.socket.onerror = () => {
+			if (!this.hasConnectedOnce) {
+				this.disableRealtimeForCurrentSession();
+				return;
+			}
+			if (import.meta.env.DEV)
+				console.warn("⚠️ VibeStream: Temporary connection drop, will retry...");
 		};
 
 		return true;
@@ -104,17 +159,31 @@ class SocketService {
 			return;
 		}
 
-		// Exponential backoff: 2s, 4s, 8s, 16s, 30s (cap)
-		const backoff = Math.min(1000 * 2 ** this.reconnectAttempts, 30000);
+		// Exponential backoff with jitter: 2s, 4s, 8s, 16s, 30s (cap) + random ±25%
+		const base = Math.min(1000 * 2 ** this.reconnectAttempts, 30000);
+		const jitter = base * (0.75 + Math.random() * 0.5); // ±25% jitter prevents thundering herd
+		const backoff = Math.round(jitter);
 
 		if (this.reconnectAttempts > 0 && import.meta.env.DEV) {
 			console.log(
-				`🔌 Reconnecting in ${backoff / 1000}s (Attempt ${this.reconnectAttempts}/${this.maxReconnects})...`,
+				`🔌 Reconnecting in ${(backoff / 1000).toFixed(1)}s (Attempt ${this.reconnectAttempts}/${this.maxReconnects})...`,
 			);
 		}
 
 		this.reconnectAttempts++;
-		setTimeout(() => {
+		this._retryTimer = setTimeout(() => {
+			this._retryTimer = null;
+			// Defer reconnect if tab is hidden — reconnect when visible
+			if (typeof document !== "undefined" && document.hidden) {
+				const onVisible = () => {
+					document.removeEventListener("visibilitychange", onVisible);
+					if (this.shouldReconnect) this.connect();
+				};
+				document.addEventListener("visibilitychange", onVisible, {
+					once: true,
+				});
+				return;
+			}
 			if (this.shouldReconnect) this.connect();
 		}, backoff);
 	}
@@ -137,7 +206,13 @@ class SocketService {
 
 	joinRoom(shopId) {
 		if (!shopId) return;
-		this.sendVibe({ action: "subscribe", shopId: shopId });
+		const normalizedShopId = String(shopId);
+		if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+			this.sendVibe({ action: "subscribe", shopId: normalizedShopId });
+		} else {
+			this.pendingRoomIds.add(normalizedShopId);
+			this.connect();
+		}
 		if (import.meta.env.DEV) console.log(`🔌 Joined Room: ${shopId}`);
 	}
 
@@ -150,8 +225,12 @@ class SocketService {
 	}
 
 	disconnect() {
-		if (!this.socket) return;
 		this.shouldReconnect = false;
+		if (this._retryTimer) {
+			clearTimeout(this._retryTimer);
+			this._retryTimer = null;
+		}
+		if (!this.socket) return;
 		try {
 			this.socket.close();
 		} catch {
@@ -175,6 +254,9 @@ class SocketService {
 			configured: Boolean(this.wsUrl),
 			connected: this.isConnected.value,
 			reconnectAttempts: this.reconnectAttempts,
+			circuitBreakerTripped:
+				this.circuitBreakerTripped ||
+				isRuntimeLaneUnavailable(RUNTIME_LANES.websocket),
 		};
 	}
 }

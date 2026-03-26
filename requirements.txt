@@ -20,3 +20,6 @@ google-auth>=2.29.0
 requests>=2.31.0
 h3>=4.4.0
 pillow>=10.4.0
+sqlalchemy>=2.0.30
+asyncpg>=0.29.0
+qdrant-client>=1.11.0

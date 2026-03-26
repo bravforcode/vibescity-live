@@ -1,6 +1,9 @@
 <script setup>
 import { RefreshCw, WifiOff, X } from "lucide-vue-next";
 import { onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 // ✅ Native PWA Service Worker Detection (Rsbuild-compatible)
 const offlineReady = ref(false);
@@ -85,13 +88,13 @@ const close = async () => {
       <!-- Content -->
       <div class="flex-1 pt-0.5">
         <h3 class="text-sm font-bold text-white mb-0.5">
-          {{ needRefresh ? "New Content Available" : "Ready for Offline" }}
+          {{ needRefresh ? t('pwa.new_content_title') : t('pwa.offline_ready_title') }}
         </h3>
         <p class="text-xs text-zinc-400 leading-relaxed">
           {{
             needRefresh
-              ? "A new version of VibeCity is available. Update now to get the latest vibes."
-              : "App cached successfully. You can now use VibeCity without internet."
+              ? t('pwa.new_content_desc')
+              : t('pwa.offline_ready_desc')
           }}
         </p>
 
@@ -100,14 +103,12 @@ const close = async () => {
           <button
             @click="updateServiceWorker()"
             class="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-colors shadow-lg shadow-blue-500/20"
-          >
-            Update Now
-          </button>
+          > {{ t('pwa.update_now') }} </button>
           <button
             @click="close"
             class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white text-xs font-medium transition-colors"
           >
-            Dismiss
+            {{ t('pwa.dismiss') }}
           </button>
         </div>
         <button
@@ -115,7 +116,7 @@ const close = async () => {
           @click="close"
           class="mt-3 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white text-xs font-medium transition-colors"
         >
-          Close
+          {{ t('common.close') }}
         </button>
       </div>
 

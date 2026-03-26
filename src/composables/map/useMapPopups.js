@@ -1,7 +1,7 @@
 import { ref, shallowRef } from "vue";
 import { useShopStore } from "@/store/shopStore";
 
-export function useMapPopups(mapRef, mapContainerRef) {
+export function useMapPopups(mapRef, mapContainerRef, options = {}) {
 	const shopStore = useShopStore();
 
 	// State
@@ -66,8 +66,8 @@ export function useMapPopups(mapRef, mapContainerRef) {
 			hideBuildingInfoPopup();
 			return;
 		}
-		if (!mapRef.value.isStyleLoaded?.()) {
-			hideBuildingInfoPopup();
+		// Fix 1C + 3E: skip silently during flyTo/style-load, do NOT hide
+		if (!mapRef.value.isStyleLoaded?.() && !mapRef.value.loaded?.()) {
 			return;
 		}
 		const now = performance.now();
@@ -98,16 +98,23 @@ export function useMapPopups(mapRef, mapContainerRef) {
 			return;
 		}
 
-		const HEADER_CLEARANCE = 72;
-		const POPUP_HEIGHT = 78;
-		const PIN_OFFSET = 16;
+		// Fix 2C: derive clearance from uiTopOffset prop, corrected POPUP_HEIGHT
+		const POPUP_HEIGHT = 62;
+		const PIN_OFFSET = 80;
+		const HEADER_CLEARANCE = Number(options.uiTopOffset?.value || 84) + 40;
+
+		// Fix 1B: set X so popup tracks pin horizontally
+		buildingPopupX.value = Math.round(projected.x);
 
 		let popupY = Math.round(projected.y - POPUP_HEIGHT - PIN_OFFSET);
 		if (popupY < HEADER_CLEARANCE) {
-			popupY = Math.round(projected.y + PIN_OFFSET + 8);
+			popupY = Math.round(projected.y + PIN_OFFSET * 0.4);
 		}
 
-		buildingPopupX.value = Math.round(projected.x + 16);
+		// Fix 3B: clamp so popup doesn't overflow below bottom UI
+		const BOTTOM_CLEARANCE = Number(options.uiBottomOffset?.value || 80);
+		popupY = Math.min(popupY, height - POPUP_HEIGHT - BOTTOM_CLEARANCE);
+
 		buildingPopupY.value = popupY;
 		buildingPopupVisible.value = true;
 	};

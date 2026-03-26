@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
-from app.core.supabase import supabase
+
 from app.core.auth import verify_user
+from app.core.supabase import supabase
 
 router = APIRouter()
 

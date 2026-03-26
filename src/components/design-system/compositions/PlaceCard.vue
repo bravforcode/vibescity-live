@@ -29,7 +29,7 @@
         :src="shop.Image_URL1"
         loading="lazy"
         class="w-full h-full object-cover transition-transform duration-700 hover:scale-105"
-        alt="Venue thumbnail"
+        :alt="shop.name ? `${shop.name} — venue photo` : 'Venue photo'"
       />
       <div
         v-else
@@ -55,7 +55,8 @@
           <!-- Favorite -->
           <button
             @click.stop="$emit('toggle-favorite')"
-            aria-label="Toggle favorite"
+            :aria-label="isFavorited ? t('a11y.remove_favorite') : t('a11y.add_favorite')"
+            :aria-pressed="isFavorited"
             class="p-2.5 rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-pink-500/80 transition-[color,background-color,border-color,transform] border border-white/10 shadow-lg"
           >
             <Heart
@@ -94,17 +95,17 @@
       <div class="flex gap-2 w-full pointer-events-auto mt-1">
         <button
           @click.stop="$emit('navigate')"
-          class="flex-1 py-2 rounded-lg bg-blue-600 active:bg-blue-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg backdrop-blur-md border border-white/10"
+          class="flex-1 py-2 min-h-[44px] rounded-lg bg-blue-600 active:bg-blue-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg backdrop-blur-md border border-white/10"
         >
-          <Navigation class="w-3.5 h-3.5" />
-          <span>Nav</span>
+          <Navigation class="w-3.5 h-3.5" aria-hidden="true" />
+          <span>{{ t('common.directions') }}</span>
         </button>
         <button
           @click.stop="$emit('open-ride')"
-          class="flex-1 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-green-600 active:scale-95 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg backdrop-blur-md border border-white/10"
+          class="flex-1 py-2 min-h-[44px] rounded-lg bg-gradient-to-r from-emerald-600 to-green-600 active:scale-95 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg backdrop-blur-md border border-white/10"
         >
-          <Car class="w-3.5 h-3.5" />
-          <span>Ride</span>
+          <Car class="w-3.5 h-3.5" aria-hidden="true" />
+          <span>{{ t('common.ride') }}</span>
         </button>
       </div>
     </div>
@@ -114,8 +115,8 @@
       <!-- Handle -->
       <button
         type="button"
-        class="w-full flex justify-center py-3"
-        aria-label="Collapse details"
+        class="w-full flex justify-center items-center min-h-[44px]"
+        :aria-label="t('a11y.collapse_details')"
         @click="$emit('collapse')"
       >
         <span class="w-12 h-1.5 bg-white/20 rounded-full"></span>
@@ -172,23 +173,26 @@
 <script setup>
 import { Car, Heart, MapPin, Music, Navigation, Star } from "lucide-vue-next";
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import ActionBtn from "../primitives/ActionBtn.vue";
 import GlassCard from "../primitives/GlassCard.vue";
 
+const { t } = useI18n();
+
 const props = defineProps({
-  shop: Object,
-  isActive: Boolean,
-  isSelected: Boolean,
-  isFavorited: Boolean,
+	shop: Object,
+	isActive: Boolean,
+	isSelected: Boolean,
+	isFavorited: Boolean,
 });
 
 const emit = defineEmits([
-  "toggle-favorite",
-  "navigate",
-  "open-ride",
-  "collapse",
-  "expand",
-  "share",
+	"toggle-favorite",
+	"navigate",
+	"open-ride",
+	"collapse",
+	"expand",
+	"share",
 ]);
 
 // Physics State
@@ -199,53 +203,53 @@ const isDragging = ref(false);
 const threshold = 120; // Hardcoded or prop
 
 const applyResistance = (diff) => {
-  const limit = 200;
-  return (1 - Math.exp(-Math.abs(diff) / 300)) * limit;
+	const limit = 200;
+	return (1 - Math.exp(-Math.abs(diff) / 300)) * limit;
 };
 
 const handleTouchStart = (e) => {
-  if (props.isSelected) return; // Only allow expand from collapsed
-  touchStartY.value = e.touches[0].clientY;
-  isDragging.value = true;
+	if (props.isSelected) return; // Only allow expand from collapsed
+	touchStartY.value = e.touches[0].clientY;
+	isDragging.value = true;
 };
 
 const handleTouchMove = (e) => {
-  if (!isDragging.value || props.isSelected) return;
+	if (!isDragging.value || props.isSelected) return;
 
-  const currentY = e.touches[0].clientY;
-  const diffY = currentY - touchStartY.value;
+	const currentY = e.touches[0].clientY;
+	const diffY = currentY - touchStartY.value;
 
-  if (diffY < 0) {
-    if (e.cancelable) e.preventDefault();
-    pullUpDistance.value = applyResistance(diffY);
-  }
+	if (diffY < 0) {
+		if (e.cancelable) e.preventDefault();
+		pullUpDistance.value = applyResistance(diffY);
+	}
 };
 
 const handleTouchEnd = () => {
-  isDragging.value = false;
-  if (pullUpDistance.value > threshold) {
-    emit("expand");
-    // Reset after animation
-    setTimeout(() => {
-      pullUpDistance.value = 0;
-    }, 300);
-  } else {
-    pullUpDistance.value = 0;
-  }
+	isDragging.value = false;
+	if (pullUpDistance.value > threshold) {
+		emit("expand");
+		// Reset after animation
+		setTimeout(() => {
+			pullUpDistance.value = 0;
+		}, 300);
+	} else {
+		pullUpDistance.value = 0;
+	}
 };
 
 // Computed Transformations
 const cardStyle = computed(() => {
-  if (props.isSelected) return {};
+	if (props.isSelected) return {};
 
-  // Slight scale effect when pulling
-  const progress = Math.min(pullUpDistance.value / threshold, 1.0);
-  return {
-    transform: `translateY(${-pullUpDistance.value}px) scale(${1 - progress * 0.05})`,
-    transition: isDragging.value
-      ? "none"
-      : "transform 0.5s cubic-bezier(0.19, 1, 0.22, 1)",
-  };
+	// Slight scale effect when pulling
+	const progress = Math.min(pullUpDistance.value / threshold, 1.0);
+	return {
+		transform: `translateY(${-pullUpDistance.value}px) scale(${1 - progress * 0.05})`,
+		transition: isDragging.value
+			? "none"
+			: "transform 0.5s cubic-bezier(0.19, 1, 0.22, 1)",
+	};
 });
 </script>
 

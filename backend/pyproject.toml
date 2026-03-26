@@ -53,6 +53,7 @@ ignore = ["E501", "B008"]
 [tool.pytest.ini_options]
 addopts = "-x -q"
 asyncio_mode = "auto"
+testpaths = ["tests"]
 markers = [
     "network: marks tests requiring external network access",
 ]

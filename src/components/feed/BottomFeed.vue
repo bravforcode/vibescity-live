@@ -26,10 +26,6 @@ const VideoExpandedView = defineAsyncComponent(
 	() => import("./VideoExpandedView.vue"),
 );
 
-const GiantPinDialog = defineAsyncComponent(
-	() => import("./GiantPinDialog.vue"),
-);
-
 const props = defineProps({
 	isDataLoading: Boolean,
 	isRefreshing: Boolean,
@@ -132,7 +128,7 @@ const toggleView = () => {
 const getItemSize = (index) => {
 	// Active card is larger due to scale effect
 	const isActive = props.carouselShops[index]?.id === props.activeShopId;
-	return props.isImmersive ? window.innerHeight : isActive ? 220 : 200;
+	return props.isImmersive ? window.innerHeight : isActive ? 120 : 110;
 };
 </script>
 
@@ -144,7 +140,7 @@ const getItemSize = (index) => {
       'transition-[transform,opacity,box-shadow,border-color,background-color] duration-500 ease-in-out',
       isImmersive
         ? 'fixed inset-0 z-[2000] bg-black pointer-events-auto'
-        : 'absolute bottom-0 left-0 right-0 z-[1200] pb-safe pointer-events-auto',
+        : 'absolute bottom-0 left-0 right-0 z-[1200] pb-safe pointer-events-none',
     ]"
   >
     <!-- ✅ Lazy Loaded Video Expansion -->
@@ -166,25 +162,10 @@ const getItemSize = (index) => {
       />
     </transition>
 
-    <!-- ✅ Lazy Loaded Giant Pin Dialog -->
-    <GiantPinDialog
-      v-if="isGiantPinView && activeGiantPin"
-      :active-giant-pin="activeGiantPin"
-      :giant-pin-shops="giantPinShops"
-      :selected-giant-shop="selectedGiantShop"
-      :selected-giant-video-url="selectedGiantVideoUrl"
-      :selected-giant-image="selectedGiantImage"
-      :get-shop-preview-image="getShopPreviewImage"
-      :is-dark-mode="isDarkMode"
-      @exit="exitGiantView"
-      @select-shop="selectGiantShop"
-      @open-ride="(shop) => emit('open-ride', shop)"
-    />
-
     <!-- ✅ Minimal Handle Bar for Visual Feedback -->
     <div
-      v-if="!isGiantPinView && !isImmersive"
-      class="flex items-center justify-center py-2 pointer-events-auto"
+      v-if="!isImmersive"
+      class="flex items-center justify-center py-1 pointer-events-auto"
     >
       <div class="w-10 h-1 rounded-full bg-white/30"></div>
     </div>
@@ -193,7 +174,7 @@ const getItemSize = (index) => {
       <div
         v-if="isGridView"
         @scroll="handleScroll"
-        class="px-4 py-2 pb-24 h-[60vh] overflow-y-auto no-scrollbar grid grid-cols-2 md:grid-cols-3 gap-3 animate-fade-in pointer-events-auto"
+        class="px-4 py-2 pb-24 h-[55vh] overflow-y-auto no-scrollbar grid grid-cols-2 md:grid-cols-3 gap-3 animate-fade-in pointer-events-auto"
       >
         <button
           v-for="shop in carouselShops"
@@ -271,11 +252,11 @@ const getItemSize = (index) => {
     </div>
 
     <!-- Horizontal Carousel / Immersive Feed -->
-    <div v-else class="relative min-h-[100px]">
+    <div v-else class="relative min-h-[100px] pointer-events-auto">
       <!-- Loading State -->
       <div
         v-if="isDataLoading"
-        class="flex items-end px-[calc(50vw-80px)] py-4 gap-4 no-scrollbar mb-0 h-[260px] overflow-x-hidden"
+        class="flex items-end px-[calc(50vw-100px)] py-3 gap-3 no-scrollbar mb-0 h-[220px] overflow-x-hidden"
       >
         <SkeletonCard
           v-for="i in 5"
@@ -283,7 +264,7 @@ const getItemSize = (index) => {
           variant="carousel"
           :isDarkMode="isDarkMode"
           class="pointer-events-auto"
-          style="width: 160px; height: 200px"
+          style="width: 190px; height: 200px"
         />
       </div>
 
@@ -347,12 +328,7 @@ const getItemSize = (index) => {
       </div>
 
       <!-- Cards Carousel / Vertical Feed -->
-      <div v-else class="relative pt-6 pb-10 z-[100]">
-        <!-- Ambient glow behind cards -->
-        <div
-          class="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/60 via-black/25 to-transparent blur-3xl"
-        ></div>
-
+      <div v-else class="relative pt-1 pb-0 z-[100] pointer-events-auto">
         <PullToRefresh
           :is-refreshing="isRefreshing"
           @refresh="emit('refresh')"
@@ -367,10 +343,10 @@ const getItemSize = (index) => {
             "
             data-testid="vibe-carousel"
             :class="[
-              'flex gap-3 no-scrollbar items-end transition-[transform,opacity,box-shadow,border-color,background-color] duration-300 snap-x snap-mandatory scroll-smooth',
+              'flex gap-2 no-scrollbar transition-[transform,opacity] duration-300 snap-x snap-mandatory scroll-smooth',
               isImmersive
                 ? 'flex-col h-full overflow-y-auto overflow-x-hidden pt-0 pb-0 gap-0'
-                : 'flex-row overflow-x-auto overflow-y-visible px-2 py-6 mb-2 h-[300px] items-end',
+                : 'flex-row overflow-x-auto overflow-y-visible px-3 pt-1 pb-2 h-[220px] items-end',
               'opacity-100',
               isDragging ? 'cursor-grabbing' : 'cursor-grab',
             ]"
@@ -389,7 +365,7 @@ const getItemSize = (index) => {
           >
             <div
               v-if="!isImmersive"
-              class="flex-shrink-0 w-[calc(50vw-80px)]"
+              class="flex-shrink-0 w-[calc(50vw-100px)]"
             ></div>
 
             <template v-if="isIndoorView">
@@ -423,16 +399,16 @@ const getItemSize = (index) => {
                 :data-shop-id="shop.id"
                 data-testid="shop-card"
                 :is-immersive="isImmersive"
-                class="vibe-card-item flex-shrink-0 transition-[transform,opacity,box-shadow,border-color,background-color] duration-500 ease-out snap-center"
+                class="vibe-card-item flex-shrink-0 rounded-2xl overflow-hidden transition-[transform,opacity,box-shadow] duration-300 ease-out snap-center"
                 :class="[
                   isImmersive
                     ? 'w-full h-[100dvh] rounded-none scale-100 opacity-100'
-                    : 'w-[160px] h-[155px]',
+                    : 'w-[190px] h-[210px]',
                   !isImmersive && activeShopId === shop.id
                     ? 'scale-100 z-20 shadow-[0_0_24px_4px_rgba(139,92,246,0.55),0_0_8px_2px_rgba(236,72,153,0.35)]'
                     : '',
                   !isImmersive && activeShopId !== shop.id
-                    ? 'scale-90 opacity-65'
+                    ? 'scale-[0.88] opacity-70'
                     : '',
                 ]"
               >
@@ -519,7 +495,7 @@ const getItemSize = (index) => {
 
             <div
               v-if="!isImmersive"
-              class="flex-shrink-0 w-[calc(50vw-80px)]"
+              class="flex-shrink-0 w-[calc(50vw-100px)]"
             ></div>
           </div>
         </PullToRefresh>

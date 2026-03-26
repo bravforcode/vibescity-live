@@ -111,7 +111,7 @@ onMounted(fetchSubscriptions);
       Active Subscriptions
     </h3>
 
-    <div v-if="loading" class="text-white/30 text-xs">Loading...</div>
+    <div v-if="loading" class="text-white/30 text-xs">Loading…</div>
     <div v-else-if="subscriptions.length === 0" class="text-white/30 text-xs">
       No active subscriptions found.
     </div>

@@ -5,6 +5,8 @@ export function useVibeEffects() {
 	// Each object: { id: timestamp, shopId: 1, emoji: "🔥", lat: ..., lng: ..., opacity: 1, offset: 0 }
 	const activeVibeEffects = ref([]);
 
+	const MAX_VIBES = 30;
+
 	const triggerVibeEffect = (shop, emoji) => {
 		if (!shop || !shop.lat) return;
 
@@ -19,6 +21,11 @@ export function useVibeEffects() {
 			opacity: 1,
 			offsetY: 0,
 		});
+
+		// Protect against Map freeze during massive websocket barrages
+		if (activeVibeEffects.value.length > MAX_VIBES) {
+			activeVibeEffects.value.shift(); // Remove the oldest vibe instantly
+		}
 
 		// Animation Loop for this specific particle is handled by CSS/GSAP usually,
 		// but since we are rendering markers on Mapbox, we might need to manually update ref or use CSS animation in the marker component.

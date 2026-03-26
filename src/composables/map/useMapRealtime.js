@@ -227,6 +227,7 @@ export function useMapRealtime(
 
 	const ensureTapRippleLayer = () => {
 		if (!mapRef.value) return;
+		if (!mapRef.value.isStyleLoaded?.()) return;
 		if (!mapRef.value.getSource("tap-ripples")) {
 			mapRef.value.addSource("tap-ripples", {
 				type: "geojson",

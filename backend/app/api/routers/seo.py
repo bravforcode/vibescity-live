@@ -1,17 +1,15 @@
 from __future__ import annotations
 
 import io
-from typing import Optional
+import re
+from urllib.parse import quote
 
 import httpx
-from fastapi import APIRouter, HTTPException, Response, Request, Query
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 from fastapi.responses import RedirectResponse
-from urllib.parse import quote
-import re
 from PIL import Image, ImageDraw, ImageOps
 
 from app.core.supabase import supabase
-
 
 router = APIRouter()
 
@@ -20,7 +18,7 @@ SUPPORTED_LOCALES = {"th", "en"}
 DEFAULT_LOCALE = "th"
 
 
-def _normalize_locale(raw: Optional[str]) -> Optional[str]:
+def _normalize_locale(raw: str | None) -> str | None:
     if not raw:
         return None
     value = str(raw).strip().lower()
@@ -69,7 +67,7 @@ def _set_locale_cookie(response: Response, locale: str) -> None:
         samesite="lax",
     )
 
-def _pick_cover_url(row: dict) -> Optional[str]:
+def _pick_cover_url(row: dict) -> str | None:
     image_urls = row.get("image_urls") or []
     if isinstance(image_urls, list) and image_urls:
         first = image_urls[0]

@@ -100,7 +100,8 @@ export async function fetchOSMPlaces(province, options = {}) {
 	const cacheKey = `osm-${province}-${radius}`;
 	const cached = getCachedData(cacheKey);
 	if (cached) {
-		console.log(`[RealTimeData] Returning cached OSM data for ${province}`);
+		if (import.meta.env.DEV)
+			console.log(`[RealTimeData] Returning cached OSM data for ${province}`);
 		return filterByCategory(cached, categories);
 	}
 
@@ -117,7 +118,8 @@ export async function fetchOSMPlaces(province, options = {}) {
   `;
 
 	try {
-		console.log(`[RealTimeData] Fetching OSM data for ${province}...`);
+		if (import.meta.env.DEV)
+			console.log(`[RealTimeData] Fetching OSM data for ${province}...`);
 
 		const response = await fetch(CONFIG.OVERPASS_API, {
 			method: "POST",
@@ -131,9 +133,10 @@ export async function fetchOSMPlaces(province, options = {}) {
 			.filter((p) => p !== null);
 
 		setCachedData(cacheKey, places);
-		console.log(
-			`[RealTimeData] Fetched ${places.length} places from OSM for ${province}`,
-		);
+		if (import.meta.env.DEV)
+			console.log(
+				`[RealTimeData] Fetched ${places.length} places from OSM for ${province}`,
+			);
 
 		return filterByCategory(places, categories);
 	} catch (error) {
@@ -236,7 +239,8 @@ export async function syncPlacesToDatabase(places, province) {
 
 		if (error) throw error;
 
-		console.log(`[RealTimeData] Synced ${places.length} places to database`);
+		if (import.meta.env.DEV)
+			console.log(`[RealTimeData] Synced ${places.length} places to database`);
 		return { synced: places.length };
 	} catch (error) {
 		console.error("[RealTimeData] Database sync error:", error);
@@ -446,7 +450,8 @@ export async function refreshAllProvinces() {
 	const results = {};
 
 	for (const province of provinces) {
-		console.log(`[RealTimeData] Refreshing ${province}...`);
+		if (import.meta.env.DEV)
+			console.log(`[RealTimeData] Refreshing ${province}...`);
 		const data = await getProvinceData(province, {
 			includeOSM: true,
 			syncToDb: true,

@@ -68,7 +68,7 @@ const getBarHeight = (val) => `${(val / maxVal.value) * 100}%`;
           :class="isDarkMode ? 'bg-zinc-800/50' : 'bg-gray-200/50'"
         >
           <div
-            class="w-full bg-blue-500/80 group-hover:bg-blue-400 transition-all duration-500 ease-out"
+            class="w-full bg-blue-500/80 group-hover:bg-blue-400 transition duration-500 ease-out"
             :style="{ height: getBarHeight(stats.impressions) }"
           ></div>
         </div>
@@ -86,7 +86,7 @@ const getBarHeight = (val) => `${(val / maxVal.value) * 100}%`;
           :class="isDarkMode ? 'bg-zinc-800/50' : 'bg-gray-200/50'"
         >
           <div
-            class="w-full bg-purple-500/80 group-hover:bg-purple-400 transition-all duration-500 ease-out delay-75"
+            class="w-full bg-purple-500/80 group-hover:bg-purple-400 transition duration-500 ease-out delay-75"
             :style="{ height: getBarHeight(stats.videoPlays) }"
           ></div>
         </div>
@@ -104,7 +104,7 @@ const getBarHeight = (val) => `${(val / maxVal.value) * 100}%`;
           :class="isDarkMode ? 'bg-zinc-800/50' : 'bg-gray-200/50'"
         >
           <div
-            class="w-full bg-green-500/80 group-hover:bg-green-400 transition-all duration-500 ease-out delay-150"
+            class="w-full bg-green-500/80 group-hover:bg-green-400 transition duration-500 ease-out delay-150"
             :style="{ height: getBarHeight(stats.actions) }"
           ></div>
         </div>
@@ -119,7 +119,7 @@ const getBarHeight = (val) => `${(val / maxVal.value) * 100}%`;
     <!-- CTA -->
     <button
       :class="[
-        'w-full py-2 rounded-lg text-[10px] font-semibold border transition-all text-center',
+        'w-full py-2 rounded-lg text-[10px] font-semibold border transition text-center',
         isDarkMode
           ? 'bg-zinc-800 hover:bg-zinc-700 text-white/50 border-white/5'
           : 'bg-gray-100 hover:bg-gray-200 text-gray-500 border-gray-200'

@@ -8,7 +8,20 @@ on:
     branches: [ main ]
 
 jobs:
+  repo-hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Repo hygiene gate
+        run: npm run ci:repo-hygiene
+
   frontend:
+    needs: [repo-hygiene]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,20 +50,9 @@ jobs:
 
       - name: Install gitleaks
         run: |
-          set -euo pipefail
-          mkdir -p "$HOME/.local/bin"
-          GITLEAKS_VERSION="8.24.2"
-          GITLEAKS_ARCHIVE="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${GITLEAKS_ARCHIVE}" -o /tmp/gitleaks.tar.gz
-          tar -xzf /tmp/gitleaks.tar.gz -C "$HOME/.local/bin" gitleaks
-          chmod +x "$HOME/.local/bin/gitleaks"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          echo "GITLEAKS_BIN=$HOME/.local/bin/gitleaks" >> "$GITHUB_ENV"
-          "$HOME/.local/bin/gitleaks" version
+          curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/install.sh | sh -s -- -b /usr/local/bin v8.24.2
 
       - name: Secret scan (gitleaks)
-        env:
-          GITLEAKS_BIN: ${{ env.GITLEAKS_BIN }}
         run: npm run ci:secret-scan:gitleaks
 
       - name: Secret scan (Stripe patterns)
@@ -59,7 +61,34 @@ jobs:
       - name: Guard SQL runlist safety rules
         run: node scripts/ci/check-runlist-guards.mjs
 
+  data-quality:
+    needs: [repo-hygiene]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Feature flag audit
+        run: npm run flags:audit
+
+      - name: Thai locale validator
+        run: npm run i18n:validate-thai
+
+      - name: Venue data validator
+        if: ${{ vars.SUPABASE_URL != '' && secrets.SUPABASE_SERVICE_ROLE_KEY != '' }}
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npm run venue:validate
+
   backend-tests:
+    needs: [repo-hygiene]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -117,10 +146,18 @@ jobs:
         run: npm install
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps
+        run: node scripts/run-playwright-cli.mjs install --with-deps
 
       - name: Run E2E smoke (low-mem)
-        run: PW_LOW_MEM=1 PW_GREP=@smoke npx playwright test
+        run: PW_LOW_MEM=1 PW_GREP=@smoke node scripts/run-playwright-cli.mjs test
+
+      - name: Console Budget (smoke)
+        if: ${{ always() }}
+        run: node scripts/ci/ui-console-budget.mjs
+
+      - name: Step Summary (smoke)
+        if: ${{ always() }}
+        run: node scripts/ci/e2e-summary.mjs --lane smoke --junit reports/e2e/junit.xml --console test-results/ui-console-events.ndjson
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
@@ -145,10 +182,18 @@ jobs:
         run: npm install
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps
+        run: node scripts/run-playwright-cli.mjs install --with-deps
 
       - name: Run E2E full matrix (exclude quarantine lane)
-        run: PW_GREP_INVERT=@map-quarantine npx playwright test
+        run: PW_GREP_INVERT=@map-quarantine node scripts/run-playwright-cli.mjs test
+
+      - name: Console Budget (full)
+        if: ${{ always() }}
+        run: node scripts/ci/ui-console-budget.mjs
+
+      - name: Step Summary (full)
+        if: ${{ always() }}
+        run: node scripts/ci/e2e-summary.mjs --lane full --junit reports/e2e/junit.xml --console test-results/ui-console-events.ndjson
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
@@ -173,7 +218,7 @@ jobs:
         run: npm install
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: node scripts/run-playwright-cli.mjs install --with-deps chromium
 
       - name: Validate MAPBOX_PUBLIC_TOKEN (strict lane)
         run: |
@@ -187,9 +232,13 @@ jobs:
           VITE_MAPBOX_TOKEN: ${{ secrets.MAPBOX_PUBLIC_TOKEN }}
         run: npm run test:e2e:map-required
 
+      - name: Console Budget (map-required)
+        if: ${{ always() }}
+        run: node scripts/ci/ui-console-budget.mjs
+
       - name: Step Summary (map-required)
         if: ${{ always() }}
-        run: node scripts/ci/e2e-summary.mjs --lane map-required --junit reports/e2e/junit.xml
+        run: node scripts/ci/e2e-summary.mjs --lane map-required --junit reports/e2e/junit.xml --console test-results/ui-console-events.ndjson
 
       - name: Upload Playwright report (map-required)
         if: ${{ always() && !cancelled() }}
@@ -214,7 +263,7 @@ jobs:
         run: npm install
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: node scripts/run-playwright-cli.mjs install --with-deps chromium
 
       - name: Validate MAPBOX_PUBLIC_TOKEN (preflight lane)
         run: |
@@ -228,9 +277,13 @@ jobs:
           VITE_MAPBOX_TOKEN: ${{ secrets.MAPBOX_PUBLIC_TOKEN }}
         run: npm run test:e2e:map-preflight
 
+      - name: Console Budget (map-preflight)
+        if: ${{ always() }}
+        run: node scripts/ci/ui-console-budget.mjs
+
       - name: Step Summary (map-preflight)
         if: ${{ always() }}
-        run: node scripts/ci/e2e-summary.mjs --lane map-preflight --junit reports/e2e/junit.xml
+        run: node scripts/ci/e2e-summary.mjs --lane map-preflight --junit reports/e2e/junit.xml --console test-results/ui-console-events.ndjson
 
       - name: Upload Playwright report (map-preflight)
         if: ${{ always() && !cancelled() }}
@@ -256,7 +309,7 @@ jobs:
         run: npm install
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: node scripts/run-playwright-cli.mjs install --with-deps chromium
 
       - name: Validate MAPBOX_PUBLIC_TOKEN (quarantine lane)
         run: |
@@ -270,9 +323,13 @@ jobs:
           VITE_MAPBOX_TOKEN: ${{ secrets.MAPBOX_PUBLIC_TOKEN }}
         run: npm run test:e2e:map-quarantine
 
+      - name: Console Budget (map-quarantine)
+        if: ${{ always() }}
+        run: node scripts/ci/ui-console-budget.mjs
+
       - name: Step Summary (map-quarantine)
         if: ${{ always() }}
-        run: node scripts/ci/e2e-summary.mjs --lane map-quarantine --junit reports/e2e/junit.xml
+        run: node scripts/ci/e2e-summary.mjs --lane map-quarantine --junit reports/e2e/junit.xml --console test-results/ui-console-events.ndjson
 
       - name: Upload Playwright report (map-quarantine)
         if: ${{ always() && !cancelled() }}
@@ -297,10 +354,18 @@ jobs:
         run: npm install
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps
+        run: node scripts/run-playwright-cli.mjs install --with-deps
 
       - name: Run E2E fallback (low-mem)
-        run: PW_LOW_MEM=1 npx playwright test
+        run: PW_LOW_MEM=1 node scripts/run-playwright-cli.mjs test
+
+      - name: Console Budget (fallback)
+        if: ${{ always() }}
+        run: node scripts/ci/ui-console-budget.mjs
+
+      - name: Step Summary (fallback)
+        if: ${{ always() }}
+        run: node scripts/ci/e2e-summary.mjs --lane fallback --junit reports/e2e/junit.xml --console test-results/ui-console-events.ndjson
 
       - name: Upload Playwright report (fallback)
         if: ${{ !cancelled() }}

@@ -13,35 +13,50 @@
         <div class="form-grid">
           <div class="field">
             <label>Title *</label>
+            <label for="ad-title">Title *</label>
             <input
+              id="ad-title"
+              name="ad-title"
               v-model="form.title"
               required
               placeholder="e.g. 50% off Coffee"
             />
           </div>
-          <div class="field">
-            <label>Description</label>
-            <input v-model="form.description" placeholder="Short promo text" />
+          <div
+            class="h-60 rounded-xl bg-slate-900 border border-slate-700/50 flex flex-col items-center justify-center gap-4 group"
+          >
+            <input
+              id="ad-description"
+              name="ad-description"
+              v-model="form.description"
+              placeholder="Short promo text"
+            />
           </div>
           <div class="field">
-            <label>Image URL</label>
+            <label for="ad-image-url">Image URL</label>
             <input
+              id="ad-image-url"
+              name="ad-image-url"
               v-model="form.image_url"
               type="url"
               placeholder="https://..."
             />
           </div>
           <div class="field">
-            <label>Link URL</label>
+            <label for="ad-link-url">Link URL</label>
             <input
+              id="ad-link-url"
+              name="ad-link-url"
               v-model="form.link_url"
               type="url"
               placeholder="https://..."
             />
           </div>
           <div class="field half">
-            <label>Latitude</label>
+            <label for="ad-latitude">Latitude</label>
             <input
+              id="ad-latitude"
+              name="ad-latitude"
               v-model.number="form.lat"
               type="number"
               step="any"
@@ -49,8 +64,10 @@
             />
           </div>
           <div class="field half">
-            <label>Longitude</label>
+            <label for="ad-longitude">Longitude</label>
             <input
+              id="ad-longitude"
+              name="ad-longitude"
               v-model.number="form.lng"
               type="number"
               step="any"
@@ -58,8 +75,10 @@
             />
           </div>
           <div class="field half">
-            <label>Radius (km)</label>
+            <label for="ad-radius">Radius (km)</label>
             <input
+              id="ad-radius"
+              name="ad-radius"
               v-model.number="form.radius_km"
               type="number"
               min="0.1"
@@ -67,19 +86,29 @@
             />
           </div>
           <div class="field half">
-            <label>Status</label>
-            <select v-model="form.status">
+            <label for="ad-status">Status</label>
+            <select id="ad-status" name="ad-status" v-model="form.status">
               <option value="active">Active</option>
               <option value="paused">Paused</option>
             </select>
           </div>
           <div class="field half">
-            <label>Starts at</label>
-            <input v-model="form.starts_at" type="datetime-local" />
+            <label for="ad-starts-at">Starts at</label>
+            <input
+              id="ad-starts-at"
+              name="ad-starts-at"
+              v-model="form.starts_at"
+              type="datetime-local"
+            />
           </div>
           <div class="field half">
-            <label>Ends at</label>
-            <input v-model="form.ends_at" type="datetime-local" />
+            <label for="ad-ends-at">Ends at</label>
+            <input
+              id="ad-ends-at"
+              name="ad-ends-at"
+              v-model="form.ends_at"
+              type="datetime-local"
+            />
           </div>
         </div>
         <div class="form-actions">
@@ -267,7 +296,7 @@ onMounted(loadAds);
   padding: 8px 16px;
   border: none;
   border-radius: 8px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: linear-gradient(135deg, #6366f1, #0ea5e9);
   color: #fff;
   font-weight: 600;
   cursor: pointer;
@@ -430,7 +459,15 @@ onMounted(loadAds);
 /* transitions */
 .slide-fade-enter-active,
 .slide-fade-leave-active {
-  transition: all 0.25s ease;
+  transition:
+    opacity,
+    transform,
+    background-color,
+    border-color,
+    color,
+    fill,
+    stroke,
+    box-shadow 0.25s ease;
 }
 .slide-fade-enter-from,
 .slide-fade-leave-to {

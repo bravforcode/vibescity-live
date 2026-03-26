@@ -4,7 +4,7 @@
  * Features: WebSocket presence, Live counts, Activity tracking
  */
 import { defineStore } from "pinia";
-import { computed, onUnmounted, ref, shallowRef } from "vue";
+import { computed, ref, shallowRef } from "vue";
 import { supabase } from "../lib/supabase";
 import { useUserStore } from "./userStore";
 
@@ -221,9 +221,6 @@ export const useRoomStore = defineStore("room", () => {
 		}
 		isConnected.value = false;
 	};
-
-	// Auto-cleanup
-	onUnmounted(cleanup);
 
 	return {
 		// State

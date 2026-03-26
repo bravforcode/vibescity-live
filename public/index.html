@@ -1,13 +1,16 @@
 <!doctype html>
-<html lang="th">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/images/pins/Vlive.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/images/apple-touch-icon.png" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
     <!-- PWA & Theme Color -->
     <meta name="theme-color" content="#8B5CF6" />
     <link rel="manifest" href="/manifest.json" />
-    <link rel="apple-touch-icon" href="/images/pins/Vlive.svg" />
+    <link rel="apple-touch-icon" href="/images/apple-touch-icon.png" />
     <title>VibeCity - Chiang Mai Entertainment</title>
     <link rel="canonical" href="https://vibecity.live/" />
     <!-- SEO & social media metadata -->
@@ -35,7 +38,10 @@
     <meta property="og:image:height" content="630" />
     <meta property="og:url" content="https://vibecity.live" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="VibeCity.live | Local Entertainment Map" />
+    <meta
+      name="twitter:title"
+      content="VibeCity.live | Local Entertainment Map"
+    />
     <meta
       name="twitter:description"
       content="Discover the hottest venues in Chiang Mai with real-time vibe updates and navigation."
@@ -64,7 +70,7 @@
       content="black-translucent"
     />
     <meta name="apple-mobile-web-app-title" content="VibeCity" />
-    <link rel="apple-touch-icon" href="/images/pins/Vlive.svg" />
+    <link rel="apple-touch-icon" href="/images/apple-touch-icon.png" />
 
     <!-- Accessibility Skip Link (for keyboard users) -->
     <style>
@@ -85,30 +91,62 @@
 
     <!-- Preload critical assets -->
     <link rel="preconnect" href="https://api.mapbox.com" />
+    <link rel="preconnect" href="https://events.mapbox.com" importance="low" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Google APIs — for venue photos via Places Photos API -->
+    <link rel="preconnect" href="https://maps.googleapis.com" />
+    <link rel="dns-prefetch" href="https://maps.gstatic.com" />
+    <!-- Non-blocking font load: preload trick eliminates render-blocking -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@500;700&family=Prompt:wght@300;400;500;600;700;800&display=swap"
-      rel="stylesheet"
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap"
     />
+    <link
+      rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap"
+    />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap"
+      />
+    </noscript>
 
     <style>
       :root {
-        --font-display:
-          "Chakra Petch", "Prompt", "Sarabun", system-ui, sans-serif;
-        --font-body: "Prompt", "Sarabun", system-ui, sans-serif;
+        --font-display: "Inter", "Sarabun", system-ui, sans-serif;
+        --font-body: "Inter", "Sarabun", system-ui, sans-serif;
         --font-mono: "JetBrains Mono", "Fira Code", "IBM Plex Mono", monospace;
       }
-      /* Prevent FOUC */
-      html {
+      /* Prevent FOUC — paint dark shell immediately before Vue mounts */
+      html, body {
+        margin: 0;
+        padding: 0;
         background: #0f0f1a;
         font-family: var(--font-body);
+        height: 100%;
+        overflow: hidden;
+      }
+      #app {
+        height: 100%;
+        width: 100%;
+      }
+      /* Critical app-shell skeleton shown before JS hydrates */
+      #app:empty::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background: #0f0f1a;
+        z-index: 9999;
       }
     </style>
   </head>
   <body>
     <a href="#main-content" class="skip-link">Skip to Map Content</a>
     <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
   </body>
 </html>

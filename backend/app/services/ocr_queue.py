@@ -1,12 +1,11 @@
 import json
-from typing import Optional
 
 import redis
 
 from app.core.config import get_settings
 
 settings = get_settings()
-_redis_client: Optional[redis.Redis] = None
+_redis_client: redis.Redis | None = None
 
 
 def get_redis() -> redis.Redis:

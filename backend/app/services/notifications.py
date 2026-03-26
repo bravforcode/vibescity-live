@@ -1,14 +1,15 @@
+
 import httpx
-from typing import List, Optional
+
 from app.core.config import get_settings
 
 settings = get_settings()
 
 async def send_push_notification(
-    user_ids: List[str],
+    user_ids: list[str],
     title: str,
     message: str,
-    data: Optional[dict] = None
+    data: dict | None = None
 ):
     """
     Send push notification via OneSignal to specific users.

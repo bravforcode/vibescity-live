@@ -52,7 +52,7 @@ const routes = [
 		path: "/:locale(th|en)/partner",
 		name: "PartnerLocale",
 		component: PartnerDashboard,
-		meta: { title: "Partner Dashboard - VibeCity", requiresAuth: true },
+		meta: { title: "Partner Dashboard - VibeCity" },
 	},
 
 	// Legacy (non-locale) public routes for dev fallback
@@ -98,7 +98,6 @@ const routes = [
 		component: PartnerDashboard,
 		meta: {
 			title: "Partner Dashboard - VibeCity",
-			requiresAuth: true,
 			legacyLocale: true,
 		},
 	},
@@ -114,7 +113,6 @@ const routes = [
 		component: MerchantDashboard,
 		meta: {
 			title: "Merchant Portal - VibeCity",
-			requiresAuth: true,
 		},
 	},
 	{
@@ -131,7 +129,22 @@ const routes = [
 	// 404 Fallback
 	{
 		path: "/:pathMatch(.*)*",
-		redirect: "/",
+		redirect: (to) => {
+			const rawPath = String(to.path || "/");
+			const segments = rawPath.split("/").filter(Boolean);
+			if (segments.length >= 2) {
+				const [maybeLocale, ...rest] = segments;
+				const normalizedLocale = String(maybeLocale || "").toLowerCase();
+				if (
+					/^[a-z]{2,5}$/i.test(normalizedLocale) &&
+					!SUPPORTED_LOCALES.has(normalizedLocale)
+				) {
+					const suffix = rest.join("/");
+					return suffix ? `/${DEFAULT_LOCALE}/${suffix}` : `/${DEFAULT_LOCALE}`;
+				}
+			}
+			return `/${getPreferredLocale()}`;
+		},
 	},
 ];
 
@@ -146,6 +159,7 @@ const router = createRouter({
 
 const LOCALE_COOKIE = "vibe_locale";
 const SUPPORTED_LOCALES = new Set(["th", "en"]);
+const DEFAULT_LOCALE = "en";
 
 const readCookie = (name) => {
 	if (typeof document === "undefined") return "";
@@ -163,11 +177,8 @@ const setLocaleCookie = (locale) => {
 	});
 };
 
-const readBool = (value) => {
-	if (value && typeof value === "object" && "value" in value) {
-		return Boolean(value.value);
-	}
-	return Boolean(value);
+const detectBrowserLocale = () => {
+	return DEFAULT_LOCALE;
 };
 
 const getPreferredLocale = () => {
@@ -175,7 +186,7 @@ const getPreferredLocale = () => {
 		const stored = localStorage.getItem("locale") || readCookie(LOCALE_COOKIE);
 		if (SUPPORTED_LOCALES.has(stored)) return stored;
 	}
-	return "th";
+	return detectBrowserLocale();
 };
 
 const localeFromPath = (path) => {
@@ -260,38 +271,14 @@ router.beforeEach(async (to, _from, next) => {
 
 	// 3. Merchant Route Protection
 	if (to.path.startsWith("/merchant")) {
-		if (!visitorId) {
-			// If no visitor ID, they definitely don't own any shops yet
-			// Redirect them home to explore/create first
-			const { useNotifications } = await import(
-				"@/composables/useNotifications"
-			);
-			useNotifications().notifyError(
-				"Access Denied: Please create a shop first to access the dashboard.",
-			);
-			return next("/");
-		}
-		// Ideally we check if they actually own anything here, but for MVP checking presence of ID is step 1.
-		// The dashboard itself handles "No Venues" state gracefully.
-	}
-
-	// Partner route requires authenticated user session.
-	if (to.name === "PartnerDashboard" || to.name === "PartnerLocale") {
-		const { useUserStore } = await import("../store/userStore");
-		const userStore = useUserStore();
 		try {
-			await userStore.initAuth?.();
+			const { getOrCreateVisitorId, bootstrapVisitor } = await import(
+				"../services/visitorIdentity"
+			);
+			getOrCreateVisitorId();
+			void bootstrapVisitor().catch(() => {});
 		} catch {
-			// fail closed below
-		}
-		if (!readBool(userStore.isAuthenticated)) {
-			const { useNotifications } = await import(
-				"@/composables/useNotifications"
-			);
-			useNotifications().notifyError(
-				"Please sign in before opening Partner Dashboard.",
-			);
-			return next("/");
+			// fail open: dashboard still handles missing visitor state
 		}
 	}
 
@@ -308,13 +295,39 @@ router.beforeEach(async (to, _from, next) => {
 			// fail closed below
 		}
 
-		if (!readBool(userStore.isAdmin)) {
+		// Allow unauthenticated users to reach /admin for explicit sign-in UI.
+		if (userStore.isAuthenticated && !userStore.isAdmin) {
 			console.warn("Unauthorized Admin Access Attempt");
-			return next("/");
+			return next(`/${getPreferredLocale()}`);
 		}
 	}
 
 	next();
+});
+
+const focusRouteLandmark = () => {
+	if (typeof window === "undefined" || typeof document === "undefined") return;
+
+	window.requestAnimationFrame(() => {
+		const h1 = document.querySelector("#main-content h1, main h1");
+		const mainContent = document.getElementById("main-content");
+		const target = h1 || mainContent;
+		if (!(target instanceof HTMLElement)) return;
+
+		const hadTabIndex = target.hasAttribute("tabindex");
+		if (!hadTabIndex) {
+			target.setAttribute("tabindex", "-1");
+		}
+
+		target.focus({ preventScroll: true });
+		if (!hadTabIndex) {
+			target.removeAttribute("tabindex");
+		}
+	});
+};
+
+router.afterEach(() => {
+	focusRouteLandmark();
 });
 
 export default router;

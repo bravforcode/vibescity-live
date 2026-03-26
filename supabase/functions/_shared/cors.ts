@@ -1,4 +1,8 @@
-const DEFAULT_ALLOWED_ORIGINS = ["https://vibecity.live"];
+const DEFAULT_ALLOWED_ORIGINS = [
+  "https://vibecity.live",
+  "https://www.vibescity.live",
+  "http://localhost:5173",
+];
 
 const parseAllowedOrigins = (): string[] => {
   const raw = (Deno.env.get("CORS_ALLOWED_ORIGINS") || "").trim();
@@ -34,8 +38,7 @@ export const buildCorsHeaders = (
 ) => ({
   "Access-Control-Allow-Origin": resolveAllowedOrigin(origin),
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-vibe-visitor-id",
+    "authorization, x-client-info, apikey, content-type, x-vibe-visitor-id, vibe_visitor_id, vibe-visitor-id",
   "Access-Control-Allow-Methods": methods,
   Vary: "Origin",
 });
-

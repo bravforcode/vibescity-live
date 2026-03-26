@@ -16,7 +16,6 @@ Prerequisites:
         CREATE EXTENSION IF NOT EXISTS vector;
 """
 
-import os
 import sys
 from pathlib import Path
 

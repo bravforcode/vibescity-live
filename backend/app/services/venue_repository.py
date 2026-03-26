@@ -1,4 +1,6 @@
-from typing import Any, Dict, Optional
+from typing import Any
+
+from app.core.cache import vector_search_cache
 
 
 class VenueRepository:
@@ -29,7 +31,7 @@ class VenueRepository:
                 .execute()
             )
 
-    def get_owner(self, venue_id: Any) -> Optional[str]:
+    def get_owner(self, venue_id: Any) -> str | None:
         try:
             response = (
                 self.client.table("venues")
@@ -58,6 +60,8 @@ class VenueRepository:
         return None
 
     def approve(self, venue_id: Any):
+        # S5: venue status change → stale search results; clear bounded cache
+        vector_search_cache.clear()
         try:
             return (
                 self.client.table("venues")
@@ -73,9 +77,11 @@ class VenueRepository:
                 .execute()
             )
 
-    def reject(self, venue_id: Any, reason: Optional[str] = None):
-        payload: Dict[str, Any] = {
-            "status": "rejected",
+    def reject(self, venue_id: Any, reason: str | None = None):
+        # S5: venue status change → stale search results; clear bounded cache
+        vector_search_cache.clear()
+        payload: dict[str, Any] = {
+            "status": "archived",
             "metadata": {"rejection_reason": reason},
         }
         try:

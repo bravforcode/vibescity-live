@@ -22,6 +22,6 @@ export const redemptionService = {
 
 		const data = await res.json();
 		if (!res.ok) throw new Error(data.detail || "Failed to claim coupon");
-		return data; // { success: true, message: "..." }
+		return data; // { success: true, message: "…" }
 	},
 };

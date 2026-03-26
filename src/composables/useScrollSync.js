@@ -7,6 +7,8 @@ export function useScrollSync({
 	smoothFlyTo,
 	selectFeedback,
 	mobileCardScrollRef,
+	onScrollDecelerate, // ✅ Track intent on deceleration
+	onCenteredShopCommit,
 }) {
 	const normalizeId = (value) => {
 		if (value === null || value === undefined) return null;
@@ -18,7 +20,9 @@ export function useScrollSync({
 	const isUserScrolling = ref(false); // Checking if User is swiping
 	const isProgrammaticScroll = ref(false); // Checking if App is scrolling (e.g. from Map click)
 
-	let scrollTimeout = null;
+	let settleTimeout = null;
+	let programmaticTimeout = null;
+	let lastProgrammaticScrollEnd = 0;
 	let ticking = false;
 	let lastHapticAt = 0;
 	const HAPTIC_INTERVAL_MS = 300;
@@ -34,6 +38,9 @@ export function useScrollSync({
 
 	const onScrollEnd = () => {
 		isUserScrolling.value = false;
+		if (!isProgrammaticScroll.value) {
+			commitCenteredShop();
+		}
 	};
 
 	const refreshCardMetrics = () => {
@@ -86,7 +93,11 @@ export function useScrollSync({
 		refreshCardMetrics();
 
 		const card = container.querySelector(`[data-shop-id="${normalizedId}"]`);
-		if (!card) return;
+		if (!card) {
+			// If card is not in the carousel, prevent an immediate steal from layout shifts
+			lastProgrammaticScrollEnd = Date.now();
+			return;
+		}
 
 		const currentCenterId = getCenteredCardId();
 		if (currentCenterId && normalizeId(currentCenterId) === normalizedId)
@@ -94,7 +105,7 @@ export function useScrollSync({
 
 		isProgrammaticScroll.value = true;
 
-		if (scrollTimeout) clearTimeout(scrollTimeout);
+		if (programmaticTimeout) clearTimeout(programmaticTimeout);
 
 		const containerWidth = container.clientWidth;
 		const cardLeft = card.offsetLeft;
@@ -106,49 +117,73 @@ export function useScrollSync({
 			behavior: "smooth",
 		});
 
-		scrollTimeout = setTimeout(() => {
+		programmaticTimeout = setTimeout(() => {
 			isProgrammaticScroll.value = false;
+			lastProgrammaticScrollEnd = Date.now();
 		}, 800);
 	};
 
+	const commitCenteredShop = () => {
+		const centerId = getCenteredCardId();
+		if (
+			!centerId ||
+			normalizeId(centerId) === normalizeId(activeShopId.value)
+		) {
+			return;
+		}
+
+		activeShopId.value = centerId;
+
+		const shop = shops.value.find(
+			(s) => normalizeId(s.id) === normalizeId(centerId),
+		);
+		if (shop && mapRef.value && typeof smoothFlyTo === "function") {
+			smoothFlyTo([shop.lat, shop.lng]);
+			if (selectFeedback && Date.now() - lastHapticAt >= HAPTIC_INTERVAL_MS) {
+				selectFeedback();
+				lastHapticAt = Date.now();
+			}
+		}
+
+		// Fire intent signal for prefetching
+		if (onScrollDecelerate && centerId) {
+			onScrollDecelerate(centerId);
+		}
+		if (shop && typeof onCenteredShopCommit === "function") {
+			onCenteredShopCommit({
+				shop,
+				shopId: centerId,
+				reason: "scroll_settle",
+			});
+		}
+	};
+
+	const isCenteredCard = (shopId) =>
+		normalizeId(getCenteredCardId()) === normalizeId(shopId);
+
 	// 3. 🖐️ Main Scroll Listener
 	const handleHorizontalScroll = () => {
-		if (isProgrammaticScroll.value) return;
+		if (isProgrammaticScroll.value) {
+			lastProgrammaticScrollEnd = Date.now();
+			return;
+		}
+		// Grace period to absorb late momentum scroll events
+		if (Date.now() - lastProgrammaticScrollEnd < 300) return;
+
 		if (!cachedCardIds.length) refreshCardMetrics();
 
 		isUserScrolling.value = true;
 
-		if (scrollTimeout) clearTimeout(scrollTimeout);
-		scrollTimeout = setTimeout(() => {
+		if (settleTimeout) clearTimeout(settleTimeout);
+		settleTimeout = setTimeout(() => {
 			isUserScrolling.value = false;
-		}, 150);
+			commitCenteredShop();
+		}, 400);
 
 		if (!ticking) {
 			window.requestAnimationFrame(() => {
-				const centerId = getCenteredCardId();
-
-				if (
-					centerId &&
-					normalizeId(centerId) !== normalizeId(activeShopId.value)
-				) {
-					// Update ID directly (parent should bind this)
-					activeShopId.value = centerId;
-
-					// Sync Map
-					const shop = shops.value.find(
-						(s) => normalizeId(s.id) === normalizeId(centerId),
-					);
-					if (shop && mapRef.value && typeof smoothFlyTo === "function") {
-						smoothFlyTo([shop.lat, shop.lng]);
-						if (
-							selectFeedback &&
-							Date.now() - lastHapticAt >= HAPTIC_INTERVAL_MS
-						) {
-							selectFeedback();
-							lastHapticAt = Date.now();
-						}
-					}
-				}
+				// keep metrics warm while scrolling; commit happens on settle.
+				getCenteredCardId();
 				ticking = false;
 			});
 			ticking = true;
@@ -182,6 +217,7 @@ export function useScrollSync({
 		onScrollStart,
 		onScrollEnd,
 		scrollToCard,
+		isCenteredCard,
 		isUserScrolling,
 		isProgrammaticScroll,
 	};

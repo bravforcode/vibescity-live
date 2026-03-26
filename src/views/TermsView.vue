@@ -71,18 +71,25 @@ const getStoredLocale = () => {
 };
 const currentLocale = computed(() => {
 	const fromRoute = normalizeLocale(route.params.locale);
-	return fromRoute || getStoredLocale() || "th";
+	return fromRoute || getStoredLocale() || "en";
 });
 const canonicalPath = computed(() => `/${currentLocale.value}/terms`);
 const canonicalUrl = computed(() => `${SITE_ORIGIN}${canonicalPath.value}`);
+const ogLocale = computed(() =>
+	currentLocale.value === "en" ? "en_US" : "th_TH",
+);
+const ogLocaleAlternate = computed(() =>
+	currentLocale.value === "en" ? "th_TH" : "en_US",
+);
 const hreflangLinks = computed(() => [
 	{ rel: "alternate", hreflang: "th", href: `${SITE_ORIGIN}/th/terms` },
 	{ rel: "alternate", hreflang: "en", href: `${SITE_ORIGIN}/en/terms` },
-	{ rel: "alternate", hreflang: "x-default", href: `${SITE_ORIGIN}/th/terms` },
+	{ rel: "alternate", hreflang: "x-default", href: `${SITE_ORIGIN}/en/terms` },
 ]);
 
 useHead(() => ({
 	title: "Terms of Service | VibeCity",
+	htmlAttrs: { lang: currentLocale.value },
 	link: [
 		{ rel: "canonical", href: canonicalUrl.value },
 		...hreflangLinks.value,
@@ -99,6 +106,8 @@ useHead(() => ({
 		},
 		{ property: "og:url", content: canonicalUrl.value },
 		{ property: "og:type", content: "website" },
+		{ property: "og:locale", content: ogLocale.value },
+		{ property: "og:locale:alternate", content: ogLocaleAlternate.value },
 	],
 }));
 </script>

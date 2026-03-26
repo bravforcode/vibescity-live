@@ -1,17 +1,16 @@
 import { createI18n } from "vue-i18n";
+import enJson from "./locales/en.json";
+import thJson from "./locales/th.json";
 
-const messages = {
+// ✅ Inline messages for keys used by SmartHeader, MapLibreContainer, etc.
+// These are MERGED with the JSON locale files, so both sources work together.
+const inlineMessages = {
 	th: {
 		nav: {
-			search: "ค้นหาบรรยากาศ, งาน, ร้านค้า...",
 			level: "ระดับ {lvl}",
 			xp: "XP: {current}/{next}",
 			all_categories: "🎯 ทุกประเภท",
 			vibes_now: "กำลังฮิตขณะนี้",
-			openMenu: "เปิดเมนู",
-			coins: "เหรียญ",
-			openFilter: "เปิดตัวกรอง",
-			clearSearch: "ล้างการค้นหา",
 			back: "ย้อนกลับ",
 		},
 		categories: {
@@ -40,56 +39,7 @@ const messages = {
 			highlights: "ไฮไลท์เด็ด",
 			navigate: "นำทาง",
 			taxi: "เรียกรถ",
-			search: "ค้นหาร้านในห้าง...",
-		},
-		menu: {
-			favorites: "รายการโปรด",
-			nightlife: "ท่องราตรี",
-			cafe: "คาเฟ่สุดชิค",
-			fashion: "แฟชั่น",
-			events: "กิจกรรม",
-			sound_on: "เปิดเสียง",
-			sound_off: "ปิดเสียง",
-			language: "ภาษา",
-		},
-		settings: {
-			title: "การตั้งค่า",
-			presets_title: "Vibe Preset",
-			presets_desc: "เลือกลุคแผนที่ในคลิกเดียว",
-			preset_smooth: "Smooth",
-			preset_colorful: "Colorful",
-			preset_cinematic: "Cinematic",
-			motion_budget_title: "Motion Budget",
-			motion_budget_desc: "คุมงบแอนิเมชันตามเครื่อง",
-			motion_micro: "Micro",
-			motion_balanced: "Balanced",
-			motion_full: "Full",
-			haptics_title: "Haptics",
-			haptics_desc: "สั่นเมื่อแตะ",
-			map_haptics_title: "Map Haptics",
-			map_haptics_desc: "สั่นเฉพาะ action สำคัญบนแผนที่",
-			motion_title: "Motion",
-			motion_desc: "ลดแอนิเมชัน",
-			power_title: "Low Power",
-			power_desc: "ลดเอฟเฟกต์หนัก",
-			ambient_title: "Ambient FX",
-			ambient_desc: "เอฟเฟกต์บรรยากาศ",
-			neon_title: "Neon Pulse",
-			neon_desc: "พัลส์แสงถนน",
-			heatmap_title: "Heatmap",
-			heatmap_desc: "แผนที่ความหนาแน่น",
-			buildings_title: "3D Buildings",
-			buildings_desc: "อาคารสามมิติ",
-			fog_title: "Map Fog",
-			fog_desc: "หมอกบนแผนที่",
-			live_chips_title: "Live Chips",
-			live_chips_desc: "แสดงสถานะโซนกำลังฮิต",
-			viewport_glow_title: "Viewport Glow",
-			viewport_glow_desc: "ขอบจอเรืองแสงเพื่อโฟกัส",
-			clear_data: "ล้างข้อมูล",
-			confirm_clear_data: "ยืนยันล้างข้อมูลทั้งหมดและรีเซ็ตแอป?",
-			privacy: "ความเป็นส่วนตัว",
-			terms: "เงื่อนไขการใช้งาน",
+			search: "ค้นหาร้านในห้าง…",
 		},
 		status: {
 			open: "เปิดอยู่",
@@ -112,33 +62,13 @@ const messages = {
 			take_me_there: "พาฉันไปที่นั่น",
 			vibe_of_hour: "ไวบ์แห่งชั่วโมงนี้",
 		},
-		legend: {
-			title: "สัญลักษณ์ในแผนที่",
-			live_now: "มีกิจกรรมขณะนี้",
-			coin_reward: "รางวัลเหรียญ",
-			selected: "สถานที่ที่เลือก",
-		},
-		reviews: {
-			title: "ความเห็นจากคอมมูนิตี้",
-			count: "รีวิว",
-			placeholder: "ร่วมแชร์บรรยากาศที่นี่...",
-			submit: "โพสต์รีวิว",
-			success_title: "บันทึกสำเร็จ!",
-			success_msg: "ขอบคุณที่ช่วยแชร์บรรยากาศให้เพื่อนๆ!",
-			verified: "ยืนยันตัวตนแล้ว",
-		},
 	},
 	en: {
 		nav: {
-			search: "Search vibes, events, shops...",
 			level: "Level {lvl}",
 			xp: "XP: {current}/{next}",
 			all_categories: "🎯 All Categories",
 			vibes_now: "Vibes Now",
-			openMenu: "Open Menu",
-			coins: "Coins",
-			openFilter: "Open Filter",
-			clearSearch: "Clear Search",
 			back: "Back",
 		},
 		categories: {
@@ -173,56 +103,7 @@ const messages = {
 			highlights: "Hot Highlights",
 			navigate: "Navigate",
 			taxi: "Ride",
-			search: "Search shops in mall...",
-		},
-		menu: {
-			favorites: "Favorites",
-			nightlife: "Nightlife",
-			cafe: "Cafe Hops",
-			fashion: "Fashion",
-			events: "Events",
-			sound_on: "Sound On",
-			sound_off: "Sound Off",
-			language: "Language",
-		},
-		settings: {
-			title: "Settings",
-			presets_title: "Vibe Preset",
-			presets_desc: "One-tap map look",
-			preset_smooth: "Smooth",
-			preset_colorful: "Colorful",
-			preset_cinematic: "Cinematic",
-			motion_budget_title: "Motion Budget",
-			motion_budget_desc: "Tune animation cost",
-			motion_micro: "Micro",
-			motion_balanced: "Balanced",
-			motion_full: "Full",
-			haptics_title: "Haptics",
-			haptics_desc: "Vibrate on tap",
-			map_haptics_title: "Map Haptics",
-			map_haptics_desc: "Haptics on key map actions",
-			motion_title: "Motion",
-			motion_desc: "Reduce animations",
-			power_title: "Low Power",
-			power_desc: "Reduce heavy effects",
-			ambient_title: "Ambient FX",
-			ambient_desc: "Atmospheric effects",
-			neon_title: "Neon Pulse",
-			neon_desc: "Neon road pulse",
-			heatmap_title: "Heatmap",
-			heatmap_desc: "Density overlay",
-			buildings_title: "3D Buildings",
-			buildings_desc: "3D city depth",
-			fog_title: "Map Fog",
-			fog_desc: "Cinematic fog",
-			live_chips_title: "Live Chips",
-			live_chips_desc: "Show zone activity chips",
-			viewport_glow_title: "Viewport Glow",
-			viewport_glow_desc: "Subtle vignette focus",
-			clear_data: "Clear Data",
-			confirm_clear_data: "Clear all data and reset the app?",
-			privacy: "Privacy Policy",
-			terms: "Terms of Service",
+			search: "Search shops in mall…",
 		},
 		status: {
 			open: "OPEN NOW",
@@ -245,37 +126,79 @@ const messages = {
 			take_me_there: "TAKE ME THERE",
 			vibe_of_hour: "VIBE OF THE HOUR",
 		},
-		legend: {
-			title: "Map Legend",
-			live_now: "LIVE NOW",
-			coin_reward: "COIN REWARD",
-			selected: "SELECTED",
-		},
-		reviews: {
-			title: "Community Vibes",
-			count: "REVIEWS",
-			placeholder: "Share the vibe...",
-			submit: "POST REVIEW",
-			success_title: "Vibe Logged!",
-			success_msg: "Your contribution helps others find the best spots.",
-			verified: "Verified",
-		},
 	},
 };
 
-// ✅ Locale persistence (จำภาษาที่เลือกไว้)
+/**
+ * Deep merge two objects. Source keys override target keys.
+ * @param {Object} target
+ * @param {Object} source
+ * @returns {Object}
+ */
+function deepMerge(target, source) {
+	const output = { ...target };
+	for (const key of Object.keys(source)) {
+		if (
+			source[key] &&
+			typeof source[key] === "object" &&
+			!Array.isArray(source[key]) &&
+			target[key] &&
+			typeof target[key] === "object"
+		) {
+			output[key] = deepMerge(target[key], source[key]);
+		} else {
+			output[key] = source[key];
+		}
+	}
+	return output;
+}
+
+// ✅ Merge JSON locale files with inline messages
+// JSON files are the base, inline messages add/override specific keys
+const messages = {
+	en: deepMerge(enJson, inlineMessages.en),
+	th: deepMerge(thJson, inlineMessages.th),
+};
+
+// ✅ Locale persistence (remember selected language)
 // Default to English, Thai available in settings
 const DEFAULT_LOCALE = "en";
-const savedLocale = localStorage.getItem("locale");
-const locale = savedLocale || DEFAULT_LOCALE;
+const SUPPORTED_LOCALES = new Set(["en", "th"]);
+
+const readCookie = (name) => {
+	if (typeof document === "undefined") return "";
+	const target = `${name}=`;
+	return document.cookie
+		.split(";")
+		.map((part) => part.trim())
+		.find((part) => part.startsWith(target))
+		?.slice(target.length);
+};
+
+const detectBrowserLocale = () => {
+	return DEFAULT_LOCALE;
+};
+
+const resolveInitialLocale = () => {
+	if (typeof window === "undefined") return DEFAULT_LOCALE;
+	const savedLocale =
+		localStorage.getItem("locale") || readCookie("vibe_locale") || "";
+	const normalized = String(savedLocale || "")
+		.trim()
+		.toLowerCase();
+	if (SUPPORTED_LOCALES.has(normalized)) return normalized;
+	return detectBrowserLocale();
+};
+
+const locale = resolveInitialLocale();
 
 const i18n = createI18n({
 	legacy: false, // Composition API
-	globalInjection: true, // (optional) ให้ใช้ $t ได้ใน template แบบง่ายขึ้น
+	globalInjection: true,
 	locale,
 	fallbackLocale: "en",
 	messages,
-	// ✅ ถ้าหา key ไม่เจอ จะ warn ใน console เฉพาะ dev
+	// ✅ Show missing key warnings only in dev mode
 	missingWarn: import.meta.env.DEV,
 	fallbackWarn: import.meta.env.DEV,
 });

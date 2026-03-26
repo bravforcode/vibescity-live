@@ -3,11 +3,11 @@ import logging
 import os
 import sys
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-from dotenv import load_dotenv
 import redis
 import requests
+from dotenv import load_dotenv
 
 # Ensure backend dir is in path
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
@@ -15,7 +15,6 @@ sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from app.core.config import get_settings
 from app.core.supabase import supabase_admin
 from app.services.slip_verification import get_feature_from_sku, verify_slip_with_gcv
-
 
 load_dotenv()
 settings = get_settings()
@@ -46,7 +45,7 @@ def ensure_group(r: redis.Redis) -> None:
 
 
 def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def fetch_order(order_id: str):
@@ -90,7 +89,7 @@ def check_duplicate(image_hash: str, text_hash: str, order_id: str) -> str:
     if not supabase_admin:
         return ""
     duplicate_window_start = (
-        datetime.now(timezone.utc)
+        datetime.now(UTC)
         - timedelta(days=settings.SLIP_DUPLICATE_WINDOW_DAYS)
     ).isoformat()
 
@@ -166,7 +165,7 @@ def process_order(order_id: str) -> None:
 
     if verification and verification.status == "verified":
         feature = get_feature_from_sku(sku)
-        starts_at = datetime.now(timezone.utc)
+        starts_at = datetime.now(UTC)
         ends_at = starts_at
 
         if "3d" in sku:

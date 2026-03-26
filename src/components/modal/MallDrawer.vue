@@ -10,13 +10,31 @@ import {
 	Share2,
 	X,
 } from "lucide-vue-next";
-import { computed, nextTick, onUnmounted, ref, watch } from "vue";
+import {
+	computed,
+	defineAsyncComponent,
+	nextTick,
+	onUnmounted,
+	ref,
+	watch,
+} from "vue";
 import { useI18n } from "vue-i18n";
+import { useChromaticGlass } from "@/composables/engine/useChromaticGlass.js";
+import { useGranularAudio } from "@/composables/engine/useGranularAudio.js";
 import { useNotifications } from "@/composables/useNotifications";
+import { usePerformance } from "@/composables/usePerformance";
+import { useSpatialFeedback } from "@/composables/useSpatialFeedback";
+import { useSwipeToDismiss } from "@/composables/useSwipeToDismiss";
+import { resolveVenueMedia } from "@/domain/venue/viewModel";
 import { Z } from "../../constants/zIndex";
+
+const ImageLoader = defineAsyncComponent(() => import("../ui/ImageLoader.vue"));
 
 const { t } = useI18n();
 const { notifySuccess } = useNotifications();
+const { isDegraded } = usePerformance();
+const { playWoosh, playSnap, playDismiss, haptic } = useSpatialFeedback();
+const { onSnap: audioSnap, onDismiss: audioDismiss } = useGranularAudio();
 
 const normalizeId = (value) => {
 	if (value === null || value === undefined) return "";
@@ -33,6 +51,11 @@ const isFavorited = (shopId) => {
 	const id = normalizeId(shopId);
 	if (!id) return false;
 	return (props.favorites || []).some((fav) => normalizeId(fav) === id);
+};
+
+const getShopImage = (shop) => {
+	const media = resolveVenueMedia(shop || {});
+	return media.primaryImage || shop?.Image_URL1 || "";
 };
 
 // import ShopCard from "../panel/ShopCard.vue"; // Optional: Reuse if needed, but custom list item is better for this view
@@ -73,6 +96,7 @@ const emit = defineEmits([
 	"close",
 	"select-shop",
 	"open-ride-modal",
+	"prefetch-ride",
 	"toggle-favorite",
 ]);
 
@@ -81,9 +105,98 @@ const activeFloor = ref(null); // Selected floor for Mall mode
 const searchQuery = ref("");
 const isSearchExpanded = ref(false); // New state for compact search
 const searchInputRef = ref(null);
-const drawerRef = ref(null);
+const backdropRef = ref(null);
+const {
+	elementRef: drawerRef,
+	pullY,
+	isDragging,
+} = useSwipeToDismiss({
+	threshold: 120,
+	onClose: () => emit("close"),
+	onFrame: ({ y }) => {
+		if (!backdropRef.value) return;
+		const op = Math.max(0, 0.6 * (1 - Math.max(0, y) / 120));
+		backdropRef.value.style.backgroundColor = `rgba(0,0,0,${op})`;
+		if (!isDegraded.value) {
+			const blur = Math.max(0, 4 * (1 - Math.max(0, y) / 120));
+			backdropRef.value.style.backdropFilter = `blur(${blur}px)`;
+			backdropRef.value.style.webkitBackdropFilter = `blur(${blur}px)`;
+		} else {
+			backdropRef.value.style.backdropFilter = "none";
+			backdropRef.value.style.webkitBackdropFilter = "none";
+		}
+		// Pin-modal coupling: drive pin glow from drag progress
+		if (mapPaddingApi) {
+			const progress = 1 - Math.min(1, Math.max(0, y) / 120);
+			mapPaddingApi.setPinDragProgress(progress);
+		}
+	},
+	onPredictRestState: ({ state, velocityPxMs }) => {
+		if (state === "close") {
+			playDismiss();
+			haptic("dismiss");
+			audioDismiss(Math.abs(velocityPxMs));
+		} else {
+			playSnap();
+			haptic("snap");
+			audioSnap();
+		}
+		if (Math.abs(velocityPxMs) > 0.3) {
+			playWoosh(Math.abs(velocityPxMs));
+		}
+	},
+});
+// Refractive glass panel — WebGL overlay captures map behind drawer
+const { enabled: glassEnabled, fallbackClass } = useChromaticGlass({
+	panelId: "mall-drawer",
+	panelRef: drawerRef,
+	aberration: 0.004,
+});
+
+// Gesture-synced backdrop constants
+const MALL_DISMISS_THRESHOLD = 120;
+
 const closeButtonRef = ref(null);
 const drawerTitleId = "mall-drawer-title";
+
+// --- Cinematic Spatial Physics: Dynamic Map Padding ---
+const mapPaddingApi = inject("mapPaddingApi", null);
+if (mapPaddingApi) {
+	mapPaddingApi.bindDrawer(drawerRef);
+
+	watch(
+		() => props.isOpen,
+		(val) => mapPaddingApi.setDrawerOpen(val),
+		{ immediate: true },
+	);
+
+	watch(
+		[() => props.selectedShopId, () => props.shops, () => props.building],
+		([id, shops, building]) => {
+			if (id && shops?.length) {
+				const shop = shops.find((s) => String(s.id) === String(id));
+				if (shop?.lat != null && shop?.lng != null) {
+					mapPaddingApi.setActivePin([Number(shop.lng), Number(shop.lat)]);
+					mapPaddingApi.setActivePinId(id);
+					return;
+				}
+			}
+			if (building?.lat != null && building?.lng != null) {
+				mapPaddingApi.setActivePin([
+					Number(building.lng),
+					Number(building.lat),
+				]);
+				return;
+			}
+			mapPaddingApi.setActivePin(null);
+			mapPaddingApi.setActivePinId(null);
+		},
+		{ immediate: true },
+	);
+}
+
+// Backdrop opacity/blur tracks pullY in real-time (no CSS class flicker)
+// Removed reactive backdropOpacity/backdropBlurPx to prevent 60FPS Vue render thrashing
 
 const scrollContainerRef = ref(null);
 const shopRefs = ref({});
@@ -342,9 +455,14 @@ onUnmounted(() => {
     <div
       v-if="isOpen"
       ref="drawerRef"
-      class="fixed inset-x-0 bottom-0 h-[85%] flex flex-col rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)] overflow-hidden"
+      class="fixed inset-x-0 bottom-0 h-[85%] flex flex-col rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)] overflow-hidden touch-pan-x"
       :style="{ zIndex: Z.DRAWER }"
-      :class="isDarkMode ? 'bg-zinc-900' : 'bg-white'"
+      :class="[
+        glassEnabled
+          ? (isDarkMode ? 'bg-black/55' : 'bg-white/65')
+          : (isDarkMode ? 'bg-zinc-900' : 'bg-white'),
+        fallbackClass,
+      ]"
       role="dialog"
       aria-modal="true"
       :aria-labelledby="drawerTitleId"
@@ -353,10 +471,9 @@ onUnmounted(() => {
       <!-- Header Image Area -->
       <div class="relative h-40 sm:h-48 flex-shrink-0">
         <div class="absolute inset-0">
-          <img
+          <ImageLoader
             v-if="building?.Image_URL || building?.image"
             :src="building?.Image_URL || building?.image"
-            class="w-full h-full object-cover"
           />
           <div
             v-else
@@ -371,7 +488,7 @@ onUnmounted(() => {
           ref="closeButtonRef"
           @click="emit('close')"
           aria-label="Close mall drawer"
-          class="absolute top-4 right-4 w-12 h-12 rounded-full bg-black/40 text-white flex items-center justify-center backdrop-blur-md hover:bg-black/60 transition-colors transition-transform z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+          class="absolute top-4 right-4 w-12 h-12 rounded-full bg-black/40 text-white flex items-center justify-center backdrop-blur-md hover:bg-black/60 transition z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
         >
           <X class="w-5 h-5" />
         </button>
@@ -406,7 +523,7 @@ onUnmounted(() => {
             building && emit('toggle-favorite', building.id || building.key)
           "
           aria-label="Toggle mall favorite"
-          class="w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md transition-colors transition-transform active:scale-90 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70"
+          class="w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md transition active:scale-90 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70"
           :class="[
             building && favorites.includes(Number(building.id || building.key))
               ? 'bg-pink-500 border-pink-400 text-white'
@@ -436,7 +553,7 @@ onUnmounted(() => {
         <button
           @click.stop="handleShare(building)"
           aria-label="Share mall"
-          class="w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-colors transition-transform active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+          class="w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md bg-white/10 border border-white/20 text-white hover:bg-white/20 transition active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
         >
           <Share2 class="w-5 h-5 text-white" />
         </button>
@@ -481,13 +598,15 @@ onUnmounted(() => {
             class="flex-1 flex items-center justify-between min-w-0"
           >
             <!-- Horizontal Scrollable Tabs -->
-            <div class="flex overflow-x-auto no-scrollbar gap-2 pb-1 pr-2">
+            <div
+              class="flex overflow-x-auto no-scrollbar gap-2 pb-1 pr-2 snap-x snap-mandatory overscroll-x-contain"
+            >
               <button
                 v-for="cat in categories"
                 :key="cat.id"
                 @click="activeTab = cat.id"
                 :class="[
-                  'px-4 py-2 rounded-xl text-xs font-black transition-colors transition-transform whitespace-nowrap active:scale-95 border-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70',
+                  'snap-center px-4 py-2 rounded-xl text-xs font-black transition whitespace-nowrap active:scale-95 border-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70',
                   activeTab === cat.id
                     ? 'bg-blue-600 text-white border-blue-400 shadow-lg shadow-blue-500/20'
                     : isDarkMode
@@ -503,7 +622,7 @@ onUnmounted(() => {
             <button
               @click="handleExpandSearch"
               aria-label="Expand search"
-              class="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full transition-colors transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+              class="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
               :class="
                 isDarkMode
                   ? 'bg-white/10 text-white hover:bg-white/20'
@@ -568,7 +687,7 @@ onUnmounted(() => {
                   v-for="fl in building.floors"
                   :key="fl"
                   @click="activeFloor = fl"
-                  class="px-4 py-2 rounded-xl text-sm font-black transition-colors transition-transform active:scale-90 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+                  class="px-4 py-2 rounded-xl text-sm font-black transition active:scale-90 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
                   :class="[
                     activeFloor === fl
                       ? 'bg-blue-600 border-blue-500 text-white shadow-lg'
@@ -605,6 +724,8 @@ onUnmounted(() => {
               <img
                 :src="building.floorPlanUrls[activeFloor]"
                 class="w-full aspect-video object-contain p-4 transition-transform duration-700 group-hover:scale-110"
+                loading="lazy"
+                decoding="async"
               />
               <div
                 class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent pointer-events-none"
@@ -632,13 +753,20 @@ onUnmounted(() => {
               >
                 {{ t("mall.highlights") }}
               </h3>
-              <div class="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+              <div
+                class="flex gap-3 overflow-x-auto no-scrollbar pb-2 snap-x snap-mandatory overscroll-x-contain"
+              >
                 <div
                   v-for="(hl, idx) in building.highlights || []"
                   :key="idx"
-                  class="flex-shrink-0 w-64 h-36 rounded-xl overflow-hidden relative shadow-md bg-gray-800"
+                  class="snap-center flex-shrink-0 w-64 h-36 rounded-xl overflow-hidden relative shadow-md bg-gray-800"
                 >
-                  <img :src="hl.src" class="w-full h-full object-cover" />
+                  <img
+                    :src="hl.src"
+                    class="w-full h-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </div>
               </div>
               <p
@@ -652,14 +780,18 @@ onUnmounted(() => {
             <!-- CTA Buttons -->
             <div class="flex flex-col gap-3">
               <button
-                class="w-full py-4 rounded-2xl bg-blue-600 text-white font-black uppercase shadow-lg shadow-blue-600/30 active:scale-95 transition-colors transition-transform flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+                class="w-full py-4 rounded-2xl bg-blue-600 text-white font-black uppercase shadow-lg shadow-blue-600/30 active:scale-95 transition flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
               >
                 <span><MapPin class="w-4 h-4 inline-block" /></span>
                 {{ t("mall.navigate") }}
               </button>
               <button
                 @click="emit('open-ride-modal', building)"
-                class="w-full py-4 rounded-2xl bg-white/10 text-white font-black uppercase border border-white/10 hover:bg-white/20 active:scale-95 transition-colors transition-transform flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-400/70"
+                @mouseenter="building && emit('prefetch-ride', building)"
+                @touchstart.passive="
+                  building && emit('prefetch-ride', building)
+                "
+                class="w-full py-4 rounded-2xl bg-white/10 text-white font-black uppercase border border-white/10 hover:bg-white/20 active:scale-95 transition flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-400/70"
               >
                 <span><Car class="w-4 h-4 inline-block" /></span>
                 {{ t("mall.taxi") }}
@@ -684,6 +816,12 @@ onUnmounted(() => {
             <div
               v-for="shop in filteredShops"
               :key="shop.id"
+              v-memo="[
+                shop.id,
+                shop.status,
+                isSelectedShop(shop.id),
+                isDarkMode,
+              ]"
               :ref="
                 (el) => {
                   if (el) shopRefs[shop.id] = el;
@@ -692,7 +830,7 @@ onUnmounted(() => {
               @click="emit('select-shop', shop)"
               @keydown.enter.prevent="emit('select-shop', shop)"
               @keydown.space.prevent="emit('select-shop', shop)"
-              class="flex items-center gap-3 p-3 rounded-2xl transition-colors transition-transform cursor-pointer group active:scale-[0.98] border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+              class="flex items-center gap-3 p-3 rounded-2xl transition cursor-pointer group active:scale-[0.98] border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
               role="button"
               tabindex="0"
               :aria-label="`Open ${shop.name || 'venue'} details`"
@@ -709,11 +847,10 @@ onUnmounted(() => {
               <div
                 class="w-16 h-16 rounded-xl overflow-hidden relative flex-shrink-0 bg-gray-500"
               >
-                <img
-                  v-if="shop.Image_URL1"
-                  :src="shop.Image_URL1"
-                  class="w-full h-full object-cover"
-                  loading="lazy"
+                <ImageLoader
+                  v-if="getShopImage(shop)"
+                  :src="getShopImage(shop)"
+                  :alt="shop.name"
                 />
                 <!-- Live Badge on Thumb -->
                 <div
@@ -764,25 +901,23 @@ onUnmounted(() => {
                 <button
                   @click.stop="emit('toggle-favorite', shop.id)"
                   :aria-label="`Toggle favorite for ${shop.name || 'venue'}`"
-                   class="w-8 h-8 flex items-center justify-center rounded-lg transition-colors transition-transform active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70"
-                   :class="[
-                     isFavorited(shop.id)
-                       ? 'text-pink-500 bg-pink-500/10'
-                       : 'text-gray-400 hover:text-pink-400 hover:bg-pink-400/5',
-                   ]"
-                 >
-                   <Heart
-                     class="w-4 h-4"
-                     :class="
-                       isFavorited(shop.id) ? 'fill-current' : ''
-                     "
-                   />
-                 </button>
+                  class="w-8 h-8 flex items-center justify-center rounded-lg transition active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70"
+                  :class="[
+                    isFavorited(shop.id)
+                      ? 'text-pink-500 bg-pink-500/10'
+                      : 'text-gray-400 hover:text-pink-400 hover:bg-pink-400/5',
+                  ]"
+                >
+                  <Heart
+                    class="w-4 h-4"
+                    :class="isFavorited(shop.id) ? 'fill-current' : ''"
+                  />
+                </button>
                 <!-- Share -->
                 <button
                   @click.stop="handleShare(shop)"
                   :aria-label="`Share ${shop.name || 'venue'}`"
-                  class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-blue-400 hover:bg-blue-400/5 transition-colors transition-transform active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+                  class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-blue-400 hover:bg-blue-400/5 transition active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
                 >
                   <Share2 class="w-4 h-4" />
                 </button>
@@ -800,13 +935,22 @@ onUnmounted(() => {
     </div>
   </transition>
 
-  <!-- Backgroun Overlay -->
+  <!-- Backdrop — opacity + blur tied to swipe gesture in real-time -->
   <transition name="fade">
     <div
       v-if="isOpen"
-      class="fixed inset-0 bg-black/60 backdrop-blur-sm"
-      :style="{ zIndex: Z.DRAWER_BACKDROP }"
+      ref="backdropRef"
+      class="fixed inset-0 will-change-[backdrop-filter,opacity]"
+      :style="{
+        zIndex: Z.DRAWER_BACKDROP,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        backdropFilter: isDegraded ? 'none' : 'blur(4px)',
+        transition: isDragging
+          ? 'none'
+          : 'background-color 0.3s ease, backdrop-filter 0.3s ease',
+      }"
       @click="emit('close')"
+      aria-hidden="true"
     ></div>
   </transition>
 </template>

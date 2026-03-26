@@ -1,0 +1,96 @@
+name: Performance Gate (Lighthouse CI)
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: perf-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+        env:
+          VITE_MAPBOX_TOKEN: ${{ secrets.VITE_MAPBOX_TOKEN }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+      - name: Start preview server (background)
+        run: npm run preview &
+
+      - name: Wait for preview server
+        run: |
+          echo "Waiting for preview server on port 4173..."
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:4173/ > /dev/null 2>&1; then
+              echo "Server ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Run Lighthouse CI
+        id: lighthouse
+        continue-on-error: true
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          configPath: "./lighthouserc.json"
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+          runs: 3
+
+      - name: Upload Lighthouse results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-results-${{ github.run_id }}
+          path: .lighthouseci/
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Summarize results
+        if: always()
+        env:
+          LH_OUTCOME: ${{ steps.lighthouse.outcome }}
+        run: |
+          {
+            echo "## Performance Gate (Lighthouse CI)"
+            echo "- Result: ${LH_OUTCOME}"
+            echo "- Budget: FCP score >= 0.80, LCP score >= 0.80, TBT <= 300ms, CLS <= 0.1"
+            if [ "${LH_OUTCOME}" = "success" ]; then
+              echo "- Status: PASSED — all budget assertions met"
+            else
+              echo "- Status: FAILED — one or more budget assertions exceeded (see artifacts)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail if budgets exceeded
+        if: steps.lighthouse.outcome == 'failure'
+        run: |
+          echo "Lighthouse CI budget assertions failed. Check the uploaded artifacts for details."
+          echo "Targets: FCP score >= 0.80, LCP score >= 0.80, TBT <= 300ms, CLS <= 0.1"
+          exit 1

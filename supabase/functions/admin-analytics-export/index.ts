@@ -1,18 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { isAdminUser } from "../_shared/admin.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-const isAdminUser = (user: { app_metadata?: Record<string, unknown> }) => {
-  const meta = user?.app_metadata || {};
-  const role = meta.role;
-  const roles = Array.isArray(meta.roles) ? meta.roles : [];
-  return role === "admin" || roles.includes("admin");
 };
 
 const clamp = (value: number, min: number, max: number) =>
@@ -29,6 +23,25 @@ const toIso = (d: Date) => d.toISOString();
 const toDay = (d: Date) => d.toISOString().slice(0, 10);
 
 type SupabaseClient = ReturnType<typeof createClient>;
+
+const isMissingTableError = (error: unknown, tableName: string) => {
+  const payload = (error || {}) as Record<string, unknown>;
+  const code = String(payload.code || "").toUpperCase();
+  const message = String(payload.message || "").toLowerCase();
+  const table = String(tableName || "").toLowerCase();
+  return (
+    code === "PGRST205" ||
+    (message.includes("could not find the table") && message.includes(table))
+  );
+};
+
+const createEmptySessionAgg = () => ({
+  uniqueVisitors: new Set<string>(),
+  uniqueVisitorsByDayMap: new Map<string, Set<string>>(),
+  sessionsByDay: [] as Array<{ day: string; sessions: number; unique_visitors: number }>,
+  topCountries: [] as Array<{ country: string; sessions: number; unique_visitors: number }>,
+  truncated: false,
+});
 
 const isUuidLike = (value: unknown) =>
   typeof value === "string" &&
@@ -479,29 +492,46 @@ serve(async (req) => {
     const fromIso = toIso(rangeFrom);
     const toIsoValue = toIso(rangeTo);
 
-    const sessionsTimeColumn = await pickSessionsTimeColumn(adminClient, fromIso, toIsoValue);
     const maxRows = clamp(
       Number(Deno.env.get("ANALYTICS_DASHBOARD_MAX_SESSION_ROWS") || "50000") || 50000,
       1000,
       250000,
     );
 
-    const sessionsTotal = await countSessions(
-      adminClient,
-      sessionsTimeColumn,
-      fromIso,
-      toIsoValue,
-      country || undefined,
-    );
+    let sessionsTimeColumn: "started_at" | "created_at" | "last_seen_at" = "last_seen_at";
+    let sessionsSource = "analytics_sessions";
+    let sessionsTotal = 0;
+    let agg = createEmptySessionAgg();
 
-    const agg = await collectSessions(
-      adminClient,
-      sessionsTimeColumn,
-      fromIso,
-      toIsoValue,
-      country || undefined,
-      maxRows,
-    );
+    const { error: sessionsProbeError } = await adminClient
+      .from("analytics_sessions")
+      .select("id")
+      .limit(1);
+
+    if (sessionsProbeError) {
+      if (!isMissingTableError(sessionsProbeError, "analytics_sessions")) {
+        throw sessionsProbeError;
+      }
+      sessionsSource = "analytics_logs_only";
+    } else {
+      sessionsTimeColumn = await pickSessionsTimeColumn(adminClient, fromIso, toIsoValue);
+      sessionsTotal = await countSessions(
+        adminClient,
+        sessionsTimeColumn,
+        fromIso,
+        toIsoValue,
+        country || undefined,
+      );
+
+      agg = await collectSessions(
+        adminClient,
+        sessionsTimeColumn,
+        fromIso,
+        toIsoValue,
+        country || undefined,
+        maxRows,
+      );
+    }
 
     const fromDay = toDay(rangeFrom);
     const toDayValue = toDay(rangeTo);
@@ -653,6 +683,7 @@ serve(async (req) => {
     rows.push(["META", "from", fromIso, "", ""]);
     rows.push(["META", "to", toIsoValue, "", ""]);
     rows.push(["META", "days", Math.ceil(rangeDays), "", ""]);
+    rows.push(["META", "sessions_source", sessionsSource, "", ""]);
     rows.push(["META", "sessions_time_column", sessionsTimeColumn, "", ""]);
     rows.push(["META", "truncated", agg.truncated, "", ""]);
     rows.push(["META", "max_session_rows", maxRows, "", ""]);

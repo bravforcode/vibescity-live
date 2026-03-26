@@ -131,7 +131,8 @@ const OSM_CATEGORY_MAP = {
 export async function fetchFromOpenStreetMap(province, radius = 10000) {
 	const center = PROVINCE_CENTERS[province];
 	if (!center) {
-		console.log(`[PlacesService] No center coordinates for ${province}`);
+		if (import.meta.env.DEV)
+			console.log(`[PlacesService] No center coordinates for ${province}`);
 		return [];
 	}
 
@@ -226,7 +227,8 @@ export async function fetchFromGooglePlaces(
 	types = ["restaurant", "bar", "cafe", "tourist_attraction"],
 ) {
 	if (!apiKey) {
-		console.log("[PlacesService] No Google API key provided");
+		if (import.meta.env.DEV)
+			console.log("[PlacesService] No Google API key provided");
 		return [];
 	}
 
@@ -240,22 +242,18 @@ export async function fetchFromGooglePlaces(
 	}
 
 	try {
-		const allPlaces = [];
+		const results = await Promise.allSettled(
+			types.map(async (type) => {
+				const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${center.lat},${center.lng}&radius=10000&type=${type}&language=th&key=${apiKey}`;
+				const response = await fetch(url);
+				const data = await response.json();
+				return data.results ? data.results.map(transformGooglePlace) : [];
+			}),
+		);
 
-		for (const type of types) {
-			const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${center.lat},${center.lng}&radius=10000&type=${type}&language=th&key=${apiKey}`;
-
-			const response = await fetch(url);
-			const data = await response.json();
-
-			if (data.results) {
-				const places = data.results.map(transformGooglePlace);
-				allPlaces.push(...places);
-			}
-
-			// Respect rate limits
-			await new Promise((r) => setTimeout(r, 200));
-		}
+		const allPlaces = results.flatMap((r) =>
+			r.status === "fulfilled" ? r.value : [],
+		);
 
 		placesCache.set(cacheKey, { data: allPlaces, timestamp: Date.now() });
 
@@ -297,10 +295,75 @@ function transformGooglePlace(googlePlace) {
 		price_level: googlePlace.price_level,
 		open_now: googlePlace.opening_hours?.open_now,
 		photo_reference: googlePlace.photos?.[0]?.photo_reference,
+		Image_URL1:
+			getGooglePlacePhotoUrl(googlePlace.photos?.[0]?.photo_reference) || null,
 		vicinity: googlePlace.vicinity,
 		source: "google_places",
 		fetched_at: new Date().toISOString(),
 	};
+}
+
+/**
+ * Build a Google Places Photo URL from a photo_reference.
+ * Requires VITE_GOOGLE_PLACES_API_KEY to be set.
+ * @param {string|null} photoReference
+ * @param {number} maxWidth
+ * @returns {string|null}
+ */
+export function getGooglePlacePhotoUrl(photoReference, maxWidth = 400) {
+	const key = import.meta.env?.VITE_GOOGLE_PLACES_API_KEY;
+	if (!key || !photoReference) return null;
+	return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxWidth}&photo_reference=${encodeURIComponent(photoReference)}&key=${key}`;
+}
+
+/**
+ * Find a venue's primary photo URL via Google Places Text Search.
+ * Uses sessionStorage to cache results (per venue name + coordinates).
+ * Falls back to null gracefully when the API key is missing or request fails.
+ *
+ * @param {string} name  - Venue name
+ * @param {number} lat   - Latitude
+ * @param {number} lng   - Longitude
+ * @returns {Promise<string|null>} Photo URL or null
+ */
+export async function findPlacePhoto(name, lat, lng) {
+	const key = import.meta.env?.VITE_GOOGLE_PLACES_API_KEY;
+	if (!key || !name) return null;
+
+	const cacheKey = `gphoto:${name}:${Math.round(lat * 1000)}:${Math.round(lng * 1000)}`;
+	try {
+		const cached = sessionStorage.getItem(cacheKey);
+		if (cached !== null) return cached || null; // "" means "no photo found"
+	} catch {
+		// sessionStorage unavailable (private mode etc.)
+	}
+
+	try {
+		const query = encodeURIComponent(`${name}`);
+		const location = `${lat},${lng}`;
+		const url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${query}&inputtype=textquery&locationbias=circle:200@${location}&fields=photos&key=${key}`;
+		const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+		if (!res.ok) {
+			try {
+				sessionStorage.setItem(cacheKey, "");
+			} catch {
+				/* noop */
+			}
+			return null;
+		}
+		const data = await res.json();
+		const photoRef =
+			data?.candidates?.[0]?.photos?.[0]?.photo_reference ?? null;
+		const photoUrl = photoRef ? getGooglePlacePhotoUrl(photoRef, 600) : null;
+		try {
+			sessionStorage.setItem(cacheKey, photoUrl ?? "");
+		} catch {
+			/* noop */
+		}
+		return photoUrl;
+	} catch {
+		return null;
+	}
 }
 
 /**
@@ -370,7 +433,7 @@ export async function searchPlaces(query, province = null) {
  */
 export function clearPlacesCache() {
 	placesCache.clear();
-	console.log("[PlacesService] Cache cleared");
+	if (import.meta.env.DEV) console.log("[PlacesService] Cache cleared");
 }
 
 /**

@@ -81,7 +81,7 @@
 } /* ม่วงลึกลับ */
 
 /* 2. Pulse Effect (ใส่ที่ Marker บนแผนที่) */
-/* วิธีใช้: <div class="marker vibe-marker-pulse">...</div> */
+/* วิธีใช้: <div class="marker vibe-marker-pulse">…</div> */
 .vibe-marker-pulse::before {
 	content: "";
 	position: absolute;
