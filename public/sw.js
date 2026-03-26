@@ -12,6 +12,11 @@ if (workbox) {
 	workbox.precaching.cleanupOutdatedCaches();
 	workbox.precaching.precacheAndRoute(self.__WB_MANIFEST || []);
 
+	// Precache offline fallback so it's available without network
+	workbox.precaching.precacheAndRoute([
+		{ url: "/offline.html", revision: "v1" },
+	]);
+
 	// Only cache genuine 200 OK responses — never opaque (status 0) ones.
 	const cacheable200 = new workbox.cacheableResponse.CacheableResponsePlugin({
 		statuses: [200],
@@ -104,15 +109,22 @@ if (workbox) {
 	// 6) Non-video public images from Supabase storage: stale-while-revalidate.
 	// IMPORTANT: fetchOptions.mode = 'cors' prevents opaque responses (status 0)
 	// that would otherwise cause 'ERR_FAILED / opaque response' browser errors.
+	// maxEntries: 150 caps disk usage — ~150 venue photos on low-end storage.
 	workbox.routing.registerRoute(
 		({ url }) =>
 			url.origin.includes("supabase.co") &&
 			url.pathname.includes("/storage/v1/object/public/") &&
 			!/\.(mp4|webm|mov|avi|mkv|m4v)$/i.test(url.pathname),
 		new workbox.strategies.StaleWhileRevalidate({
-			cacheName: `${CACHE_PREFIX}-supabase-images-v2`,
+			cacheName: `${CACHE_PREFIX}-supabase-images-v3`,
 			fetchOptions: { mode: "cors", credentials: "omit" },
-			plugins: [cacheableImg, expLong],
+			plugins: [
+				cacheableImg,
+				new workbox.expiration.ExpirationPlugin({
+					maxEntries: 150,
+					maxAgeSeconds: 7 * 24 * 60 * 60,
+				}),
+			],
 		}),
 	);
 
@@ -125,6 +137,17 @@ if (workbox) {
 			plugins: [cacheable200, expShort],
 		}),
 	);
+
+	// Offline fallback — serve /offline.html for navigate requests that fail
+	workbox.routing.setCatchHandler(async ({ request }) => {
+		if (request.mode === "navigate") {
+			return (
+				(await caches.match("/offline.html")) ||
+				new Response("Offline", { status: 503 })
+			);
+		}
+		return Response.error();
+	});
 } else {
 	console.error("[SW] Workbox failed to load");
 }

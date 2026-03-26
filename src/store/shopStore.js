@@ -145,6 +145,12 @@ const idToSeed = (id) => {
 	return hashStringToInt(id);
 };
 
+// Module-level distance cache — keyed by shopId + rounded GPS grid (~1.1 km cells).
+// Survives computed re-runs; cleared when it exceeds 10 K entries (LRU-lite).
+const _distCache = new Map();
+const _distKey = (id, lat, lng) =>
+	`${id}_${Math.round(lat * 100)}_${Math.round(lng * 100)}`;
+
 const unavailableRpcNames = new Set();
 const isRpcMissingError = (error) => {
 	const code = String(error?.code || "").toUpperCase();
@@ -333,14 +339,22 @@ export const useShopStore = defineStore(
 						lat,
 						lng,
 						hasValidCoords: hasCoords,
-						distance: hasCoords
-							? calculateDistance(
+						distance: (() => {
+							if (!hasCoords) return Number.POSITIVE_INFINITY;
+							const k = _distKey(normalizedShop.id, userLoc[0], userLoc[1]);
+							let d = _distCache.get(k);
+							if (d === undefined) {
+								d = calculateDistance(
 									userLoc[0],
 									userLoc[1],
 									coords.lat,
 									coords.lng,
-								)
-							: Number.POSITIVE_INFINITY,
+								);
+								if (_distCache.size > 10_000) _distCache.clear();
+								_distCache.set(k, d);
+							}
+							return d;
+						})(),
 						randomKey:
 							(idToSeed(normalizedShop.id) + rotationSeed.value * 1103515245) %
 							12345,
