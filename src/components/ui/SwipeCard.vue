@@ -725,6 +725,8 @@ const handleManualExpand = () => {
   display: flex;
   flex-direction: column;
   container-type: inline-size;
+  /* Limit paint/layout scope to this card — browser won't reflow neighbors */
+  contain: layout style paint;
 
   /*
    * touch-action: pan-x  →  browser handles horizontal (parent carousel)

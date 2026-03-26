@@ -234,6 +234,11 @@ export function useMapCore(containerRef, options = {}) {
 		containerRef.value.innerHTML = "";
 
 		lastRequestedStyleUrl = style;
+		// Detect low-end device: ≤4 CPU cores or ≤4 GB RAM
+		const isLowEnd =
+			typeof navigator !== "undefined" &&
+			((navigator.hardwareConcurrency ?? 4) <= 4 ||
+				(navigator.deviceMemory ?? 8) <= 4);
 		map.value = markRaw(
 			new maplibregl.Map({
 				container: containerRef.value,
@@ -244,12 +249,21 @@ export function useMapCore(containerRef, options = {}) {
 				maxZoom: 22,
 				pitch: 70, // 3D perspective without showing beyond map world
 				bearing: 0,
-				antialias:
-					typeof navigator !== "undefined" &&
-					(navigator.hardwareConcurrency ?? 4) > 4,
+				antialias: !isLowEnd,
+				// Cap pixel ratio: retina devices render 2-3× tiles; 1.5 saves ~40% GPU work
+				pixelRatio: isLowEnd
+					? 1
+					: Math.min(
+							typeof window !== "undefined"
+								? (window.devicePixelRatio ?? 1)
+								: 1,
+							1.5,
+						),
 				attributionControl: false,
+				preserveDrawingBuffer: false,
+				crossSourceCollisions: false,
 				fadeDuration: 0, // Eliminate tile fade-in stutter on mobile
-				maxTileCacheSize: 100, // Limit memory for tile cache
+				maxTileCacheSize: isLowEnd ? 40 : 100, // Fewer cached tiles = less RAM on low-end
 				transformRequest: (url, _resourceType) => {
 					// Suppress noisy 404 tileset fetches that some custom styles reference.
 					if (isSuppressedTilesetRequest(url)) {

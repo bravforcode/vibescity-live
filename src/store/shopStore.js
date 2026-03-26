@@ -4,7 +4,7 @@
  * Features: Caching, Pagination, Search, Real-time updates
  */
 import { defineStore } from "pinia";
-import { computed, ref, shallowRef } from "vue";
+import { computed, ref, shallowRef, watch } from "vue";
 import { normalizeId, normalizeSlug } from "../domain/venue/normalize";
 import {
 	normalizeVenueCollection,
@@ -228,6 +228,22 @@ export const useShopStore = defineStore(
 		const collectedCoins = shallowRef(new Set());
 		const currentTime = ref(new Date()); // ✅ Current time for status calculations
 
+		// Debounced GPS location — prevents 5000+ Haversine recalcs per GPS ping.
+		// processedShops depends on this ref, NOT directly on locationStore.userLocation.
+		const debouncedUserLocation = shallowRef(
+			locationStore.userLocation || null,
+		);
+		let _locationDebounceTimer = null;
+		watch(
+			() => locationStore.userLocation,
+			(newLoc) => {
+				clearTimeout(_locationDebounceTimer);
+				_locationDebounceTimer = setTimeout(() => {
+					debouncedUserLocation.value = newLoc;
+				}, 400);
+			},
+		);
+
 		// UI State
 		const activeShopId = ref(null);
 		const activeCategories = ref([]);
@@ -286,7 +302,7 @@ export const useShopStore = defineStore(
 		);
 
 		const processedShops = computed(() => {
-			const userLoc = locationStore.userLocation || [18.7883, 98.9853];
+			const userLoc = debouncedUserLocation.value || [18.7883, 98.9853];
 			const seen = new Set();
 
 			return rawShops.value
