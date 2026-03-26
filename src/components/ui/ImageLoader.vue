@@ -24,6 +24,10 @@ const props = defineProps({
 		type: String,
 		default: "w-6 h-6 text-white/20",
 	},
+	fetchpriority: {
+		type: String,
+		default: "auto",
+	},
 });
 
 const emit = defineEmits(["load", "error"]);
@@ -39,6 +43,10 @@ const load = () => {
 
 	const img = new Image();
 	img.crossOrigin = "anonymous";
+	// Set fetch priority on Image object (HTML attribute won't work for programmatic loads)
+	if (props.fetchpriority && props.fetchpriority !== "auto") {
+		img.fetchPriority = props.fetchpriority;
+	}
 	img.onload = () => {
 		currentSrc.value = props.src;
 		isLoaded.value = true;

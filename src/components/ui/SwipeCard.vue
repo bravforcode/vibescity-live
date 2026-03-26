@@ -55,6 +55,11 @@ const props = defineProps({
 	isImmersive: { type: Boolean, default: false },
 	isActive: { type: Boolean, default: false },
 	shop: { type: Object, default: null },
+	fetchpriority: {
+		type: String,
+		default: "auto",
+		validator: (v) => ["high", "low", "auto"].includes(v),
+	},
 });
 
 const emit = defineEmits([
@@ -500,6 +505,7 @@ const handleManualExpand = () => {
           v-if="showImageFallback"
           :src="primaryImageUrl"
           :alt="displayName"
+          :fetchpriority="fetchpriority"
           img-class="sc-media-fill transition-transform duration-700 will-change-transform group-hover:scale-105"
           :class="!videoLoaded ? 'z-10' : ''"
         />

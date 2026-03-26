@@ -1,6 +1,6 @@
 <script setup>
 import { Heart, MapPin, Navigation, Share2, Sparkles } from "lucide-vue-next";
-import { defineAsyncComponent, ref } from "vue";
+import { computed, defineAsyncComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { DynamicScroller, DynamicScrollerItem } from "vue-virtual-scroller";
 import "vue-virtual-scroller/dist/vue-virtual-scroller.css";
@@ -78,6 +78,10 @@ const emit = defineEmits([
 	"exit-giant-view",
 	"share-shop", // ✅ Added share event
 ]);
+
+// Cap DOM nodes for performance — slice in computed keeps v-memo cache stable
+const CAROUSEL_CAP = 30;
+const cappedShops = computed(() => props.carouselShops.slice(0, CAROUSEL_CAP));
 
 // ✅ Haptic Feedback
 const { tapFeedback, selectFeedback, impactFeedback } = useHaptics();
@@ -177,12 +181,14 @@ const getItemSize = (index) => {
         class="px-4 py-2 pb-24 h-[55vh] overflow-y-auto no-scrollbar grid grid-cols-2 md:grid-cols-3 gap-3 animate-fade-in pointer-events-auto"
       >
         <button
-          v-for="shop in carouselShops"
+          v-for="shop in cappedShops"
           :key="shop.id"
+          v-memo="[shop.id, shop.status, shop.isPromoted]"
           @click="emit('open-detail', shop)"
           :aria-label="`Open details for ${shop.name}`"
           type="button"
           class="relative aspect-[3/4] rounded-2xl overflow-hidden bg-zinc-900 border border-white/10 shadow-xl active:scale-95 transition-[transform,opacity,box-shadow,border-color,background-color] hover:shadow-2xl hover:shadow-purple-500/20 text-left"
+          style="contain: layout style;"
         >
         <img
           v-if="shop.Image_URL1"
@@ -190,6 +196,7 @@ const getItemSize = (index) => {
           :alt="shop.name"
           class="absolute inset-0 w-full h-full object-cover"
           loading="lazy"
+          decoding="async"
         />
         <div
           class="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent"
@@ -305,6 +312,8 @@ const getItemSize = (index) => {
               :src="s.Image_URL1"
               :alt="s.name"
               class="w-full h-full object-cover"
+              loading="lazy"
+              decoding="async"
             />
             <div
               class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"
@@ -379,11 +388,12 @@ const getItemSize = (index) => {
 
             <template v-else>
               <SwipeCard
-                v-for="shop in carouselShops"
+                v-for="(shop, index) in cappedShops"
                 :key="shop.id"
                 :shop="shop"
                 :is-active="activeShopId === shop.id"
                 :is-selected="activeShopId === shop.id"
+                :fetchpriority="index === 0 ? 'high' : 'auto'"
                 v-memo="[
                   shop.id,
                   shop.status,
