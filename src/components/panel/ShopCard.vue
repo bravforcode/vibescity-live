@@ -6,7 +6,7 @@ import { useNotifications } from "@/composables/useNotifications";
 import { useBlurUpImage } from "../../composables/useBlurUpImage";
 import { useCardTilt } from "../../composables/useCardTilt";
 import { useSmartVideo } from "../../composables/useSmartVideo";
-import { getGooglePlacePhotoUrl } from "../../services/placesService.js";
+import { resolveVenueMedia } from "../../domain/venue/viewModel";
 import { useCoinStore } from "../../store/coinStore";
 import { openExternal } from "../../utils/browserUtils";
 import {
@@ -41,6 +41,10 @@ const props = defineProps({
 		default: () => [],
 	},
 	useRideButton: {
+		type: Boolean,
+		default: false,
+	},
+	isPriority: {
 		type: Boolean,
 		default: false,
 	},
@@ -166,13 +170,20 @@ const handleMouseEnter = () => {
 	emit("hover", props.shop);
 };
 
-// Blur-up progressive image loading — fallback to Google Places photo if no Supabase image
-const shopImageUrl = computed(
+const resolvedRealMedia = computed(() => resolveVenueMedia(props.shop || {}));
+const mediaCounts = computed(
 	() =>
-		props.shop?.Image_URL1 ||
-		getGooglePlacePhotoUrl(props.shop?.photo_reference) ||
-		null,
+		props.shop?.media_counts ||
+		resolvedRealMedia.value.counts || { images: 0, videos: 0, total: 0 },
 );
+const realImageCount = computed(() => Number(mediaCounts.value?.images || 0));
+const realVideoCount = computed(() => Number(mediaCounts.value?.videos || 0));
+const primaryRealImageUrl = computed(
+	() => resolvedRealMedia.value.primaryImage || props.shop?.Image_URL1 || null,
+);
+
+// Blur-up progressive image loading from real venue media only
+const shopImageUrl = computed(() => primaryRealImageUrl.value);
 const {
 	imgSrc: blurUpSrc,
 	isLoaded: imageLoaded,
@@ -187,22 +198,14 @@ const { tiltStyle, glareStyle, onPointerMove, onPointerLeave } = useCardTilt({
 
 const videoError = ref(false);
 const resolvedVideoUrl = computed(() =>
-	getUsableMediaUrl(
-		props.shop?.Video_URL ||
-			props.shop?.video_url ||
-			props.shop?.videoUrl ||
-			"",
-	),
+	getUsableMediaUrl(resolvedRealMedia.value.videoUrl || ""),
 );
 const shouldRenderVideo = computed(
 	() => props.isActive && Boolean(resolvedVideoUrl.value) && !videoError.value,
 );
 const resolvedImageUrl = computed(
 	() =>
-		blurUpSrc.value ||
-		getOptimizedUrl(props.shop?.Image_URL1, 600) ||
-		getGooglePlacePhotoUrl(props.shop?.photo_reference, 600) ||
-		null,
+		blurUpSrc.value || getOptimizedUrl(primaryRealImageUrl.value, 600) || null,
 );
 
 const cardAriaLabel = computed(
@@ -270,7 +273,7 @@ watch(
         v-if="shouldRenderVideo"
         ref="videoRef"
         :src="resolvedVideoUrl"
-        :poster="shop.Image_URL1"
+        :poster="primaryRealImageUrl || undefined"
         muted
         loop
         playsinline
@@ -280,12 +283,13 @@ watch(
       />
       <!-- Fallback Image if no video (or while loading handled by poster) -->
       <img
-        v-else-if="shop.Image_URL1"
+        v-else-if="primaryRealImageUrl"
         :src="resolvedImageUrl"
         :alt="shop.name || shop.title || 'Shop thumbnail'"
         class="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-[transform,filter] duration-700"
         :style="blurStyle"
-        loading="lazy"
+        :loading="isPriority ? 'eager' : 'lazy'"
+        :fetchpriority="isPriority ? 'high' : 'auto'"
         decoding="async"
       />
       <div
@@ -321,7 +325,7 @@ watch(
           <!-- LIVE Badge -->
           <div
             v-if="shop.status === 'LIVE' || shop.Status === 'LIVE'"
-            class="relative px-2.5 py-1.5 rounded-xl bg-red-600/90 backdrop-blur-md text-white text-[10px] font-black border border-red-500/50 shadow-lg"
+            class="shop-top-badge shop-top-badge--live"
           >
             <span class="flex items-center gap-1.5">
               <span
@@ -338,7 +342,7 @@ watch(
           <!-- Giant Pin Badge (Building) -->
           <div
             v-if="shop.is_giant_active || shop.isGiantPin"
-            class="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white text-[10px] font-black border border-amber-400/50 shadow-lg flex items-center gap-1.5 animate-pulse"
+            class="shop-top-badge shop-top-badge--giant animate-pulse"
           >
             <span>🏢</span> GIANT PIN
           </div>
@@ -346,22 +350,20 @@ watch(
           <!-- Flash/Golden Badges -->
           <div
             v-else-if="isFlashActive(shop)"
-            class="px-2.5 py-1.5 rounded-xl text-white text-[10px] font-black shadow-lg border border-orange-400/60 bg-gradient-to-r from-red-500 to-orange-500"
+            class="shop-top-badge shop-top-badge--flash"
           >
             🔥 FLASH
           </div>
           <div
             v-else-if="shop.isGolden || shop.isPromoted"
-            class="px-2.5 py-1.5 rounded-xl text-black text-[10px] font-black shadow-lg border border-yellow-300/60 bg-gradient-to-br from-yellow-300 to-yellow-500"
+            class="shop-top-badge shop-top-badge--gold"
           >
             ✨ GOLDEN
           </div>
         </div>
 
         <!-- Distance Badge -->
-        <div
-          class="px-2.5 py-1.5 rounded-xl bg-black/40 backdrop-blur-xl border border-white/20 shadow-lg self-start"
-        >
+        <div class="shop-distance-pill">
           <span
             class="text-[10px] font-black text-blue-300 flex items-center gap-1"
           >
@@ -388,11 +390,11 @@ watch(
               coinStore.awardCoins(1);
             }
           "
-          class="w-11 h-11 flex items-center justify-center rounded-full backdrop-blur-md border transition-[transform,background-color,border-color,color] active:scale-90 shadow-xl"
+          class="shop-fab transition-[transform,background-color,border-color,color] active:scale-90"
           :class="[
             isFavorited
-              ? 'bg-pink-500/80 border-pink-400 text-white'
-              : 'bg-black/30 border-white/20 text-white/70 hover:bg-black/50',
+              ? 'shop-fab--active'
+              : 'shop-fab--idle',
           ]"
           :aria-label="
             isFavorited ? t('a11y.remove_favorite') : t('a11y.add_favorite')
@@ -410,7 +412,7 @@ watch(
         <!-- Share Button -->
         <button
           @click.stop="handleShare"
-          class="w-11 h-11 flex items-center justify-center rounded-full bg-black/30 backdrop-blur-md border border-white/20 text-white/70 hover:bg-black/50 transition-[transform,background-color,border-color,color] active:scale-90 shadow-xl"
+          class="shop-fab shop-fab--idle transition-[transform,background-color,border-color,color] active:scale-90"
           :aria-label="t('common.share')"
         >
           <Share2 class="w-4 h-4" stroke-width="2.5" aria-hidden="true" />
@@ -421,13 +423,13 @@ watch(
       <div
         class="absolute bottom-0 left-0 right-0 p-4 pb-2 z-10 flex flex-col justify-end h-full pointer-events-none"
       >
-        <div class="pointer-events-auto glass-info-panel rounded-xl p-2.5">
+        <div class="pointer-events-auto shop-info-panel rounded-xl p-3">
           <!-- Stats Mode Toggle (Merchant Only) -->
           <div v-if="showStats" class="mb-2">
             <MerchantStats :shopId="shop.id" :isDarkMode="isDarkMode" />
             <button
               @click.stop="showStats = false"
-              class="mt-2 w-full py-2 min-h-[44px] bg-black/40 text-white text-[10px] rounded-lg border border-white/10 hover:bg-black/60"
+              class="shop-ghost-button mt-2 w-full"
             >
               {{ t("shop.back_to_details") }}
             </button>
@@ -435,16 +437,16 @@ watch(
 
           <div v-else>
             <!-- Header -->
-            <div class="flex items-start justify-between">
+            <div class="shop-header">
               <h3
-                class="text-xl font-black text-white leading-none mb-1 drop-shadow-xl tracking-tighter font-sans line-clamp-1"
+                class="text-xl font-black text-white leading-none tracking-tighter font-sans line-clamp-1"
               >
                 {{ shop.name }}
               </h3>
               <!-- Chart Toggle Button -->
               <button
                 @click.stop="showStats = true"
-                class="w-11 h-11 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white/80 border border-white/10 backdrop-blur-md"
+                class="shop-fab shop-fab--idle"
                 :aria-label="t('shop.view_stats')"
               >
                 <BarChart class="w-4 h-4" aria-hidden="true" />
@@ -452,16 +454,13 @@ watch(
             </div>
 
             <!-- Sub-info -->
-            <div
-              class="flex items-center gap-3 mb-2 text-white/90 text-[10px] font-bold uppercase tracking-wider"
-            >
-              <span
-                class="px-1.5 py-0.5 rounded-md bg-white/20 backdrop-blur-sm border border-white/10"
+            <div class="shop-meta-row">
+              <span class="shop-chip shop-chip--category"
                 >{{ shop.category || "Shop" }}</span
               >
               <span
                 v-if="shop.rating"
-                class="px-1.5 py-0.5 rounded-md bg-yellow-500/30 backdrop-blur-sm border border-yellow-400/30 flex items-center gap-0.5"
+                class="shop-chip shop-chip--rating"
               >
                 <Star
                   class="w-2.5 h-2.5 fill-yellow-400 text-yellow-400"
@@ -471,11 +470,23 @@ watch(
               </span>
               <span
                 v-else
-                class="px-1.5 py-0.5 rounded-md bg-purple-500/30 backdrop-blur-sm border border-purple-400/30"
+                class="shop-chip shop-chip--new"
               >
                 {{ t("shop.new") }}
               </span>
-              <span class="flex items-center gap-1"
+              <span
+                v-if="realImageCount > 0"
+                class="shop-chip shop-chip--media"
+              >
+                IMG {{ realImageCount }}
+              </span>
+              <span
+                v-if="realVideoCount > 0"
+                class="shop-chip shop-chip--media"
+              >
+                VID {{ realVideoCount }}
+              </span>
+              <span class="shop-time-pill"
                 ><Clock class="w-2.5 h-2.5" /> {{ shop.openTime || "--" }} -
                 {{ shop.closeTime || "--" }}</span
               >
@@ -489,7 +500,7 @@ watch(
             <!-- Promotion Info -->
             <div
               v-if="shop.promotionInfo"
-              class="mb-2 px-2 py-1 rounded-lg bg-gradient-to-r from-orange-500/20 to-red-500/20 border border-orange-400/30"
+              class="shop-promo-banner"
             >
               <span
                 class="text-[9px] font-black text-orange-300 uppercase tracking-wide"
@@ -503,7 +514,7 @@ watch(
               <button
                 v-if="useRideButton"
                 @click.stop="emit('open-ride', shop)"
-                class="col-span-2 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white text-[10px] font-black shadow-lg border border-blue-400/30 flex items-center justify-center gap-2 active:scale-95 transition-[transform,filter,box-shadow]"
+                class="shop-cta shop-cta--primary col-span-2 active:scale-95 transition-[transform,filter,box-shadow]"
               >
                 {{ t("shop.call_ride") }}
               </button>
@@ -511,13 +522,13 @@ watch(
               <template v-else>
                 <button
                   @click.stop="emit('open-detail', shop)"
-                  class="py-2.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-white text-[10px] font-bold hover:bg-white/20 transition-colors"
+                  class="shop-cta shop-cta--secondary transition-colors"
                 >
                   {{ t("shop.details") }}
                 </button>
                 <button
                   @click.stop="openGoogleMaps"
-                  class="py-2.5 rounded-xl bg-green-500/20 backdrop-blur-md border border-green-500/30 text-green-300 text-[10px] font-bold hover:bg-green-500/30 transition-colors"
+                  class="shop-cta shop-cta--nav transition-colors"
                 >
                   {{ t("shop.navigate") }}
                 </button>
@@ -548,14 +559,208 @@ watch(
   overflow: hidden;
 }
 
-/* Glassmorphism info panel at card bottom */
-.glass-info-panel {
-  background: rgba(10, 10, 20, 0.45);
-  backdrop-filter: blur(16px) saturate(1.6);
-  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+/* Solid map-card surface for reliable readability over busy tiles */
+.shop-info-panel {
+  background: #090c12;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-bottom: none;
-  border-radius: 12px 12px 0 0;
+  border-radius: 16px 16px 0 0;
+  box-shadow:
+    0 20px 42px rgba(0, 0, 0, 0.42),
+    0 1px 0 rgba(255, 255, 255, 0.05) inset;
+}
+
+.shop-top-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 24px;
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.9rem;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  box-shadow: 0 10px 20px rgba(2, 6, 23, 0.28);
+}
+
+.shop-top-badge--live {
+  background: #b91c1c;
+  color: white;
+  border: 1px solid rgba(248, 113, 113, 0.4);
+}
+
+.shop-top-badge--giant {
+  background: linear-gradient(135deg, #f59e0b, #ea580c);
+  color: white;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+}
+
+.shop-top-badge--flash {
+  background: linear-gradient(135deg, #ef4444, #f97316);
+  color: white;
+  border: 1px solid rgba(251, 146, 60, 0.5);
+}
+
+.shop-top-badge--gold {
+  background: linear-gradient(135deg, #fde047, #f59e0b);
+  color: #111827;
+  border: 1px solid rgba(253, 224, 71, 0.55);
+}
+
+.shop-distance-pill {
+  align-self: flex-start;
+  padding: 0.42rem 0.68rem;
+  border-radius: 0.95rem;
+  background: #101722;
+  border: 1px solid rgba(56, 189, 248, 0.18);
+  box-shadow: 0 10px 22px rgba(2, 6, 23, 0.28);
+}
+
+.shop-chip--media {
+  background: rgba(15, 23, 42, 0.88);
+  color: #dbeafe;
+  border: 1px solid rgba(59, 130, 246, 0.22);
+}
+
+.shop-fab {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 26px rgba(2, 6, 23, 0.34);
+}
+
+.shop-fab--idle {
+  background: #10151d;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.shop-fab--idle:hover {
+  background: #171d27;
+}
+
+.shop-fab--active {
+  background: #8f174b;
+  border-color: rgba(244, 114, 182, 0.45);
+  color: white;
+}
+
+.shop-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.55rem;
+}
+
+.shop-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.7rem;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.shop-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  min-height: 24px;
+  padding: 0.28rem 0.5rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.shop-chip--category {
+  background: #161b24;
+}
+
+.shop-chip--rating {
+  background: #2a2110;
+  border-color: rgba(250, 204, 21, 0.25);
+}
+
+.shop-chip--new {
+  background: #1f1631;
+  border-color: rgba(192, 132, 252, 0.3);
+}
+
+.shop-time-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 24px;
+  padding: 0.28rem 0.5rem;
+  border-radius: 9999px;
+  background: #121821;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  color: rgba(226, 232, 240, 0.82);
+}
+
+.shop-promo-banner {
+  margin-bottom: 0.6rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 0.9rem;
+  background: linear-gradient(135deg, rgba(194, 65, 12, 0.24), rgba(153, 27, 27, 0.2));
+  border: 1px solid rgba(251, 146, 60, 0.24);
+}
+
+.shop-cta {
+  min-height: 44px;
+  border-radius: 14px;
+  font-size: 10px;
+  font-weight: 800;
+  border: 1px solid transparent;
+  box-shadow: 0 12px 24px rgba(2, 6, 23, 0.22);
+}
+
+.shop-cta--primary {
+  background: linear-gradient(100deg, #0f4c81 0%, #0891b2 100%);
+  color: white;
+  border-color: rgba(103, 232, 249, 0.22);
+}
+
+.shop-cta--secondary {
+  background: #151b24;
+  color: white;
+  border-color: rgba(148, 163, 184, 0.18);
+}
+
+.shop-cta--secondary:hover {
+  background: #1b2330;
+}
+
+.shop-cta--nav {
+  background: #102018;
+  color: #86efac;
+  border-color: rgba(34, 197, 94, 0.24);
+}
+
+.shop-cta--nav:hover {
+  background: #163222;
+}
+
+.shop-ghost-button {
+  min-height: 44px;
+  border-radius: 0.8rem;
+  background: #151b24;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.shop-ghost-button:hover {
+  background: #1b2330;
 }
 
 /* Animated gradient border for active cards */

@@ -10,8 +10,15 @@ import {
 	normalizeVenueCollection,
 	normalizeVenueViewModel,
 } from "../domain/venue/viewModel";
+import { isFrontendOnlyDevMode } from "../lib/runtimeConfig";
 import { isSupabaseSchemaCacheError, supabase } from "../lib/supabase";
 import { apiFetch, parseApiError } from "../services/apiClient";
+import {
+	enrichVenueRowsWithRealMedia,
+	getRealVenueMedia,
+	mergeVenueRowWithRealMedia,
+} from "../services/shopService";
+import { isAppDebugLoggingEnabled } from "../utils/debugFlags";
 import { useFeatureFlagStore } from "./featureFlagStore";
 import { useLocationStore } from "./locationStore";
 
@@ -106,6 +113,9 @@ const normalizeCoords = (shop) => {
 	if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) return null;
 	return { lat: latNum, lng: lngNum };
 };
+
+const shouldLogVenueStoreInfo = () =>
+	import.meta.env.DEV && isAppDebugLoggingEnabled();
 
 const normalizeStatusForUi = (status) => {
 	const normalized = String(status || "active")
@@ -207,11 +217,12 @@ const buildE2eShops = () => {
 
 // Schema-safe minimal baseline first, then optional enrichment query.
 const BASE_VENUE_COLUMNS =
-	'id,slug,short_code,name,category,status,created_at,total_views,view_count,rating,location,latitude,longitude,image_urls,video_url,"Video_URL",pin_type,pin_metadata,is_verified';
+	"id,slug,short_code,name,category,status,created_at,total_views,view_count,rating,location,latitude,longitude,image_urls,video_url,pin_type,pin_metadata,is_verified";
 const OPTIONAL_VENUE_COLUMNS =
 	"id,description,province,district,phone,building:building_id,floor,video_url,open_time:opening_hours";
 const V2_FEED_COOLDOWN_MS = 3 * 60 * 1000;
 const SCHEMA_CACHE_FETCH_COOLDOWN_MS = 15_000;
+const LOCAL_DEV_HOST_PATTERN = /^(localhost|127\.0\.0\.1)$/i;
 
 // ═══════════════════════════════════════════
 // 🏪 Store Definition
@@ -461,6 +472,13 @@ export const useShopStore = defineStore(
 		// ═══════════════════════════════════════════
 		const venueDetailInFlight = new Map();
 		const venueDetailLoaded = new Set();
+		const isTransientAuthLockTimeout = (err) => {
+			const message = String(err?.message || "").toLowerCase();
+			return (
+				message.includes("navigator lockmanager lock") ||
+				message.includes("lock:sb-")
+			);
+		};
 		const isV2CircuitError = (err) => {
 			if (isSupabaseSchemaCacheError(err)) return true;
 			const code = String(err?.code || "").toLowerCase();
@@ -526,7 +544,7 @@ export const useShopStore = defineStore(
 
 			// Cache check: refetch only if >5 min old
 			if (!force && lastFetchTime.value && now - lastFetchTime.value < 300000) {
-				if (import.meta.env.DEV) console.log("🏪 Using cached shops");
+				if (shouldLogVenueStoreInfo()) console.log("🏪 Using cached shops");
 				return;
 			}
 
@@ -537,7 +555,8 @@ export const useShopStore = defineStore(
 				await featureFlagStore.refreshFlags();
 				if (
 					featureFlagStore.isEnabled("use_v2_feed") &&
-					now >= v2FeedCircuitUntil.value
+					now >= v2FeedCircuitUntil.value &&
+					!isFrontendOnlyDevMode()
 				) {
 					try {
 						await fetchShopsV2(force);
@@ -552,7 +571,7 @@ export const useShopStore = defineStore(
 							}
 						}
 						// V2 feed RPC may not exist yet – fall through to standard query
-						if (import.meta.env.DEV) {
+						if (import.meta.env.DEV && !isTransientAuthLockTimeout(v2Err)) {
 							console.warn(
 								"🏪 V2 feed failed, falling back to standard query:",
 								v2Err?.message || v2Err,
@@ -582,11 +601,12 @@ export const useShopStore = defineStore(
 
 				if (err) throw err;
 				data = await enrichVenueRows(data || []);
+				data = await enrichVenueRowsWithRealMedia(data || []);
 
 				applyVenueRows(data || []);
 				lastFetchTime.value = Date.now();
 
-				if (import.meta.env.DEV)
+				if (shouldLogVenueStoreInfo())
 					console.log(`🏪 Fetched ${data?.length || 0} venues`);
 			} catch (e) {
 				if (isSupabaseSchemaCacheError(e)) {
@@ -657,7 +677,8 @@ export const useShopStore = defineStore(
 				isPromoted: Boolean(s.is_promoted),
 			}));
 
-			applyVenueRows(mapped);
+			const enriched = await enrichVenueRowsWithRealMedia(mapped);
+			applyVenueRows(enriched);
 			lastFetchTime.value = Date.now();
 		};
 
@@ -710,7 +731,8 @@ export const useShopStore = defineStore(
 					isGiantPin: Boolean(s.giant_active),
 				}));
 
-				applyVenueRows(mapped);
+				const enriched = await enrichVenueRowsWithRealMedia(mapped);
+				applyVenueRows(enriched);
 			} catch (e) {
 				error.value = { message: e.message, code: e.code };
 			} finally {
@@ -722,7 +744,7 @@ export const useShopStore = defineStore(
 		 * Fetch full details for a single venue without reloading the whole list.
 		 * Used for lazy hydration when opening detail views.
 		 */
-		const fetchVenueDetail = async (id) => {
+		const fetchVenueDetail = async (id, { syncCollection = false } = {}) => {
 			const key = normalizeId(id);
 			if (!key) return null;
 
@@ -747,13 +769,16 @@ export const useShopStore = defineStore(
 					if (err) throw err;
 					if (!data) return null;
 
-					const merged = normalizeVenueViewModel(
-						{ ...(existing || {}), ...data },
-						{
-							userLocation: getUserLocationForNormalize(),
-							collectedCoinIds: collectedCoins.value,
-						},
-					);
+					let mergedRow = { ...(existing || {}), ...data };
+					const realMedia = await getRealVenueMedia(key);
+					if (realMedia) {
+						mergedRow = mergeVenueRowWithRealMedia(mergedRow, realMedia);
+					}
+
+					const merged = normalizeVenueViewModel(mergedRow, {
+						userLocation: getUserLocationForNormalize(),
+						collectedCoinIds: collectedCoins.value,
+					});
 					venueDetailLoaded.add(key);
 
 					// Update maps
@@ -769,9 +794,13 @@ export const useShopStore = defineStore(
 					// Update list (preserve ordering)
 					const next = Array.isArray(rawShops.value) ? [...rawShops.value] : [];
 					const idx = next.findIndex((s) => normalizeId(s?.id) === key);
-					if (idx >= 0) next[idx] = merged;
-					else next.unshift(merged);
-					rawShops.value = next;
+					if (idx < 0) {
+						next.unshift(merged);
+						rawShops.value = next;
+					} else if (syncCollection) {
+						next[idx] = merged;
+						rawShops.value = next;
+					}
 
 					return merged;
 				} catch (e) {
@@ -858,6 +887,13 @@ export const useShopStore = defineStore(
 		};
 		const shouldFallbackReviewsApi = (status) =>
 			[404, 405, 422].includes(Number(status));
+		const shouldShortCircuitReviewsApiInLocalDev = () =>
+			import.meta.env.DEV &&
+			typeof window !== "undefined" &&
+			LOCAL_DEV_HOST_PATTERN.test(window.location.hostname) &&
+			import.meta.env.VITE_API_PROXY_DEV !== "true";
+		const shouldSkipReviewsApi = () =>
+			isFrontendOnlyDevMode() || shouldShortCircuitReviewsApiInLocalDev();
 		const isReviewAccessError = (err) => {
 			const status = Number(err?.status || err?.statusCode || 0);
 			const code = String(err?.code || "").toUpperCase();
@@ -871,6 +907,16 @@ export const useShopStore = defineStore(
 				message.includes("permission denied")
 			);
 		};
+		const isReviewNetworkError = (err) => {
+			const message = String(err?.message || "").toLowerCase();
+			return (
+				message.includes("failed to fetch") ||
+				message.includes("networkerror") ||
+				message.includes("load failed") ||
+				message.includes("cors") ||
+				message.includes("preflight")
+			);
+		};
 
 		const fetchShopReviews = async (shopId) => {
 			if (reviewsUnavailable.value) {
@@ -878,8 +924,10 @@ export const useShopStore = defineStore(
 				return;
 			}
 			const key = String(shopId);
+			const shouldUseReviewsApi =
+				!reviewsApiDisabled.value && !shouldSkipReviewsApi();
 
-			if (!reviewsApiDisabled.value) {
+			if (shouldUseReviewsApi) {
 				try {
 					const response = await apiFetch(
 						`/shops/${encodeURIComponent(shopId)}/reviews?limit=50`,
@@ -927,7 +975,10 @@ export const useShopStore = defineStore(
 				if (err) throw err;
 				reviews.value[key] = data || [];
 			} catch (e) {
-				if (isReviewAccessError(e)) {
+				if (
+					isReviewAccessError(e) ||
+					(shouldSkipReviewsApi() && isReviewNetworkError(e))
+				) {
 					reviewsUnavailable.value = true;
 					reviews.value[key] = [];
 					return;
@@ -945,8 +996,10 @@ export const useShopStore = defineStore(
 					error: "reviews_unavailable",
 				};
 			}
+			const shouldUseReviewsApi =
+				!reviewsApiDisabled.value && !shouldSkipReviewsApi();
 
-			if (!reviewsApiDisabled.value) {
+			if (shouldUseReviewsApi) {
 				try {
 					const response = await apiFetch(
 						`/shops/${encodeURIComponent(shopId)}/reviews`,
@@ -1000,7 +1053,10 @@ export const useShopStore = defineStore(
 				reviews.value[String(shopId)].unshift(data);
 				return { success: true, data };
 			} catch (e) {
-				if (isReviewAccessError(e)) {
+				if (
+					isReviewAccessError(e) ||
+					(shouldSkipReviewsApi() && isReviewNetworkError(e))
+				) {
 					reviewsUnavailable.value = true;
 					return { success: false, error: "reviews_unavailable" };
 				}

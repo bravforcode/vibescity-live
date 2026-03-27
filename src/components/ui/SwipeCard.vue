@@ -21,9 +21,6 @@ import {
 	MapPin,
 	Share2,
 	Star,
-	Volume2,
-	VolumeX,
-	Zap,
 } from "lucide-vue-next";
 import {
 	computed,
@@ -37,6 +34,8 @@ import { useI18n } from "vue-i18n";
 import { useGranularAudio } from "@/composables/engine/useGranularAudio.js";
 import { useHaptics } from "@/composables/useHaptics";
 import { useHardwareInfo } from "@/composables/useHardwareInfo";
+import { useVenueImage } from "@/composables/useVenueImage";
+import { resolveVenueMedia } from "@/domain/venue/viewModel";
 import { useFavoritesStore } from "../../store/favoritesStore";
 import { useShopStore } from "../../store/shopStore";
 import {
@@ -71,7 +70,7 @@ const emit = defineEmits([
 	"open-ride",
 ]);
 
-const { selectFeedback, successFeedback, impactFeedback } = useHaptics();
+const { selectFeedback, impactFeedback } = useHaptics();
 const { onSwipe: audioSwipe, onSnap: audioSnap } = useGranularAudio();
 const shopStore = useShopStore();
 const favoritesStore = useFavoritesStore();
@@ -97,12 +96,34 @@ const displayDistance = computed(() => {
 	const d = props.shop?.distance ?? props.shop?.Distance;
 	return d == null ? "Nearby" : `${Number(d).toFixed(1)} km`;
 });
-const displayRating = computed(() => props.shop?.rating ?? "—");
 const displayTime = computed(() => {
 	const o = props.shop?.openTime || props.shop?.OpenTime || "10:00";
 	const c = props.shop?.closeTime || props.shop?.CloseTime || "22:00";
 	return `${o} – ${c}`;
 });
+const resolvedVenueMedia = computed(() => resolveVenueMedia(props.shop || {}));
+const mediaCounts = computed(
+	() =>
+		props.shop?.media_counts ||
+		resolvedVenueMedia.value.counts || { images: 0, videos: 0, total: 0 },
+);
+const realImageCount = computed(() => Number(mediaCounts.value?.images || 0));
+const realVideoCount = computed(() => Number(mediaCounts.value?.videos || 0));
+const venueImage = computed(() =>
+	useVenueImage({
+		Image_URL1:
+			resolvedVenueMedia.value.primaryImage ?? props.shop?.Image_URL1 ?? null,
+		category: displayCategory.value,
+	}),
+);
+const hasRealImage = computed(() => venueImage.value.hasRealImage);
+const placeholderGradient = computed(
+	() => venueImage.value.placeholderGradient,
+);
+const escapeCssUrl = (value) =>
+	String(value || "")
+		.replace(/\\/g, "\\\\")
+		.replace(/"/g, '\\"');
 
 const isGiantPin = computed(
 	() =>
@@ -157,10 +178,19 @@ const toggleFavorite = () => {
 
 const lastTapTime = ref(0);
 const DOUBLE_TAP_MS = 280;
+const activeTouchAction = ref("pan-x");
+const INTERACTIVE_SELECTOR =
+	"button, a, input, select, textarea, [role='button'], [data-interactive='true']";
+
+const isInteractiveTarget = (target) =>
+	target instanceof Element && Boolean(target.closest(INTERACTIVE_SELECTOR));
 
 const handlePointerUp = (e) => {
 	// Only primary button / tap
 	if (e.button !== 0 && e.button !== undefined) return;
+	if (pointerStartedOnInteractive || isInteractiveTarget(e.target)) return;
+	if (gestureActive && (gestureMoved || axisLocked)) return;
+	if (isDragging.value) return;
 	const now = Date.now();
 	if (now - lastTapTime.value < DOUBLE_TAP_MS) {
 		toggleFavorite();
@@ -201,15 +231,9 @@ const shareShop = async () => {
 const videoEl = ref(null);
 const videoLoaded = ref(false);
 const videoError = ref(false);
-const isMuted = ref(true);
-const primaryImageUrl = computed(() => props.shop?.Image_URL1 || "");
+const primaryImageUrl = computed(() => venueImage.value.imageUrl || "");
 const resolvedVideoUrl = computed(() =>
-	getUsableMediaUrl(
-		props.shop?.Video_URL ||
-			props.shop?.video_url ||
-			props.shop?.videoUrl ||
-			"",
-	),
+	getUsableMediaUrl(resolvedVenueMedia.value.videoUrl || ""),
 );
 const canAutoPlayVideo = computed(
 	() => !isSlowNetwork.value && !isLowPowerMode.value,
@@ -228,13 +252,22 @@ const showImageFallback = computed(
 const showMediaPlaceholder = computed(
 	() => !primaryImageUrl.value && (!showVideo.value || !videoLoaded.value),
 );
-
-const toggleMute = () => {
-	if (!videoEl.value) return;
-	isMuted.value = !isMuted.value;
-	videoEl.value.muted = isMuted.value;
-	selectFeedback();
-};
+const surfaceBackdropStyle = computed(() => {
+	if (primaryImageUrl.value) {
+		return {
+			backgroundImage: `url("${escapeCssUrl(primaryImageUrl.value)}")`,
+			backgroundPosition: "center",
+			backgroundRepeat: "no-repeat",
+			backgroundSize: "cover",
+		};
+	}
+	return {
+		background: placeholderGradient.value,
+	};
+});
+const mediaPlaceholderStyle = computed(() => ({
+	background: placeholderGradient.value,
+}));
 
 const handleVideoError = (event) => {
 	if (Number(event?.target?.error?.code || 0) === 1) return;
@@ -253,7 +286,6 @@ watch(
 	() => {
 		videoLoaded.value = false;
 		videoError.value = false;
-		isMuted.value = true;
 		if (videoEl.value) {
 			videoEl.value.pause();
 			videoEl.value.muted = true;
@@ -271,7 +303,6 @@ watch(
 				try {
 					await videoEl.value.play();
 				} catch {
-					isMuted.value = true;
 					videoEl.value.muted = true;
 					videoEl.value.play().catch(() => {});
 				}
@@ -304,6 +335,8 @@ let axisLocked = false; // "vertical" | "horizontal" | false
 let startX = 0;
 let startY = 0;
 let snapTriggered = false;
+let gestureMoved = false;
+let pointerStartedOnInteractive = false;
 let _lastMoveY = 0;
 let _lastMoveT = 0;
 
@@ -320,16 +353,20 @@ const easePull = (raw) => PULL_MAX * (1 - Math.exp(-Math.abs(raw) / 250));
 const onPointerDown = (e) => {
 	if (props.isImmersive) return;
 	if (e.button !== 0) return; // primary only
+	pointerStartedOnInteractive = isInteractiveTarget(e.target);
+	if (pointerStartedOnInteractive) return;
 	// Don't capture here — we track on the document in onPointerMove
 	// to avoid losing tracking to child elements
 	gestureActive = true;
 	axisLocked = false;
 	snapTriggered = false;
+	gestureMoved = false;
 	startX = e.clientX;
 	startY = e.clientY;
 	_lastMoveY = e.clientY;
 	_lastMoveT = performance.now();
 	isDragging.value = false; // only set true once axis locked vertical
+	activeTouchAction.value = "pan-x";
 	attachGlobal();
 };
 
@@ -342,6 +379,7 @@ const onPointerMove = (e) => {
 	if (!axisLocked) {
 		const totalMove = Math.sqrt(dx * dx + dy * dy);
 		if (totalMove < 15) return; // dead-zone: wait for intent (increased from 6 to 15 to prevent accidental swipes)
+		gestureMoved = true;
 		axisLocked = Math.abs(dy) > Math.abs(dx) ? "vertical" : "horizontal";
 	}
 
@@ -349,12 +387,14 @@ const onPointerMove = (e) => {
 		// Horizontal swipe — reset any pull and let parent handle
 		if (pullY.value !== 0) pullY.value = 0;
 		isDragging.value = false;
+		activeTouchAction.value = "pan-x";
 		return;
 	}
 
 	// Vertical — prevent page scroll
 	e.preventDefault();
 	isDragging.value = true;
+	activeTouchAction.value = "none";
 
 	if (dy < 0) {
 		pullY.value = easePull(-dy); // positive value = pulled up
@@ -381,11 +421,14 @@ const onPointerMove = (e) => {
 
 const onPointerUp = () => {
 	if (!gestureActive) {
+		activeTouchAction.value = "pan-x";
+		pointerStartedOnInteractive = false;
 		detachGlobal();
 		return;
 	}
 	gestureActive = false;
 	isDragging.value = false;
+	activeTouchAction.value = "pan-x";
 
 	if (pullY.value > props.threshold * 0.38) {
 		impactFeedback("medium");
@@ -397,6 +440,8 @@ const onPointerUp = () => {
 	} else {
 		pullY.value = 0;
 	}
+	gestureMoved = false;
+	pointerStartedOnInteractive = false;
 	detachGlobal();
 };
 
@@ -433,14 +478,12 @@ const cardStyle = computed(() => ({
 	"--pull": `${pullY.value}px`,
 	"--scale": `${1 - progress.value * 0.04}`,
 	"--radius": `${24 + progress.value * 8}px`,
-	transform: isDragging.value
-		? `translate3d(0, calc(-1 * var(--pull)), 0) scale(var(--scale))`
-		: `translate3d(0, calc(-1 * var(--pull)), 0) scale(var(--scale))`,
+	transform: `translate3d(0, calc(-1 * var(--pull)), 0) scale(var(--scale))`,
 	borderRadius: "var(--radius)",
 	transition: isDragging.value
 		? "none"
 		: "transform 0.55s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.35s ease",
-	willChange: "transform, border-radius",
+	willChange: isDragging.value ? "transform, border-radius" : "auto",
 }));
 
 const infoOpacity = computed(() =>
@@ -461,10 +504,20 @@ const pillTransform = computed(
 		`translateY(${Math.min(0, -pullY.value * 0.12)}px) scale(${0.88 + progress.value * 0.14})`,
 );
 
-const handleManualExpand = () => {
+const handleManualExpand = (event) => {
+	const trigger =
+		event?.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+	trigger?.blur();
 	impactFeedback("medium");
 	audioSnap();
 	emit("expand");
+};
+
+const handleRootKeydown = (e) => {
+	if (e.target !== e.currentTarget) return;
+	if (e.key !== "Enter" && e.key !== " ") return;
+	e.preventDefault();
+	handleManualExpand(e);
 };
 </script>
 
@@ -478,13 +531,20 @@ const handleManualExpand = () => {
     data-testid="shop-card"
     class="sc-root"
     :class="{ 'z-30': isSelected }"
+    :data-active="isActive ? 'true' : 'false'"
+    :data-has-real-image="hasRealImage ? 'true' : 'false'"
+    :data-card-visual="hasRealImage ? 'full-bleed' : 'placeholder'"
+    :style="{ touchAction: activeTouchAction }"
+    :tabindex="!isImmersive ? 0 : -1"
+    :aria-label="!isImmersive ? `Open details for ${displayName}` : undefined"
     @pointerdown="onPointerDown"
     @pointerup="handlePointerUp"
+    @keydown="handleRootKeydown"
   >
     <!-- ════════════════════════════════════════════
          CARD SURFACE
     ════════════════════════════════════════════ -->
-    <div class="sc-surface" :style="cardStyle">
+    <div class="sc-surface" :style="[cardStyle, surfaceBackdropStyle]">
       <!-- ── Media Layer ─────────────────────────── -->
       <div class="sc-media">
         <video
@@ -512,16 +572,17 @@ const handleManualExpand = () => {
         <!-- No media placeholder -->
         <div
           v-if="showMediaPlaceholder"
-          class="sc-media-fill flex items-center justify-center bg-gradient-to-br from-zinc-900 to-zinc-950"
+          class="sc-media-fill flex items-center justify-center"
+          :style="mediaPlaceholderStyle"
         >
-          <div class="flex flex-col items-center gap-3 text-zinc-600">
+          <div class="flex flex-col items-center gap-3 text-white/70">
             <div
-              class="w-14 h-14 rounded-full border border-zinc-800 flex items-center justify-center"
+              class="w-14 h-14 rounded-full border border-white/20 bg-black/15 backdrop-blur-sm flex items-center justify-center"
             >
               <ImageOff class="w-6 h-6" />
             </div>
             <span class="text-[9px] uppercase tracking-widest font-bold"
-              >No Preview</span
+              >{{ displayCategory }}</span
             >
           </div>
         </div>
@@ -536,21 +597,6 @@ const handleManualExpand = () => {
 
       <!-- ── Base Gradient ──────────────────────── -->
       <div class="sc-gradient" aria-hidden="true" />
-
-      <!-- ── Volume Toggle ─────────────────────── -->
-      <Transition name="fade">
-        <button
-          v-if="showVideo"
-          class="sc-action-btn absolute top-3 right-[3.75rem] z-30"
-          :aria-label="isMuted ? t('a11y.unmute_video') : t('a11y.mute_video')"
-          @click.stop="toggleMute"
-        >
-          <component
-            :is="isMuted ? VolumeX : Volume2"
-            class="w-[18px] h-[18px]"
-          />
-        </button>
-      </Transition>
 
       <!-- ── Badges ────────────────────────────── -->
       <div
@@ -620,59 +666,49 @@ const handleManualExpand = () => {
         class="sc-info"
         :style="{ opacity: infoOpacity, transition: 'opacity 0.15s ease' }"
       >
-        <!-- Venue Name -->
-        <h4 class="sc-venue-name">{{ displayName }}</h4>
+        <div class="sc-info-surface">
+          <h4 class="sc-venue-name">{{ displayName }}</h4>
 
-        <!-- Meta row -->
-        <div class="flex items-center gap-1.5 mb-1.5">
-          <span class="sc-chip">{{ displayCategory }}</span>
-          <span class="sc-meta-item">
-            <Clock class="w-3 h-3 flex-shrink-0" aria-hidden="true" />
-            {{ displayTime }}
-          </span>
-          <span class="sc-meta-item">
-            <MapPin class="w-3 h-3 flex-shrink-0" aria-hidden="true" />
-            {{ displayDistance }}
-          </span>
-        </div>
-
-        <!-- Stats Row -->
-        <div class="flex items-center gap-2 mb-1.5">
-          <!-- Rating -->
-          <div class="sc-stat-pill">
-            <span class="sc-rating-dot" aria-hidden="true" />
-            <span class="text-xs font-bold text-white tabular-nums">{{
-              displayRating
-            }}</span>
+          <div class="sc-meta-row">
+            <span class="sc-chip">{{ displayCategory }}</span>
+            <span class="sc-meta-item sc-meta-item--distance">
+              <MapPin class="w-3 h-3 flex-shrink-0" aria-hidden="true" />
+              {{ displayDistance }}
+            </span>
+            <span v-if="realImageCount > 0" class="sc-meta-item">
+              IMG {{ realImageCount }}
+            </span>
+            <span v-if="realVideoCount > 0" class="sc-meta-item">
+              VID {{ realVideoCount }}
+            </span>
           </div>
-          <!-- Open/Live indicator -->
-          <div v-if="isLive" class="sc-stat-pill sc-stat-pill--live">
-            <Zap class="w-3 h-3 text-red-400" aria-hidden="true" />
-            <span class="text-[10px] font-bold text-red-400">Live Now</span>
-          </div>
-        </div>
 
-        <!-- CTA: Share + Ride (side-by-side) -->
-        <div class="flex gap-1.5">
-          <button
-            class="sc-cta sc-cta--full"
-            :aria-label="t('common.share')"
-            @click.stop="shareShop"
-          >
-            <Share2 class="w-4 h-4 flex-shrink-0" aria-hidden="true" />
-            <span>{{ t("common.share") }}</span>
-          </button>
-          <button
-            class="sc-cta sc-cta--full"
-            :aria-label="`${t('common.ride')} to ${displayName}`"
-            @click.stop="emit('open-ride')"
-          >
-            <Car class="w-4 h-4 flex-shrink-0" aria-hidden="true" />
-            <span>{{ t("common.ride") }}</span>
-            <span class="ml-auto text-[10px] font-normal opacity-60">{{
-              displayDistance
-            }}</span>
-          </button>
+          <div class="sc-sub-row">
+            <div class="sc-stat-pill sc-stat-pill--time">
+              <Clock class="w-3 h-3 flex-shrink-0" aria-hidden="true" />
+              <span>{{ displayTime }}</span>
+            </div>
+          </div>
+
+          <div class="sc-cta-row">
+            <button
+              class="sc-cta sc-cta--secondary sc-cta--icon"
+              :aria-label="t('common.share')"
+              @click.stop="shareShop"
+            >
+              <Share2 class="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+              <span class="sr-only">{{ t("common.share") }}</span>
+            </button>
+            <button
+              class="sc-cta sc-cta--primary"
+              :aria-label="`${t('common.ride')} to ${displayName}`"
+              @click.stop="emit('open-ride')"
+            >
+              <Car class="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+              <span>{{ t("common.ride") }}</span>
+              <span class="sc-cta-distance">{{ displayDistance }}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -697,11 +733,12 @@ const handleManualExpand = () => {
     <div
       class="sc-pill-wrap pointer-events-none"
       :style="{ opacity: pillOpacity, transform: pillTransform }"
-      aria-hidden="true"
+      :aria-hidden="pillOpacity < 0.15"
     >
       <button
         class="sc-pill pointer-events-auto"
-        tabindex="-1"
+        :tabindex="pillOpacity < 0.15 ? -1 : 0"
+        :aria-label="t('shop.details')"
         @click.stop="handleManualExpand"
       >
         <ChevronUp
@@ -738,6 +775,7 @@ const handleManualExpand = () => {
   pointer-events: auto;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
+  cursor: pointer;
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -749,14 +787,16 @@ const handleManualExpand = () => {
   height: 100%;
   border-radius: 24px;
   overflow: hidden;
-  background: #0f0f12;
-  border: 1px solid rgba(255 255 255 / 0.06);
+  background:
+    radial-gradient(circle at top, rgba(255 255 255 / 0.08), transparent 36%),
+    linear-gradient(180deg, #0c1017 0%, #06080d 100%);
+  border: 1px solid rgba(255 255 255 / 0.08);
 
   /* Shadow stack: ambient + directional + glow */
   box-shadow:
-    0 4px 6px -1px rgba(0 0 0 / 0.5),
-    0 20px 50px -12px rgba(0 0 0 / 0.7),
-    0 0 0 0.5px rgba(255 255 255 / 0.04) inset;
+    0 8px 24px rgba(0 0 0 / 0.34),
+    0 26px 60px rgba(0 0 0 / 0.52),
+    0 0 0 0.5px rgba(255 255 255 / 0.06) inset;
 
   backface-visibility: hidden;
   transform: translateZ(0);
@@ -777,7 +817,6 @@ const handleManualExpand = () => {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  will-change: transform;
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -789,7 +828,7 @@ const handleManualExpand = () => {
   pointer-events: none;
   z-index: 10;
   mix-blend-mode: overlay;
-  opacity: 0.45;
+  opacity: 0.16;
 }
 .sc-glow {
   position: absolute;
@@ -824,12 +863,22 @@ const handleManualExpand = () => {
 .sc-gradient {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    to top,
-    rgba(0, 0, 0, 0.94) 0%,
-    rgba(0, 0, 0, 0.35) 40%,
-    transparent 80%
-  );
+  background:
+    linear-gradient(
+      to top,
+      rgba(2, 6, 12, 0.97) 0%,
+      rgba(3, 10, 18, 0.82) 24%,
+      rgba(7, 14, 22, 0.42) 54%,
+      rgba(7, 10, 14, 0.12) 78%,
+      transparent 100%
+    ),
+    linear-gradient(
+      135deg,
+      rgba(0, 0, 0, 0.38) 0%,
+      rgba(0, 0, 0, 0.08) 38%,
+      rgba(0, 0, 0, 0.44) 100%
+    ),
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.14), transparent 32%);
   pointer-events: none;
   z-index: 10;
 }
@@ -841,16 +890,16 @@ const handleManualExpand = () => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 9px;
+  min-height: 24px;
+  padding: 4px 10px;
   border-radius: 999px;
   font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  backdrop-filter: blur(8px);
 }
 .sc-badge--live {
-  background: rgba(220 38 38 / 0.85);
+  background: #b91c1c;
   color: #fff;
   border: 1px solid rgba(248 113 113 / 0.4);
 }
@@ -883,24 +932,22 @@ const handleManualExpand = () => {
   align-items: center;
   justify-content: center;
   color: #fff;
-  background: rgba(0 0 0 / 0.45);
-  backdrop-filter: blur(12px) saturate(180%);
-  border: 1px solid rgba(255 255 255 / 0.1);
+  background: rgba(7 10 16 / 0.58);
+  border: 1px solid rgba(255 255 255 / 0.14);
+  backdrop-filter: blur(14px) saturate(1.16);
   transition:
     background 0.2s ease,
     transform 0.15s ease,
     box-shadow 0.2s ease;
-  /* GPU  */
-  will-change: transform;
 }
 .sc-action-btn:active {
   transform: scale(0.88);
 }
 .sc-action-btn:hover {
-  background: rgba(0 0 0 / 0.62);
+  background: rgba(15 23 42 / 0.72);
 }
 .sc-action-btn--active {
-  background: rgba(236 72 153 / 0.55);
+  background: #8f174b;
   border-color: rgba(236 72 153 / 0.45);
   box-shadow: 0 0 18px rgba(236 72 153 / 0.35);
 }
@@ -951,75 +998,132 @@ const handleManualExpand = () => {
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 0.5rem 0.65rem 0.55rem;
+  padding: 0.55rem 0.65rem 0.75rem;
   z-index: 20;
   overflow: hidden;
 }
 
+.sc-info-surface {
+  border-radius: 20px 20px 18px 18px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  padding: 0.72rem 0.75rem 0.74rem;
+}
+
 .sc-venue-name {
-  font-size: clamp(1rem, 0.78rem + 1cqi, 1.35rem);
+  font-size: clamp(0.88rem, 0.72rem + 0.9cqi, 1.25rem);
   font-weight: 900;
   color: #fff;
-  line-height: 1.2;
+  line-height: 1.12;
   letter-spacing: -0.02em;
-  margin-bottom: 0.2rem;
+  margin-bottom: 0.42rem;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* Single-line truncate */
+  /* Keep long venue names readable on narrow cards. */
   display: -webkit-box;
-  -webkit-line-clamp: 1;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  text-shadow: 0 2px 12px rgba(0 0 0 / 0.6);
+  overflow-wrap: anywhere;
+  text-shadow:
+    0 2px 10px rgba(0 0 0 / 0.78),
+    0 0 18px rgba(0 0 0 / 0.46);
+}
+
+.sc-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+  flex-wrap: wrap;
+  min-width: 0;
+  margin-bottom: 0.42rem;
 }
 
 .sc-chip {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 64%;
+  padding: 0.32rem 0.55rem;
+  border-radius: 999px;
   background: rgba(255 255 255 / 0.16);
-  backdrop-filter: blur(6px);
-  border: 1px solid rgba(255 255 255 / 0.08);
+  border: 1px solid rgba(255 255 255 / 0.22);
   font-size: clamp(0.58rem, 0.5rem + 0.4cqi, 0.65rem);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: rgba(255 255 255 / 0.9);
+  color: rgba(255 255 255 / 0.98);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 6px rgba(0 0 0 / 0.55);
 }
 
 .sc-meta-item {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   font-size: clamp(0.6rem, 0.55rem + 0.36cqi, 0.72rem);
-  color: rgba(255 255 255 / 0.65);
+  color: rgba(241 245 249 / 0.98);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-shadow: 0 1px 6px rgba(0 0 0 / 0.65);
+}
+
+.sc-meta-item--distance {
+  margin-left: auto;
+  flex: 0 1 auto;
+  max-width: 44%;
+  padding: 0.32rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(8 145 178 / 0.24);
+  border: 1px solid rgba(103 232 249 / 0.28);
+  color: rgba(186 230 253 / 0.95);
+}
+
+.sc-sub-row {
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  margin-bottom: 0.58rem;
 }
 
 .sc-stat-pill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
+  gap: 4px;
+  min-height: 24px;
+  padding: 0.26rem 0.48rem;
   border-radius: 999px;
-  background: rgba(0 0 0 / 0.45);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255 255 255 / 0.08);
+  background: rgba(255 255 255 / 0.14);
+  border: 1px solid rgba(255 255 255 / 0.18);
+  color: rgba(255 255 255 / 0.96);
+  flex-shrink: 0;
+  text-shadow: 0 1px 6px rgba(0 0 0 / 0.65);
 }
-.sc-stat-pill--live {
-  border-color: rgba(239 68 68 / 0.3);
+.sc-stat-pill--time {
+  color: rgba(226 232 240 / 0.82);
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 
-.sc-rating-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #facc15;
-  flex-shrink: 0;
-  box-shadow: 0 0 6px #facc15aa;
+.sc-stat-pill--time span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sc-cta-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 0.55rem;
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -1031,23 +1135,41 @@ const handleManualExpand = () => {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 11px 16px;
+  min-height: 44px;
+  padding: 0.72rem 0.8rem;
   border-radius: 14px;
   font-size: clamp(0.72rem, 0.62rem + 0.58cqi, 0.92rem);
-  font-weight: 700;
+  font-weight: 800;
   color: #fff;
-  background: linear-gradient(100deg, #4f46e5 0%, #0ea5e9 100%);
-  border: 1px solid rgba(129 140 248 / 0.25);
-  box-shadow:
-    0 4px 18px rgba(79 70 229 / 0.35),
-    0 1px 0 rgba(255 255 255 / 0.08) inset;
+  border: 1px solid transparent;
+  box-shadow: 0 10px 22px rgba(2 6 23 / 0.26);
   transition:
     filter 0.18s ease,
     transform 0.14s ease;
-  will-change: transform;
 }
-.sc-cta--full {
-  padding: 7px 10px;
+.sc-cta--secondary {
+  justify-content: flex-start;
+  background: rgba(255 255 255 / 0.14);
+  border-color: rgba(255 255 255 / 0.2);
+  color: rgba(255 255 255 / 0.92);
+}
+
+.sc-cta--primary {
+  justify-content: flex-start;
+  background: linear-gradient(100deg, #0f4c81 0%, #0891b2 100%);
+  border-color: rgba(103 232 249 / 0.22);
+}
+
+.sc-cta--icon {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.sc-cta-distance {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255 255 255 / 0.72);
 }
 .sc-cta:active {
   transform: scale(0.97);
@@ -1079,8 +1201,7 @@ const handleManualExpand = () => {
   width: 36px;
   height: 4px;
   border-radius: 999px;
-  background: rgba(255 255 255 / 0.35);
-  backdrop-filter: blur(4px);
+  background: rgba(255 255 255 / 0.55);
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -1093,10 +1214,15 @@ const handleManualExpand = () => {
   right: 0;
   display: flex;
   justify-content: center;
-  z-index: 0;
+  z-index: 30;
   transition:
     opacity 0.15s ease,
     transform 0.15s ease;
+}
+
+[data-active="false"] .sc-info,
+[data-active="false"] .sc-action-btn {
+  pointer-events: none;
 }
 
 .sc-pill {
@@ -1105,8 +1231,7 @@ const handleManualExpand = () => {
   gap: 6px;
   padding: 8px 18px;
   border-radius: 999px;
-  background: rgba(0 0 0 / 0.65);
-  backdrop-filter: blur(20px) saturate(180%);
+  background: #0b0f16;
   border: 1px solid rgba(255 255 255 / 0.1);
   box-shadow: 0 8px 32px rgba(0 0 0 / 0.4);
   font-size: 10px;
@@ -1167,13 +1292,42 @@ const handleManualExpand = () => {
   }
 }
 
-@container (max-width: 14rem) {
+@container (max-width: 13rem) {
   .sc-info {
-    padding: 0.45rem 0.65rem 0.5rem;
+    padding: 0.45rem 0.6rem 0.58rem;
+  }
+
+  .sc-info-surface {
+    padding: 0.66rem;
+  }
+
+  .sc-meta-row,
+  .sc-sub-row,
+  .sc-cta-row {
+    gap: 0.38rem;
   }
 
   .sc-cta {
-    padding: 0.4rem 0.7rem;
+    padding-inline: 0.72rem;
+  }
+}
+
+@container (max-width: 10.5rem) {
+  .sc-chip {
+    max-width: 100%;
+  }
+
+  .sc-meta-item--distance {
+    max-width: 100%;
+    margin-left: 0;
+  }
+
+  .sc-stat-pill--time {
+    display: none;
+  }
+
+  .sc-cta-distance {
+    display: none;
   }
 }
 </style>

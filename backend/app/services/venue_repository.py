@@ -1,5 +1,7 @@
 from typing import Any
 
+from postgrest import APIError
+
 from app.core.cache import vector_search_cache
 
 
@@ -22,7 +24,7 @@ class VenueRepository:
                 .order("created_at", desc=True)
                 .execute()
             )
-        except Exception:
+        except (APIError, RuntimeError, ValueError):
             return (
                 self.client.table("shops")
                 .select("*")
@@ -42,7 +44,7 @@ class VenueRepository:
             )
             if response and response.data:
                 return response.data.get("owner_id")
-        except Exception:
+        except (APIError, RuntimeError, ValueError):
             pass
 
         try:
@@ -55,7 +57,7 @@ class VenueRepository:
             )
             if response and response.data:
                 return response.data.get("owner_id")
-        except Exception:
+        except (APIError, RuntimeError, ValueError):
             return None
         return None
 
@@ -69,7 +71,7 @@ class VenueRepository:
                 .eq("id", venue_id)
                 .execute()
             )
-        except Exception:
+        except (APIError, RuntimeError, ValueError):
             return (
                 self.client.table("shops")
                 .update({"status": "active", "is_verified": True})
@@ -86,5 +88,5 @@ class VenueRepository:
         }
         try:
             return self.client.table("venues").update(payload).eq("id", venue_id).execute()
-        except Exception:
+        except (APIError, RuntimeError, ValueError):
             return self.client.table("shops").update(payload).eq("id", venue_id).execute()

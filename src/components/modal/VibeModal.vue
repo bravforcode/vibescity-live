@@ -2,7 +2,6 @@
 import { useMotion } from "@vueuse/motion";
 import {
 	computed,
-	defineAsyncComponent,
 	inject,
 	nextTick,
 	onMounted,
@@ -14,9 +13,10 @@ import {
 import { useChromaticGlass } from "../../composables/engine/useChromaticGlass.js";
 import { useGranularAudio } from "../../composables/engine/useGranularAudio.js";
 import { useHaptics } from "../../composables/useHaptics";
+import { usePerformance } from "../../composables/usePerformance";
 import { Z } from "../../constants/zIndex";
 import { resolveVenueMedia } from "../../domain/venue/viewModel";
-import { searchVenueVideo } from "../../services/youtubeService.js";
+import { defineResilientAsync } from "../../utils/asyncComponentFactory";
 import { getMediaDetails } from "../../utils/linkHelper";
 import {
 	markMediaElementFailed,
@@ -26,23 +26,29 @@ import {
 // ==========================================
 // ✅ LAZY LOADED COMPONENTS
 // ==========================================
-const VisitorCount = defineAsyncComponent({
-	loader: () => import("../ui/VisitorCount.vue"),
-	delay: 200,
-	timeout: 10000,
-});
+const VisitorCount = defineResilientAsync(
+	() => import("../ui/VisitorCount.vue"),
+	{
+		delay: 200,
+		timeout: 10000,
+	},
+);
 
-const ReviewSystem = defineAsyncComponent({
-	loader: () => import("../ui/ReviewSystem.vue"),
-	delay: 200,
-	timeout: 10000,
-});
+const ReviewSystem = defineResilientAsync(
+	() => import("../ui/ReviewSystem.vue"),
+	{
+		delay: 200,
+		timeout: 10000,
+	},
+);
 
-const PhotoGallery = defineAsyncComponent({
-	loader: () => import("../ui/PhotoGallery.vue"),
-	delay: 120,
-	timeout: 10000,
-});
+const PhotoGallery = defineResilientAsync(
+	() => import("../ui/PhotoGallery.vue"),
+	{
+		delay: 120,
+		timeout: 10000,
+	},
+);
 
 // ==========================================
 // ✅ IMPORTS
@@ -94,6 +100,7 @@ const DISMISS_THRESHOLD = {
 // ==========================================
 const { t } = useI18n();
 const { selectFeedback, successFeedback, impactFeedback } = useHaptics();
+const { isLowPowerMode } = usePerformance();
 const {
 	onSwipe: audioSwipe,
 	onSnap: audioSnap,
@@ -127,10 +134,17 @@ const emit = defineEmits(["close", "toggle-favorite"]);
 
 // UI State
 const modalCard = ref(null);
+const prefersCoarsePointer =
+	typeof window !== "undefined" &&
+	window.matchMedia?.("(pointer: coarse)")?.matches === true;
+const preferLiteModalEffects = ref(
+	prefersCoarsePointer || isLowPowerMode.value,
+);
 // Refractive glass panel — placed after modalCard so ref is captured
 const { enabled: glassEnabled, fallbackClass } = useChromaticGlass({
 	panelId: "vibe-modal",
 	panelRef: modalCard,
+	enabled: () => !preferLiteModalEffects.value,
 	aberration: 0.006,
 });
 const scrollContentRef = ref(null);
@@ -184,38 +198,17 @@ const lastPointerTap = ref(0);
 // ==========================================
 
 const resolvedVenueMedia = computed(() => resolveVenueMedia(props.shop || {}));
-
-// YouTube video found via search (lazy-fetched when modal opens)
-const youtubeVideoUrl = ref(null);
-watch(
-	() => props.shop?.id,
-	async (shopId) => {
-		if (!shopId) {
-			youtubeVideoUrl.value = null;
-			return;
-		}
-		const base = resolvedVenueMedia.value;
-		// Only search YouTube if venue has no existing videoUrl
-		if (base.videoUrl) {
-			youtubeVideoUrl.value = null;
-			return;
-		}
-		youtubeVideoUrl.value = await searchVenueVideo(
-			props.shop?.name || "",
-			props.shop?.city || props.shop?.province || "",
-		);
-	},
-	{ immediate: true },
+const resolvedMediaCounts = computed(
+	() =>
+		props.shop?.media_counts ||
+		resolvedVenueMedia.value.counts || { images: 0, videos: 0, total: 0 },
 );
 
 const media = computed(() => {
 	try {
 		const resolved = resolvedVenueMedia.value;
 		const mediaUrl =
-			resolved.videoUrl ||
-			youtubeVideoUrl.value ||
-			resolved.primaryImage ||
-			FALLBACK_IMAGE;
+			resolved.videoUrl || resolved.primaryImage || FALLBACK_IMAGE;
 		return getMediaDetails(mediaUrl);
 	} catch (error) {
 		console.error("Error processing media:", error);
@@ -257,13 +250,36 @@ const fallbackPosterCategory = computed(
 const safeTopOffset = computed(
 	() => "calc(env(safe-area-inset-top) + 0.75rem)",
 );
+const modalBackdropClass = computed(() =>
+	preferLiteModalEffects.value
+		? "absolute inset-0 bg-black/78 transition-opacity duration-200"
+		: "absolute inset-0 bg-black/70 backdrop-blur-xl transition-opacity duration-300",
+);
+const modalSurfaceClass = computed(() =>
+	preferLiteModalEffects.value
+		? "relative w-full md:max-w-5xl bg-white dark:bg-[#0a0a12] md:rounded-[2rem] rounded-t-[2rem] flex flex-col shadow-[0_-6px_24px_rgba(0,0,0,0.32)] max-h-[72vh] md:max-h-[76vh] pointer-events-auto overflow-hidden"
+		: "relative w-full md:max-w-5xl bg-white dark:bg-[#0a0a12] md:rounded-[2rem] rounded-t-[2rem] flex flex-col shadow-[0_-8px_48px_rgba(0,0,0,0.5)] max-h-[72vh] md:max-h-[76vh] pointer-events-auto overflow-hidden",
+);
+const closeButtonClass = computed(() =>
+	preferLiteModalEffects.value
+		? "absolute right-4 z-50 flex h-8 w-8 items-center justify-center rounded-full border border-white/12 bg-black/35 transition active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 dark:bg-white/12"
+		: "absolute right-4 z-50 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/10 backdrop-blur-xl transition active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 dark:bg-white/10",
+);
 
 const processedImages = computed(() => {
 	try {
 		const items = [];
 		const resolved = resolvedVenueMedia.value;
-		const videoSrc = resolved.videoUrl || youtubeVideoUrl.value;
-		if (videoSrc) items.push(videoSrc);
+		const structuredItems = Array.isArray(resolved.items) ? resolved.items : [];
+		structuredItems.forEach((item) => {
+			try {
+				const url = getMediaDetails(item.url)?.url;
+				if (url && !items.includes(url)) items.push(url);
+			} catch {}
+		});
+		if (items.length > 0) return items;
+
+		if (resolved.videoUrl) items.push(resolved.videoUrl);
 
 		const images = Array.isArray(resolved.images) ? resolved.images : [];
 		images.forEach((img) => {
@@ -291,7 +307,13 @@ const isVideo = (url) => {
 const hasGallery = computed(() => processedImages.value.length > 0);
 
 const hasSocialLinks = computed(
-	() => props.shop?.IG_URL || props.shop?.FB_URL || props.shop?.TikTok_URL,
+	() =>
+		props.shop?.IG_URL ||
+		props.shop?.FB_URL ||
+		props.shop?.TikTok_URL ||
+		props.shop?.social_links?.instagram ||
+		props.shop?.social_links?.facebook ||
+		props.shop?.social_links?.tiktok,
 );
 
 const shopStatus = computed(() => props.shop?.status || "UNKNOWN");
@@ -896,6 +918,8 @@ const getParticleStyle = (index) => {
 onMounted(() => {
 	try {
 		isMobile.value = isMobileDevice();
+		preferLiteModalEffects.value =
+			isLowPowerMode.value || isMobile.value || prefersCoarsePointer;
 		initialVisitorCount.value = Math.floor(Math.random() * 50) + 10;
 
 		updateCountdown();
@@ -962,7 +986,7 @@ onUnmounted(() => {
   >
     <!-- iOS-Style Backdrop with Blur -->
     <div
-      class="absolute inset-0 bg-black/70 backdrop-blur-xl transition-opacity duration-300"
+      :class="modalBackdropClass"
       :style="{ opacity: 1 - dragProgress * 0.5 }"
       @click="handleClose"
     />
@@ -973,8 +997,7 @@ onUnmounted(() => {
       @touchstart.stop="handleTouchStart"
       @touchmove.stop="handleTouchMove"
       @touchend.stop="handleTouchEnd"
-      class="relative w-full md:max-w-5xl bg-white dark:bg-[#0a0a12] md:rounded-[2rem] rounded-t-[2rem] flex flex-col shadow-[0_-8px_48px_rgba(0,0,0,0.5)] max-h-[72vh] md:max-h-[76vh] pointer-events-auto overflow-hidden"
-      :class="fallbackClass"
+      :class="[modalSurfaceClass, fallbackClass]"
       :style="{
         zIndex: Z.MODAL,
         '--safe-area-top': 'env(safe-area-inset-top)',
@@ -1003,7 +1026,7 @@ onUnmounted(() => {
       <button
         @click="handleClose"
         aria-label="Close details"
-        class="absolute right-4 z-50 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/10 backdrop-blur-xl transition active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 dark:bg-white/10"
+        :class="closeButtonClass"
         :style="{ top: safeTopOffset }"
       >
         <X class="w-5 h-5 text-gray-700 dark:text-white" />
@@ -1137,7 +1160,7 @@ onUnmounted(() => {
               <span
                 class="text-sm font-black text-gray-900 dark:text-white mt-0.5"
               >
-                {{ processedImages.length }}
+                {{ resolvedMediaCounts.images }}
               </span>
             </div>
           </div>
@@ -1286,7 +1309,9 @@ onUnmounted(() => {
           <h4
             class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3"
           >
-            {{ t("vibe.gallery") }} ({{ processedImages.length }})
+            {{
+              t("vibe.gallery")
+            }} ({{ resolvedMediaCounts.total || processedImages.length }})
           </h4>
 
           <div class="relative">
@@ -1428,8 +1453,8 @@ onUnmounted(() => {
           </h4>
           <div class="grid grid-cols-3 gap-2">
             <a
-              v-if="shop.IG_URL"
-              :href="shop.IG_URL"
+              v-if="shop.IG_URL || shop.social_links?.instagram"
+              :href="shop.IG_URL || shop.social_links?.instagram"
               target="_blank"
               rel="noopener noreferrer"
               @click="impactFeedback('medium')"
@@ -1440,8 +1465,8 @@ onUnmounted(() => {
             </a>
 
             <a
-              v-if="shop.FB_URL"
-              :href="shop.FB_URL"
+              v-if="shop.FB_URL || shop.social_links?.facebook"
+              :href="shop.FB_URL || shop.social_links?.facebook"
               target="_blank"
               rel="noopener noreferrer"
               @click="impactFeedback('medium')"
@@ -1452,8 +1477,8 @@ onUnmounted(() => {
             </a>
 
             <a
-              v-if="shop.TikTok_URL"
-              :href="shop.TikTok_URL"
+              v-if="shop.TikTok_URL || shop.social_links?.tiktok"
+              :href="shop.TikTok_URL || shop.social_links?.tiktok"
               target="_blank"
               rel="noopener noreferrer"
               @click="impactFeedback('medium')"

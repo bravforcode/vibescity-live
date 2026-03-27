@@ -1,13 +1,19 @@
 
+import asyncio
+import logging
+
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
+from postgrest import APIError
 from pydantic import BaseModel, Field
 
 from app.core.rate_limit import limiter
 from app.core.supabase import supabase, supabase_admin
 from app.services.shop_service import shop_service
+from app.services.venue_media_service import venue_media_service
 
 router = APIRouter()
+logger = logging.getLogger("app.shops")
 REVIEW_SELECT_PRIMARY = "id,venue_id,rating,comment,user_name,created_at"
 REVIEW_SELECT_FALLBACK = "id,venue_id,rating,content,user_id,status,created_at"
 
@@ -46,7 +52,7 @@ def _fetch_review_rows(db, shop_id: str, limit: int) -> list[dict]:
                 .execute()
             )
             return response.data or []
-        except Exception as exc:  # pragma: no cover - defensive fallback
+        except APIError as exc:  # pragma: no cover - defensive fallback
             last_error = exc
     if last_error:
         raise last_error
@@ -88,7 +94,7 @@ def _insert_review_row(
             )
             rows = response.data or []
             return rows[0] if rows else payload
-        except Exception as exc:  # pragma: no cover - defensive fallback
+        except APIError as exc:  # pragma: no cover - defensive fallback
             last_error = exc
     if last_error:
         raise last_error
@@ -105,6 +111,52 @@ async def read_shops(request: Request):
         content=data,
         headers={"Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=60"},
     )
+
+
+@router.get("/media", response_model=dict)
+@limiter.limit("30/minute")
+async def read_shop_media_index(
+    request: Request,
+    limit: int = Query(default=1000, ge=1, le=5000),
+    offset: int = Query(default=0, ge=0),
+    include_missing: bool = Query(default=True),
+):
+    """
+    Retrieve normalized real media coverage for all shops.
+    """
+    payload = await asyncio.to_thread(
+        venue_media_service.list_shop_media,
+        limit=limit,
+        offset=offset,
+        include_missing=include_missing,
+    )
+    return JSONResponse(
+        content=payload,
+        headers={"Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=60"},
+    )
+
+
+@router.get("/{shop_id}/media", response_model=dict)
+@limiter.limit("60/minute")
+async def read_shop_media(
+    request: Request,
+    shop_id: str,
+    hydrate_missing_image: bool = Query(default=True),
+):
+    """
+    Retrieve normalized real media for a single shop.
+    """
+    payload = await venue_media_service.get_shop_media(
+        shop_id,
+        hydrate_missing_image=hydrate_missing_image,
+    )
+    if not payload:
+        raise HTTPException(status_code=404, detail="Shop media not found")
+    return JSONResponse(
+        content=payload,
+        headers={"Cache-Control": "public, max-age=30, s-maxage=120, stale-while-revalidate=30"},
+    )
+
 
 @router.get("/{shop_id}", response_model=dict)
 @limiter.limit("120/minute")
@@ -136,7 +188,8 @@ async def read_shop_reviews(
             content=[_normalize_review_row(row) for row in rows],
             headers={"Cache-Control": "public, max-age=30, s-maxage=120, stale-while-revalidate=30"},
         )
-    except Exception:
+    except APIError as exc:
+        logger.warning("shop_reviews_fetch_failed", extra={"shop_id": shop_id, "err": str(exc)})
         # Fail-open for UI smoothness.
         return []
 
@@ -168,5 +221,6 @@ async def create_shop_review(
             user_name=normalized_user,
         )
         return _normalize_review_row(created)
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to create review: {exc}") from exc
+    except APIError as exc:
+        logger.error("shop_review_create_failed", extra={"shop_id": shop_id, "err": str(exc)})
+        raise HTTPException(status_code=500, detail="Failed to create review") from exc

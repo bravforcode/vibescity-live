@@ -56,4 +56,63 @@ describe("resolveVenueMedia", () => {
 			images: ["https://cdn.example.com/media/fallback.jpg"],
 		});
 	});
+
+	it("prefers authoritative real media over legacy image and video fields", () => {
+		const venue = {
+			Image_URL1: "https://cdn.example.com/media/legacy.jpg",
+			Video_URL: "https://youtube.com/watch?v=legacy",
+			real_media: [
+				{
+					type: "image",
+					url: "https://cdn.example.com/media/real-cover.jpg",
+				},
+				{
+					type: "video",
+					url: "https://cdn.example.com/media/real-reel.mp4",
+				},
+			],
+			media_counts: {
+				images: 1,
+				videos: 1,
+				total: 2,
+			},
+		};
+
+		expect(resolveVenueMedia(venue)).toMatchObject({
+			videoUrl: "https://cdn.example.com/media/real-reel.mp4",
+			primaryImage: "https://cdn.example.com/media/real-cover.jpg",
+			images: ["https://cdn.example.com/media/real-cover.jpg"],
+			counts: {
+				images: 1,
+				videos: 1,
+				total: 2,
+			},
+			hasRealMedia: true,
+		});
+	});
+
+	it("does not fall back to legacy media when explicit real media counts are zero", () => {
+		const venue = {
+			Image_URL1: "https://cdn.example.com/media/legacy.jpg",
+			Video_URL: "https://cdn.example.com/media/legacy.mp4",
+			real_media: [],
+			media_counts: {
+				images: 0,
+				videos: 0,
+				total: 0,
+			},
+		};
+
+		expect(resolveVenueMedia(venue)).toMatchObject({
+			videoUrl: "",
+			primaryImage: "",
+			images: [],
+			counts: {
+				images: 0,
+				videos: 0,
+				total: 0,
+			},
+			hasRealMedia: true,
+		});
+	});
 });

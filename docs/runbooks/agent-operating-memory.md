@@ -2,8 +2,8 @@
 
 > Read this file before every work session in `C:\vibecity.live`.
 
-- Last updated: 2026-03-25
-- Current focus: Home / map / dashboard recovery remains the functional baseline, and phase 2 repository stabilization has now cleared the repo's merge-blocker state. The latest tranche resolved all previously unmerged files, kept the MapLibre migration baseline, tightened Vercel CSP, and aligned Supabase Edge `verify_jwt` policy for admin-only functions while backend-side `get_map_pins` 500 investigation remains a separate follow-up.
+- Last updated: 2026-03-27
+- Current focus: Real-shop-media is the active tranche again, with cards, drawers, and the venue modal now expected to render from `real_media` / `media_counts` instead of external Google photo or YouTube fallback sources.
 - Canonical skill: `.agents/skills/vibecity-session-handoff/SKILL.md`
 
 ## Start Every Session
@@ -25,8 +25,9 @@
   - `VITE_DIRECTIONS_DEV=false`
 - `rsbuild.config.ts` keeps HMR on `/rsbuild-hmr`, uses `logLevel: "warn"`, and now follows the current page host/port by default.
 - Only set `RSBUILD_HMR_HOST` or `RSBUILD_HMR_PORT` when a proxy or alternate origin truly requires an override.
-- Frontend-only local dev now uses `/map-styles/vibecity-dev.json` as the default local fallback style instead of the full neon style.
-- Frontend-only local dev on Chromium now defaults to `preview` renderer mode via `getLocalDevMapRendererMode()`; use `VITE_LOCAL_DEV_MAP_RENDERER=webgl` or the in-app "Open full WebGL map" session opt-in only when intentionally testing the raw renderer.
+- The map now uses `/map-styles/vibecity-neon.json` as the default fallback style in all frontend lanes, including localhost.
+- Localhost Chromium now boots directly into the same WebGL renderer path as production; the temporary preview HUD, preview pins, and session renderer toggle have been removed.
+- Legacy session keys such as `vibecity.dev.mapRenderer` are now ignored by the app and no longer affect renderer selection.
 - Map lifecycle includes WebGL context loss detection and controlled recovery via `useMapCore` and `MapLibreContainer.vue`.
 - Frontend-only local dev no longer prewarms `useSDFClusters` / `useFluidOverlay` during setup; god-tier WebGL layers only boot after idle in non-local-dev lanes.
 - WebGL recovery no longer forces an immediate dev-only reinit; it now waits for a grace period and skips recovery if the map becomes healthy on its own.
@@ -34,6 +35,9 @@
 - Venue media and reviews fetches are skipped or rerouted in frontend-only dev so localhost does not emit false 404, 504, or CORS noise.
 - Video elements only eager-load for active cards, which removed the repeated cache/range churn from the home feed.
 - Deprecated LCP entry reads were replaced with `webVitalsService.getLatestVitals()`.
+- Admin fallback emails are no longer hardcoded in backend defaults, Supabase edge helpers, or admin bootstrap/grant scripts; allowlists are explicit environment configuration only.
+- Audited map marker update paths now avoid `.innerHTML` for user-derived strings and use `textContent` or explicit DOM/SVG composition instead.
+- `repo-deep-audit` now supports rule-level path exclusions plus SQL comment stripping, and scorecards should be regenerated only after the latest signals file has been written.
 
 ## Hot Files
 
@@ -60,12 +64,17 @@
 - `src/composables/map/useMapAtmosphere.js`
 - `src/components/map/layers/WeatherLayer.js`
 - `src/components/panel/ShopCard.vue`
+- `src/components/ui/SwipeCard.vue`
+- `src/components/modal/VibeModal.vue`
+- `src/components/feed/BottomFeed.vue`
+- `src/composables/engine/useChromaticGlass.js`
 - `src/composables/useSmartVideo.js`
 - `src/utils/debugFlags.js`
 - `src/store/locationStore.js`
 - `src/plugins/masterIntegration.js`
 - `src/plugins/phase1Integration.js`
 - `src/views/HomeView.vue`
+- `scripts/performance/profile-home-runtime.mjs`
 - `tests/e2e/helpers/mapProfile.ts`
 - `tests/unit/socketService.spec.js`
 - `tests/unit/visitorIdentity.spec.js`
@@ -95,73 +104,49 @@
 ## Current Resume Items
 
 - Preserve the "quiet by default" logging policy unless the user explicitly asks for diagnostic verbosity.
-- The worktree is still globally dirty, but the repo is no longer blocked by unmerged files.
-- Imported external skills still live under `skills/` and `.agents/skills/`; re-run `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/import_external_skills.ps1` if the source `.skill` archives change.
-- Use these session artifacts first when resuming this lane:
-  - `.planning/20260325-skill-import-and-project-audit.md`
-  - `.planning/20260325-phase2-repo-stabilization.md`
-  - `.planning/20260325-conflict-resolution-batch.md`
-  - `docs/skills/imported-external-skills.md`
-  - `docs/audits/20260325-ultrathink-project-audit.md`
-- `.agents/skills/vibecity-session-handoff/SKILL.md` remains the canonical resume skill for this repo.
-- CI now has a dedicated `repo-hygiene` lane, and it currently passes after the conflict-resolution batch.
-- `api/index.py` remains the Vercel Python entrypoint shim that imports `backend/app/main.py`.
-- Keep `en` as the default for first-visit and invalid-locale normalization, but preserve `/th/...` links and explicit stored locale choices.
-- `PartnerDashboard.vue` should stay page-gated; do not reintroduce `useDashboardGuard("partner")` on that route.
-- Map safe mode is session-latched via `ff_map_shader_safe_mode_v1` + `vibecity.map.safe-mode-latched`; do not re-enable advanced layers automatically after a shader/runtime attach failure in the same session.
-- Popup/modal media verification still relies on:
-  - `popup-live-bar`
-  - `popup-media`
-  - `vibe-modal-media`
-  - `vibe-modal-fallback`
-- Remaining hardening follow-ups are now narrower:
-  - if anonymous checkout is ever removed, re-evaluate `verify_jwt` for `create-checkout-session` and `create-manual-order`
-  - if we want to remove CSP `unsafe-inline`, first externalize inline JSON-LD/style blocks from `public/index.html`
-  - continue separate backend follow-up for persistent `get_map_pins` 500s via `docs/followups/get-map-pins-500.md`
+- The worktree is still globally dirty; do not assume unrelated modified files belong to the current task.
+- The active media endpoints are:
+  - `GET /api/v1/shops/media`
+  - `GET /api/v1/shops/{shop_id}/media`
+- Bulk shop/feed flows enrich venue rows from `/api/v1/shops/media`, while venue detail still calls the per-shop endpoint with `hydrate_missing_image=true`.
+- Visible shop UI should read normalized real-media state from `resolveVenueMedia()` and `media_counts`; do not reintroduce Google Places photo or YouTube search fallback in cards or the venue modal.
+- Backend test runs should use `C:\vibecity.live\backend\.venv\Scripts\python.exe`; the global Python on this machine still has the older `websockets` package mismatch.
+- On Windows, run the repo checklist with `PYTHONIOENCODING=utf-8`; the default CP1252 console can still fail on emoji output before real validation begins.
+- Repo-wide checklist currently stops at the global lint lane; rely on targeted changed-file validation unless that lane is repaired first.
 
 ## Current Snapshot
 
-- Focus: repository stabilization is now past the merge-conflict phase and into targeted hardening / cleanup.
+- Focus: Ship the real-shop-media tranche end to end so every visible shop surface reads real image/video payloads and counts from the backend media API rather than external fallback media helpers.
+- Session plan artifact:
+  - `.planning/20260327-real-shop-media-api.md`
 - Files touched in this session:
-  - `.planning/20260325-conflict-resolution-batch.md`
-  - `.planning/STATE.md`
+  - `backend/app/services/venue_media_service.py`
+  - `backend/app/api/routers/shops.py`
+  - `backend/app/services/venue_repository.py`
+  - `backend/tests/test_shop_media_api.py`
+  - `src/domain/venue/viewModel.js`
+  - `src/components/panel/ShopCard.vue`
+  - `src/components/ui/SwipeCard.vue`
+  - `src/components/modal/VibeModal.vue`
+  - `src/services/shopService.js`
+  - `src/store/shopStore.js`
+  - `tests/unit/venueViewModel.media.spec.js`
   - `docs/runbooks/agent-operating-memory.md`
-  - `src/i18n.js`
-  - `backend/app/main.py`
-  - `bun.lock`
-  - `src/components/dashboard/OwnerDashboard.vue`
-  - `src/components/feed/BottomFeed.vue`
-  - `src/components/map/MapLibreContainer.vue`
-  - `src/components/panel/MerchantRegister.vue`
-  - `src/components/ui/ConsentBanner.vue`
-  - `src/components/ui/FilterMenu.vue`
-  - `src/components/ui/VibeActionSheet.vue`
-  - `src/components/ui/VibeBanner.vue`
-  - `src/composables/map/useMapCore.js`
-  - `src/composables/map/useMapLayers.js`
-  - `src/composables/map/useMapMarkers.js`
-  - `src/composables/useAppLogic.js`
-  - `src/locales/en.json`
-  - `src/locales/th.json`
-  - `src/styles/map-atmosphere.css`
-  - `src/utils/mapRenderer.js`
-  - `src/views/HomeView.vue`
-  - `vercel.json`
-  - `supabase/config.toml`
-  - `scripts/release/config/function-allowlist.json`
+- Behavior changed in this session:
+  - `backend/app/services/venue_media_service.py` now aggregates real media from venue rows, approved `venue_photos`, and direct social/video links, with optional Google Places image hydration for single-shop requests.
+  - `backend/app/api/routers/shops.py` now exposes `/api/v1/shops/media` for bulk coverage and `/api/v1/shops/{shop_id}/media` for detail hydration.
+  - `src/services/shopService.js` now normalizes real-media records, caches the bulk index, and merges rows so the real media payload becomes the frontend source of truth.
+  - `src/domain/venue/viewModel.js` now treats explicit `real_media` / `media_counts` as authoritative, carries normalized media counts through the venue view model, and maps `social_links` into the UI-facing fields.
+  - `src/components/panel/ShopCard.vue`, `src/components/ui/SwipeCard.vue`, and `src/components/modal/VibeModal.vue` now read real media directly and no longer fall back to Google Places photos or YouTube search results for this tranche.
+  - `src/store/shopStore.js` now enriches feed/search/detail venue rows with real media before normalizing UI state.
+  - `backend/app/services/venue_repository.py` now tolerates the broader offline/storage fallback exceptions needed by the existing drift tests.
 - Validation confirmed in this session:
-  - `git diff --name-only --diff-filter=U` is now empty; all previously unmerged files were resolved.
-  - `node scripts/ci/check-repo-hygiene.mjs` passes.
-  - `npx vue-tsc --noEmit --pretty false` passes.
-  - `bun run build` passes.
-  - `python -m py_compile backend/app/main.py api/index.py` passes.
-  - `vercel.json` parses successfully and its CSP no longer contains `unsafe-eval`.
-  - `supabase/config.toml` and `scripts/release/config/function-allowlist.json` are in sync for shared function `verify_jwt` policy.
+  - `npx biome check src/domain/venue/viewModel.js src/services/shopService.js src/store/shopStore.js src/components/panel/ShopCard.vue src/components/ui/SwipeCard.vue src/components/modal/VibeModal.vue tests/unit/venueViewModel.media.spec.js` passes.
+  - `npx vitest run tests/unit/venueViewModel.media.spec.js` passes.
+  - `C:\vibecity.live\backend\.venv\Scripts\python.exe -m pytest tests/test_shop_media_api.py tests/test_venues_shops_drift.py -q` passes.
 - Residual note:
-  - The worktree is still globally dirty; do not assume unrelated modified files belong to this stabilization tranche.
-  - `create-checkout-session` and `create-manual-order` intentionally remain `verify_jwt = false` because anonymous payment entry is still supported.
-  - CSP is tighter, but `script-src 'unsafe-inline'` still remains because `public/index.html` currently embeds inline JSON-LD, inline styles, and a stylesheet `onload` attribute.
-  - Persistent `get_map_pins` 500s and backend-side map pin contract issues remain separate follow-up work.
+  - The worktree remains globally dirty; only the files listed above belong to this tranche.
+  - Repo-wide `checklist.py` still stops at the global lint lane, so targeted validations are the current trusted signal for this tranche.
 
 ## Update Protocol
 

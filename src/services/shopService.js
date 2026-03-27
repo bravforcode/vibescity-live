@@ -17,6 +17,10 @@ const VENUE_LIST_COLUMNS =
 	"id,name,slug,category,description,status,province,district,zone,building,floor,category_color,latitude,longitude,location,image_urls,image_url_1,image_url_2,video_url,social_links,is_promoted,rating,review_count,is_verified,pin_type,pin_metadata,visibility_score,open_time,close_time,golden_time,end_golden_time,vibe_info,crowd_info,promotion_info,promotion_endtime";
 
 let realMediaEndpointUnavailable = false;
+let realVenueMediaIndexCache = null;
+let realVenueMediaIndexFetchedAt = 0;
+let realVenueMediaIndexPromise = null;
+const REAL_MEDIA_INDEX_TTL_MS = 5 * 60 * 1000;
 
 const normalizeMediaItem = (item) => {
 	if (!item || typeof item !== "object") return null;
@@ -76,6 +80,130 @@ const normalizeRealVenueMediaPayload = (payload) => {
 	}
 
 	return items;
+};
+
+const normalizeUrlList = (items) =>
+	Array.isArray(items)
+		? items
+				.map((item) => String(item || "").trim())
+				.filter((item) => item.length > 0)
+		: [];
+
+const buildMediaCounts = ({ images = [], videos = [], media = [] } = {}) => {
+	const imageCount = Array.isArray(images) ? images.length : 0;
+	const videoCount = Array.isArray(videos) ? videos.length : 0;
+	const totalCount =
+		Array.isArray(media) && media.length > 0
+			? media.length
+			: imageCount + videoCount;
+	return {
+		images: imageCount,
+		videos: videoCount,
+		total: totalCount,
+	};
+};
+
+const normalizeRealVenueMediaRecord = (payload) => {
+	if (!payload || typeof payload !== "object") return null;
+
+	const media = normalizeRealVenueMediaPayload(payload);
+	const images = normalizeUrlList(payload.images);
+	const videos = normalizeUrlList(payload.videos);
+	const shopId = String(
+		payload.shop_id || payload.shopId || payload.id || "",
+	).trim();
+	const socialLinks =
+		payload.social_links &&
+		typeof payload.social_links === "object" &&
+		!Array.isArray(payload.social_links)
+			? payload.social_links
+			: {};
+
+	const resolvedImages =
+		images.length > 0
+			? images
+			: media.filter((item) => item.type === "image").map((item) => item.url);
+	const resolvedVideos =
+		videos.length > 0
+			? videos
+			: media.filter((item) => item.type === "video").map((item) => item.url);
+	const videoUrl = String(
+		payload.video_url || payload.videoUrl || resolvedVideos[0] || "",
+	).trim();
+	const counts =
+		payload.counts && typeof payload.counts === "object"
+			? {
+					images: Number(payload.counts.images || 0),
+					videos: Number(payload.counts.videos || 0),
+					total: Number(payload.counts.total || 0),
+				}
+			: buildMediaCounts({
+					images: resolvedImages,
+					videos: resolvedVideos,
+					media,
+				});
+
+	return {
+		shopId,
+		images: resolvedImages,
+		videos: resolvedVideos,
+		videoUrl,
+		media,
+		coverage:
+			payload.coverage && typeof payload.coverage === "object"
+				? payload.coverage
+				: null,
+		counts,
+		socialLinks,
+	};
+};
+
+const updateRealVenueMediaIndexRecord = (record) => {
+	if (!record?.shopId) return;
+	if (!(realVenueMediaIndexCache instanceof Map)) {
+		realVenueMediaIndexCache = new Map();
+	}
+	realVenueMediaIndexCache.set(String(record.shopId), record);
+	realVenueMediaIndexFetchedAt = Date.now();
+};
+
+export const mergeVenueRowWithRealMedia = (row, mediaRecord) => {
+	if (!row || !mediaRecord) return row;
+
+	const images = Array.isArray(mediaRecord.images) ? mediaRecord.images : [];
+	const videoUrl = String(mediaRecord.videoUrl || "").trim();
+	const mergedSocialLinks =
+		mediaRecord.socialLinks &&
+		typeof mediaRecord.socialLinks === "object" &&
+		Object.keys(mediaRecord.socialLinks).length > 0
+			? {
+					...(row.social_links || {}),
+					...mediaRecord.socialLinks,
+				}
+			: row.social_links || {};
+
+	return {
+		...row,
+		image_urls: images,
+		images,
+		Image_URL1: images[0] || "",
+		Image_URL2: images[1] || "",
+		video_url: videoUrl,
+		Video_URL: videoUrl,
+		videoUrl,
+		real_media: Array.isArray(mediaRecord.media) ? mediaRecord.media : [],
+		media_coverage: mediaRecord.coverage || row.media_coverage || null,
+		media_counts:
+			mediaRecord.counts ||
+			buildMediaCounts({
+				images,
+				videos: mediaRecord.videos,
+				media: mediaRecord.media,
+			}),
+		social_links: mergedSocialLinks,
+		cover_image: images[0] || "",
+		coverImage: images[0] || "",
+	};
 };
 
 const fetchVenuesWithFallback = async (mutateQuery) => {
@@ -195,7 +323,7 @@ export const getShops = async (province = "ทุกจังหวัด") => {
 };
 
 /**
- * Fetch real media from the internal backend API scraper
+ * Fetch normalized real media for a single venue from the backend API.
  */
 export const getRealVenueMedia = async (venueId) => {
 	if (!venueId || realMediaEndpointUnavailable || isFrontendOnlyDevMode()) {
@@ -203,11 +331,14 @@ export const getRealVenueMedia = async (venueId) => {
 	}
 
 	try {
-		const response = await apiFetch(`/media/${venueId}/real`, {
-			headers: {
-				Accept: "application/json",
+		const response = await apiFetch(
+			`/shops/${venueId}/media?hydrate_missing_image=true`,
+			{
+				headers: {
+					Accept: "application/json",
+				},
 			},
-		});
+		);
 		if (!response.ok) {
 			if (response.status === 404) {
 				realMediaEndpointUnavailable = true;
@@ -215,8 +346,10 @@ export const getRealVenueMedia = async (venueId) => {
 			return null;
 		}
 		const data = await response.json();
-		const normalized = normalizeRealVenueMediaPayload(data);
-		return normalized.length > 0 ? normalized : null;
+		const normalized = normalizeRealVenueMediaRecord(data);
+		if (!normalized) return null;
+		updateRealVenueMediaIndexRecord(normalized);
+		return normalized;
 	} catch (error) {
 		if (isExpectedAbortError(error)) {
 			return null;
@@ -224,6 +357,84 @@ export const getRealVenueMedia = async (venueId) => {
 		logUnexpectedNetworkError("Error fetching real venue media:", error);
 		return null;
 	}
+};
+
+export const getRealVenueMediaIndex = async ({ force = false } = {}) => {
+	if (realMediaEndpointUnavailable || isFrontendOnlyDevMode()) {
+		return new Map();
+	}
+
+	const now = Date.now();
+	if (
+		!force &&
+		realVenueMediaIndexCache instanceof Map &&
+		now - realVenueMediaIndexFetchedAt < REAL_MEDIA_INDEX_TTL_MS
+	) {
+		return realVenueMediaIndexCache;
+	}
+
+	if (realVenueMediaIndexPromise) {
+		return realVenueMediaIndexPromise;
+	}
+
+	realVenueMediaIndexPromise = (async () => {
+		try {
+			const response = await apiFetch(
+				"/shops/media?limit=5000&offset=0&include_missing=true",
+				{
+					headers: {
+						Accept: "application/json",
+					},
+				},
+			);
+			if (!response.ok) {
+				if (response.status === 404) {
+					realMediaEndpointUnavailable = true;
+				}
+				return new Map();
+			}
+
+			const payload = await response.json();
+			const rows = Array.isArray(payload?.data) ? payload.data : [];
+			const nextIndex = new Map();
+			rows.forEach((row) => {
+				const normalized = normalizeRealVenueMediaRecord(row);
+				if (normalized?.shopId) {
+					nextIndex.set(String(normalized.shopId), normalized);
+				}
+			});
+			realVenueMediaIndexCache = nextIndex;
+			realVenueMediaIndexFetchedAt = Date.now();
+			return nextIndex;
+		} catch (error) {
+			if (!isExpectedAbortError(error)) {
+				logUnexpectedNetworkError(
+					"Error fetching real venue media index:",
+					error,
+				);
+			}
+			return new Map();
+		} finally {
+			realVenueMediaIndexPromise = null;
+		}
+	})();
+
+	return realVenueMediaIndexPromise;
+};
+
+export const enrichVenueRowsWithRealMedia = async (rows, options = {}) => {
+	if (!Array.isArray(rows) || rows.length === 0) {
+		return Array.isArray(rows) ? rows : [];
+	}
+
+	const mediaIndex = await getRealVenueMediaIndex(options);
+	if (!(mediaIndex instanceof Map) || mediaIndex.size === 0) {
+		return rows;
+	}
+
+	return rows.map((row) =>
+		mergeVenueRowWithRealMedia(row, mediaIndex.get(String(row?.id || ""))),
+	);
 };
 
 /**
