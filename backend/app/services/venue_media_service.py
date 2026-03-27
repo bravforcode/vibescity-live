@@ -4,12 +4,10 @@ import asyncio
 import json
 import logging
 from collections import defaultdict
-from urllib.parse import quote, urlsplit, urlunsplit
+from urllib.parse import urlsplit, urlunsplit
 
-import httpx
 from postgrest import APIError
 
-from app.core.config import settings
 from app.core.supabase import supabase, supabase_admin
 
 logger = logging.getLogger("app.shop_media")
@@ -200,66 +198,10 @@ class VenueMediaService:
                 continue
         return {}
 
-    async def _lookup_google_place_photo(self, row: dict) -> str:
-        if not settings.GOOGLE_API_KEY:
-            return ""
-        name = str(row.get("name") or "").strip()
-        if not name:
-            return ""
-
-        params = {
-            "input": name,
-            "inputtype": "textquery",
-            "fields": "place_id",
-            "key": settings.GOOGLE_API_KEY,
-        }
-        lat = self._coerce_float(row.get("latitude"))
-        lng = self._coerce_float(row.get("longitude"))
-        if lat is not None and lng is not None:
-            params["locationbias"] = f"circle:300@{lat},{lng}"
-
-        timeout = httpx.Timeout(connect=3.0, read=6.0, write=6.0, pool=3.0)
-        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-            try:
-                search_response = await client.get(
-                    "https://maps.googleapis.com/maps/api/place/findplacefromtext/json",
-                    params=params,
-                )
-                search_response.raise_for_status()
-                place_id = (
-                    search_response.json().get("candidates", [{}])[0].get("place_id") or ""
-                )
-                if not place_id:
-                    return ""
-
-                details_response = await client.get(
-                    "https://maps.googleapis.com/maps/api/place/details/json",
-                    params={
-                        "place_id": place_id,
-                        "fields": "photos",
-                        "key": settings.GOOGLE_API_KEY,
-                    },
-                )
-                details_response.raise_for_status()
-                photo_reference = (
-                    details_response.json().get("result", {}).get("photos", [{}])[0].get("photo_reference")
-                    or ""
-                )
-                if not photo_reference:
-                    return ""
-                return (
-                    "https://maps.googleapis.com/maps/api/place/photo"
-                    f"?maxwidth=1200&photo_reference={quote(photo_reference)}"
-                    f"&key={quote(settings.GOOGLE_API_KEY)}"
-                )
-            except (httpx.HTTPError, KeyError, TypeError, ValueError):
-                return ""
-
     def _build_payload(
         self,
         row: dict,
         photo_rows: list[dict] | None = None,
-        google_photo_url: str = "",
     ) -> dict:
         photo_rows = photo_rows or []
         media_items: list[dict] = []
@@ -278,15 +220,6 @@ class VenueMediaService:
                 "image",
                 photo.get("url"),
                 str(photo.get("source") or "ugc.venue_photos"),
-            )
-
-        if google_photo_url:
-            self._append_media_item(
-                media_items,
-                seen,
-                "image",
-                google_photo_url,
-                "google_places.photo_lookup",
             )
 
         for key, source in self._VIDEO_SOURCE_KEYS:
@@ -379,7 +312,7 @@ class VenueMediaService:
         self,
         shop_id: str,
         *,
-        hydrate_missing_image: bool = True,
+        hydrate_missing_image: bool = False,
     ) -> dict | None:
         rows = await asyncio.to_thread(self._fetch_venue_rows, shop_id)
         if not rows:
@@ -389,16 +322,9 @@ class VenueMediaService:
         venue_id = str(row.get("id"))
         approved_photos = await asyncio.to_thread(self._fetch_approved_photos, [venue_id])
         payload = self._build_payload(row, approved_photos.get(venue_id, []))
-
-        if hydrate_missing_image and not payload["coverage"]["has_images"]:
-            google_photo_url = await self._lookup_google_place_photo(row)
-            if google_photo_url:
-                payload = self._build_payload(
-                    row,
-                    approved_photos.get(venue_id, []),
-                    google_photo_url=google_photo_url,
-                )
-
+        # Keep the query flag for backward compatibility, but do not hydrate from
+        # external fallbacks. This endpoint is authoritative real media only.
+        _ = hydrate_missing_image
         return payload
 
 

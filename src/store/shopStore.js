@@ -288,15 +288,14 @@ export const useShopStore = defineStore(
 				collectedCoinIds: collectedCoins.value,
 			});
 
+		const hasDisplayableRealMedia = (shop) =>
+			Number(shop?.media_counts?.total || shop?.media?.counts?.total || 0) > 0;
+
 		const applyVenueRows = (rows) => {
 			const normalized = normalizeVenueRows(rows || []);
-			// Requirement: remove venues without photos or videos from website
-			// Temporarily disabled for debugging single-card issue
-			const filtered = normalized; /*.filter((shop) => {
-				const hasImage = shop.images?.some((img) => img && img.trim() !== "");
-				const hasVideo = !!shop.videoUrl?.trim();
-				return hasImage || hasVideo;
-			});*/
+			const filtered = normalized.filter((shop) =>
+				hasDisplayableRealMedia(shop),
+			);
 
 			rawShops.value = filtered;
 			shopMap.value = new Map(
@@ -772,6 +771,9 @@ export const useShopStore = defineStore(
 					let mergedRow = { ...(existing || {}), ...data };
 					const realMedia = await getRealVenueMedia(key);
 					if (realMedia) {
+						if (Number(realMedia?.counts?.total || 0) <= 0) {
+							return null;
+						}
 						mergedRow = mergeVenueRowWithRealMedia(mergedRow, realMedia);
 					}
 

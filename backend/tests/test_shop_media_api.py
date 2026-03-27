@@ -140,7 +140,7 @@ def test_list_shop_media_includes_all_shops_and_merges_sources():
     assert by_id["v3"]["coverage"]["has_media"] is False
 
 
-def test_get_shop_media_can_hydrate_missing_image():
+def test_get_shop_media_stays_real_only_when_media_is_missing():
     service = VenueMediaService(
         client=_FakeClient(
             {
@@ -161,18 +161,12 @@ def test_get_shop_media_can_hydrate_missing_image():
         )
     )
 
-    async def _fake_google_lookup(_row):
-        return "https://maps.googleapis.com/maps/api/place/photo?photo_reference=test"
-
-    service._lookup_google_place_photo = _fake_google_lookup
-
     payload = asyncio.run(service.get_shop_media("v9", hydrate_missing_image=True))
 
     assert payload is not None
-    assert payload["images"] == [
-        "https://maps.googleapis.com/maps/api/place/photo?photo_reference=test"
-    ]
-    assert payload["coverage"]["has_images"] is True
+    assert payload["images"] == []
+    assert payload["coverage"]["has_images"] is False
+    assert payload["coverage"]["has_media"] is False
 
 
 def test_shop_media_routes_return_media_contract(client, monkeypatch):
@@ -197,7 +191,7 @@ def test_shop_media_routes_return_media_contract(client, monkeypatch):
         },
     )
 
-    async def _fake_get_shop_media(_shop_id, hydrate_missing_image=True):
+    async def _fake_get_shop_media(_shop_id, hydrate_missing_image=False):
         return {
             "shop_id": "abc",
             "name": "ABC",

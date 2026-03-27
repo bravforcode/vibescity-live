@@ -141,7 +141,7 @@ async def read_shop_media_index(
 async def read_shop_media(
     request: Request,
     shop_id: str,
-    hydrate_missing_image: bool = Query(default=True),
+    hydrate_missing_image: bool = Query(default=False),
 ):
     """
     Retrieve normalized real media for a single shop.

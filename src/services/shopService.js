@@ -332,7 +332,7 @@ export const getRealVenueMedia = async (venueId) => {
 
 	try {
 		const response = await apiFetch(
-			`/shops/${venueId}/media?hydrate_missing_image=true`,
+			`/shops/${venueId}/media?hydrate_missing_image=false`,
 			{
 				headers: {
 					Accept: "application/json",
