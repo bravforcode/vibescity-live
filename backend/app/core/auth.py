@@ -1,8 +1,16 @@
 import asyncio
+import logging
 import time
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from supabase import (
+    AuthApiError,
+    AuthError,
+    AuthRetryableError,
+    AuthSessionMissingError,
+    AuthUnknownError,
+)
 
 from app.core.config import get_settings
 from app.core.supabase import supabase
@@ -10,6 +18,7 @@ from app.core.supabase import supabase
 security = HTTPBearer()
 security_optional = HTTPBearer(auto_error=False)
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 # In-memory JWT cache: token → (user, expires_at)
 # Caches for 60s — well within Supabase token expiry (~1h)
@@ -79,12 +88,20 @@ async def verify_user(credentials: HTTPAuthorizationCredentials = Depends(securi
 
     except HTTPException:
         raise
-    except Exception:
+    except (AuthRetryableError, AuthUnknownError, OSError, RuntimeError) as exc:
+        logger.warning("Supabase auth unavailable during verify_user: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service unavailable",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+    except (AuthApiError, AuthSessionMissingError, AuthError, TypeError, ValueError) as exc:
+        logger.info("Supabase auth rejected token: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from exc
 
 async def verify_admin(user = Depends(verify_user)):
     """

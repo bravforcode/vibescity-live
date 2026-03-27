@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 import requests
 import stripe
 from fastapi import APIRouter, Depends, HTTPException, Request
+from postgrest import APIError
 from pydantic import BaseModel, Field
 
 from app.core.auth import verify_user
@@ -51,8 +52,13 @@ def _schedule_payment_sheet_log(
     except RuntimeError:
         # No running event loop — log warning and continue (never block payment flows)
         logger.warning("_schedule_payment_sheet_log: no running event loop, skipping %s", event_type)
-    except Exception:
-        pass  # fail-open; never block payment flows
+    except TypeError as exc:
+        logger.warning("payment_sheet_log_schedule_failed", extra={"event_type": event_type, "err": str(exc)})
+
+
+def _is_duplicate_slip_error(exc: Exception) -> bool:
+    lowered = str(exc).lower()
+    return "duplicate key value" in lowered and "slip_url" in lowered
 
 
 class CheckoutSessionRequest(BaseModel):
@@ -97,12 +103,9 @@ async def get_product_price(sku: str) -> int:
 
 
 async def _resolve_order_amount(sku: str, client_amount: float | None) -> float:
-    try:
-        satang = await get_product_price(sku)
-        if satang and satang > 0:
-            return round(float(satang) / 100.0, 2)
-    except Exception:
-        pass
+    satang = await get_product_price(sku)
+    if satang and satang > 0:
+        return round(float(satang) / 100.0, 2)
     if client_amount and client_amount > 0:
         return round(float(client_amount), 2)
     raise HTTPException(status_code=400, detail="Invalid amount")
@@ -140,8 +143,8 @@ async def _fetch_ip_info(ip: str) -> dict[str, Any] | None:
     """Non-blocking IP info lookup — runs sync requests in a thread."""
     if not ip or not settings.IPINFO_TOKEN:
         return None
-    try:
-        def _get() -> dict[str, Any] | None:
+    def _get() -> dict[str, Any] | None:
+        try:
             resp = requests.get(
                 f"https://ipinfo.io/{ip}/json?token={settings.IPINFO_TOKEN}",
                 timeout=5,
@@ -149,26 +152,30 @@ async def _fetch_ip_info(ip: str) -> dict[str, Any] | None:
             if resp.status_code >= 400:
                 return None
             return resp.json()
-        return await asyncio.to_thread(_get)
-    except Exception:
-        return None
+        except (requests.RequestException, ValueError) as exc:
+            logger.info("ip_info_lookup_failed", extra={"ip": ip, "err": str(exc)})
+            return None
+
+    return await asyncio.to_thread(_get)
 
 
 async def _send_discord(payload: dict[str, Any]) -> None:
     """Non-blocking Discord notification — runs sync requests in a thread."""
     if not settings.DISCORD_WEBHOOK_URL:
         return
-    try:
-        def _post() -> None:
-            requests.post(
+    def _post() -> None:
+        try:
+            response = requests.post(
                 settings.DISCORD_WEBHOOK_URL,
                 headers={"Content-Type": "application/json"},
                 data=json.dumps(payload),
                 timeout=5,
             )
-        await asyncio.to_thread(_post)
-    except Exception:
-        pass
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            logger.warning("discord_webhook_failed", extra={"err": str(exc)})
+
+    await asyncio.to_thread(_post)
 
 
 @router.post("/create-checkout-session")
@@ -179,68 +186,68 @@ async def create_checkout_session(
     user: dict = Depends(verify_user),
 ):
     user_id = None
-    try:
-        if not settings.STRIPE_SECRET_KEY:
-            raise HTTPException(status_code=500, detail="Stripe is not configured")
-        # 1. Define Products & Prices (In a real app, database backed)
-        # For MVP, we map itemType to prices here.
+    if not settings.STRIPE_SECRET_KEY:
+        raise HTTPException(status_code=500, detail="Stripe is not configured")
+    # 1. Define Products & Prices (In a real app, database backed)
+    # For MVP, we map itemType to prices here.
 
-        line_items = []
-        mode = "payment"
+    line_items = []
+    mode = "payment"
 
-        # Example Pricing (THB)
-        PRICES = {
-            # Features
-            "verified": 19900,  # 199.00 THB
-            "glow": 9900,  # 99.00 THB
-            "boost": 4900,  # 49.00 THB
-            "giant": 29900,  # 299.00 THB
+    # Example Pricing (THB)
+    PRICES = {
+        # Features
+        "verified": 19900,  # 199.00 THB
+        "glow": 9900,  # 99.00 THB
+        "boost": 4900,  # 49.00 THB
+        "giant": 29900,  # 299.00 THB
 
-            # Application features could also be subscriptions
-        }
+        # Application features could also be subscriptions
+    }
 
-        price_amount = PRICES.get(body.itemType)
-        if not price_amount:
-            raise HTTPException(status_code=400, detail="Invalid item type")
+    price_amount = PRICES.get(body.itemType)
+    if not price_amount:
+        raise HTTPException(status_code=400, detail="Invalid item type")
 
-        line_items.append(
-            {
-                "price_data": {
-                    "currency": "thb",
-                    "product_data": {
-                        "name": f"VibeCity: {body.itemType.upper()}",
-                    },
-                    "unit_amount": price_amount,
+    line_items.append(
+        {
+            "price_data": {
+                "currency": "thb",
+                "product_data": {
+                    "name": f"VibeCity: {body.itemType.upper()}",
                 },
-                "quantity": 1,
-            }
-        )
-
-        # 2. metadata for Webhook
-        user_id = user.get("id") if isinstance(user, dict) else getattr(user, "id", None)
-
-        # C3: Deterministic idempotency key — prevents duplicate charges on retry
-        ts_bucket = str(int(time.time()) // 3600)
-        idempotency_key = str(
-            uuid.uuid5(
-                uuid.NAMESPACE_OID,
-                f"{user_id}:{body.itemType}:{body.itemId}:{ts_bucket}",
-            )
-        )
-
-        metadata = {
-            "user_id": user_id,
-            "item_type": body.itemType,
-            "item_id": body.itemId,
-            "idempotency_key": idempotency_key,  # Passed to webhook for order-level dedup
+                "unit_amount": price_amount,
+            },
+            "quantity": 1,
         }
+    )
 
-        # specific metadata for webhook handler expectations
-        if body.itemType in ["verified", "glow", "boost", "giant"]:
-            # The existing webhook expects 'venue_id' and 'sku'
-            metadata["venue_id"] = body.itemId
-            metadata["sku"] = f"{body.itemType}_feature"
+    # 2. metadata for Webhook
+    user_id = user.get("id") if isinstance(user, dict) else getattr(user, "id", None)
 
+    # C3: Deterministic idempotency key — prevents duplicate charges on retry
+    ts_bucket = str(int(time.time()) // 3600)
+    idempotency_key = str(
+        uuid.uuid5(
+            uuid.NAMESPACE_OID,
+            f"{user_id}:{body.itemType}:{body.itemId}:{ts_bucket}",
+        )
+    )
+
+    metadata = {
+        "user_id": user_id,
+        "item_type": body.itemType,
+        "item_id": body.itemId,
+        "idempotency_key": idempotency_key,  # Passed to webhook for order-level dedup
+    }
+
+    # specific metadata for webhook handler expectations
+    if body.itemType in ["verified", "glow", "boost", "giant"]:
+        # The existing webhook expects 'venue_id' and 'sku'
+        metadata["venue_id"] = body.itemId
+        metadata["sku"] = f"{body.itemType}_feature"
+
+    try:
         session = stripe.checkout.Session.create(
             payment_method_types=["card", "promptpay"],
             line_items=line_items,
@@ -265,7 +272,6 @@ async def create_checkout_session(
         )
 
         return {"url": session.url}
-
     except stripe.error.StripeError as e:
         logger.error(
             "stripe_checkout_error",
@@ -276,8 +282,8 @@ async def create_checkout_session(
                 "item_id": body.itemId,
             },
         )
-        raise HTTPException(status_code=502, detail="Payment provider error")
-    except Exception as e:
+        raise HTTPException(status_code=502, detail="Payment provider error") from e
+    except (TypeError, ValueError) as e:
         logger.error(
             "checkout_error",
             extra={
@@ -287,10 +293,7 @@ async def create_checkout_session(
                 "item_id": body.itemId,
             },
         )
-        raise HTTPException(
-            status_code=400,
-            detail="Unable to create checkout session",
-        )
+        raise HTTPException(status_code=500, detail="Unable to create checkout session") from e
 
 
 @router.post("/manual-order")
@@ -372,7 +375,7 @@ async def create_manual_order(request: Request, body: ManualOrderRequest):
                         "order": existing,
                         "duplicate": True,
                     }
-            except Exception as e:
+            except APIError as e:
                 logger.warning(
                     "manual_order_duplicate_check_failed",
                     extra={
@@ -389,9 +392,7 @@ async def create_manual_order(request: Request, body: ManualOrderRequest):
                 raise HTTPException(status_code=500, detail="Failed to create order")
             order = order_res.data[0]
         except Exception as e:
-            message = str(e)
-            lowered = message.lower()
-            if "duplicate key value" in lowered and "slip_url" in lowered:
+            if _is_duplicate_slip_error(e):
                 existing_order = None
                 try:
                     existing_res = (
@@ -403,7 +404,11 @@ async def create_manual_order(request: Request, body: ManualOrderRequest):
                     )
                     if existing_res.data:
                         existing_order = existing_res.data[0]
-                except Exception:
+                except APIError as lookup_exc:
+                    logger.warning(
+                        "manual_order_duplicate_lookup_failed",
+                        extra={"err": str(lookup_exc), "slip_url": body.slip_url},
+                    )
                     existing_order = None
 
                 if existing_order:
@@ -425,8 +430,14 @@ async def create_manual_order(request: Request, body: ManualOrderRequest):
                 raise HTTPException(
                     status_code=409,
                     detail="This slip has already been submitted and is being processed",
-                )
-            raise HTTPException(status_code=400, detail=message)
+                ) from e
+            if not isinstance(e, APIError):
+                raise
+            logger.error(
+                "manual_order_create_failed",
+                extra={"err": str(e), "visitor_id": body.visitor_id, "venue_id": body.venue_id},
+            )
+            raise HTTPException(status_code=500, detail="Failed to create order") from e
 
     slip_audit_payload = {
         "order_id": order.get("id"),
@@ -456,8 +467,8 @@ async def create_manual_order(request: Request, body: ManualOrderRequest):
 
     try:
         supabase_admin.table("slip_audit").insert(slip_audit_payload).execute()
-    except Exception:
-        pass
+    except APIError as exc:
+        logger.warning("slip_audit_insert_failed", extra={"order_id": order.get("id"), "err": str(exc)})
 
     _schedule_payment_sheet_log(
         "manual_order_submitted",
@@ -527,8 +538,11 @@ async def create_manual_order(request: Request, body: ManualOrderRequest):
                 if duplicate_res.data:
                     verification_status = "rejected"
                     verification_reason = "duplicate_slip"
-            except Exception:
-                pass
+            except APIError as exc:
+                logger.warning(
+                    "manual_order_duplicate_image_check_failed",
+                    extra={"order_id": order.get("id"), "err": str(exc)},
+                )
 
         update_payload = {
             "status": verification_status,
@@ -542,15 +556,22 @@ async def create_manual_order(request: Request, body: ManualOrderRequest):
                 "id", order.get("id")
             ).execute()
             order.update(update_payload)
-        except Exception:
-            pass
+        except APIError as exc:
+            logger.warning(
+                "manual_order_auto_verify_update_failed",
+                extra={"order_id": order.get("id"), "err": str(exc)},
+            )
 
         ocr_enqueued = False
         if verification_status == "pending_review":
             try:
                 enqueue_ocr_job(order.get("id"))
                 ocr_enqueued = True
-            except Exception:
+            except (RuntimeError, ValueError) as exc:
+                logger.warning(
+                    "manual_order_auto_verify_enqueue_failed",
+                    extra={"order_id": order.get("id"), "err": str(exc)},
+                )
                 ocr_enqueued = False
 
         return {
@@ -574,7 +595,7 @@ async def create_manual_order(request: Request, body: ManualOrderRequest):
             visitor_id=body.visitor_id,
         )
         return {"success": True, "order": order, "ocr_enqueued": True}
-    except Exception as e:
+    except (RuntimeError, ValueError) as e:
         # Do not fail the entire request after order creation.
         retry_token = str(uuid.uuid4())
         fallback_metadata = {**(order.get("metadata") or {})}
@@ -591,9 +612,12 @@ async def create_manual_order(request: Request, body: ManualOrderRequest):
                 }
             ).eq("id", order.get("id")).execute()
             order["metadata"] = fallback_metadata
-        except Exception:
+        except APIError as fallback_exc:
             # Best-effort fallback only.
-            pass
+            logger.warning(
+                "manual_order_ocr_fallback_update_failed",
+                extra={"order_id": order.get("id"), "err": str(fallback_exc)},
+            )
 
         _schedule_payment_sheet_log(
             "manual_order_ocr_enqueue_failed",
@@ -664,7 +688,7 @@ async def _handle_checkout_completed(session: dict) -> None:
                     extra={"idempotency_key": idempotency_key, "order_id": order_id},
                 )
                 return
-        except Exception as e:
+        except APIError as e:
             # Non-fatal: log and proceed (idempotency_key column may not exist yet)
             logger.warning("idempotency_check_failed", extra={"err": str(e)})
 
@@ -683,7 +707,7 @@ async def _handle_checkout_completed(session: dict) -> None:
             },
             channel="payments",
         )
-    except Exception as e:
+    except APIError as e:
         logger.error(
             "checkout_completed_handler_error",
             extra={"error": str(e), "order_id": order_id, "session_id": session_id},
@@ -722,12 +746,12 @@ async def stripe_webhook(request: Request):
             sig_header=sig_header,
             secret=settings.STRIPE_WEBHOOK_SECRET,
         )
-    except stripe.error.SignatureVerificationError:
+    except stripe.error.SignatureVerificationError as exc:
         logger.warning("stripe_webhook_invalid_signature")
-        raise HTTPException(status_code=400, detail="Invalid signature")
-    except Exception as e:
+        raise HTTPException(status_code=400, detail="Invalid signature") from exc
+    except ValueError as e:
         logger.error("stripe_webhook_parse_error", extra={"error": str(e)})
-        raise HTTPException(status_code=400, detail="Bad payload")
+        raise HTTPException(status_code=400, detail="Bad payload") from e
 
     event_id = event.get("id", "")
     if not supabase_admin:
@@ -754,7 +778,7 @@ async def stripe_webhook(request: Request):
                 "processed_at": None,
             }
         ).execute()
-    except Exception as e:
+    except APIError as e:
         err = str(e).lower()
         if "duplicate key" in err or "23505" in err:
             return {"received": True, "duplicate": True}
@@ -762,7 +786,7 @@ async def stripe_webhook(request: Request):
             "stripe_event_store_error",
             extra={"event_id": event_id, "err": str(e)},
         )
-        raise HTTPException(status_code=500, detail="Event processing error")
+        raise HTTPException(status_code=500, detail="Event processing error") from e
 
     event_type = event.get("type")
     if event_type == "checkout.session.completed":
@@ -774,7 +798,7 @@ async def stripe_webhook(request: Request):
         supabase_admin.table("stripe_webhook_events").update(
             {"processed_at": datetime.now(UTC).isoformat()}
         ).eq("stripe_event_id", event_id).execute()
-    except Exception as e:
+    except APIError as e:
         logger.warning(
             "stripe_event_processed_mark_failed",
             extra={"event_id": event_id, "err": str(e)},

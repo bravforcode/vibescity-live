@@ -178,4 +178,4 @@ if __name__ == "__main__":
         asyncio.run(main(target))
     except KeyboardInterrupt:
         logger.info("Ingestion interrupted by user")
-        raise SystemExit(130)
+        raise SystemExit(130) from None

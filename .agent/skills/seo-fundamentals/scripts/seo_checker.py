@@ -34,7 +34,9 @@ except:
 SKIP_DIRS = {
     'node_modules', '.next', 'dist', 'build', '.git', '.github',
     '__pycache__', '.vscode', '.idea', 'coverage', 'test', 'tests',
-    '__tests__', 'spec', 'docs', 'documentation', 'examples'
+    '__tests__', 'spec', 'docs', 'documentation', 'examples',
+    '.venv', 'venv', '.vercel', '.vercel_python_packages',
+    '.agent', '.agents', 'backend', 'scripts', 'supabase'
 }
 
 # Files to skip (not pages)
@@ -43,6 +45,8 @@ SKIP_PATTERNS = [
     'service', 'api', 'lib', 'constant', 'type', 'interface', 'mock',
     '.test.', '.spec.', '_test.', '_spec.'
 ]
+
+AUXILIARY_HTML_FILES = {'offline.html', 'readme.html'}
 
 
 def is_page_file(file_path: Path) -> bool:
@@ -77,19 +81,41 @@ def is_page_file(file_path: Path) -> bool:
 
 def find_pages(project_path: Path) -> list:
     """Find page files to check."""
-    patterns = ['**/*.html', '**/*.htm', '**/*.jsx', '**/*.tsx']
-    
-    files = []
-    for pattern in patterns:
-        for f in project_path.glob(pattern):
-            # Skip excluded directories
-            if any(skip in f.parts for skip in SKIP_DIRS):
-                continue
-            
-            # Check if it's likely a page
-            if is_page_file(f):
+    patterns = ['**/*.html', '**/*.htm', '**/*.jsx', '**/*.tsx', '**/*.vue']
+    candidate_roots = [
+        project_path / 'src',
+        project_path / 'public',
+        project_path / 'pages',
+        project_path / 'app',
+        project_path / 'routes',
+        project_path / 'views',
+    ]
+
+    files: list[Path] = []
+    seen: set[Path] = set()
+
+    root_index = project_path / 'index.html'
+    if root_index.exists():
+        files.append(root_index)
+        seen.add(root_index.resolve())
+
+    for root in candidate_roots:
+        if not root.exists():
+            continue
+        for pattern in patterns:
+            for f in root.glob(pattern):
+                if any(skip in f.parts for skip in SKIP_DIRS):
+                    continue
+                if f.name.lower() in AUXILIARY_HTML_FILES:
+                    continue
+                if not is_page_file(f):
+                    continue
+                resolved = f.resolve()
+                if resolved in seen:
+                    continue
                 files.append(f)
-    
+                seen.add(resolved)
+
     return files[:50]  # Limit to 50 files
 
 
@@ -102,22 +128,45 @@ def check_page(file_path: Path) -> dict:
     except Exception as e:
         return {"file": str(file_path.name), "issues": [f"Error: {e}"]}
     
-    # Detect if this is a layout/template file (has Head component)
-    is_layout = 'Head>' in content or '<head' in content.lower()
+    content_lower = content.lower()
+    suffix = file_path.suffix.lower()
+    has_head_api = (
+        bool(re.search(r"\busehead\s*\(", content, re.I))
+        or bool(re.search(r"\bdefinepagemeta\s*\(", content, re.I))
+        or "export const metadata" in content_lower
+        or bool(re.search(r"<head[\s>]", content_lower))
+    )
+    has_noindex_robots = bool(
+        re.search(r'robots["\']\s*,?\s*content\s*:\s*["\']noindex', content, re.I)
+        or re.search(r'name=["\']robots["\'][^>]*content=["\']noindex', content, re.I)
+    )
+    requires_head_metadata = suffix in {".html", ".htm"} or has_head_api
+    if has_noindex_robots:
+        requires_head_metadata = False
     
     # 1. Title tag
-    has_title = '<title' in content.lower() or 'title=' in content or 'Head>' in content
-    if not has_title and is_layout:
+    has_title = (
+        "<title" in content_lower
+        or "title=" in content
+        or bool(re.search(r"\btitle\s*:", content))
+    )
+    if not has_title and requires_head_metadata:
         issues.append("Missing <title> tag")
     
     # 2. Meta description
-    has_description = 'name="description"' in content.lower() or 'name=\'description\'' in content.lower()
-    if not has_description and is_layout:
+    has_description = (
+        'name="description"' in content_lower
+        or "name='description'" in content_lower
+        or bool(re.search(r"name\s*:\s*['\"]description['\"]", content, re.I))
+    )
+    if not has_description and requires_head_metadata:
         issues.append("Missing meta description")
     
     # 3. Open Graph tags
-    has_og = 'og:' in content or 'property="og:' in content.lower()
-    if not has_og and is_layout:
+    has_og = "og:" in content_lower or bool(
+        re.search(r"property\s*:\s*['\"]og:", content, re.I)
+    )
+    if not has_og and requires_head_metadata:
         issues.append("Missing Open Graph tags")
     
     # 4. Heading hierarchy - multiple H1s

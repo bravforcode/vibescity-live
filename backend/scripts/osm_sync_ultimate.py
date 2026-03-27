@@ -57,6 +57,7 @@ import h3
 import redis
 import requests
 from dotenv import load_dotenv
+from postgrest import APIError
 from supabase import Client, create_client
 
 # -----------------------------
@@ -68,6 +69,19 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger("vibecity-osm-sync")
+
+OSM_PARSE_ERRORS = (TypeError, ValueError)
+OVERPASS_ERRORS = (json.JSONDecodeError, requests.RequestException, ValueError)
+REDIS_CONNECT_ERRORS = (redis.RedisError, OSError, RuntimeError, ValueError)
+SYNC_OPERATION_ERRORS = (
+    APIError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+    redis.RedisError,
+    requests.RequestException,
+)
 
 
 # -----------------------------
@@ -88,7 +102,7 @@ def parse_osm_timestamp(ts: Any) -> str | None:
     try:
         s = str(ts).replace("Z", "+00:00")
         return datetime.fromisoformat(s).isoformat()
-    except Exception:
+    except OSM_PARSE_ERRORS:
         return None
 
 def compute_content_hash(
@@ -194,7 +208,7 @@ def redact_redis_url(url: str) -> str:
         if p.port:
             netloc = f"{netloc}:{p.port}"
         return urlunparse((p.scheme, netloc, p.path, "", "", ""))
-    except Exception:
+    except (TypeError, ValueError):
         return "<invalid-redis-url>"
 
 
@@ -246,7 +260,7 @@ def connect_redis() -> redis.Redis:
             r.ping()
             logger.info(f"🔌 Connected to Real Redis ({redact_redis_url(url)})")
             return r
-        except Exception as e:
+        except REDIS_CONNECT_ERRORS as e:
             safe_url = redact_redis_url(url)
             errors.append(f"{safe_url} -> {e}")
             logger.warning(f"⚠️ Redis connect failed ({safe_url}): {e}")
@@ -469,7 +483,7 @@ def fetch_overpass_bbox(s: float, w: float, n: float, e: float, newer_iso: str |
             resp.raise_for_status()
             return resp.json().get("elements", [])
 
-        except Exception as e:
+        except OVERPASS_ERRORS as e:
             last_err = e
             backoff = min((2 ** (attempt - 1)) * 1.5, 60.0) + random.uniform(0, 1.0)
             time.sleep(backoff)
@@ -656,7 +670,7 @@ class DBManager:
         """Fail fast when venues contract does not include required OSM columns."""
         try:
             self.sb.table("venues").select(",".join(REQUIRED_VENUES_COLUMNS)).limit(1).execute()
-        except Exception as e:
+        except (APIError, RuntimeError, TypeError, ValueError) as e:
             raise RuntimeError(
                 "Missing required public.venues columns for OSM sync. "
                 f"Expected columns: {', '.join(REQUIRED_VENUES_COLUMNS)}"
@@ -711,7 +725,7 @@ class DBManager:
         try:
             # expects: create function bulk_touch_venues(venue_ids uuid[]) returns void
             self.sb.rpc("bulk_touch_venues", {"venue_ids": venue_ids}).execute()
-        except Exception:
+        except APIError:
             # safe fallback
             return
 
@@ -734,7 +748,7 @@ class DensityPrewarmer:
         for cell, score in dens:
             try:
                 lat, lon = h3.cell_to_latlng(cell)
-            except Exception:
+            except OSM_PARSE_ERRORS:
                 continue
             x = lon2tilex(lon, z)
             y = lat2tiley(lat, z)
@@ -759,7 +773,7 @@ class UltimateSync:
 
         try:
             self.redis = connect_redis()
-        except Exception as e:
+        except REDIS_CONNECT_ERRORS as e:
             if not conf.ALLOW_FAKE_REDIS:
                 raise RuntimeError(
                     f"Redis connection failed and ALLOW_FAKE_REDIS=false: {e}"
@@ -771,7 +785,9 @@ class UltimateSync:
                 self.redis = fakeredis.FakeRedis(decode_responses=True)
             except ImportError:
                 logger.error("❌ Redis unavailable and fakeredis not installed.")
-                raise e
+                raise RuntimeError(
+                    "Redis unavailable and fakeredis not installed."
+                ) from e
 
         self.sb = create_client(conf.SUPABASE_URL, conf.SUPABASE_SERVICE_ROLE_KEY)
         self.db = DBManager(self.sb)
@@ -959,7 +975,7 @@ class UltimateSync:
                 "elapsed_s": round(elapsed, 2),
             }
 
-        except Exception as e:
+        except SYNC_OPERATION_ERRORS as e:
             self.scheduler.schedule_next(tid, success=False)
             return {"tile": tid, "ok": False, "error": str(e)}
 
@@ -1050,7 +1066,7 @@ def parse_failed_tiles_from_log(log_path: str) -> list[str]:
     try:
         with open(log_path, encoding="utf-8", errors="ignore") as f:
             lines = f.readlines()
-    except Exception as e:
+    except OSError as e:
         logger.warning(f"⚠️ Unable to read log file '{log_path}': {e}")
         return []
 
@@ -1101,7 +1117,7 @@ def main():
         try:
             sys.stdout.reconfigure(encoding="utf-8")
             sys.stderr.reconfigure(encoding="utf-8")
-        except Exception:
+        except (AttributeError, OSError, ValueError):
             pass
 
     retry_failed_log: str | None = None
@@ -1115,7 +1131,7 @@ def main():
         elif a.startswith("--loop="):
             try:
                 loop_n = int(a.split("=", 1)[1])
-            except Exception:
+            except ValueError:
                 loop_n = 1
 
     app = UltimateSync()

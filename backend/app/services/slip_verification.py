@@ -1,4 +1,5 @@
 import base64
+import binascii
 import hashlib
 import json
 import re
@@ -100,7 +101,7 @@ def _extract_amount_from_line(line: str) -> Decimal | None:
     for candidate in AMOUNT_PATTERN.findall(line or ""):
         try:
             return _to_decimal(candidate)
-        except Exception:
+        except (TypeError, ValueError):
             continue
     return None
 
@@ -241,11 +242,11 @@ def _decode_service_account(raw: str) -> dict[str, Any] | None:
     if not text.startswith("{"):
         try:
             text = base64.b64decode(text).decode("utf-8")
-        except Exception:
+        except (binascii.Error, UnicodeDecodeError):
             return None
     try:
         return json.loads(text)
-    except Exception:
+    except json.JSONDecodeError:
         return None
 
 
@@ -374,7 +375,7 @@ async def _resolve(value: Any) -> Any:
 async def verify_slip_with_gcv(slip_url: str, amount: Any) -> SlipVerification:
     try:
         expected_amount = _to_decimal(amount)
-    except Exception as exc:
+    except (TypeError, ValueError) as exc:
         return SlipVerification(
             status="rejected",
             reason="amount_mismatch",
@@ -390,7 +391,7 @@ async def verify_slip_with_gcv(slip_url: str, amount: Any) -> SlipVerification:
 
     try:
         image_bytes = await _resolve(fetch_slip_bytes(slip_url, settings.GCV_OCR_MAX_BYTES))
-    except Exception as exc:
+    except (requests.RequestException, RuntimeError, ValueError) as exc:
         return SlipVerification(
             status="rejected",
             reason="fetch_error",

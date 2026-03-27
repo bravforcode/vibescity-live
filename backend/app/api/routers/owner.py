@@ -1,8 +1,10 @@
 import asyncio
+import logging
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from postgrest import APIError
 from pydantic import BaseModel
 
 from app.api.routers.vibes import manager
@@ -13,6 +15,7 @@ from app.core.visitor_auth import require_valid_visitor
 from app.services.venue_repository import VenueRepository
 
 router = APIRouter()
+logger = logging.getLogger("app.owner")
 
 
 class OwnerStats(BaseModel):
@@ -30,14 +33,14 @@ def _now_utc() -> datetime:
 def _safe_int(value, default: int = 0) -> int:
     try:
         return int(value)
-    except Exception:
+    except (TypeError, ValueError):
         return default
 
 
 def _safe_float(value, default: float = 0.0) -> float:
     try:
         return float(value)
-    except Exception:
+    except (TypeError, ValueError):
         return default
 
 
@@ -51,7 +54,7 @@ def _parse_dt(value) -> datetime | None:
         text = f"{text[:-1]}+00:00"
     try:
         return datetime.fromisoformat(text).astimezone(UTC)
-    except Exception:
+    except ValueError:
         return None
 
 
@@ -134,7 +137,8 @@ async def _fetch_events_for_venues(
         try:
             response = await asyncio.to_thread(query.execute)
             out.extend(list(response.data or []))
-        except Exception:
+        except APIError as exc:
+            logger.warning("owner_events_fetch_failed", extra={"err": str(exc), "venue_ids": chunk})
             continue
     return out
 
@@ -153,6 +157,8 @@ async def get_shop_stats(
         live_count = len(manager.room_connections[shop_id])
 
     client = supabase_admin or supabase
+    if client is None:
+        raise HTTPException(status_code=500, detail="Database client not configured")
     venue_data = {}
     try:
         response = await asyncio.to_thread(
@@ -163,7 +169,8 @@ async def get_shop_stats(
             .execute()
         )
         venue_data = response.data or {}
-    except Exception:
+    except APIError as exc:
+        logger.info("owner_stats_venues_lookup_failed", extra={"shop_id": shop_id, "err": str(exc)})
         try:
             response = await asyncio.to_thread(
                 lambda: client.table("shops")
@@ -173,7 +180,11 @@ async def get_shop_stats(
                 .execute()
             )
             venue_data = response.data or {}
-        except Exception:
+        except APIError as fallback_exc:
+            logger.warning(
+                "owner_stats_shops_lookup_failed",
+                extra={"shop_id": shop_id, "err": str(fallback_exc)},
+            )
             venue_data = {}
 
     total_views = venue_data.get("total_views")
@@ -414,19 +425,23 @@ async def _ensure_owner_or_admin(shop_id: str, user: dict):
     try:
         await verify_admin(user)
         return
-    except Exception:
-        pass
+    except HTTPException as exc:
+        if exc.status_code != 403:
+            raise
 
     user_id = getattr(user, "id", None)
     if not user_id:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     client = supabase_admin or supabase
+    if client is None:
+        raise HTTPException(status_code=500, detail="Database client not configured")
     repository = VenueRepository(client)
     try:
         owner_id = repository.get_owner(shop_id)
-    except Exception:
-        raise HTTPException(status_code=500, detail="Failed to verify ownership")
+    except APIError as exc:
+        logger.error("owner_lookup_failed", extra={"shop_id": shop_id, "err": str(exc)})
+        raise HTTPException(status_code=500, detail="Failed to verify ownership") from exc
 
     if not owner_id or str(owner_id) != str(user_id):
         raise HTTPException(status_code=403, detail="Owner privileges required")

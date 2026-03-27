@@ -32,4 +32,4 @@ def claim_coupon(coupon_id: int, user: dict = Depends(verify_user)):
         raise
     except Exception as e:
         print(f"Redemption error: {e}")
-        raise HTTPException(500, detail="Transaction failed")
+        raise HTTPException(500, detail="Transaction failed") from e

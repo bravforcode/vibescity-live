@@ -723,6 +723,7 @@ onUnmounted(() => {
             >
               <img
                 :src="building.floorPlanUrls[activeFloor]"
+                :alt="`${building.name || 'Mall'} floor plan ${activeFloor}`"
                 class="w-full aspect-video object-contain p-4 transition-transform duration-700 group-hover:scale-110"
                 loading="lazy"
                 decoding="async"
@@ -763,6 +764,7 @@ onUnmounted(() => {
                 >
                   <img
                     :src="hl.src"
+                    :alt="hl.alt || hl.title || `${building.name || 'Mall'} highlight ${idx + 1}`"
                     class="w-full h-full object-cover"
                     loading="lazy"
                     decoding="async"

@@ -22,10 +22,10 @@ try:
 except ImportError:
     pass
 
-from app.db.session import _core_session_maker
-
 
 async def list_tables():
+    from app.db.session import _core_session_maker
+
     print("Connecting to database...")
     try:
         async with _core_session_maker.instance() as session:

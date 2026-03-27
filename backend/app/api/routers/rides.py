@@ -79,7 +79,7 @@ async def estimate_ride(request: Request, body: RideEstimateRequest):
             }
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/providers")

@@ -8,11 +8,10 @@ import time
 from datetime import UTC, datetime
 from typing import Any
 
+import redis
 from dotenv import load_dotenv
 
 load_dotenv()
-
-import redis
 
 logging.basicConfig(
     level=logging.INFO,
@@ -20,6 +19,17 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger("vibecity-workers-enterprise")
+
+REDIS_RECOVERABLE_ERRORS = (redis.RedisError, OSError, RuntimeError, ValueError)
+JSON_RECOVERABLE_ERRORS = (json.JSONDecodeError, TypeError, ValueError)
+WORKER_MESSAGE_ERRORS = (
+    json.JSONDecodeError,
+    KeyError,
+    TypeError,
+    ValueError,
+    RuntimeError,
+    redis.RedisError,
+)
 
 
 # =========================
@@ -96,7 +106,7 @@ def get_redis() -> redis.Redis:
         r.ping()
         logger.info("🔌 Connected to Real Redis")
         return r
-    except Exception as e:
+    except REDIS_RECOVERABLE_ERRORS as e:
         logger.warning(f"⚠️ Real Redis failed ({e}). Falling back to fakeredis (in-memory).")
         try:
             import fakeredis
@@ -104,7 +114,9 @@ def get_redis() -> redis.Redis:
             return fakeredis.FakeRedis(decode_responses=True)
         except ImportError:
             logger.error("❌ Redis unavailable and fakeredis not installed.")
-            raise e
+            raise RuntimeError(
+                "Redis unavailable and fakeredis not installed."
+            ) from e
 
 def ensure_group(r: redis.Redis, stream: str, group: str) -> None:
     try:
@@ -119,7 +131,7 @@ def safe_json_load(s: str) -> Any:
         return None
     try:
         return json.loads(s)
-    except Exception:
+    except JSON_RECOVERABLE_ERRORS:
         return None
 
 def now_ts() -> float:
@@ -185,17 +197,17 @@ class BaseConsumer:
                             if ok:
                                 self.r.xack(self.stream, self.group, msg_id)
 
-                        except Exception as ex:
+                        except WORKER_MESSAGE_ERRORS as ex:
                             logger.error(f"❌ {self.name} failed msg {msg_id}: {ex}")
                             # DLQ
                             try:
                                 dlq_stream = f"{Config.DLQ_PREFIX}{self.stream}"
                                 self.r.xadd(dlq_stream, {"error": str(ex), "event": json.dumps(fields, ensure_ascii=False)})
                                 self.r.xack(self.stream, self.group, msg_id)
-                            except Exception:
+                            except (TypeError, ValueError, redis.RedisError):
                                 pass
 
-            except Exception as loop_ex:
+            except REDIS_RECOVERABLE_ERRORS as loop_ex:
                 logger.error(f"❌ loop error {self.name}: {loop_ex}")
                 time.sleep(2)
 
@@ -399,7 +411,7 @@ class HeatmapInvalidateConsumer(BaseConsumer):
             for cell, val in row.items():
                 try:
                     agg[cell] = agg.get(cell, 0) + int(val)
-                except Exception:
+                except (TypeError, ValueError):
                     continue
         return agg
 
@@ -432,7 +444,7 @@ class PrewarmTilesWorker:
         while True:
             try:
                 self.tick()
-            except Exception as e:
+            except (TypeError, ValueError, redis.RedisError, OSError) as e:
                 logger.error(f"prewarm tick error: {e}")
             time.sleep(sleep_sec)
 
@@ -470,7 +482,7 @@ def main():
         try:
             sys.stdout.reconfigure(encoding="utf-8")
             sys.stderr.reconfigure(encoding="utf-8")
-        except Exception:
+        except (AttributeError, OSError, ValueError):
             pass
 
     r = get_redis()

@@ -1,4 +1,5 @@
 import base64
+import binascii
 import hashlib
 import hmac
 import json
@@ -40,7 +41,7 @@ def _get_signing_secret() -> bytes:
 def normalize_visitor_id(visitor_id: str) -> str:
     try:
         return str(UUID(str(visitor_id).strip()))
-    except Exception as exc:
+    except (AttributeError, TypeError, ValueError) as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="visitor_id must be a valid UUID",
@@ -79,7 +80,14 @@ def get_token_payload(token: str) -> dict | None:
         if not isinstance(payload, dict):
             return None
         return payload
-    except Exception:
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeDecodeError,
+        binascii.Error,
+        json.JSONDecodeError,
+    ):
         return None
 
 

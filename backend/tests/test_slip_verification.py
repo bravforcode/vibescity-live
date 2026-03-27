@@ -683,7 +683,7 @@ class TestToDecimal:
         assert _to_decimal("THB500.50") == Decimal("500.50")
 
     def test_invalid_type_raises(self):
-        with pytest.raises(Exception):
+        with pytest.raises(TypeError):
             _to_decimal([123])
 
 

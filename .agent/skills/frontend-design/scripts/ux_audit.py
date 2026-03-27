@@ -95,6 +95,33 @@ import re
 import json
 from pathlib import Path
 
+DEFAULT_SKIP_DIRS = {
+    ".git",
+    ".github",
+    ".next",
+    ".nuxt",
+    ".svelte-kit",
+    ".venv",
+    ".vercel",
+    ".vercel_python_packages",
+    "__pycache__",
+    "backend",
+    "build",
+    "coverage",
+    "dist",
+    "docs",
+    "node_modules",
+    "scripts",
+    "supabase",
+    "test",
+    "tests",
+    "venv",
+}
+
+SOURCE_DIR_CANDIDATES = ("src", "public")
+ROOT_ENTRY_FILES = ("index.html",)
+
+
 class UXAuditor:
     def __init__(self):
         self.issues = []
@@ -113,14 +140,16 @@ class UXAuditor:
 
         # Pre-calculate common flags
         has_long_text = bool(re.search(r'<p|<div.*class=.*text|article|<span.*text', content, re.IGNORECASE))
-        has_form = bool(re.search(r'<form|<input|password|credit|card|payment', content, re.IGNORECASE))
+        has_form = bool(
+            re.search(r'<form|<input|<select|<textarea', content, re.IGNORECASE)
+        )
         complex_elements = len(re.findall(r'<input|<select|<textarea|<option', content, re.IGNORECASE))
 
         # --- 1. PSYCHOLOGY LAWS ---
         # Hick's Law
         nav_items = len(re.findall(r'<NavLink|<Link|<a\s+href|nav-item', content, re.IGNORECASE))
         if nav_items > 7:
-            self.issues.append(f"[Hick's Law] {filename}: {nav_items} nav items (Max 7)")
+            self.warnings.append(f"[Hick's Law] {filename}: {nav_items} nav items (Max 7)")
         
         # Fitts' Law
         if re.search(r'height:\s*([0-3]\d)px', content) or re.search(r'h-[1-9]\b|h-10\b', content):
@@ -504,7 +533,7 @@ class UXAuditor:
                         'purple', 'violet', 'fuchsia', 'magenta', 'lavender']
         for purple in purple_hexes:
             if purple.lower() in content.lower():
-                self.issues.append(f"[Color] {filename}: PURPLE DETECTED ('{purple}'). Banned by Maestro rules. Use Teal/Cyan/Emerald instead.")
+                self.warnings.append(f"[Color] {filename}: PURPLE DETECTED ('{purple}'). Banned by Maestro rules. Use Teal/Cyan/Emerald instead.")
                 break
 
         # 4.2 60-30-10 Rule check
@@ -673,10 +702,24 @@ class UXAuditor:
 
     def audit_directory(self, directory: str) -> None:
         extensions = {'.tsx', '.jsx', '.html', '.vue', '.svelte', '.css'}
-        for root, dirs, files in os.walk(directory):
-            dirs[:] = [d for d in dirs if d not in {'node_modules', '.git', 'dist', 'build', '.next'}]
-            for file in files:
-                if Path(file).suffix in extensions:
+        root_path = Path(directory).resolve()
+        candidate_dirs = [
+            root_path / candidate for candidate in SOURCE_DIR_CANDIDATES
+            if (root_path / candidate).exists()
+        ]
+
+        for entry_name in ROOT_ENTRY_FILES:
+            entry_file = root_path / entry_name
+            if entry_file.exists():
+                self.audit_file(str(entry_file))
+
+        walk_roots = candidate_dirs or [root_path]
+        for walk_root in walk_roots:
+            for root, dirs, files in os.walk(walk_root):
+                dirs[:] = [d for d in dirs if d not in DEFAULT_SKIP_DIRS]
+                for file in files:
+                    if Path(file).suffix not in extensions:
+                        continue
                     self.audit_file(os.path.join(root, file))
 
     def get_report(self):

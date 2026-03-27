@@ -67,7 +67,7 @@ async def claim_vibe(request: Request, body: ClaimRequest):
         ).execute()
     except Exception as e:
         logger.error("claim_vibe_rpc_failed", extra={"error": str(e)})
-        raise HTTPException(status_code=500, detail="Claim service unavailable")
+        raise HTTPException(status_code=500, detail="Claim service unavailable") from e
 
     if not result.data:
         raise HTTPException(status_code=500, detail="Empty RPC response")
@@ -95,7 +95,7 @@ async def get_my_claims(request: Request, visitor_id: str):
         ).execute()
     except Exception as e:
         logger.error("get_my_claims_failed", extra={"error": str(e)})
-        raise HTTPException(status_code=500, detail="Claims service unavailable")
+        raise HTTPException(status_code=500, detail="Claims service unavailable") from e
 
     if not result.data:
         return {"venue_ids": [], "balance": 0}

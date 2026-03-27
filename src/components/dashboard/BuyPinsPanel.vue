@@ -597,6 +597,7 @@
                   <div v-if="previewUrl" class="w-full h-full p-2">
                     <img
                       :src="previewUrl"
+                      alt="Uploaded payment slip preview"
                       class="w-full h-full object-contain rounded-lg"
                     />
                   </div>

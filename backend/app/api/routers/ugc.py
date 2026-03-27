@@ -1,11 +1,12 @@
 """
 UGC Router - User Generated Content & Gamification
 """
+import logging
 from datetime import UTC, datetime
-from typing import Union
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from postgrest import APIError
 from pydantic import BaseModel, Field
 from starlette.requests import Request
 
@@ -15,7 +16,8 @@ from app.core.rate_limit import limiter
 from app.core.supabase import supabase
 
 router = APIRouter()
-VenueIdInput = Union[str, int, UUID]
+VenueIdInput = str | int | UUID
+logger = logging.getLogger("app.ugc")
 
 
 class ShopSubmission(BaseModel):
@@ -67,8 +69,9 @@ def grant_rewards(user_id: str, action: str) -> dict | None:
         if isinstance(data, dict) and data.get("success"):
             return data
         return None
-    except Exception:
+    except (APIError, Exception) as exc:
         # Reward failures should not block the user action.
+        logger.warning("ugc_reward_grant_failed", extra={"user_id": user_id, "action": action, "err": str(exc)})
         return None
 
 
@@ -120,8 +123,9 @@ def submit_shop(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except APIError as exc:
+        logger.error("ugc_submit_shop_failed", extra={"user_id": user.id, "err": str(exc)})
+        raise HTTPException(status_code=500, detail="Failed to submit shop") from exc
 
 
 @router.post("/check-in")
@@ -148,7 +152,7 @@ def check_in(
                     .gte("created_at", today_start.isoformat())
                     .execute()
                 )
-            except Exception:
+            except APIError:
                 existing = (
                     supabase.table("check_ins")
                     .select("id")
@@ -176,7 +180,7 @@ def check_in(
             payload["venue_id_uuid"] = venue_uuid
         try:
             result = supabase.table("check_ins").insert(payload).execute()
-        except Exception:
+        except APIError:
             payload.pop("venue_id_uuid", None)
             result = supabase.table("check_ins").insert(payload).execute()
         if not result.data:
@@ -196,8 +200,9 @@ def check_in(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except APIError as exc:
+        logger.error("ugc_check_in_failed", extra={"user_id": user.id, "err": str(exc)})
+        raise HTTPException(status_code=500, detail="Check-in failed") from exc
 
 
 @router.post("/photos")
@@ -220,7 +225,7 @@ def upload_photo(
             payload["venue_id_uuid"] = venue_uuid
         try:
             result = supabase.table("venue_photos").insert(payload).execute()
-        except Exception:
+        except APIError:
             payload.pop("venue_id_uuid", None)
             if venue_uuid:
                 payload["venue_id"] = venue_text
@@ -242,8 +247,9 @@ def upload_photo(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except APIError as exc:
+        logger.error("ugc_upload_photo_failed", extra={"user_id": user.id, "err": str(exc)})
+        raise HTTPException(status_code=500, detail="Photo upload failed") from exc
 
 
 @router.get("/my-stats")
@@ -284,7 +290,8 @@ def get_user_stats(user=Depends(verify_user)):
                 "photos_count": 0,
             },
         }
-    except Exception:
+    except APIError as exc:
+        logger.warning("ugc_stats_fetch_failed", extra={"user_id": user_id, "err": str(exc)})
         return {
             "success": True,
             "stats": {"user_id": user_id, "coins": 0, "xp": 0, "level": 1},
@@ -302,7 +309,8 @@ def get_leaderboard(limit: int = Query(10, le=50, description="Max results")):
             .execute()
         )
         return {"success": True, "leaderboard": response.data or []}
-    except Exception:
+    except APIError as exc:
+        logger.warning("ugc_leaderboard_fetch_failed", extra={"limit": limit, "err": str(exc)})
         return {"success": True, "leaderboard": []}
 
 
@@ -317,7 +325,8 @@ def get_achievements(user=Depends(verify_user)):
             .execute()
         )
         return {"success": True, "achievements": result.data or []}
-    except Exception:
+    except APIError as exc:
+        logger.warning("ugc_achievements_fetch_failed", extra={"user_id": user_id, "err": str(exc)})
         return {"success": True, "achievements": []}
 
 
@@ -333,5 +342,6 @@ def get_user_submissions(user=Depends(verify_user)):
             .execute()
         )
         return {"success": True, "submissions": result.data or []}
-    except Exception:
+    except APIError as exc:
+        logger.warning("ugc_submissions_fetch_failed", extra={"user_id": user_id, "err": str(exc)})
         return {"success": True, "submissions": []}

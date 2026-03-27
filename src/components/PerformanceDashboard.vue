@@ -3,7 +3,11 @@
     <div class="dashboard-header">
       <h2>{{ $t("auto.k_f8b1115d") }}</h2>
       <div class="time-controls">
-        <select v-model="timeRange" @change="refreshData">
+        <select
+          v-model="timeRange"
+          aria-label="Performance time range"
+          @change="refreshData"
+        >
           <option value="1h">{{ $t("auto.k_b465e4d5") }}</option>
           <option value="24h">{{ $t("auto.k_6f094336") }}</option>
           <option value="7d">{{ $t("auto.k_b58d8d6f") }}</option>

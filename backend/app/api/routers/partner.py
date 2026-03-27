@@ -1,8 +1,10 @@
 import asyncio
+import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Query
+from postgrest import APIError
 from pydantic import BaseModel
 
 from app.core.supabase import supabase_admin
@@ -10,6 +12,7 @@ from app.core.visitor_auth import require_valid_visitor
 from app.services.sheets_logger import sheets_logger
 
 router = APIRouter()
+logger = logging.getLogger("app.partner")
 
 PARTNER_PRIMARY_PLAN_CODE = "partner_program"
 PARTNER_PRIMARY_SKU = "partner_program"
@@ -36,7 +39,7 @@ def _parse_dt(value: str | None) -> datetime | None:
         text = f"{text[:-1]}+00:00"
     try:
         return datetime.fromisoformat(text).astimezone(UTC)
-    except Exception:
+    except ValueError:
         return None
 
 
@@ -104,7 +107,7 @@ async def _fetch_rows_by_visitor(
             rows = list(res.data or [])
             if rows:
                 return rows
-        except Exception as exc:
+        except APIError as exc:
             last_error = exc
 
     if last_error and not query_succeeded:
@@ -394,11 +397,12 @@ async def upsert_partner_profile(
                 .single()
                 .execute()
             )
-    except Exception as exc:
+    except APIError as exc:
         message = str(exc).lower()
         if "referral_code" in message and "duplicate" in message:
-            raise HTTPException(status_code=409, detail="Referral code already in use")
-        raise HTTPException(status_code=400, detail="Unable to save partner profile")
+            raise HTTPException(status_code=409, detail="Referral code already in use") from exc
+        logger.error("partner_profile_save_failed", extra={"visitor_id": normalized_visitor_id, "err": str(exc)})
+        raise HTTPException(status_code=400, detail="Unable to save partner profile") from exc
 
     profile_data = res.data or payload
     await sheets_logger.log_event(
@@ -471,8 +475,9 @@ async def update_partner_bank(
 
     try:
         await _upsert_partner_bank_secret(str(partner.get("id")), bank_payload)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Unable to persist secure payout details")
+    except APIError as exc:
+        logger.error("partner_bank_secret_save_failed", extra={"partner_id": partner.get("id"), "err": str(exc)})
+        raise HTTPException(status_code=400, detail="Unable to persist secure payout details") from exc
 
     await asyncio.to_thread(
         lambda: supabase_admin.table("partners")

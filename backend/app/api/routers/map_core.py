@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Query, HTTPException
+import hashlib
+import json
+from datetime import UTC, datetime
+
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
-from typing import Optional
-from datetime import datetime, timezone
-import hashlib, json
 
 router = APIRouter(tags=["map-core"])
 
@@ -15,8 +16,8 @@ def _parse_bbox(bbox: str) -> tuple[float, float, float, float]:
         raise HTTPException(400, "bbox must be minLng,minLat,maxLng,maxLat")
     try:
         mn_lng, mn_lat, mx_lng, mx_lat = map(float, parts)
-    except ValueError:
-        raise HTTPException(400, "bbox values must be numeric")
+    except ValueError as exc:
+        raise HTTPException(400, "bbox values must be numeric") from exc
     if not (-180 <= mn_lng < mx_lng <= 180):
         raise HTTPException(400, "longitude range invalid: minLng must be < maxLng within [-180,180]")
     if not (-90 <= mn_lat < mx_lat <= 90):
@@ -33,13 +34,13 @@ class VenuePin(BaseModel):
     lat: float
     lng: float
     category: str
-    rating: Optional[float] = None
+    rating: float | None = None
     is_live: bool = False
 
 
 class VenuesResponse(BaseModel):
     schema_version: int = Field(1, description="Bump on breaking schema change")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     total: int = Field(..., description="Total venues in bbox before limit clamp")
     venues: list[VenuePin]
 
@@ -54,7 +55,7 @@ class HotRoadSegment(BaseModel):
 class HotRoadsResponse(BaseModel):
     schema_version: int = Field(1)
     snapshot_id: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     unchanged: bool = Field(False, description="True when since= matches current snapshot_id")
     segments: list[HotRoadSegment]
 
@@ -115,7 +116,7 @@ async def get_venues(
 @router.get("/hot-roads", response_model=HotRoadsResponse)
 async def get_hot_roads(
     bbox: str = Query(..., description="minLng,minLat,maxLng,maxLat"),
-    since: Optional[str] = Query(None, description="snapshot_id from previous response"),
+    since: str | None = Query(None, description="snapshot_id from previous response"),
 ):
     mn_lng, mn_lat, mx_lng, mx_lat = _parse_bbox(bbox)
 

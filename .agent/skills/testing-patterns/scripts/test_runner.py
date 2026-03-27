@@ -24,13 +24,26 @@ except:
     pass
 
 
+def _resolve_python_runner(project_path: Path) -> tuple[list[str], Path]:
+    """Prefer a repo-local backend interpreter when backend tests are present."""
+    backend_dir = project_path / "backend"
+    backend_tests = backend_dir / "tests"
+    backend_venv_python = backend_dir / ".venv" / "Scripts" / "python.exe"
+
+    if backend_tests.exists() and backend_venv_python.exists():
+        return ([str(backend_venv_python), "-m", "pytest", "-v", "backend/tests"], project_path)
+
+    return (["python", "-m", "pytest", "-v"], project_path)
+
+
 def detect_test_framework(project_path: Path) -> dict:
     """Detect test framework and commands."""
     result = {
         "type": "unknown",
         "framework": None,
         "cmd": None,
-        "coverage_cmd": None
+        "coverage_cmd": None,
+        "cwd": project_path,
     }
     
     # Node.js project
@@ -68,10 +81,12 @@ def detect_test_framework(project_path: Path) -> dict:
     
     # Python project
     if (project_path / "pyproject.toml").exists() or (project_path / "requirements.txt").exists():
+        python_cmd, python_cwd = _resolve_python_runner(project_path)
         result["type"] = "python"
         result["framework"] = "pytest"
-        result["cmd"] = ["python", "-m", "pytest", "-v"]
-        result["coverage_cmd"] = ["python", "-m", "pytest", "--cov", "--cov-report=term-missing"]
+        result["cmd"] = python_cmd
+        result["coverage_cmd"] = python_cmd[:3] + ["--cov", "--cov-report=term-missing", "backend/tests"]
+        result["cwd"] = python_cwd
     
     return result
 
@@ -174,7 +189,7 @@ def main():
     print("-"*60)
     
     # Run tests
-    result = run_tests(cmd, project_path)
+    result = run_tests(cmd, test_info.get("cwd", project_path))
     
     # Print output (truncated)
     if result["output"]:

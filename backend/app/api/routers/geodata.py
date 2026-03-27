@@ -207,7 +207,7 @@ async def get_osm_places(province: str, radius: int = 10000):
 
     except httpx.RequestError as e:
         logger.error(f"Overpass request failed: {e}")
-        raise HTTPException(status_code=502, detail="Overpass API failed")
+        raise HTTPException(status_code=502, detail="Overpass API failed") from e
     except Exception as e:
         logger.error(f"Error processing OSM data: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e

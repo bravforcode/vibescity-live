@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from app.core.auth import get_optional_user, verify_admin
 from app.core.supabase import supabase
+from app.services.analytics_service import analytics_buffer
 from app.services.sheets_logger import sheets_logger
 
 router = APIRouter()
@@ -16,8 +17,6 @@ class AnalyticsEvent(BaseModel):
     data: dict[str, Any] = Field(default_factory=dict)
     user_id: str | None = None
     visitor_id: str | None = None
-
-from app.services.analytics_service import analytics_buffer
 
 
 @router.post("/log")

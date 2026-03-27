@@ -11,6 +11,8 @@ import asyncio
 import logging
 from datetime import UTC, datetime
 
+from postgrest import APIError
+
 logger = logging.getLogger(__name__)
 
 _INTERVAL_SECONDS = 300  # 5 minutes
@@ -22,7 +24,6 @@ async def _reconcile_once() -> None:
         from app.core.supabase import supabase_admin
         from app.db.session import _qdrant_client
         from app.services.vector.places_vector_service import (
-            COLLECTION_NAME,
             configure_genai_once,
             embed_text,
             upsert_points,
@@ -37,7 +38,7 @@ async def _reconcile_once() -> None:
 
     try:
         client = _qdrant_client.instance
-    except Exception as exc:
+    except AttributeError as exc:
         logger.debug("triad_reconcile: qdrant unavailable — %s", exc)
         return
 
@@ -50,7 +51,7 @@ async def _reconcile_once() -> None:
             .limit(50)
             .execute()
         )
-    except Exception as exc:
+    except APIError as exc:
         logger.warning("triad_reconcile: DB query failed — %s", exc)
         return
 
@@ -63,7 +64,7 @@ async def _reconcile_once() -> None:
     # 2. Re-upsert each venue to Qdrant
     try:
         await configure_genai_once()
-    except Exception as exc:
+    except (RuntimeError, ValueError) as exc:
         logger.warning("triad_reconcile: genai not available — %s", exc)
         return
 
@@ -86,7 +87,7 @@ async def _reconcile_once() -> None:
             )
             await upsert_points(client, [point])
             synced_ids.append(venue_id)
-        except Exception as exc:
+        except (RuntimeError, TypeError, ValueError) as exc:
             logger.warning("triad_reconcile: upsert failed for %s — %s", venue_id, exc)
 
     if not synced_ids:
@@ -102,7 +103,7 @@ async def _reconcile_once() -> None:
             .execute()
         )
         logger.info("triad_reconcile: stamped %d venues", len(synced_ids))
-    except Exception as exc:
+    except APIError as exc:
         logger.warning("triad_reconcile: timestamp update failed — %s", exc)
 
 
@@ -111,6 +112,6 @@ async def run_forever() -> None:
     while True:
         try:
             await _reconcile_once()
-        except Exception as exc:
+        except (APIError, RuntimeError, TypeError, ValueError) as exc:
             logger.warning("triad_reconcile: unexpected error — %s", exc)
         await asyncio.sleep(_INTERVAL_SECONDS)

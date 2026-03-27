@@ -7,6 +7,7 @@ Usage:
 """
 
 import sys
+from importlib.util import find_spec
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -14,23 +15,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.core.config import settings  # noqa: E402
 
 # Check optional dependencies
-try:
-    import google.generativeai
-    GENAI_INSTALLED = True
-except ImportError:
-    GENAI_INSTALLED = False
-
-try:
-    import qdrant_client
-    QDRANT_INSTALLED = True
-except ImportError:
-    QDRANT_INSTALLED = False
-
-try:
-    import asyncpg
-    ASYNCPG_INSTALLED = True
-except ImportError:
-    ASYNCPG_INSTALLED = False
+GENAI_INSTALLED = find_spec("google.generativeai") is not None
+QDRANT_INSTALLED = find_spec("qdrant_client") is not None
+ASYNCPG_INSTALLED = find_spec("asyncpg") is not None
 
 
 def redact(value: str) -> str:

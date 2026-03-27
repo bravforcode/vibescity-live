@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import app.api.routers.payments as payments
 
@@ -114,12 +115,17 @@ def test_manual_order_success(client, monkeypatch):
             self._filters[key] = value
             return self
 
+        def limit(self, *_args, **_kwargs):
+            return self
+
         def select(self, *_args, **_kwargs):
             return self
 
         def execute(self):
             if self.table_name == "orders":
-                return _FakeInsertResult([{"id": "order-1", **(self._payload or {})}])
+                if self._payload is None:
+                    return _FakeInsertResult([])
+                return _FakeInsertResult([{"id": "order-1", **self._payload}])
             return _FakeInsertResult([])
 
     class _FakeSupabase:
@@ -128,8 +134,8 @@ def test_manual_order_success(client, monkeypatch):
 
     monkeypatch.setattr(payments, "supabase_admin", _FakeSupabase())
     monkeypatch.setattr(payments, "enqueue_ocr_job", lambda _order_id: "1-0")
-    monkeypatch.setattr(payments, "_send_discord", lambda _payload: None)
-    monkeypatch.setattr(payments, "_fetch_ip_info", lambda _ip: None)
+    monkeypatch.setattr(payments, "_send_discord", AsyncMock(return_value=None))
+    monkeypatch.setattr(payments, "_fetch_ip_info", AsyncMock(return_value=None))
 
     payload = {
         "venue_id": "c2968e0d-3f5f-4f4c-a5b3-2db6dcaf2fb0",
@@ -177,13 +183,18 @@ def test_manual_order_queue_failure_returns_pending(client, monkeypatch):
         def eq(self, *_args, **_kwargs):
             return self
 
+        def limit(self, *_args, **_kwargs):
+            return self
+
         def select(self, *_args, **_kwargs):
             return self
 
         def execute(self):
             if self.table_name == "orders":
+                if self._payload is None:
+                    return _FakeInsertResult([])
                 return _FakeInsertResult(
-                    [{"id": "order-queue-fail", **(self._payload or {})}]
+                    [{"id": "order-queue-fail", **self._payload}]
                 )
             return _FakeInsertResult([])
 
@@ -197,8 +208,8 @@ def test_manual_order_queue_failure_returns_pending(client, monkeypatch):
         "enqueue_ocr_job",
         lambda _order_id: (_ for _ in ()).throw(RuntimeError("queue down")),
     )
-    monkeypatch.setattr(payments, "_send_discord", lambda _payload: None)
-    monkeypatch.setattr(payments, "_fetch_ip_info", lambda _ip: None)
+    monkeypatch.setattr(payments, "_send_discord", AsyncMock(return_value=None))
+    monkeypatch.setattr(payments, "_fetch_ip_info", AsyncMock(return_value=None))
 
     payload = {
         "venue_id": "c2968e0d-3f5f-4f4c-a5b3-2db6dcaf2fb0",
