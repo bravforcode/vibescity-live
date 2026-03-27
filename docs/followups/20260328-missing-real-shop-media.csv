@@ -1,0 +1,36 @@
+priority,shop_id,name,category,province,district,source,admin_source,seed_source,coverage_level
+high,0252d260-e7bb-4072-8653-7448f221fe02,ผาแดงสปอร์ตคลับ,Fitness,Chon Buri,Si Racha,osm,thai-geolocate-repair,,
+high,02363acb-cf7f-489c-a81e-cfc9badb5108,Dusita coffee & bakery,Cafe,Lampang,Mueang Lampang,osm,thai-geolocate-repair,,
+high,00ec1a4f-dbc4-4eb4-a7ce-444ffe5879a6,Krua Than Khun,Restaurant,Phitsanulok,Nakhon Thai,osm,thai-geolocate-repair,,
+high,014e5b26-29ea-4b81-ae62-7df61cbba732,ชมดาวรีสอร์ท,tourism:chalet,Si Sa Ket,Huai Thap Than,th-real-poi-coverage,thai-geolocate-repair,th-admin-coverage-seed,subdistrict
+high,00853ca7-7d14-49e1-8466-c5b15780977a,Abacus,Restaurant,Thailand,,osm,unknown,,
+high,011690e8-62c4-47ec-9271-91ec64f7a1d5,Cobra Stone Viewpoint,Landmark,Thailand,,osm,unknown,,
+high,01e3a560-6867-41a1-949f-30ebfd43fc0e,Cool Camping,leisure:resort,Yala,Than To,th-real-poi-coverage,real-poi-replacement,th-admin-coverage-seed,subdistrict
+medium,00ab12cb-9f40-46a8-b617-5229698a9a72,Independent,fuel,Chachoengsao,Ban Pho,th-real-poi-coverage,real-poi-replacement,th-admin-coverage-seed,subdistrict
+medium,00bd6390-9850-4111-bbcc-3aaba85c860b,บางจาก,fuel,Chai Nat,Noen Kham,th-real-poi-coverage,thai-geolocate-repair,th-admin-coverage-seed,district
+medium,0053a095-5b89-45c9-bdee-e7d3701a3445,โรงพยาบาลเนินสง่า,hospital,Chaiyaphum,Noen Sa-Nga,th-real-poi-coverage,thai-geolocate-repair,th-admin-coverage-seed,district
+medium,01c1be51-a0bc-4036-b4e7-30a113154d81,โรงพยาบาลผาขาว,hospital,Loei,Pha Khao,th-real-poi-coverage,thai-geolocate-repair,th-admin-coverage-seed,subdistrict
+medium,00249614-208c-404a-9bac-ccfa62129d79,Independent Fuel Station,fuel,Nakhon Ratchasima,Sikhio,th-real-poi-coverage,real-poi-replacement,th-admin-coverage-seed,subdistrict
+medium,0199f31d-3aae-425b-b79b-c1f46137ba87,เอสโซ่,fuel,Nakhon Sawan,Tak Fa,th-real-poi-coverage,real-poi-replacement,th-admin-coverage-seed,subdistrict
+medium,00dacc15-6879-4490-9916-1f599e4e6557,Shell,fuel,Phra Nakhon Si Ayutthaya,Bang Pahan,th-real-poi-coverage,real-poi-replacement,th-admin-coverage-seed,subdistrict
+medium,00fd9103-c28d-4eb9-8e18-cba88dc3e05e,Rattanaburi Hospital,hospital,Surin,Tha Tum,th-real-poi-coverage,real-poi-replacement,th-admin-coverage-seed,subdistrict
+medium,004510e7-651f-4d20-8305-27b5e5b4b0f2,PTT,fuel,Ubon Ratchathani,Khemarat,th-real-poi-coverage,thai-geolocate-repair,th-admin-coverage-seed,subdistrict
+low,017456ce-90bd-43f2-9a5c-55de5c6ffb66,Ban Nong Phet Primary School,school,Buri Ram,Mueang Buri Ram,th-real-poi-coverage,real-poi-replacement,th-admin-coverage-seed,subdistrict
+low,0230881b-1a0b-4cca-8949-279181faf8ff,โรงเรียนวัดหัวเด่น,school,Chai Nat,Sankhaburi,th-real-poi-coverage,thai-geolocate-repair,th-admin-coverage-seed,subdistrict
+low,02686afc-76d3-48c6-bfee-346931644732,โรงเรียนบ้านท่าดีหมี,school,Loei,Chiang Khan,th-real-poi-coverage,real-poi-replacement,th-admin-coverage-seed,subdistrict
+low,025bd33c-827a-42aa-802a-334c70ca8140,โรงเรียนบ้านนาดีศรีสุข,school,Maha Sarakham,Kantharawichai,th-real-poi-coverage,real-poi-replacement,th-admin-coverage-seed,subdistrict
+low,019ae5fe-4325-44c4-96a0-637bc1322ed9,โรงเรียนบ้านบางโหนด,school,Nakhon Si Thammarat,Hua Sai,th-real-poi-coverage,thai-geolocate-repair,th-admin-coverage-seed,subdistrict
+low,0210b746-459e-4042-af0f-157ec93a04e0,โรงเรียนวัดทางพูน,school,Nakhon Si Thammarat,Chaloem Phra Kiat,th-real-poi-coverage,real-poi-replacement,th-admin-coverage-seed,subdistrict
+low,026fcc61-fde8-49e2-b199-f81546413077,โรงเรียนบ้านคลองช้าง,school,Pattani,Khok Pho,th-real-poi-coverage,real-poi-replacement,th-admin-coverage-seed,subdistrict
+low,00d16c25-608b-468b-9819-1875c3047632,โรงเรียนบ้านคลองปลาหมอ,school,Phetchabun,Chon Daen,th-real-poi-coverage,real-poi-replacement,th-admin-coverage-seed,subdistrict
+low,026e84ce-e8ef-4031-a4b3-754c8523d5a9,โรงเรียนบ้านคลองทรายราษฎร์อุทิศ,school,Phichit,Sak Lek,th-real-poi-coverage,real-poi-replacement,th-admin-coverage-seed,subdistrict
+low,01eb8962-67a1-4f71-96ff-eb20dfce87e6,โรงเรียนวัดมะกอกงอ,school,Phichit,Bang Mun Nak,th-real-poi-coverage,real-poi-replacement,th-admin-coverage-seed,subdistrict
+low,00f3170e-cc81-43dd-9da9-bd1ac069b447,โรงเรียนไทยรัฐวิทยา 60,school,Phichit,Tap Khlo,th-real-poi-coverage,real-poi-replacement,th-admin-coverage-seed,subdistrict
+low,001cd935-b48f-4972-86a6-80aa7ef962b1,โรงเรียนบ้านหนองกุลา,school,Phitsanulok,Bang Rakam,th-real-poi-coverage,real-poi-replacement,th-admin-coverage-seed,subdistrict
+low,005ab4cd-3b4c-46a3-b44e-649e6ae44117,โรงเรียนวัดช้างใหญ่,school,Phra Nakhon Si Ayutthaya,Bang Ban,th-real-poi-coverage,real-poi-replacement,th-admin-coverage-seed,subdistrict
+low,00e72dad-6bed-4799-ba5c-fa295bdcdb61,โรงเรียนบ้านหน่อมฟ้าเลื่อมวิทยา,school,Roi Et,At Samat,th-real-poi-coverage,real-poi-replacement,th-admin-coverage-seed,subdistrict
+low,0177e2a5-908b-4ff1-a61e-7cf823e2f7d8,โรงเรียนบ้านจอก(ประชาสามัคคี),school,Si Sa Ket,Si Rattana,th-real-poi-coverage,thai-geolocate-repair,th-admin-coverage-seed,subdistrict
+low,01c9bfbf-ae40-4b0c-8c4f-ef0dcfa62564,Ban Sai Nursery,school,Surin,Prasat,th-real-poi-coverage,thai-geolocate-repair,th-admin-coverage-seed,subdistrict
+low,0157cbe1-99f9-4907-86af-9cb41958dc5e,โรงเรียนบ้านหนองกัว,school,Surin,Mueang Surin,th-real-poi-coverage,thai-geolocate-repair,th-admin-coverage-seed,subdistrict
+low,0158f310-0f98-4ae4-b03e-4943086b15c5,โรงเรียนบ้านเกาะปุด,school,Trang,Na Yong,th-real-poi-coverage,real-poi-replacement,th-admin-coverage-seed,subdistrict
+low,026176bd-14e7-434b-ac88-d5abee0a6c57,โรงเรียนวัดโพธิ์ชัย,school,Uttaradit,Fak Tha,th-real-poi-coverage,thai-geolocate-repair,th-admin-coverage-seed,subdistrict
