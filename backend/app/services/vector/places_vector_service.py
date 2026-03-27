@@ -35,7 +35,7 @@ def _record_cb_success() -> None:
     _cb_failures = []
 
 try:
-    import google.generativeai as genai
+    from google import genai
 
     GENAI_AVAILABLE = True
 except ImportError:
@@ -66,6 +66,7 @@ EMBEDDING_DIM = 768
 
 _genai_configured = False
 _genai_lock = asyncio.Lock()
+_genai_client: Any | None = None
 _collection_ready = False
 _collection_lock = asyncio.Lock()
 
@@ -75,17 +76,17 @@ def _settings():
 
 
 async def configure_genai_once() -> None:
-    global _genai_configured
+    global _genai_client, _genai_configured
     if _genai_configured:
         return
     async with _genai_lock:
         if _genai_configured:
             return
         if not GENAI_AVAILABLE:
-            raise RuntimeError("google-generativeai not installed")
+            raise RuntimeError("google-genai not installed")
         if not _settings().GOOGLE_API_KEY:
             raise RuntimeError("GOOGLE_API_KEY not set")
-        genai.configure(api_key=_settings().GOOGLE_API_KEY)
+        _genai_client = genai.Client(api_key=_settings().GOOGLE_API_KEY)
         _genai_configured = True
         logger.info("Gemini configured once for places vectors")
 
@@ -118,10 +119,19 @@ async def ensure_collection_once(client: Any) -> None:
 
 async def embed_text(text: str) -> list[float]:
     if not GENAI_AVAILABLE:
-        raise RuntimeError("google-generativeai not installed")
+        raise RuntimeError("google-genai not installed")
     await configure_genai_once()
-    result = await asyncio.to_thread(genai.embed_content, model=EMBEDDING_MODEL, content=text)
-    return result["embedding"]
+    if _genai_client is None:
+        raise RuntimeError("google-genai client not initialized")
+    result = await asyncio.to_thread(
+        _genai_client.models.embed_content,
+        model=EMBEDDING_MODEL,
+        contents=text,
+    )
+    embeddings = getattr(result, "embeddings", None) or []
+    if not embeddings or not getattr(embeddings[0], "values", None):
+        raise RuntimeError("google-genai returned empty embedding")
+    return list(embeddings[0].values)
 
 
 def build_embedding_text(row: dict) -> str:

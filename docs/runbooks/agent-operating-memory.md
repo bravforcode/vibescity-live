@@ -3,7 +3,7 @@
 > Read this file before every work session in `C:\vibecity.live`.
 
 - Last updated: 2026-03-28
-- Current focus: Keep the repo validation gate green after the backend Ruff cleanup tranche, including the Windows-local lint/test runners and the manual-order payment test doubles.
+- Current focus: Keep the repo validation gate green after the backend cleanup tranches, including the Windows-local validators and the Gemini client migration to `google.genai`.
 - Canonical skill: `.agents/skills/vibecity-session-handoff/SKILL.md`
 
 ## Start Every Session
@@ -110,11 +110,11 @@
 - `.agent/skills/testing-patterns/scripts/test_runner.py` now prefers `backend/.venv/Scripts/python.exe` for backend pytest lanes, which is required on this machine because the global Python env still breaks `supabase/realtime` imports.
 - `.agent/skills/frontend-design/scripts/ux_audit.py` and `.agent/skills/seo-fundamentals/scripts/seo_checker.py` now target frontend source/page files more accurately; if they fail again, treat new failures as real repo issues first, not as default validator noise.
 - `backend/tests/conftest.py` still hard-overrides test-safe service env by default; use `VIBECITY_TEST_USE_REAL_SERVICES=1` only when intentionally exercising live infra from pytest.
-- Backend startup still emits a `google.generativeai` deprecation `FutureWarning`; this is non-blocking for the gate but still needs a later dependency cleanup.
+- `backend/app/services/vector/places_vector_service.py` now expects `google.genai` instead of `google.generativeai`; if startup/test warnings mention the deprecated package again, treat that as a regression or an unpatched environment.
 
 ## Current Snapshot
 
-- Focus: repo validation gate is green after the backend cleanup tranche and validator hardening.
+- Focus: repo validation gate is green after the backend cleanup tranche, validator hardening, and the Gemini client migration.
 - Session plan artifact:
   - `.planning/20260327-release-gate-and-backend-hardening.md`
 - Files touched in this session:
@@ -138,11 +138,14 @@
   - `backend/app/core/visitor_auth.py`
   - `backend/app/jobs/triad_reconcile.py`
   - `backend/app/services/slip_verification.py`
+  - `backend/app/services/vector/places_vector_service.py`
   - `backend/scripts/ingest_knowledge.py`
   - `backend/scripts/list_tables.py`
   - `backend/scripts/osm_sync_ultimate.py`
   - `backend/scripts/triad_doctor.py`
   - `backend/scripts/workers.py`
+  - `backend/pyproject.toml`
+  - `backend/requirements.txt`
   - `backend/tests/test_payments.py`
   - `backend/tests/test_payments_slip_flow.py`
   - `backend/tests/test_slip_verification.py`
@@ -157,18 +160,21 @@
   - Repo-wide Ruff debt under the targeted backend routers/scripts/tests tranche was cleared, plus remaining repo Ruff fallout such as `visitor_auth.py`.
   - Manual-order duplicate-slip handling is now resilient to duplicate-key exceptions that arrive as generic exceptions from test doubles/client wrappers, while still only special-casing `slip_url` uniqueness conflicts.
   - `grant_rewards()` now treats generic reward RPC failures the same as `APIError` and returns `None` without breaking the user flow.
+  - Gemini vector embedding calls now use `google.genai.Client(...).models.embed_content(...)`, and the old `google.generativeai` deprecation warning is no longer emitted during backend pytest/startup.
+  - `backend/scripts/triad_doctor.py` now checks `google.genai` and tolerates missing optional settings fields instead of crashing before printing diagnostics.
   - Admin analytics/performance/system-health selects now expose `aria-label`, and image previews/floor-plan/highlight images now include `alt` text for the audit lane.
   - UX/SEO validators now focus on real frontend/page sources and stop failing on the previous Windows/local heuristic noise.
 - Validation confirmed in this session:
   - `ruff check . --exclude .git,.venv,.vercel_python_packages,__pycache__,.mypy_cache,.pytest_cache,.ruff_cache,coverage,dist,node_modules,venv` passes.
   - `python -u .agent/skills/lint-and-validate/scripts/lint_runner.py .` passes.
   - `python -u .agent/skills/testing-patterns/scripts/test_runner.py .` passes.
+  - `backend/.venv/Scripts/python.exe -m pytest -q backend/tests` passes without the old `google.generativeai` deprecation warning; remaining warnings are unrelated `httpx` deprecations in payment tests.
+  - `backend/.venv/Scripts/python.exe backend/scripts/triad_doctor.py` now completes and reports dependency/config status instead of crashing on missing settings attributes.
   - `python -u .agent/skills/frontend-design/scripts/ux_audit.py .` passes.
   - `python -u .agent/skills/seo-fundamentals/scripts/seo_checker.py .` passes.
   - `python -u .agent/scripts/checklist.py .` passes.
 - Residual note:
   - The worktree remains globally dirty; only the files listed above belong to this tranche.
-  - Backend pytest still emits the `google.generativeai` deprecation warning, but it is non-blocking and does not fail the gate.
 
 ## Update Protocol
 

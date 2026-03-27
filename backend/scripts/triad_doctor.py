@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.core.config import settings  # noqa: E402
 
 # Check optional dependencies
-GENAI_INSTALLED = find_spec("google.generativeai") is not None
+GENAI_INSTALLED = find_spec("google.genai") is not None
 QDRANT_INSTALLED = find_spec("qdrant_client") is not None
 ASYNCPG_INSTALLED = find_spec("asyncpg") is not None
 
@@ -46,19 +46,23 @@ def is_missing(value: str | None) -> bool:
     return value is None or (isinstance(value, str) and not value.strip())
 
 
+def _setting(name: str, default=None):
+    return getattr(settings, name, default)
+
+
 def check_config() -> None:
     """Check TRIAD environment variables."""
     print("=== TRIAD Configuration ===\n")
 
     triad_vars = [
-        ("DATABASE_URL", settings.DATABASE_URL),
-        ("SUPABASE_DIRECT_URL", settings.SUPABASE_DIRECT_URL),
-        ("NEON_DATABASE_URL", settings.NEON_DATABASE_URL),
-        ("NEON_DIRECT_DATABASE_URL", settings.NEON_DIRECT_DATABASE_URL),
-        ("QDRANT_URL", settings.QDRANT_URL),
-        ("QDRANT_API_KEY", settings.QDRANT_API_KEY),
-        ("QDRANT_GRPC_PORT", str(settings.QDRANT_GRPC_PORT)),
-        ("GOOGLE_API_KEY", settings.GOOGLE_API_KEY or ""),
+        ("DATABASE_URL", _setting("DATABASE_URL")),
+        ("SUPABASE_DIRECT_URL", _setting("SUPABASE_DIRECT_URL")),
+        ("NEON_DATABASE_URL", _setting("NEON_DATABASE_URL")),
+        ("NEON_DIRECT_DATABASE_URL", _setting("NEON_DIRECT_DATABASE_URL")),
+        ("QDRANT_URL", _setting("QDRANT_URL")),
+        ("QDRANT_API_KEY", _setting("QDRANT_API_KEY")),
+        ("QDRANT_GRPC_PORT", str(_setting("QDRANT_GRPC_PORT", ""))),
+        ("GOOGLE_API_KEY", _setting("GOOGLE_API_KEY", "") or ""),
     ]
 
     missing = []
@@ -69,11 +73,13 @@ def check_config() -> None:
         if is_missing(value):
             missing.append(name)
 
-    print(f"\n{'[OK] ' if settings.SAFE_MODE else '[OFF]'} SAFE_MODE: {settings.SAFE_MODE}")
-    print(f"{'[OK] ' if settings.MEMORY_ENABLED else '[OFF]'} MEMORY_ENABLED: {settings.MEMORY_ENABLED}")
+    safe_mode = bool(_setting("SAFE_MODE", False))
+    memory_enabled = bool(_setting("MEMORY_ENABLED", False))
+    print(f"\n{'[OK] ' if safe_mode else '[OFF]'} SAFE_MODE: {safe_mode}")
+    print(f"{'[OK] ' if memory_enabled else '[OFF]'} MEMORY_ENABLED: {memory_enabled}")
 
     print("\n=== Dependencies ===\n")
-    print(f"{'[OK] ' if GENAI_INSTALLED else '[MIS]'} google-generativeai: {'installed' if GENAI_INSTALLED else 'NOT INSTALLED'}")
+    print(f"{'[OK] ' if GENAI_INSTALLED else '[MIS]'} google-genai: {'installed' if GENAI_INSTALLED else 'NOT INSTALLED'}")
     print(f"{'[OK] ' if QDRANT_INSTALLED else '[MIS]'} qdrant-client: {'installed' if QDRANT_INSTALLED else 'NOT INSTALLED'}")
     print(f"{'[OK] ' if ASYNCPG_INSTALLED else '[MIS]'} asyncpg: {'installed' if ASYNCPG_INSTALLED else 'NOT INSTALLED'}")
 
@@ -98,7 +104,7 @@ async def ping_services() -> None:
 
     # Supabase
     try:
-        conn = await asyncpg.connect(settings.SUPABASE_DIRECT_URL, timeout=5)
+        conn = await asyncpg.connect(_setting("SUPABASE_DIRECT_URL"), timeout=5)
         result = await conn.fetchval("SELECT 1")
         await conn.close()
         print(f"[OK]  Supabase CORE: connected (SELECT 1 = {result})")
@@ -107,7 +113,7 @@ async def ping_services() -> None:
 
     # Neon
     try:
-        conn = await asyncpg.connect(settings.NEON_DIRECT_DATABASE_URL, timeout=5)
+        conn = await asyncpg.connect(_setting("NEON_DIRECT_DATABASE_URL"), timeout=5)
         result = await conn.fetchval("SELECT 1")
         await conn.close()
         print(f"[OK]  Neon HISTORY: connected (SELECT 1 = {result})")
@@ -119,11 +125,11 @@ async def ping_services() -> None:
         try:
             from qdrant_client import QdrantClient
             client = QdrantClient(
-                url=settings.QDRANT_URL,
-                api_key=settings.QDRANT_API_KEY,
+                url=_setting("QDRANT_URL"),
+                api_key=_setting("QDRANT_API_KEY"),
                 timeout=5,
                 prefer_grpc=True,
-                grpc_port=settings.QDRANT_GRPC_PORT
+                grpc_port=_setting("QDRANT_GRPC_PORT"),
             )
             collections = client.get_collections()
             print(f"[OK]  Qdrant MEMORY: connected ({len(collections.collections)} collections)")

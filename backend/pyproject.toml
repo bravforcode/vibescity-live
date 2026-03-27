@@ -17,6 +17,7 @@ dependencies = [
     "redis>=5.0.0",
     "python-dotenv>=1.0.1",
     "google-auth>=2.29.0",
+    "google-genai>=1.68.0",
     "requests>=2.31.0",
     "h3>=4.4.0",
     "prometheus-client>=0.20.0",
