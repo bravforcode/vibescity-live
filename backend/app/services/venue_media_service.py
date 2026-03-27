@@ -39,19 +39,6 @@ class VenueMediaService:
         ("cinematic_video_url", "venues.cinematic_video_url"),
         ("video", "venues.video"),
     )
-    _DIRECT_VIDEO_HINTS = (
-        "youtu.be/",
-        "youtube.com/watch",
-        "youtube.com/shorts/",
-        "facebook.com/",
-        "/videos/",
-        "instagram.com/reel/",
-        "instagram.com/reels/",
-        "tiktok.com/",
-        "/video/",
-        "vimeo.com/",
-    )
-
     def __init__(self, client=None):
         self.client = client or supabase_admin or supabase
 
@@ -110,7 +97,40 @@ class VenueMediaService:
         lowered = normalized.lower()
         if lowered.endswith((".mp4", ".webm", ".ogg", ".mov", ".m3u8")):
             return True
-        return any(hint in lowered for hint in self._DIRECT_VIDEO_HINTS)
+
+        parsed = urlsplit(normalized)
+        host = parsed.netloc.lower().split("@")[-1]
+        if host.startswith("www."):
+            host = host[4:]
+        if host.startswith("m."):
+            host = host[2:]
+
+        path = parsed.path.lower().rstrip("/")
+        query = parsed.query.lower()
+
+        if host == "youtu.be":
+            return bool(path.strip("/"))
+        if host == "youtube.com":
+            if path == "/watch":
+                return "v=" in query
+            return path.startswith("/shorts/") or path.startswith("/embed/")
+        if host == "instagram.com":
+            return (
+                path.startswith("/reel/")
+                or path.startswith("/reels/")
+                or path.startswith("/tv/")
+            )
+        if host == "tiktok.com":
+            return "/video/" in path
+        if host == "facebook.com":
+            if path == "/watch":
+                return "v=" in query
+            return path.startswith("/reel/") or "/videos/" in path
+        if host == "fb.watch":
+            return bool(path.strip("/"))
+        if host == "vimeo.com":
+            return bool(path.strip("/"))
+        return False
 
     def _append_media_item(
         self,

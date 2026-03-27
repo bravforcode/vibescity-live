@@ -169,6 +169,40 @@ def test_get_shop_media_stays_real_only_when_media_is_missing():
     assert payload["coverage"]["has_media"] is False
 
 
+def test_social_profiles_do_not_count_as_videos_without_post_urls():
+    service = VenueMediaService(
+        client=_FakeClient(
+            {
+                "venues": [
+                    {
+                        "id": "v10",
+                        "name": "Profile Only",
+                        "slug": "profile-only",
+                        "image_urls": [],
+                        "video_url": "",
+                        "latitude": 18.81,
+                        "longitude": 98.97,
+                        "social_links": {
+                            "facebook": "https://www.facebook.com/coolcampingresort",
+                            "instagram": "https://www.instagram.com/coolcampingresort/",
+                            "tiktok": "https://www.tiktok.com/@coolcampingresort",
+                            "youtube": "https://www.youtube.com/watch?v=abc123xyz00",
+                        },
+                    }
+                ],
+                "venue_photos": [],
+            }
+        )
+    )
+
+    payload = service.list_shop_media(limit=10, offset=0, include_missing=True)
+    item = payload["data"][0]
+
+    assert item["videos"] == ["https://www.youtube.com/watch?v=abc123xyz00"]
+    assert item["counts"]["videos"] == 1
+    assert item["coverage"]["has_videos"] is True
+
+
 def test_shop_media_routes_return_media_contract(client, monkeypatch):
     monkeypatch.setattr(
         shops_router.venue_media_service,
