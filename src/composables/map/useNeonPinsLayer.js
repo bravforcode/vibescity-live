@@ -29,6 +29,21 @@ export function useNeonPinsLayer(
 	const pinInstances = new Map(); // shopId → { el, unmount }
 	let overlayEl = null;
 	let mapMoveCleanup = null;
+	const resolveHighlightedId = () =>
+		String(
+			typeof highlightedShopId === "function"
+				? highlightedShopId()
+				: (highlightedShopId?.value ?? ""),
+		);
+	const getShopsSignature = () =>
+		Array.isArray(shopsRef.value)
+			? shopsRef.value
+					.map(
+						(shop) =>
+							`${shop?.id ?? ""}:${shop?.lat ?? ""}:${shop?.lng ?? ""}:${shop?.isLive ? 1 : 0}`,
+					)
+					.join("|")
+			: "";
 
 	// ── Viewport + density filter ────────────────────────────────────────────
 	const visibleShops = computed(() => {
@@ -44,11 +59,7 @@ export function useNeonPinsLayer(
 		const H = canvas?.height ?? 667;
 
 		// Resolve the current highlighted (carousel-center) shop id
-		const highlightId = String(
-			typeof highlightedShopId === "function"
-				? highlightedShopId()
-				: (highlightedShopId?.value ?? ""),
-		);
+		const highlightId = resolveHighlightedId();
 
 		// Project each shop and keep only those inside the canvas
 		const candidates = [];
@@ -150,9 +161,9 @@ export function useNeonPinsLayer(
 		const el = entry.el;
 		const w = el.offsetWidth || 0;
 		const h = el.offsetHeight || 0;
-		const x = Math.round(pt.x - w / 2);
-		const y = Math.round(pt.y - h);
-		el.style.transform = `translate(${x}px,${y}px)`;
+		const x = pt.x - w / 2;
+		const y = pt.y - h;
+		el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
 	};
 
 	const unmountPin = (id) => {
@@ -222,6 +233,15 @@ export function useNeonPinsLayer(
 		{ immediate: true },
 	);
 
+	watch(
+		resolveHighlightedId,
+		(nextId) => {
+			selectedShopId.value = nextId || null;
+			syncPins();
+		},
+		{ immediate: true },
+	);
+
 	watch(showNeonPins, (enabled) => {
 		ensureOverlay();
 		if (overlayEl) {
@@ -232,11 +252,7 @@ export function useNeonPinsLayer(
 	});
 
 	// Re-sync when shops list changes
-	watch(
-		() => shopsRef.value,
-		() => syncPins(),
-		{ deep: false },
-	);
+	watch(getShopsSignature, () => syncPins(), { immediate: true });
 
 	onUnmounted(() => {
 		mapMoveCleanup?.();

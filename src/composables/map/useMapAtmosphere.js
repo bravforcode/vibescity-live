@@ -306,6 +306,12 @@ export function useMapAtmosphere(
 
 	const updateWeatherVisuals = () => {
 		if (!map.value || !isMapReady.value) return;
+		if (
+			typeof map.value.isStyleLoaded === "function" &&
+			!map.value.isStyleLoaded()
+		) {
+			return;
+		}
 
 		if (!map.value.getLayer("weather-layer")) {
 			const labelLayerId = getFirstExistingLayerId([

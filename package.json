@@ -6,7 +6,9 @@
 	"scripts": {
 		"dev": "rsbuild dev --port 5173",
 		"build": "rsbuild build && node scripts/prerender-venues.mjs",
+		"build:e2e": "node scripts/sync-public-nationwide-data.mjs && node scripts/generate-localhost-venue-snapshot.mjs && rsbuild build --env-mode e2e && node scripts/prerender-venues.mjs",
 		"preview": "rsbuild preview",
+		"preview:e2e": "rsbuild preview --env-mode e2e",
 		"check": "biome check --write src && node scripts/ci/check-source-i18n-hardcoded.mjs",
 		"check:bundle": "node scripts/check-bundle-sizes.mjs",
 		"format": "biome format --write src",

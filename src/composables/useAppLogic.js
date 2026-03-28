@@ -2,6 +2,7 @@ import { storeToRefs } from "pinia";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
+import { DEFAULT_OG_TITLE } from "../config/appMeta";
 import i18n from "../i18n.js";
 import { setClientCookie } from "../lib/cookies";
 import { supabase } from "../lib/supabase";
@@ -22,6 +23,10 @@ import {
 	removeFavoriteItem,
 	saveFavoriteItem,
 } from "../utils/storageHelper";
+import {
+	buildMapSelectionIntent,
+	getCenteredSelectionSource,
+} from "./map/mapSelectionIntent";
 import { useAudioSystem } from "./useAudioSystem";
 // ✅ Modular Composables
 import { useEventLogic } from "./useEventLogic";
@@ -123,6 +128,10 @@ export function useAppLogic() {
 		typeof window === "undefined"
 			? { pathname: "", search: "" }
 			: { pathname: window.location.pathname, search: window.location.search };
+	const initialDeepLinkRequested =
+		/\/(?:th|en)?\/(?:venue|v)\//.test(initialUrlSnapshot.pathname) ||
+		new URLSearchParams(initialUrlSnapshot.search).has("venue") ||
+		new URLSearchParams(initialUrlSnapshot.search).has("shop");
 
 	// --- 1. Init UI & State ---
 	const uiLogic = useUILogic(); // Drawers, Modals, Responsive
@@ -206,10 +215,73 @@ export function useAppLogic() {
 	const showSafetyPanel = ref(false); // ✅ Moved up
 	const showFavoritesModal = ref(false); // ✅ Moved up
 	const isRefreshing = ref(false);
+	const mapSelectionIntent = ref(null);
 	const legendHeight = computed(() => bottomUiHeight.value || 0);
 	const activeFilters = computed(() => [...activeCategories.value]);
 	const openedDetailShopIds = new Set();
+	let mapSelectionRequestSeq = 0;
 	let handleCenteredShopCommit = null;
+	const DETAIL_AUTO_REOPEN_COOLDOWN_MS = 900;
+	let startupPreviewBootstrapped = false;
+	let centeredDetailAutoOpenSuppressedUntil = 0;
+	const suppressCenteredDetailAutoOpen = (
+		durationMs = DETAIL_AUTO_REOPEN_COOLDOWN_MS,
+	) => {
+		const safeDuration = Math.max(0, Number(durationMs) || 0);
+		centeredDetailAutoOpenSuppressedUntil = Date.now() + safeDuration;
+	};
+	const runAfterNextPaint = (task) => {
+		if (typeof window === "undefined") {
+			task?.();
+			return;
+		}
+		window.requestAnimationFrame(() => {
+			window.requestAnimationFrame(() => {
+				task?.();
+			});
+		});
+	};
+	const scheduleDetailIdleWork = (task, timeout = 1200) => {
+		if (typeof window === "undefined") {
+			task?.();
+			return;
+		}
+		if (typeof window.requestIdleCallback === "function") {
+			window.requestIdleCallback(
+				() => {
+					task?.();
+				},
+				{ timeout },
+			);
+			return;
+		}
+		window.setTimeout(() => {
+			task?.();
+		}, 180);
+	};
+	const publishMapSelectionIntent = ({
+		shop = null,
+		shopId = null,
+		source = "carousel",
+		surface = "preview",
+		cameraMode,
+		popupMode = "compact",
+		routeMode = "none",
+	} = {}) => {
+		const nextIntent = buildMapSelectionIntent({
+			requestId: ++mapSelectionRequestSeq,
+			shop,
+			shopId,
+			source,
+			surface,
+			cameraMode,
+			popupMode,
+			routeMode,
+		});
+		if (!nextIntent) return null;
+		mapSelectionIntent.value = nextIntent;
+		return nextIntent;
+	};
 
 	const isUiVisible = computed(() => {
 		if (import.meta.env.VITE_E2E === "true") return true;
@@ -243,13 +315,8 @@ export function useAppLogic() {
 		onScrollDecelerate: intentPredictor.recordCarouselDeceleration,
 		onCenteredShopCommit: (payload) => handleCenteredShopCommit?.(payload),
 	});
-	const {
-		handleHorizontalScroll,
-		scrollToCard,
-		onScrollStart,
-		onScrollEnd,
-		isCenteredCard,
-	} = scrollSync;
+	const { handleHorizontalScroll, scrollToCard, onScrollStart, onScrollEnd } =
+		scrollSync;
 
 	// --- 7. Local State & Glue Logic ---
 	// --- REFACTORED: Computed Base for Logic ---
@@ -544,10 +611,32 @@ export function useAppLogic() {
 		window.history.replaceState({}, "", targetPath);
 		return true;
 	};
-	const closeDetailSheet = ({ syncRoute = true, replace = true } = {}) => {
+	const closeDetailSheet = ({
+		syncRoute = true,
+		replace = true,
+		preserveActiveShop = true,
+		autoOpenCooldownMs = DETAIL_AUTO_REOPEN_COOLDOWN_MS,
+	} = {}) => {
+		const preservedActiveId =
+			normalizeVenueId(activeShopId.value) ||
+			normalizeVenueId(selectedShop.value?.id);
 		selectedShop.value = null;
-		activeShopId.value = null;
-		shopStore.setActiveShop(null);
+		suppressCenteredDetailAutoOpen(autoOpenCooldownMs);
+		const nextActiveId = preserveActiveShop ? preservedActiveId : null;
+		activeShopId.value = nextActiveId;
+		shopStore.setActiveShop(nextActiveId);
+		if (nextActiveId) {
+			publishMapSelectionIntent({
+				shop: shopStore.getShopById(nextActiveId),
+				shopId: nextActiveId,
+				source: "carousel",
+				surface: "preview",
+				popupMode: "compact",
+				routeMode: "none",
+			});
+		} else {
+			mapSelectionIntent.value = null;
+		}
 		if (syncRoute) {
 			if (replace) window.history.replaceState({}, "", withLocalePrefix("/"));
 			else window.history.pushState({}, "", withLocalePrefix("/"));
@@ -576,9 +665,12 @@ export function useAppLogic() {
 			syncRouteMode = "replace",
 			trackEvent = false,
 			trackEventType = "view_venue",
-			shouldFly = true,
 			shouldSyncCarousel = true,
-			flyOffsetY,
+			selectionSource = syncRoute ? "detail" : "carousel",
+			selectionSurface = syncRoute ? "detail" : "preview",
+			cameraMode,
+			popupMode = "compact",
+			shopOverride = null,
 		} = {},
 	) => {
 		const normalizedId = normalizeVenueId(shopId);
@@ -586,6 +678,13 @@ export function useAppLogic() {
 
 		activeShopId.value = normalizedId;
 		shopStore.setActiveShop(normalizedId);
+		if (selectionSurface !== "detail" && selectedShop.value) {
+			closeDetailSheet({
+				syncRoute: false,
+				preserveActiveShop: true,
+				autoOpenCooldownMs: DETAIL_AUTO_REOPEN_COOLDOWN_MS,
+			});
+		}
 		if (syncRoute) {
 			syncVenueUrl(normalizedId, { replace: syncRouteMode !== "push" });
 		}
@@ -594,12 +693,8 @@ export function useAppLogic() {
 			uiLogic.toggleImmersive?.(); // If defined
 		}
 
-		const shop = shopStore.getShopById(normalizedId); // ✅ Use getShopById for accuracy
+		const shop = shopOverride || shopStore.getShopById(normalizedId); // ✅ Use getShopById for accuracy
 		if (shop) {
-			if (shouldFly && shop.lat && shop.lng) {
-				smoothFlyTo([shop.lat, shop.lng], { offsetY: flyOffsetY });
-			}
-
 			// Sync Carousel
 			if (shouldSyncCarousel && isMobileView.value) {
 				scrollToCard(shopId);
@@ -616,6 +711,15 @@ export function useAppLogic() {
 				activeBuilding.value = null;
 			}
 		}
+		publishMapSelectionIntent({
+			shop,
+			shopId: normalizedId,
+			source: selectionSource,
+			surface: selectionSurface,
+			cameraMode,
+			popupMode,
+			routeMode: syncRoute ? syncRouteMode : "none",
+		});
 
 		if (trackEvent) {
 			trackAnalyticsEvent(trackEventType, { source: "ui" }, normalizedId);
@@ -625,15 +729,19 @@ export function useAppLogic() {
 	const handleMarkerClick = (shop) => {
 		if (!shop) {
 			activeShopId.value = null;
+			mapSelectionIntent.value = null;
 			return;
 		}
 		selectFeedback();
 		microFeedback();
-		socketService.joinRoom(shop.id);
-		handleOpenDetail(shop, {
+		applyShopSelection(shop.id, false, {
+			syncRoute: false,
 			trackEvent: true,
-			trackEventType: "open_detail",
-			routeMode: "replace",
+			trackEventType: "preview_marker",
+			selectionSource: "marker",
+			selectionSurface: "preview",
+			popupMode: "compact",
+			shopOverride: shop,
 		});
 	};
 
@@ -643,6 +751,7 @@ export function useAppLogic() {
 			trackEvent = false,
 			trackEventType = "open_detail",
 			routeMode = "push",
+			selectionSource = "detail",
 		} = {},
 	) => {
 		if (!shop) {
@@ -651,107 +760,90 @@ export function useAppLogic() {
 		}
 		markDetailOpened(shop.id);
 
-		// When opening detail sheet, the modal covers ~85-90vh of the screen on mobile,
-		// so we need a much larger offsetY (e.g. 40%) to ensure the pin flies into the visible top 10%.
-		const viewportHeight =
-			typeof window !== "undefined" ? window.innerHeight : 800;
+		const normalizedShopId = normalizeVenueId(shop.id);
+		const openDetailShell = () => {
+			if (normalizeVenueId(selectedShop.value?.id) === normalizedShopId) return;
+			selectedShop.value = shop;
+		};
 
-		applyShopSelection(shop.id, false, {
-			syncRoute: true,
-			syncRouteMode: routeMode,
-			trackEvent,
-			trackEventType,
-			flyOffsetY: Math.round(viewportHeight * 0.48),
-		});
-
-		// Stagger the heavy Vue modal mount slightly to let Mapbox lock into WebGL animation first
-		requestAnimationFrame(() => {
-			requestAnimationFrame(() => {
-				selectedShop.value = shop;
+		runAfterNextPaint(() => {
+			applyShopSelection(shop.id, false, {
+				syncRoute: true,
+				syncRouteMode: routeMode,
+				trackEvent,
+				trackEventType,
+				selectionSource,
+				selectionSurface: "detail",
+				cameraMode: "detail-focus",
+				popupMode: "compact",
+				shopOverride: shop,
 			});
 		});
 
+		// Open the shell immediately, but keep the expensive map/store sync out of the input event.
+		if (typeof window !== "undefined") {
+			window.setTimeout(openDetailShell, 0);
+		} else {
+			openDetailShell();
+		}
+
 		// Progressive enhancement: fetch full venue details lazily.
-		// Must not block UI or navigation.
+		// Keep the hydrated detail local to the modal so the whole feed/map does not recompute.
 		try {
-			void shopStore
-				.fetchVenueDetail?.(shop.id)
-				.then((detail) => {
-					if (!detail) return;
-					if (!selectedShop.value) return;
-					if (String(selectedShop.value.id) !== String(detail.id)) return;
-					selectedShop.value = detail;
-				})
-				.catch(() => {});
+			scheduleDetailIdleWork(() => {
+				void shopStore
+					.fetchVenueDetail?.(shop.id, { syncCollection: false })
+					.then((detail) => {
+						if (!detail) return;
+						if (!selectedShop.value) return;
+						if (String(selectedShop.value.id) !== String(detail.id)) return;
+						selectedShop.value = detail;
+					})
+					.catch(() => {});
+			});
 		} catch {
 			// ignore
 		}
 
-		// Join realtime room for live vibes/metrics when the detail sheet is open.
+		// Join realtime room after the first paint so input responsiveness wins.
 		try {
-			socketService.joinRoom(shop.id);
+			runAfterNextPaint(() => {
+				socketService.joinRoom(shop.id);
+			});
 		} catch {
 			// ignore
 		}
 	};
 
-	handleCenteredShopCommit = ({ shop, shopId }) => {
+	handleCenteredShopCommit = ({ shop, shopId, reason }) => {
 		const normalizedId = normalizeVenueId(shopId || shop?.id);
 		if (!shop || !normalizedId) return;
-		if (openedDetailShopIds.has(normalizedId)) return;
 		if (
 			selectedShop.value &&
 			normalizeVenueId(selectedShop.value.id) === normalizedId
 		) {
-			markDetailOpened(normalizedId);
 			return;
 		}
-		handleOpenDetail(shop, {
+		const selectionSource = getCenteredSelectionSource(reason);
+		applyShopSelection(normalizedId, false, {
+			syncRoute: false,
 			trackEvent: false,
-			routeMode: "replace",
+			shouldSyncCarousel: false,
+			selectionSource,
+			selectionSurface: "preview",
+			popupMode: "compact",
+			shopOverride: shop,
 		});
 	};
 
 	const handleCardClick = (shop) => {
 		if (!shop) return;
-
-		// Stop user scroll processing
-		scrollSync.isUserScrolling.value = false;
-
-		const shouldSettleCardFirst =
-			isMobileView.value && !isCenteredCard(normalizeVenueId(shop.id));
-
-		if (shouldSettleCardFirst) {
-			scrollToCard(shop.id);
-			cardClickTimer = window.setTimeout(() => {
-				applyShopSelection(shop.id, false, {
-					trackEvent: true,
-					trackEventType: "view_venue",
-					shouldSyncCarousel: false,
-				});
-			}, 260);
-		} else {
-			applyShopSelection(shop.id, false, {
-				trackEvent: true,
-				trackEventType: "view_venue",
-			});
-		}
-
-		// Video sync logic
-		const videoEl = document.querySelector(
-			`div[data-shop-id="${shop.id}"] video`,
-		);
-		if (videoEl) {
-			shop.initialTime = videoEl.currentTime;
-		}
-
-		if (IS_STRICT_MAP_E2E) {
-			handleOpenDetail(shop, {
-				trackEvent: true,
-				trackEventType: "open_detail",
-				routeMode: "replace",
-			});
-		}
+		handleOpenDetail(shop, {
+			trackEvent: true,
+			trackEventType: "open_detail",
+			routeMode: IS_STRICT_MAP_E2E ? "replace" : "push",
+			selectionSource: "detail",
+		});
 	};
 
 	const handlePanelScroll = (shop) => {
@@ -774,7 +866,7 @@ export function useAppLogic() {
 
 	// Metadata & Title
 	const updateMetadata = () => {
-		const baseTitle = "VibeCity.live | Local Entertainment Map";
+		const baseTitle = DEFAULT_OG_TITLE;
 		// Note: selectedShop ref might not always be set if just activeId changed
 		// Better to find from store
 		// Better to find from store
@@ -784,7 +876,7 @@ export function useAppLogic() {
 		if (currentShop) {
 			document.title = `${currentShop.name} - VibeCity.live`;
 		} else if (activeCat) {
-			document.title = `${activeCat} in Chiang Mai - VibeCity.live`;
+			document.title = `${activeCat} in Thailand - VibeCity.live`;
 		} else {
 			document.title = baseTitle;
 		}
@@ -870,7 +962,6 @@ export function useAppLogic() {
 	let timeInterval = null;
 	let popStateHandler = null;
 	let deepLinkTimer = null;
-	let cardClickTimer = null;
 	let searchBlurTimer = null;
 	let initRunSeq = 0;
 
@@ -1165,10 +1256,6 @@ export function useAppLogic() {
 			clearTimeout(deepLinkTimer);
 			deepLinkTimer = null;
 		}
-		if (cardClickTimer) {
-			clearTimeout(cardClickTimer);
-			cardClickTimer = null;
-		}
 		if (searchBlurTimer) {
 			clearTimeout(searchBlurTimer);
 			searchBlurTimer = null;
@@ -1239,8 +1326,7 @@ export function useAppLogic() {
 			.slice(0, 12),
 	);
 	const selectedShopCoords = computed(() => {
-		const current =
-			selectedShop.value || shopStore.getShopById(activeShopId.value);
+		const current = selectedShop.value;
 		if (!current) return null;
 		const lat = Number(current.lat);
 		const lng = Number(current.lng);
@@ -1253,6 +1339,30 @@ export function useAppLogic() {
 			? [...selectedCategoryIds]
 			: [];
 	};
+
+	watch(
+		() => shopStore.visibleShops,
+		(newShops) => {
+			if (startupPreviewBootstrapped) return;
+			if (initialDeepLinkRequested) return;
+			if (selectedShop.value) return;
+			if (normalizeVenueId(activeShopId.value)) return;
+			const firstShop = Array.isArray(newShops) ? newShops[0] : null;
+			if (!firstShop?.id) return;
+			startupPreviewBootstrapped = true;
+			runAfterNextPaint(() => {
+				applyShopSelection(firstShop.id, false, {
+					syncRoute: false,
+					trackEvent: false,
+					selectionSource: "startup",
+					selectionSurface: "preview",
+					popupMode: "compact",
+					shopOverride: firstShop,
+				});
+			});
+		},
+		{ deep: false },
+	);
 
 	const requestGeolocation = () => {
 		if (!locationStore.isTracking) {
@@ -1403,6 +1513,7 @@ export function useAppLogic() {
 		handleCardClick,
 		handleCardHover,
 		handleOpenDetail,
+		mapSelectionIntent,
 		handlePanelScroll,
 		handleSwipe,
 		handleEnterIndoor,

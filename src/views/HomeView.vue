@@ -1,14 +1,6 @@
 <!-- src/views/HomeView.vue -->
 <script setup>
-import {
-	computed,
-	defineAsyncComponent,
-	nextTick,
-	onMounted,
-	provide,
-	ref,
-	watch,
-} from "vue";
+import { computed, nextTick, onMounted, provide, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import BottomFeed from "../components/feed/BottomFeed.vue";
@@ -23,32 +15,38 @@ import SidebarDrawer from "../components/ui/SidebarDrawer.vue";
 import { useMapPadding } from "../composables/map/useMapPadding";
 import { useAppLogic } from "../composables/useAppLogic";
 import { useLocalAds } from "../composables/useLocalAds";
+import {
+	buildCategoryDescription,
+	DEFAULT_PAGE_DESCRIPTION,
+	DEFAULT_PAGE_TITLE,
+} from "../config/appMeta";
 import { setClientCookie } from "../lib/cookies";
 import { getSiteOrigin } from "../lib/runtimeConfig";
 import { useFeatureFlagStore } from "../store/featureFlagStore";
 import { useUserStore } from "../store/userStore";
 import { defineResilientAsync } from "../utils/asyncComponentFactory";
+import { isAppDebugLoggingEnabled } from "../utils/debugFlags";
 
 const IS_STRICT_MAP_E2E = import.meta.env.VITE_E2E_MAP_REQUIRED === "true";
+const VibeSkeleton = defineResilientAsync(
+	() => import("../components/ui/VibeSkeleton.vue"),
+);
 // Lazy-load the map component (444 kB gzipped) to unblock initial parse.
 // Shows VibeSkeleton while map loads (45s timeout for slow networks).
-const MapContainer = defineAsyncComponent({
-	loader: () => import("../components/map/MapLibreContainer.vue"),
-	loadingComponent: defineAsyncComponent(
-		() => import("../components/ui/VibeSkeleton.vue"),
-	),
-	errorComponent: MapErrorFallback,
-	timeout: 45000,
-});
+const MapContainer = defineResilientAsync(
+	() => import("../components/map/MapLibreContainer.vue"),
+	{
+		loadingComponent: VibeSkeleton,
+		errorComponent: MapErrorFallback,
+		timeout: 45000,
+	},
+);
 const VideoPanel = defineResilientAsync(
 	() => import("../components/panel/VideoPanel.vue"),
 );
 // SidebarDrawer moved to sync above
 const VibeError = defineResilientAsync(
 	() => import("../components/ui/VibeError.vue"),
-);
-const VibeSkeleton = defineResilientAsync(
-	() => import("../components/ui/VibeSkeleton.vue"),
 );
 const SwipeCard = defineResilientAsync(
 	() => import("../components/ui/SwipeCard.vue"),
@@ -93,6 +91,8 @@ const FavoritesModal = defineResilientAsync(
 const showFilterMenu = ref(false);
 const showRelatedDrawer = ref(false); // Stack View Logic
 const mapReadySignal = ref(false);
+const mapContentReadySignal = ref(false);
+const mapStyleModeSignal = ref("unknown");
 const route = useRoute();
 const router = useRouter();
 const { t } = useI18n();
@@ -246,6 +246,7 @@ const {
 	handleCardClick,
 	handleCardHover,
 	handleOpenDetail,
+	mapSelectionIntent,
 	closeDetailSheet,
 	handlePanelScroll,
 	handleSwipe,
@@ -325,10 +326,19 @@ const handleOpenFilterMenu = () => {
 };
 const handleCardSelect = (shop) => {
 	handleCardClick(shop);
-	handleOpenDetail(shop);
 };
-const handleMapReadyChange = (ready) => {
-	mapReadySignal.value = Boolean(ready);
+const handleMapReadyChange = (status) => {
+	if (status && typeof status === "object") {
+		mapReadySignal.value = Boolean(status.publicReady ?? status.ready);
+		mapContentReadySignal.value = Boolean(
+			status.contentReady ?? status.publicReady ?? status.ready,
+		);
+		mapStyleModeSignal.value = String(status.styleMode || "unknown");
+		return;
+	}
+	mapReadySignal.value = Boolean(status);
+	mapContentReadySignal.value = Boolean(status);
+	mapStyleModeSignal.value = "unknown";
 };
 
 watch(isImmersive, (immersive) => {
@@ -423,6 +433,25 @@ const resolveVenueUrl = (shopOrId) => {
 	return `${SITE_ORIGIN}${path}`;
 };
 
+const handleShareShop = (shopOrPayload) => {
+	const shop = shopOrPayload?.shop || shopOrPayload;
+	const shareUrl = resolveVenueUrl(shop?.id || shop);
+	if (typeof window === "undefined") return;
+	const title = shop?.name || "VibeCity Shop";
+	const text = `Check out ${shop?.name || "this shop"} on VibeCity!`;
+	if (window.navigator?.share) {
+		window.navigator
+			.share({
+				title,
+				text,
+				url: shareUrl,
+			})
+			.catch(() => {});
+		return;
+	}
+	window.navigator?.clipboard?.writeText(shareUrl).catch(() => {});
+};
+
 const activeVenue = computed(() => {
 	const targetSlug = resolveVenueSlug(route.params.slug);
 	const routeIdParam = resolveVenueId(route.params.id);
@@ -462,22 +491,15 @@ const seoTitle = computed(() =>
 		? `${activeVenue.value.name} | VibeCity`
 		: route.params.category
 			? `${String(route.params.category)} | VibeCity`
-			: "VibeCity - Chiang Mai Entertainment",
+			: DEFAULT_PAGE_TITLE,
 );
 
 const seoDescription = computed(() => {
 	if (!activeVenue.value) {
 		if (route.params.category) {
-			const category = String(route.params.category);
-			return clampText(
-				`Explore ${category} venues in Chiang Mai with VibeCity.`,
-				155,
-			);
+			return clampText(buildCategoryDescription(route.params.category), 155);
 		}
-		return clampText(
-			"Discover the best nightlife, cafes, and events in Chiang Mai. Real-time vibes, exclusive deals, and local secrets.",
-			155,
-		);
+		return clampText(DEFAULT_PAGE_DESCRIPTION, 155);
 	}
 
 	const venueName = activeVenue.value.name || "Venue";
@@ -793,6 +815,7 @@ const handleLogoClick = () => {
 	selectFeedback();
 	// Reset venue selection + filters for a true "home" state.
 	selectedShop.value = null;
+	mapSelectionIntent.value = null;
 	activeShopId.value = null;
 	activeCategories.value = [];
 	activeStatus.value = "ALL";
@@ -813,7 +836,9 @@ const syncRewards = async () => {
 	try {
 		await refreshUserStats?.();
 	} catch (error) {
-		console.warn("[HomeView] Failed to refresh reward stats:", error);
+		if (isAppDebugLoggingEnabled()) {
+			console.warn("[HomeView] Failed to refresh reward stats:", error);
+		}
 	}
 };
 
@@ -825,6 +850,7 @@ onMounted(() => {
 // Avoid noisy logs in production (keeps CI + monitoring clean).
 if (import.meta.env.DEV) {
 	onMounted(() => {
+		if (!isAppDebugLoggingEnabled()) return;
 		console.log("🔍 [HomeView] Mounted");
 		console.log("🔍 [HomeView] isMobileView:", isMobileView.value);
 		console.log("🔍 [HomeView] isLandscape:", isLandscape.value);
@@ -834,6 +860,7 @@ if (import.meta.env.DEV) {
 }
 const handleReloadMap = () => {
 	mapReadySignal.value = false;
+	mapContentReadySignal.value = false;
 	nextTick(() => mapRef.value?.initMapOnce?.());
 };
 const handleResetFilters = () => {
@@ -1020,6 +1047,8 @@ const hasFilteredResults = computed(() => {
             <div
               data-testid="map-shell"
               :data-map-ready="mapReadySignal ? 'true' : 'false'"
+              :data-map-content-ready="mapContentReadySignal ? 'true' : 'false'"
+              :data-map-style-mode="mapStyleModeSignal"
               data-map-init-requested="true"
               data-map-token-invalid="false"
               class="absolute inset-0 pointer-events-none opacity-0"
@@ -1049,6 +1078,7 @@ const hasFilteredResults = computed(() => {
                     :buildings="activeEvents"
                     :is-sidebar-open="isPanelOpen"
                     :selectedShopCoords="selectedShopCoords"
+                    :selectionIntent="mapSelectionIntent"
                     :isImmersive="isImmersive"
                     :isGiantPinView="isGiantPinView"
                     :isDashboardOpen="isDashboardOpen"
@@ -1166,6 +1196,8 @@ const hasFilteredResults = computed(() => {
             <div
               data-testid="map-shell"
               :data-map-ready="mapReadySignal ? 'true' : 'false'"
+              :data-map-content-ready="mapContentReadySignal ? 'true' : 'false'"
+              :data-map-style-mode="mapStyleModeSignal"
               data-map-init-requested="true"
               data-map-token-invalid="false"
               class="absolute inset-0 pointer-events-none opacity-0"
@@ -1193,6 +1225,7 @@ const hasFilteredResults = computed(() => {
                 :buildings="activeEvents"
                 :isSidebarOpen="isPanelOpen"
                 :selectedShopCoords="selectedShopCoords"
+                :selectionIntent="mapSelectionIntent"
                 :isImmersive="isImmersive"
                 :isGiantPinView="isGiantPinView"
                 :isDashboardOpen="isDashboardOpen"
@@ -1209,28 +1242,34 @@ const hasFilteredResults = computed(() => {
 
           <!-- Right: Feed (40%) -->
           <div
+            data-testid="landscape-feed"
             class="relative h-full overflow-y-auto no-scrollbar bg-gradient-to-b from-[#0b1020] via-zinc-950 to-zinc-900"
           >
             <div
-              class="p-3 pt-14 grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4"
+              class="grid grid-cols-1 gap-3 p-3 pt-14 md:gap-4 md:p-4 md:pt-16 xl:grid-cols-2"
             >
-              <SwipeCard
-                v-for="shop in filteredShops.slice(0, 10)"
+              <div
+                v-for="(shop, index) in filteredShops.slice(0, 10)"
                 :key="`land-${shop.id}`"
-                :show-expand="false"
-                class="w-full aspect-[16/10] md:aspect-[4/3] rounded-xl overflow-hidden shadow-lg border border-white/10"
+                :data-shop-id="shop.id"
+                data-testid="landscape-shop-card"
+                class="group min-h-0 cursor-pointer"
+                @click="handleCardSelect(shop)"
+                @mouseenter="handleCardHover(shop)"
+                @focusin="handleCardHover(shop)"
               >
-                <img loading="lazy"
-                  :src="shop.Image_URL1"
-                  :alt="shop.name || 'Shop preview'"
-                  class="w-full h-full object-cover"
+                <SwipeCard
+                  :shop="shop"
+                  :is-active="activeShopId === shop.id"
+                  :is-selected="activeShopId === shop.id"
+                  :fetchpriority="index === 0 ? 'high' : 'auto'"
+                  :show-expand="false"
+                  class="w-full aspect-[16/10] overflow-hidden rounded-[22px] border border-white/10 shadow-[0_18px_60px_rgba(2,6,23,0.38)] transition-transform duration-300 group-hover:-translate-y-0.5 md:aspect-[4/3]"
+                  @toggle-favorite="toggleFavorite(shop.id)"
+                  @share="handleShareShop(shop)"
+                  @open-ride="openRideModal(shop)"
                 />
-                <div
-                  class="absolute bottom-4 left-4 font-bold text-white uppercase shadow-black drop-shadow-md"
-                >
-                  {{ shop.name }}
-                </div>
-              </SwipeCard>
+              </div>
             </div>
           </div>
         </div>
@@ -1246,6 +1285,8 @@ const hasFilteredResults = computed(() => {
             <div
               data-testid="map-shell"
               :data-map-ready="mapReadySignal ? 'true' : 'false'"
+              :data-map-content-ready="mapContentReadySignal ? 'true' : 'false'"
+              :data-map-style-mode="mapStyleModeSignal"
               data-map-init-requested="true"
               data-map-token-invalid="false"
               class="absolute inset-0 pointer-events-none opacity-0"
@@ -1272,6 +1313,7 @@ const hasFilteredResults = computed(() => {
                 :buildings="activeEvents"
                 :isSidebarOpen="!isVibeNowCollapsed"
                 :selectedShopCoords="selectedShopCoords"
+                :selectionIntent="mapSelectionIntent"
                 :legendHeight="legendHeight"
                 :isImmersive="isImmersive"
                 :isGiantPinView="isGiantPinView"
@@ -1356,29 +1398,7 @@ const hasFilteredResults = computed(() => {
                 @swipe-left="(shop) => handleSwipe('left', shop)"
                 @swipe-right="(shop) => handleSwipe('right', shop)"
                 @toggle-favorite="toggleFavorite"
-                @share-shop="
-                  (shop) => {
-                    /* ✅ Handle Share safely */
-                    const shareUrl = resolveVenueUrl(shop?.id);
-                    if (
-                      typeof window !== 'undefined' &&
-                      window.navigator &&
-                      window.navigator.share
-                    ) {
-                      window.navigator
-                        .share({
-                          title: shop?.name || 'VibeCity Shop',
-                          text: `Check out ${shop?.name || 'this shop'} on VibeCity!`,
-                          url: shareUrl,
-                        })
-                        .catch(() => {});
-                    } else {
-                      window.navigator?.clipboard
-                        ?.writeText(shareUrl)
-                        .catch(() => {});
-                    }
-                  }
-                "
+                @share-shop="handleShareShop"
                 @toggle-immersive="toggleImmersive"
                 @set-active-floor="(f) => (activeFloor = f)"
                 @reset-filters="

@@ -2,7 +2,8 @@ import { expect, test } from "@playwright/test";
 import { enforceMapConditionOrSkip } from "./helpers/mapProfile";
 
 const MAP_SHELL_SELECTOR = '[data-testid="map-shell"]';
-const MAP_READY_SELECTOR = '[data-testid="map-shell"][data-map-ready="true"]';
+const MAP_READY_SELECTOR =
+	'[data-testid="map-shell"][data-map-ready="true"][data-map-content-ready="true"]';
 
 test.describe("Map Smoke Lite", () => {
 	test("map shell is present and map reaches ready state @smoke-map-lite @map-required", async ({
@@ -151,10 +152,26 @@ test.describe("Map Smoke Lite", () => {
 		const popupMedia = page.getByTestId("popup-media").first();
 		await expect(popupLiveBar).toBeVisible({ timeout: 10_000 });
 		await expect(popupMedia).toBeVisible({ timeout: 10_000 });
+		const popup = page
+			.locator(".vibe-maplibre-popup.maplibregl-popup-anchor-bottom")
+			.first();
+		await expect(popup).toBeVisible({ timeout: 10_000 });
+		await expect(popup).toHaveAttribute("data-anchor-policy", "above-pin");
+		await page.waitForTimeout(250);
 
 		const mediaHeight = await popupMedia.evaluate((node) =>
 			Math.round(node.getBoundingClientRect().height),
 		);
+		const popupInsets = await popup.evaluate((node) => {
+			const popupRect = node.getBoundingClientRect();
+			const mapShell = document
+				.querySelector('[data-testid="map-shell"]')
+				?.getBoundingClientRect();
+			return {
+				topInset: mapShell ? Math.round(popupRect.top - mapShell.top) : -1,
+			};
+		});
 		expect(mediaHeight).toBeGreaterThan(0);
+		expect(popupInsets.topInset).toBeGreaterThanOrEqual(20);
 	});
 });

@@ -2,6 +2,12 @@ import { defineConfig, devices } from "@playwright/test";
 
 const noWebServer = process.env.PW_NO_WEBSERVER === "1";
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || "http://localhost:5417";
+const baseUrlObject = new URL(baseURL);
+const webServerPort = Number(
+	process.env.PLAYWRIGHT_WEB_SERVER_PORT ||
+		baseUrlObject.port ||
+		(baseUrlObject.protocol === "https:" ? "443" : "80"),
+);
 
 export default defineConfig({
 	testDir: "./tests/visual",
@@ -28,8 +34,7 @@ export default defineConfig({
 	webServer: noWebServer
 		? undefined
 		: {
-				command:
-					"npm run build -- --env-mode e2e && npm run preview -- --env-mode e2e --host 0.0.0.0 --port 5417",
+				command: `npm run build:e2e && npm run preview:e2e -- --host 0.0.0.0 --port ${webServerPort}`,
 				url: baseURL,
 				reuseExistingServer: false,
 				timeout: 180_000,

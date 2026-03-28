@@ -3,6 +3,8 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { markRaw, onUnmounted, ref, shallowRef } from "vue";
 import { frontendObservabilityService } from "../../services/frontendObservabilityService";
 import { useInteractionState } from "../useInteractionState";
+import { isMapContentReadyForMode } from "./mapContentReadiness";
+import { normalizeMapStyleMode } from "./mapStyleMode";
 
 // Env-driven style URL: prefer custom style, then fallback, then safe public default
 const MAP_STYLE =
@@ -19,6 +21,21 @@ const MAPLIBRE_SUPPRESSED_WARN_PATTERNS = [
 	["place-labels", "featureset"],
 	["Couldn't find terrain source"], // Suppress spurious terrain warnings during style transitions
 ];
+const MAPLIBRE_TRANSIENT_TOUCH_WARN =
+	"[Intervention] Ignored attempt to cancel a touchmove event with cancelable=false";
+const MAPLIBRE_PIN_IMAGE_WARN_SNIPPETS = [
+	"could not be loaded. Please make sure you have added the image with map.addImage()",
+	'You can provide missing images by listening for the "styleimagemissing" map event.',
+];
+const MAPLIBRE_TRANSIENT_PIN_IMAGE_IDS = [
+	"pin-normal",
+	"pin-grey",
+	"pin-red",
+	"pin-blue",
+	"pin-purple",
+	"pin-boost",
+	"pin-giant",
+];
 
 let maplibreWarnFilterRefs = 0;
 let maplibreWarnOriginal = null;
@@ -28,8 +45,18 @@ const shouldSuppressMaplibreFeaturesetWarn = (args) => {
 	const message = args
 		.map((part) => (typeof part === "string" ? part : String(part ?? "")))
 		.join(" ");
-	return MAPLIBRE_SUPPRESSED_WARN_PATTERNS.some((pattern) =>
-		pattern.every((snippet) => message.includes(snippet)),
+	const matchesKnownPattern = MAPLIBRE_SUPPRESSED_WARN_PATTERNS.some(
+		(pattern) => pattern.every((snippet) => message.includes(snippet)),
+	);
+	if (matchesKnownPattern) return true;
+	if (message.includes(MAPLIBRE_TRANSIENT_TOUCH_WARN)) return true;
+	return (
+		MAPLIBRE_TRANSIENT_PIN_IMAGE_IDS.some((id) =>
+			message.includes(`"${id}"`),
+		) &&
+		MAPLIBRE_PIN_IMAGE_WARN_SNIPPETS.every((snippet) =>
+			message.includes(snippet),
+		)
 	);
 };
 
@@ -60,6 +87,9 @@ export function useMapCore(containerRef, options = {}) {
 	const map = shallowRef(null);
 	const isMapReady = ref(false);
 	const isMapLoaded = ref(false);
+	const isMapContentReady = ref(false);
+	const mapContentState = ref("idle");
+	const activeStyleUrl = ref("");
 	const onContextLost =
 		typeof options.onContextLost === "function" ? options.onContextLost : null;
 	const onContextRestored =
@@ -69,15 +99,115 @@ export function useMapCore(containerRef, options = {}) {
 	const onMapError =
 		typeof options.onMapError === "function" ? options.onMapError : null;
 	const isStrictMapE2E = import.meta.env.VITE_E2E_MAP_REQUIRED === "true";
+	const resolvedStyleMode = normalizeMapStyleMode(options.styleMode);
+	const contentReadyTimeoutMs =
+		Number(options.contentReadyTimeoutMs) > 0
+			? Number(options.contentReadyTimeoutMs)
+			: resolvedStyleMode === "quiet"
+				? 1_500
+				: 8_000;
+	const resolveStyleUrl = (value) =>
+		typeof value === "string" && value.trim() ? value.trim() : "";
 	// MapLibre GL does not require an access token — no token setup needed.
-	const PRIMARY_STYLE_URL = MAP_STYLE;
+	const PRIMARY_STYLE_URL =
+		resolveStyleUrl(options.primaryStyleUrl) || MAP_STYLE;
 	const FALLBACK_STYLE_URL =
+		resolveStyleUrl(options.fallbackStyleUrl) ||
 		import.meta.env.VITE_MAP_STYLE_FALLBACK_URL ||
+		PRIMARY_STYLE_URL ||
 		"https://demotiles.maplibre.org/style.json";
 	const STYLE_ENDPOINT_PATH = "/styles/v1/";
 	const EMPTY_VECTOR_TILE_DATA_URI = "data:application/x-protobuf;base64,";
+	const MAP_RESOURCE_HOST_SNIPPETS = [
+		"openfreemap.org",
+		"openmaptiles.org",
+		"demotiles.maplibre.org",
+	];
 	let lastRequestedStyleUrl = "";
 	let styleFallbackInProgress = false;
+	let contentReadyEpoch = 0;
+	let contentReadyPollTimer = null;
+	let contentReadyDeadlineTimer = null;
+
+	const clearContentReadyTimers = () => {
+		if (contentReadyPollTimer) {
+			clearTimeout(contentReadyPollTimer);
+			contentReadyPollTimer = null;
+		}
+		if (contentReadyDeadlineTimer) {
+			clearTimeout(contentReadyDeadlineTimer);
+			contentReadyDeadlineTimer = null;
+		}
+	};
+
+	const resetContentReadyTracking = () => {
+		clearContentReadyTimers();
+		isMapContentReady.value = false;
+		mapContentState.value = "pending";
+		contentReadyEpoch =
+			typeof performance !== "undefined" ? performance.now() : Date.now();
+	};
+
+	const markContentReady = (reason = "ready") => {
+		if (isMapContentReady.value) return;
+		clearContentReadyTimers();
+		isMapContentReady.value = true;
+		mapContentState.value = reason;
+	};
+
+	const evaluateContentReadiness = () => {
+		if (!map.value) return false;
+		let style = null;
+		try {
+			style =
+				typeof map.value.getStyle === "function" ? map.value.getStyle() : null;
+		} catch {
+			style = null;
+		}
+		const resourceEntries =
+			typeof performance !== "undefined"
+				? performance.getEntriesByType("resource")
+				: [];
+		return isMapContentReadyForMode({
+			styleMode: resolvedStyleMode,
+			shellReady: Boolean(map.value.isStyleLoaded?.() || map.value.loaded?.()),
+			style,
+			resourceEntries,
+			since: contentReadyEpoch,
+			hostSnippets: MAP_RESOURCE_HOST_SNIPPETS,
+		});
+	};
+
+	const reportContentReadyTimeout = () => {
+		if (isMapContentReady.value || !map.value) return;
+		mapContentState.value = "timed_out";
+		onMapError?.({
+			kind: "content_ready_timeout",
+			styleMode: resolvedStyleMode,
+			styleUrl: activeStyleUrl.value || lastRequestedStyleUrl,
+		});
+		if (import.meta.env.DEV) {
+			console.warn(
+				`Map content did not become ready within ${contentReadyTimeoutMs}ms (${resolvedStyleMode}) for ${activeStyleUrl.value || lastRequestedStyleUrl || "unknown-style"}.`,
+			);
+		}
+	};
+
+	const startContentReadyMonitor = () => {
+		clearContentReadyTimers();
+		const poll = () => {
+			if (!map.value) return;
+			if (evaluateContentReadiness()) {
+				markContentReady("ready");
+				return;
+			}
+			contentReadyPollTimer = setTimeout(poll, 250);
+		};
+		poll();
+		contentReadyDeadlineTimer = setTimeout(() => {
+			reportContentReadyTimeout();
+		}, contentReadyTimeoutMs);
+	};
 
 	// Pin images used by symbol layers. Preload on load/style.load and keep
 	// styleimagemissing as a fallback (styles can reset images on setStyle).
@@ -187,6 +317,25 @@ export function useMapCore(containerRef, options = {}) {
 		);
 	};
 
+	const isRecoverableMapResourceFetchError = (err, event) => {
+		const url = String(err?.url || "").toLowerCase();
+		const message = String(err?.message || event?.message || "").toLowerCase();
+		if (
+			!message.includes("failed to fetch") &&
+			!message.includes("networkerror") &&
+			!message.includes("load failed")
+		) {
+			return false;
+		}
+		if (!url) return true;
+		return (
+			url.includes("/map-styles/") ||
+			url.endsWith(".json") ||
+			url.endsWith(".pbf") ||
+			MAP_RESOURCE_HOST_SNIPPETS.some((snippet) => url.includes(snippet))
+		);
+	};
+
 	const isSuppressedTilesetRequest = (url) =>
 		typeof url === "string" &&
 		(url.includes("mapbox.procedural-buildings-v1") ||
@@ -206,6 +355,9 @@ export function useMapCore(containerRef, options = {}) {
 		}
 
 		try {
+			activeStyleUrl.value = FALLBACK_STYLE_URL;
+			resetContentReadyTracking();
+			startContentReadyMonitor();
 			map.value.setStyle(FALLBACK_STYLE_URL);
 		} catch {
 			styleFallbackInProgress = false;
@@ -234,6 +386,8 @@ export function useMapCore(containerRef, options = {}) {
 		containerRef.value.innerHTML = "";
 
 		lastRequestedStyleUrl = style;
+		activeStyleUrl.value = style;
+		resetContentReadyTracking();
 		// Detect low-end device: ≤4 CPU cores or ≤4 GB RAM
 		const isLowEnd =
 			typeof navigator !== "undefined" &&
@@ -275,7 +429,13 @@ export function useMapCore(containerRef, options = {}) {
 		);
 
 		const canvas = map.value.getCanvas?.() || null;
+		const canvasContainer = map.value.getCanvasContainer?.() || null;
+		if (canvasContainer) {
+			canvasContainer.style.touchAction = "none";
+			canvasContainer.style.overscrollBehavior = "none";
+		}
 		if (canvas) {
+			canvas.style.touchAction = "none";
 			const handleContextLost = (event) => {
 				event.preventDefault?.();
 				onContextLost?.(event);
@@ -308,6 +468,7 @@ export function useMapCore(containerRef, options = {}) {
 				map.value.resize(); // Ensure correct size
 			}
 		};
+		startContentReadyMonitor();
 
 		const readyTimeoutMs = isStrictMapE2E ? 8_000 : 12_000;
 		const readyFallbackTimer = setTimeout(() => {
@@ -346,12 +507,16 @@ export function useMapCore(containerRef, options = {}) {
 		map.value.on("style.load", clearReadyFallbackTimer);
 		map.value.on("idle", clearReadyFallbackTimer);
 		map.value.on("remove", clearReadyFallbackTimer);
+		map.value.on("remove", clearContentReadyTimers);
 		map.value.on("remove", uninstallMaplibreWarnFilter);
 
 		// Track last requested style even when callers use map.value.setStyle directly.
 		const baseSetStyle = map.value.setStyle.bind(map.value);
 		map.value.setStyle = (nextStyle, options) => {
 			lastRequestedStyleUrl = nextStyle;
+			activeStyleUrl.value = nextStyle;
+			resetContentReadyTracking();
+			startContentReadyMonitor();
 			return baseSetStyle(nextStyle, options);
 		};
 
@@ -425,6 +590,21 @@ export function useMapCore(containerRef, options = {}) {
 				return;
 			}
 
+			if (isRecoverableMapResourceFetchError(err, e)) {
+				void frontendObservabilityService.reportMapLifecycle(
+					"map_resource_fetch_failed",
+					{
+						url: url || null,
+						message: msg || null,
+						fallbackApplied: lastRequestedStyleUrl !== FALLBACK_STYLE_URL,
+					},
+				);
+				if (lastRequestedStyleUrl !== FALLBACK_STYLE_URL) {
+					applyFallbackStyle(url || msg || "map_resource_fetch_failed");
+				}
+				return;
+			}
+
 			// Genuine errors
 			console.error("MapLibre Error:", e);
 		});
@@ -476,6 +656,7 @@ export function useMapCore(containerRef, options = {}) {
 			map.value.remove();
 			map.value = null;
 		}
+		clearContentReadyTimers();
 		uninstallMaplibreWarnFilter();
 	});
 
@@ -483,6 +664,9 @@ export function useMapCore(containerRef, options = {}) {
 		map,
 		isMapReady,
 		isMapLoaded,
+		isMapContentReady,
+		mapContentState,
+		activeStyleUrl,
 		initMap,
 		setMapStyle,
 	};

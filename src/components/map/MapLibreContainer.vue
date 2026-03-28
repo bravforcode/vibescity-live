@@ -24,8 +24,14 @@ import {
 import { useI18n } from "vue-i18n";
 import { DEFAULT_CITY } from "@/config/cityConfig";
 import { MAP_CONFIG } from "@/config/mapConfig";
+import { resolveVenueMedia } from "@/domain/venue/viewModel";
 import "../../assets/map-atmosphere.css";
 import "../../assets/css/map-markers.css";
+import {
+	resolveMapStyleUrlForMode,
+	resolveRuntimeMapStyleMode,
+	shouldEnableMapTextLabels,
+} from "../../composables/map/mapStyleMode";
 import { useMapAtmosphere } from "../../composables/map/useMapAtmosphere";
 import { useMapCore } from "../../composables/map/useMapCore";
 // useMapHeatmap deferred — loaded after map idle (non-blocking)
@@ -43,9 +49,7 @@ import { useAudioSystem } from "../../composables/useAudioSystem";
 import { useHaptics } from "../../composables/useHaptics";
 import {
 	getApiV1BaseUrl,
-	getLocalDevMapRendererMode,
 	isFrontendOnlyDevMode,
-	persistLocalDevMapRendererMode,
 } from "../../lib/runtimeConfig";
 import {
 	clearRuntimeLaneUnavailable,
@@ -76,23 +80,44 @@ import { calculateDistance, calculateShopStatus } from "../../utils/shopUtils";
 import LiveActivityChips from "./LiveActivityChips.vue";
 import MapLoadingSkeleton from "./MapLoadingSkeleton.vue";
 
-// MapLibre GL does not use mapbox:// style URLs — use env-driven or local neon fallback
-const NEON_STYLE_URL = isFrontendOnlyDevMode()
-	? "/map-styles/vibecity-dev.json"
-	: "/map-styles/vibecity-neon.json";
-const PRIMARY_STYLE_URL =
+// MapLibre GL does not use mapbox:// style URLs — always use the production neon style by default.
+const LOCAL_DEV_HOST_PATTERN = /^(localhost|127\.0\.0\.1)$/i;
+const isLocalBrowserHost = () =>
+	typeof window !== "undefined" &&
+	LOCAL_DEV_HOST_PATTERN.test(window.location.hostname);
+const IS_LOCALHOST_BROWSER = isLocalBrowserHost();
+const LOCALHOST_STYLE_URL = "/map-styles/vibecity-localhost.json";
+const NEON_STYLE_URL = "/map-styles/vibecity-neon.json";
+const LOCALHOST_STYLE_MODE =
+	String(import.meta.env.VITE_LOCALHOST_MAP_STYLE_MODE || "prod")
+		.trim()
+		.toLowerCase() === "quiet"
+		? "quiet"
+		: "prod";
+const ENV_PRIMARY_STYLE_URL =
 	import.meta.env.VITE_MAP_STYLE_URL ||
 	import.meta.env.VITE_MAP_STYLE_FALLBACK_URL ||
 	NEON_STYLE_URL;
-const DARK_STYLE = PRIMARY_STYLE_URL;
-const LIGHT_STYLE = PRIMARY_STYLE_URL;
-const STRICT_E2E_STYLE = import.meta.env.VITE_MAP_STYLE_URL || NEON_STYLE_URL;
+const PROD_STYLE_URL = IS_LOCALHOST_BROWSER
+	? NEON_STYLE_URL
+	: ENV_PRIMARY_STYLE_URL || NEON_STYLE_URL;
+const STRICT_E2E_STYLE = NEON_STYLE_URL;
+const RESOLVED_STYLE_MODE = resolveRuntimeMapStyleMode({
+	isLocalhostBrowser: IS_LOCALHOST_BROWSER,
+	requestedMode: LOCALHOST_STYLE_MODE,
+});
+const resolveStyleUrlForMode = (styleMode = RESOLVED_STYLE_MODE) =>
+	resolveMapStyleUrlForMode({
+		styleMode,
+		prodStyleUrl: PROD_STYLE_URL,
+		quietStyleUrl: LOCALHOST_STYLE_URL,
+		isStrictMapE2E: IS_STRICT_MAP_E2E,
+		strictE2EStyleUrl: STRICT_E2E_STYLE,
+	});
 const PIN_SOURCE_ID = "pins_source";
 const PIN_LAYER_ID = "unclustered-pins";
 const PIN_HITBOX_LAYER_ID = "unclustered-pins-hitbox";
 const SELECTED_PIN_LAYER_ID = "selected-pin-marker";
-const CLUSTER_LAYER_ID = "clusters";
-const CLUSTER_COUNT_LAYER_ID = "cluster-count";
 const DISTANCE_LINE_SOURCE_ID = "distance-line";
 const THAILAND_AGGREGATE_LEVEL = "country";
 const COUNTRY_AGGREGATE_MAX_ZOOM = 6.2;
@@ -106,6 +131,7 @@ const ZONE_DRILLDOWN_ZOOM = Math.max(
 	Number(MAP_CONFIG?.zoom?.lod?.full?.min ?? 15),
 	ZONE_AGGREGATE_MAX_ZOOM + 0.1,
 );
+const IS_DEV_BUILD = import.meta.env.DEV;
 const IS_E2E = import.meta.env.VITE_E2E === "true";
 const IS_STRICT_MAP_E2E = import.meta.env.VITE_E2E_MAP_REQUIRED === "true";
 const ENABLE_DOM_OVERLAY_MARKERS = IS_E2E || IS_STRICT_MAP_E2E;
@@ -128,10 +154,9 @@ const SHOULD_FETCH_ROUTE_PROXY =
 	!import.meta.env.DEV ||
 	import.meta.env.VITE_API_PROXY_DEV === "true" ||
 	import.meta.env.VITE_DIRECTIONS_DEV === "true";
+const MAP_TEXT_LABELS_ENABLED = shouldEnableMapTextLabels(RESOLVED_STYLE_MODE);
 
 const { t, te, locale } = useI18n();
-const IS_FRONTEND_ONLY_DEV_MAP_MODE = isFrontendOnlyDevMode();
-const DEV_SAFE_MAP_RENDERER_PREVIEW = "preview";
 const tt = (key, fallback) => (te(key) ? t(key) : fallback);
 const queueMapIdleTask = (task, timeout = 2500) => {
 	if (typeof window === "undefined") return;
@@ -187,14 +212,11 @@ const shouldBootGodTierLayers = computed(
 		enableMapEffectsPipelineV2.value &&
 		(!enableMapShaderSafeModeV1.value || !mapRuntimeSafeModeLatched.value) &&
 		!isPerfRestricted.value &&
-		!IS_FRONTEND_ONLY_DEV_MAP_MODE &&
 		!IS_E2E &&
 		!IS_STRICT_MAP_E2E,
 );
 const styleUrlForTheme = (_isDarkMode) => {
-	if (IS_STRICT_MAP_E2E) return STRICT_E2E_STYLE;
-	// Use neon style for production vibe
-	return NEON_STYLE_URL;
+	return resolveStyleUrlForMode();
 };
 
 // Wave 3: Task 3.6 — Record parse + setup overhead after stores and composables resolve.
@@ -231,6 +253,9 @@ const triggerVibeEffect = (shop, content) => {
 const { impactFeedback } = useHaptics();
 const handleMotionChange = (e) => {
 	prefersReducedMotion.value = e.matches;
+};
+const handlePointerPrecisionChange = (e) => {
+	isCoarsePointerPrimary.value = e.matches;
 };
 const handleVisibilityChange = () => {
 	isDocumentHidden.value =
@@ -284,32 +309,7 @@ onMounted(() => {
 	// Initialize location tracking
 	const locationStore = useLocationStore();
 	void locationStore.startWatching().catch(() => {});
-
-	// Handle WebGL context lost gracefully
-	setTimeout(() => {
-		const canvas = mapContainer.value?.querySelector("canvas");
-		if (canvas) {
-			canvas.addEventListener("webglcontextlost", (e) => {
-				e.preventDefault();
-				console.warn("[MapLibre] WebGL context lost — will attempt restore");
-			});
-			canvas.addEventListener("webglcontextrestored", () => {
-				if (map.value) {
-					map.value.resize();
-					map.value.triggerRepaint();
-				}
-			});
-		}
-	}, 1000);
 });
-
-const getFirstExistingLayerId = (candidateIds = []) => {
-	if (!map.value) return null;
-	for (const id of candidateIds) {
-		if (id && map.value.getLayer(id)) return id;
-	}
-	return null;
-};
 
 // Add Heatmap Layer
 // Heatmap layer handled by composable
@@ -318,6 +318,7 @@ const props = defineProps({
 	shops: Array,
 	userLocation: Array,
 	highlightedShopId: [Number, String],
+	selectionIntent: { type: Object, default: null },
 	isDarkMode: { type: Boolean, default: true },
 	activeZone: { type: String, default: null },
 	uiTopOffset: { type: Number, default: 0 },
@@ -343,78 +344,24 @@ const mapWrapperStyle = computed(() => ({
 	willChange: props.isDashboardOpen ? "auto" : "transform",
 }));
 
-const clampPercent = (value, min, max) => Math.min(max, Math.max(min, value));
-const localDevMapRendererMode = ref(
-	IS_FRONTEND_ONLY_DEV_MAP_MODE ? getLocalDevMapRendererMode() : "webgl",
-);
-const syncLocalDevMapRendererMode = () => {
-	localDevMapRendererMode.value = IS_FRONTEND_ONLY_DEV_MAP_MODE
-		? getLocalDevMapRendererMode()
-		: "webgl";
-};
-const devSafeMapPreviewMode = computed(
-	() =>
-		IS_FRONTEND_ONLY_DEV_MAP_MODE &&
-		localDevMapRendererMode.value === DEV_SAFE_MAP_RENDERER_PREVIEW,
-);
-const devSafePreviewPins = computed(() => {
-	const source = Array.isArray(props.shops) ? props.shops : [];
-	const candidates = source
-		.filter((shop) => {
-			const lat = Number(shop?.lat ?? shop?.latitude);
-			const lng = Number(shop?.lng ?? shop?.longitude);
-			return Number.isFinite(lat) && Number.isFinite(lng);
-		})
-		.slice(0, 18);
-
-	if (!candidates.length) return [];
-
-	const latitudes = candidates.map((shop) => Number(shop.lat ?? shop.latitude));
-	const longitudes = candidates.map((shop) =>
-		Number(shop.lng ?? shop.longitude),
-	);
-	const minLat = Math.min(...latitudes);
-	const maxLat = Math.max(...latitudes);
-	const minLng = Math.min(...longitudes);
-	const maxLng = Math.max(...longitudes);
-	const latSpan = Math.max(maxLat - minLat, 0.01);
-	const lngSpan = Math.max(maxLng - minLng, 0.01);
-	const highlightedId =
-		props.highlightedShopId !== null && props.highlightedShopId !== undefined
-			? String(props.highlightedShopId)
-			: "";
-
-	return candidates.map((shop, index) => {
-		const lat = Number(shop.lat ?? shop.latitude);
-		const lng = Number(shop.lng ?? shop.longitude);
-		const x = lngSpan > 0 ? (lng - minLng) / lngSpan : 0.5;
-		const y = latSpan > 0 ? 1 - (lat - minLat) / latSpan : 0.5;
-		const jitterX = ((index % 3) - 1) * 2.4;
-		const jitterY = ((Math.floor(index / 3) % 3) - 1) * 2.8;
-		return {
-			id: shop.id ?? `preview-${index}`,
-			shop,
-			name: shop.name || shop.title || `Venue ${index + 1}`,
-			isHighlighted: highlightedId !== "" && String(shop.id) === highlightedId,
-			top: `${clampPercent(14 + y * 70 + jitterY, 12, 88)}%`,
-			left: `${clampPercent(10 + x * 80 + jitterX, 8, 92)}%`,
-		};
-	});
-});
-const isMapUiReady = computed(
-	() => devSafeMapPreviewMode.value || isMapReady.value,
-);
 const getMapLifecycleMode = () => {
-	if (devSafeMapPreviewMode.value) return "preview";
 	if (maplessMode.value) return "mapless";
 	return "map";
 };
 
 const prefersReducedMotion = ref(false);
 let motionMediaQuery = null;
+const isCoarsePointerPrimary = ref(false);
+let pointerPrecisionMediaQuery = null;
 const isPerfRestricted = computed(
 	() =>
 		prefs.isLowPowerMode || prefs.isReducedMotion || prefersReducedMotion.value,
+);
+const shouldPreferSmoothMobileRuntime = computed(
+	() => isCoarsePointerPrimary.value && effectiveMotionBudget.value !== "full",
+);
+const runtimeAnimationGuard = computed(
+	() => isPerfRestricted.value || shouldPreferSmoothMobileRuntime.value,
 );
 const mapEffectsEnabled = computed(
 	() =>
@@ -427,16 +374,23 @@ const allowAmbientFx = computed(
 	() =>
 		mapEffectsEnabled.value &&
 		prefs.isAmbientFxEnabled &&
-		!isPerfRestricted.value,
+		!runtimeAnimationGuard.value,
 );
 const allowNeonPulse = computed(
 	() =>
 		mapEffectsEnabled.value &&
 		prefs.isNeonPulseEnabled &&
-		!isPerfRestricted.value,
+		!runtimeAnimationGuard.value,
 );
 const allowHeatmap = computed(
 	() => mapEffectsEnabled.value && prefs.isHeatmapEnabled,
+);
+const allowHeatmapAnimation = computed(
+	() =>
+		allowHeatmap.value &&
+		!prefersReducedMotion.value &&
+		!shouldPreferSmoothMobileRuntime.value &&
+		effectiveMotionBudget.value !== "micro",
 );
 const allow3dBuildings = computed(
 	() =>
@@ -452,20 +406,26 @@ const allowViewportGlow = computed(
 	() =>
 		mapEffectsEnabled.value &&
 		prefs.isViewportGlowEnabled &&
-		!isPerfRestricted.value,
+		!runtimeAnimationGuard.value,
 );
 const viewportGlowOpacity = ref(0);
 const allowWeatherFx = computed(
 	() =>
 		mapEffectsEnabled.value &&
 		prefs.isWeatherFxEnabled &&
-		!isPerfRestricted.value &&
+		!runtimeAnimationGuard.value &&
 		!isOffline.value,
 );
 const soundEnabled = computed(() => Boolean(prefs.isSoundEnabled));
 const effectiveMotionBudget = computed(() => {
 	if (isPerfRestricted.value) return "micro";
 	return prefs.motionBudget || "micro";
+});
+const mapLayerEffectsMode = computed(() => {
+	if (IS_E2E || IS_STRICT_MAP_E2E) return "off";
+	if (runtimeAnimationGuard.value) return "off";
+	if (effectiveMotionBudget.value === "micro") return "off";
+	return "full";
 });
 const shouldRunAtmosphere = computed(
 	() =>
@@ -553,13 +513,13 @@ const isMapOperational = () => {
 };
 const getWebglRestoreGraceMs = () => {
 	if (!isMapReady.value) {
-		return IS_FRONTEND_ONLY_DEV_MAP_MODE ? 1600 : 1200;
+		return 1200;
 	}
-	return IS_FRONTEND_ONLY_DEV_MAP_MODE ? 320 : 900;
+	return 900;
 };
 const scheduleWebglRecovery = (
 	reason = "webgl_context_lost",
-	delayMs = IS_FRONTEND_ONLY_DEV_MAP_MODE ? 24 : 180,
+	delayMs = 180,
 ) => {
 	if (maplessMode.value) return;
 	if (webglRecoveryTimer) return;
@@ -617,7 +577,7 @@ const handleWebglContextLost = () => {
 };
 const settleMapAfterContextRestore = (reason = "webgl_context_restored") => {
 	let attempts = 0;
-	const maxAttempts = IS_FRONTEND_ONLY_DEV_MAP_MODE ? 180 : 120;
+	const maxAttempts = 120;
 	const settle = () => {
 		const mapInstance = map.value;
 		if (!mapInstance) return;
@@ -666,14 +626,34 @@ const handleWebglContextRestored = () => {
 		settleMapAfterContextRestore("webgl_context_restored");
 	}
 };
-const { map, isMapReady, initMap, setMapStyle } = useMapCore(mapContainer, {
+const {
+	map,
+	isMapReady,
+	isMapContentReady,
+	mapContentState,
+	activeStyleUrl,
+	initMap,
+} = useMapCore(mapContainer, {
 	onContextLost: handleWebglContextLost,
 	onContextRestored: handleWebglContextRestored,
 	onMapError: (error) => {
+		if (error?.kind === "content_ready_timeout") {
+			reportMapLifecycle("content_ready_timeout", {
+				styleMode: error.styleMode,
+				styleUrl: error.styleUrl,
+			});
+			return;
+		}
 		if (!isShaderCompileLikeError(error)) return;
 		latchMapRuntimeSafeMode("map_error", error);
 	},
+	styleMode: RESOLVED_STYLE_MODE,
+	fallbackStyleUrl: resolveStyleUrlForMode(),
+	primaryStyleUrl: resolveStyleUrlForMode(),
 });
+const publicMapReady = computed(() =>
+	Boolean(isMapReady.value && isMapContentReady.value),
+);
 
 // ✅ P1: Spatial image prefetcher (v2) — center-priority, adaptive batch, session cache.
 // `warmShop` pre-warms a specific shop on hover so tapping it shows images instantly.
@@ -704,6 +684,9 @@ const applySourceData = (sourceId, data) => {
 };
 const mapReadyFallbackArmed = ref(false);
 const currentStyleUrl = ref(null);
+const selectionSourceLabel = ref("none");
+const cameraRequestId = ref("0");
+const popupSettleState = ref("idle");
 let styleApplySeq = 0;
 const showMapRecoveryHint = ref(false);
 const mapLoadTimeoutReached = ref(false);
@@ -720,13 +703,6 @@ const EMPTY_SELECTED_PIN_FILTER = ["==", ["get", "id"], "__none__"];
 const initMapOnce = (styleOverride = null) => {
 	if (mapInitRequested.value) return;
 	if (!mapContainer.value) return;
-	if (IS_FRONTEND_ONLY_DEV_MAP_MODE) {
-		syncLocalDevMapRendererMode();
-		if (devSafeMapPreviewMode.value) {
-			activateDevSafeMapPreview();
-			return;
-		}
-	}
 
 	mapInitRequested.value = true;
 	mapInitStartedAt.value = Date.now();
@@ -775,41 +751,6 @@ const updateSelectedPinLayerFilter = (highlightedId) => {
 
 const maplessMode = ref(false); // User chose to continue without map
 let mapTeardownDone = false;
-
-const activateDevSafeMapPreview = (
-	reason = "chromium_frontend_only_dev_default",
-) => {
-	if (!IS_FRONTEND_ONLY_DEV_MAP_MODE) return;
-	maplessMode.value = false;
-	showMapRecoveryHint.value = false;
-	mapLoadTimeoutReached.value = false;
-	mapReadyReported.value = false;
-	mapContextRecovering.value = false;
-	mapInitRequested.value = false;
-	if (map.value) {
-		teardownMap();
-	}
-	reportMapLifecycle("dev_safe_preview_enabled", { reason });
-};
-
-const enableFullMapForCurrentSession = () => {
-	if (!IS_FRONTEND_ONLY_DEV_MAP_MODE) return;
-	persistLocalDevMapRendererMode("webgl");
-	syncLocalDevMapRendererMode();
-	showMapRecoveryHint.value = false;
-	mapLoadTimeoutReached.value = false;
-	maplessMode.value = false;
-	mapInitRequested.value = false;
-	reportMapLifecycle("dev_safe_preview_disabled", {
-		reason: "manual_opt_in",
-	});
-	initMapOnce(currentStyleUrl.value);
-};
-
-const handleDevSafePreviewPinClick = (shop) => {
-	if (!shop) return;
-	emit("select-shop", shop);
-};
 
 const teardownMap = () => {
 	if (mapTeardownDone) return;
@@ -881,9 +822,6 @@ const teardownMap = () => {
 		map.value.off("click", PIN_HITBOX_LAYER_ID, handlePointClick);
 		map.value.off("mouseenter", PIN_HITBOX_LAYER_ID, setPointer);
 		map.value.off("mouseleave", PIN_HITBOX_LAYER_ID, resetPointer);
-		map.value.off("click", CLUSTER_LAYER_ID, handleClusterClick);
-		map.value.off("mouseenter", CLUSTER_LAYER_ID, setPointer);
-		map.value.off("mouseleave", CLUSTER_LAYER_ID, resetPointer);
 		map.value.remove();
 		map.value = null;
 	}
@@ -897,7 +835,6 @@ const armMapRecoveryTimeout = () => {
 		mapRecoveryTimeoutId = null;
 	}
 	if (IS_E2E) return;
-	if (devSafeMapPreviewMode.value) return;
 	if (maplessMode.value) return;
 	if (!mapInitRequested.value || isMapReady.value) return;
 	mapRecoveryTimeoutId = window.setTimeout(() => {
@@ -930,10 +867,6 @@ const handleMapRecovery = () => {
 };
 
 const continueWithoutMap = () => {
-	if (IS_FRONTEND_ONLY_DEV_MAP_MODE) {
-		persistLocalDevMapRendererMode("auto");
-		syncLocalDevMapRendererMode();
-	}
 	maplessMode.value = true;
 	showMapRecoveryHint.value = false;
 	mapLoadTimeoutReached.value = false;
@@ -965,8 +898,16 @@ const armStrictStyleGate = () => {
 onMounted(() => {
 	if (typeof window === "undefined" || !window.matchMedia) return;
 	motionMediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+	pointerPrecisionMediaQuery = window.matchMedia(
+		"(hover: none) and (pointer: coarse)",
+	);
 	prefersReducedMotion.value = motionMediaQuery.matches;
+	isCoarsePointerPrimary.value = pointerPrecisionMediaQuery.matches;
 	motionMediaQuery.addEventListener?.("change", handleMotionChange);
+	pointerPrecisionMediaQuery.addEventListener?.(
+		"change",
+		handlePointerPrecisionChange,
+	);
 });
 
 onMounted(() => {
@@ -988,6 +929,7 @@ const {
 	addNeonRoads,
 	addCarAnimation,
 	loadMapImages,
+	setCyberpunkAtmosphere,
 	upsertTrafficRoads,
 	stopCarAnimation,
 	ensureCoinAnimation,
@@ -998,11 +940,11 @@ const {
 	addCriticalLayers,
 	addDeferredLayers,
 	addNeonSignLayers,
-	neonSignCache,
 } = useMapLayers(map, {
-	effectsMode: () => "full",
+	effectsMode: () => mapLayerEffectsMode.value,
 	scheduler: (sourceId, data) => applySourceData(sourceId, data),
 	coinMinZoom: 0,
+	renderTextLabels: MAP_TEXT_LABELS_ENABLED,
 });
 
 const {
@@ -1015,13 +957,59 @@ const {
 
 // Initialize neon sign theme composable
 const { toNeonFeatureProperties } = useNeonSignTheme();
+const NEON_FEATURE_EXPERIMENT_ID = "stable";
+const NEON_FEATURE_SIGNATURE_VERSION = "2-stable";
+const NEON_FEATURE_CLIENT_VERSION =
+	import.meta.env.VITE_APP_VERSION || "unknown";
+const neonFeaturePropsCache = new Map();
+const getCachedNeonFeatureProperties = (shop) => {
+	if (!shop || typeof shop !== "object") return {};
+	const shopId = String(shop.id ?? shop.shop_id ?? "").trim();
+	const options = {
+		selectedShopId: props.highlightedShopId,
+		experimentId: NEON_FEATURE_EXPERIMENT_ID,
+		signatureVersion: NEON_FEATURE_SIGNATURE_VERSION,
+		clientVersion: NEON_FEATURE_CLIENT_VERSION,
+	};
+	if (!shopId) {
+		return toNeonFeatureProperties(shop, options);
+	}
+	const lat = Number(shop.lat ?? shop.latitude);
+	const lng = Number(shop.lng ?? shop.longitude);
+	const cacheKey = [
+		String(props.highlightedShopId ?? ""),
+		String(shop.name ?? shop.title ?? ""),
+		String(shop.status ?? shop.state ?? ""),
+		String(shop.pin_state ?? ""),
+		String(shop.category ?? shop.primary_category ?? shop.type ?? ""),
+		String(shop.city_zone ?? shop.cityZone ?? shop.zone ?? shop.district ?? ""),
+		String(shop.visibility_score ?? shop.visibilityScore ?? ""),
+		String(shop.boost ?? shop.boost_active ?? shop.is_boost_active ?? ""),
+		Number.isFinite(lat) ? lat.toFixed(4) : "na",
+		Number.isFinite(lng) ? lng.toFixed(4) : "na",
+	].join("|");
+	const cached = neonFeaturePropsCache.get(shopId);
+	if (cached?.key === cacheKey) {
+		return cached.value;
+	}
+	const nextValue = toNeonFeatureProperties(shop, options);
+	neonFeaturePropsCache.set(shopId, {
+		key: cacheKey,
+		value: nextValue,
+	});
+	return nextValue;
+};
 
 import {
 	getMapPins,
 	getMapProvinceAggregates,
 } from "../../services/shopService";
 
-const zoom = ref(17.5);
+const zoom = ref(
+	Number.isFinite(Number(DEFAULT_CITY.defaultZoom))
+		? Number(DEFAULT_CITY.defaultZoom)
+		: 17.5,
+);
 const center = ref([DEFAULT_CITY.lng, DEFAULT_CITY.lat]);
 
 const mapInitRequested = ref(false);
@@ -1134,6 +1122,19 @@ const getWeatherCenter = () => {
 let _weatherInstance = null;
 const weatherCondition = ref(null);
 const isWeatherNight = ref(false);
+const deferredFeatureWatchStops = [];
+let deferredFeaturesDisposed = false;
+const registerDeferredFeatureWatch = (...args) => {
+	const stop = watch(...args);
+	deferredFeatureWatchStops.push(stop);
+	return stop;
+};
+const stopDeferredFeatureWatches = () => {
+	while (deferredFeatureWatchStops.length > 0) {
+		const stop = deferredFeatureWatchStops.pop();
+		stop?.();
+	}
+};
 const refreshWeather = () => {
 	_weatherInstance?.refresh?.();
 };
@@ -1274,7 +1275,7 @@ const {
 } = useMapRealtime(
 	map,
 	isMapReady,
-	isPerfRestricted,
+	runtimeAnimationGuard,
 	effectiveMotionBudget,
 	computed(() => props.highlightedShopId),
 	computed(() => props.shops),
@@ -1296,7 +1297,7 @@ const {
 	allowNeonPulse,
 	allowWeatherFx,
 	allowMapFog,
-	isPerfRestricted,
+	isPerfRestricted: runtimeAnimationGuard,
 	weatherCondition,
 	isWeatherNight,
 	shouldRunAtmosphere,
@@ -1357,6 +1358,12 @@ const resolveTrafficAnchor = () => {
 
 const refreshTrafficSubset = async ({ force = false } = {}) => {
 	if (!map.value || !isMapReady.value) return;
+	if (mapLayerEffectsMode.value === "off") {
+		stopCarAnimation();
+		lastTrafficCenter.value = null;
+		lastTrafficRefreshAt.value = Date.now();
+		return;
+	}
 	const anchor = resolveTrafficAnchor();
 
 	if (!anchor) {
@@ -1695,6 +1702,7 @@ let mapPinsRpcDisabledUntil = 0;
 let isPinsRefreshInFlight = false;
 let queuedPinsRefreshForce = false;
 let queuedPinsRefreshAllowSameViewport = false;
+let queuedPinsRefreshLocalOnly = false;
 
 const getViewportKey = () => {
 	if (!map.value) return "";
@@ -1722,6 +1730,11 @@ const scheduleMapRefresh = (options = null) => {
 		typeof options === "object" &&
 		"allowSameViewport" in options &&
 		Boolean(options.allowSameViewport);
+	const localOnly =
+		Boolean(options) &&
+		typeof options === "object" &&
+		"localOnly" in options &&
+		Boolean(options.localOnly);
 
 	if (!isMapOperational()) return;
 	if (props.isGiantPinView) return;
@@ -1764,21 +1777,31 @@ const scheduleMapRefresh = (options = null) => {
 				queuedPinsRefreshForce = queuedPinsRefreshForce || force;
 				queuedPinsRefreshAllowSameViewport =
 					queuedPinsRefreshAllowSameViewport || allowSameViewport;
+				queuedPinsRefreshLocalOnly = queuedPinsRefreshLocalOnly || localOnly;
 				return;
 			}
 			isPinsRefreshInFlight = true;
-			Promise.resolve(refreshPins()).finally(() => {
+			Promise.resolve(refreshPins({ localOnly })).finally(() => {
 				isPinsRefreshInFlight = false;
-				if (queuedPinsRefreshForce || queuedPinsRefreshAllowSameViewport) {
+				if (
+					queuedPinsRefreshForce ||
+					queuedPinsRefreshAllowSameViewport ||
+					queuedPinsRefreshLocalOnly
+				) {
 					const nextForce = queuedPinsRefreshForce;
 					const nextAllowSameViewport =
 						queuedPinsRefreshAllowSameViewport || nextForce;
+					const nextLocalOnly = queuedPinsRefreshLocalOnly && !nextForce;
 					queuedPinsRefreshForce = false;
 					queuedPinsRefreshAllowSameViewport = false;
+					queuedPinsRefreshLocalOnly = false;
 					scheduleMapRefresh(
 						nextForce
 							? { force: true }
-							: { allowSameViewport: nextAllowSameViewport },
+							: {
+									allowSameViewport: nextAllowSameViewport,
+									localOnly: nextLocalOnly,
+								},
 					);
 				}
 			});
@@ -1786,572 +1809,656 @@ const scheduleMapRefresh = (options = null) => {
 	}, MAP_REFRESH_DEBOUNCE_MS);
 };
 
-const refreshPins = async () => {
+const normalizeMapPinId = (value) => String(value ?? "").trim();
+
+const isAllowedMapPinId = (id, allowedIds = allowedIdsRef.value) => {
+	const idStr = normalizeMapPinId(id);
+	if (!idStr) return false;
+	if (allowedIds === null) return true;
+	return allowedIds.has(idStr);
+};
+
+const isCoinCollectedForId = (id) => {
+	const collected = shopStore.collectedCoins;
+	if (!collected?.has) return false;
+	if (collected.has(id)) return true;
+	const idStr = normalizeMapPinId(id);
+	if (idStr && collected.has(idStr)) return true;
+	const idNum = Number(idStr);
+	if (Number.isFinite(idNum) && collected.has(idNum)) return true;
+	return false;
+};
+
+const resolvePinHasCoin = (id, rawHasCoin) => {
+	const collected = isCoinCollectedForId(id);
+	if (rawHasCoin === null || rawHasCoin === undefined) {
+		return !collected;
+	}
+	if (typeof rawHasCoin === "boolean") {
+		return rawHasCoin && !collected;
+	}
+	const raw = String(rawHasCoin).trim().toLowerCase();
+	if (raw === "true" || raw === "1") return !collected;
+	if (raw === "false" || raw === "0") return false;
+	return !collected;
+};
+
+const resolveFeaturePinState = ({ pin_state, pin_type, is_event, status }) => {
+	const aggregateStates = new Set([
+		THAILAND_AGGREGATE_LEVEL,
+		"province",
+		"zone",
+	]);
+	const pinStateRaw = String(pin_state || "")
+		.trim()
+		.toLowerCase();
+	const pinTypeRaw = String(pin_type || "")
+		.trim()
+		.toLowerCase();
+	const statusRaw = String(status || "")
+		.trim()
+		.toLowerCase();
+	if (aggregateStates.has(pinStateRaw)) return pinStateRaw;
+	const eventLike =
+		Boolean(is_event) ||
+		pinStateRaw === "event" ||
+		pinTypeRaw === "event" ||
+		pinTypeRaw === "giant";
+	if (eventLike) return "event";
+	const liveLike = pinStateRaw === "live" || statusRaw === "live";
+	if (liveLike) return "live";
+	if (
+		pinStateRaw === "open" ||
+		statusRaw === "open" ||
+		statusRaw === "active"
+	) {
+		return "open";
+	}
+	if (pinStateRaw === "tonight" || statusRaw === "tonight") {
+		return "tonight";
+	}
+	return "off";
+};
+
+const pinStateFromStatus = (statusValue) => {
+	const s = String(statusValue || "")
+		.trim()
+		.toUpperCase();
+	if (s === "LIVE") return "live";
+	if (s === "ACTIVE" || s === "OPEN") return "open";
+	if (s === "TONIGHT") return "tonight";
+	return "off";
+};
+
+const resolveShopScheduleStatus = (shop) => {
+	if (!shop || typeof shop !== "object") return "OFF";
+	const now = new Date(nowTick.value);
+	const manualStatus = String(
+		shop.originalStatus ?? shop.statusRaw ?? shop.status ?? "",
+	)
+		.trim()
+		.toUpperCase();
+	try {
+		return String(
+			calculateShopStatus({ ...shop, originalStatus: manualStatus }, now),
+		).toUpperCase();
+	} catch {
+		return manualStatus || "OFF";
+	}
+};
+
+const toPinFeature = ({
+	id,
+	name,
+	lat,
+	lng,
+	pin_type,
+	pin_state,
+	verified,
+	glow,
+	boost,
+	giant,
+	has_coin,
+	visibility_score,
+	image,
+	status,
+	is_event,
+	is_live,
+	shop,
+	province,
+	district,
+	aggregate_level,
+	aggregate_shop_count,
+	aggregate_dominant_count,
+	promotion_score,
+	sign_scale,
+	pin_metadata,
+	extraProperties = {},
+}) => {
+	const latNum = Number(lat);
+	const lngNum = Number(lng);
+	if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) return null;
+	if (latNum < -90 || latNum > 90 || lngNum < -180 || lngNum > 180) {
+		return null;
+	}
+
+	const idStr = normalizeMapPinId(id);
+	if (!idStr) return null;
+	const normalizedPinState = resolveFeaturePinState({
+		pin_state,
+		pin_type,
+		is_event,
+		is_live,
+		status,
+	});
+	const normalizedPinType =
+		String(pin_type || "")
+			.trim()
+			.toLowerCase() || "normal";
+	const neonProps = shop ? getCachedNeonFeatureProperties(shop) : {};
+
+	return {
+		type: "Feature",
+		geometry: { type: "Point", coordinates: [lngNum, latNum] },
+		properties: {
+			id: idStr,
+			name: name || "",
+			pin_type: normalizedPinType,
+			pin_state: normalizedPinState,
+			verified: Boolean(verified),
+			glow: Boolean(glow),
+			boost: Boolean(boost),
+			giant: Boolean(giant),
+			has_coin: Boolean(has_coin),
+			visibility_score: Number(visibility_score ?? 0) || 0,
+			is_event: normalizedPinState === "event",
+			is_live: normalizedPinState === "live" || liveVenueRefs.value.has(idStr),
+			status:
+				String(status || "")
+					.trim()
+					.toUpperCase() ||
+				{
+					country: "COUNTRY",
+					province: "PROVINCE",
+					zone: "ZONE",
+					live: "LIVE",
+					open: "ACTIVE",
+					tonight: "TONIGHT",
+				}[normalizedPinState] ||
+				"OFF",
+			vibe_score: Number(visibility_score ?? 0) || 0,
+			image: image || null,
+			province: province ?? shop?.province ?? shop?.Province ?? null,
+			district: district ?? shop?.district ?? shop?.Zone ?? null,
+			aggregate_level: aggregate_level || null,
+			aggregate_shop_count: Number(aggregate_shop_count ?? 0) || 0,
+			aggregate_dominant_count: Number(aggregate_dominant_count ?? 0) || 0,
+			promotion_score: Number(promotion_score ?? 0) || 0,
+			sign_scale: Number(sign_scale ?? 1) || 1,
+			pin_metadata: pin_metadata ?? null,
+			...neonProps,
+			...extraProperties,
+		},
+	};
+};
+
+const toFeatureMediaProps = (source) => {
+	const media = resolveVenueMedia(source || {});
+
+	return {
+		image: media.primaryImage || null,
+		extraProperties: {
+			real_media: Array.isArray(source?.real_media)
+				? source.real_media
+				: Array.isArray(source?.realMedia)
+					? source.realMedia
+					: Array.isArray(source?.media_items)
+						? source.media_items
+						: null,
+			media: source?.media ?? null,
+			media_counts:
+				source?.media_counts ??
+				source?.mediaCounts ??
+				source?.counts ??
+				media.counts,
+		},
+	};
+};
+
+const pinFeatureFromShop = (shop) => {
+	if (!shop) return null;
+	const pinTypeRaw = String(shop.pin_type || "").toLowerCase();
+	const isGiant =
+		pinTypeRaw === "giant" ||
+		shop.is_giant_active === true ||
+		shop.isGiantPin === true ||
+		shop.giantActive === true;
+	const scheduleStatus = resolveShopScheduleStatus(shop);
+	const schedulePinState = pinStateFromStatus(scheduleStatus);
+	const mediaProps = toFeatureMediaProps(shop);
+
+	return toPinFeature({
+		id: shop.id,
+		name: shop.name,
+		lat: shop.lat ?? shop.latitude,
+		lng: shop.lng ?? shop.longitude,
+		pin_type: isGiant ? "giant" : pinTypeRaw || "normal",
+		pin_state: isGiant ? "event" : schedulePinState,
+		verified: shop.is_verified || shop.verifiedActive || shop.verified_active,
+		glow: shop.is_glowing || shop.glowActive || shop.glow_active,
+		boost: shop.is_boost_active || shop.boostActive || shop.boost_active,
+		giant: isGiant || shop.giant_active,
+		has_coin: resolvePinHasCoin(shop.id, shop.has_coin ?? shop.hasCoin),
+		visibility_score: shop.visibility_score ?? shop.visibilityScore,
+		image: mediaProps.image,
+		status: scheduleStatus,
+		is_event: isGiant || Boolean(shop.is_event),
+		is_live: scheduleStatus === "LIVE",
+		shop,
+		province: shop.province ?? shop.Province,
+		district: shop.district ?? shop.Zone,
+		extraProperties: mediaProps.extraProperties,
+	});
+};
+
+const pinFeatureFromRpc = (pin) => {
+	if (!pin) return null;
+	const mediaProps = toFeatureMediaProps(pin);
+	return toPinFeature({
+		id: pin.id,
+		name: pin.name,
+		lat: pin.lat,
+		lng: pin.lng,
+		pin_type: pin.pinType || pin.pin_type,
+		pin_state: pin.pinState || pin.pin_state,
+		verified: pin.verifiedActive,
+		glow: pin.glowActive,
+		boost: pin.boostActive,
+		giant: pin.giantActive,
+		has_coin: resolvePinHasCoin(pin.id, pin.hasCoin ?? pin.has_coin),
+		visibility_score: pin.visibilityScore,
+		image: mediaProps.image || pin.coverImage,
+		status: pin.status,
+		is_event: pin.isEvent || pin.is_event,
+		is_live: pin.isLive || pin.is_live,
+		province: pin.province,
+		district: pin.district ?? pin.zone,
+		aggregate_level: pin.aggregateLevel || pin.aggregate_level,
+		aggregate_shop_count: pin.aggregateShopCount ?? pin.aggregate_shop_count,
+		aggregate_dominant_count:
+			pin.aggregateDominantCount ?? pin.aggregate_dominant_count,
+		promotion_score: pin.promotionScore ?? pin.promotion_score,
+		sign_scale: pin.signScale ?? pin.sign_scale,
+		pin_metadata: pin.pinMetadata ?? pin.pin_metadata,
+		extraProperties: mediaProps.extraProperties,
+	});
+};
+
+const ensureHighlightedShop = (features = [], shops = []) => {
+	const highlightedId =
+		props.highlightedShopId != null
+			? normalizeMapPinId(props.highlightedShopId)
+			: null;
+	if (!highlightedId) return features;
+	const shop =
+		shops.find((entry) => normalizeMapPinId(entry?.id) === highlightedId) ||
+		shopStore.getShopById?.(highlightedId);
+	const feature = pinFeatureFromShop(shop);
+	if (!feature) return features;
+
+	const next = [...features];
+	const idx = next.findIndex(
+		(entry) => String(entry?.properties?.id ?? "") === highlightedId,
+	);
+	if (idx >= 0) {
+		next[idx] = feature;
+	} else {
+		next.unshift(feature);
+	}
+	return next;
+};
+
+const mergeFeaturesById = (baseFeatures = [], overlayFeatures = []) => {
+	const merged = new Map();
+	for (const feature of baseFeatures) {
+		const id = normalizeMapPinId(feature?.properties?.id);
+		if (!id) continue;
+		merged.set(id, feature);
+	}
+	for (const feature of overlayFeatures) {
+		const id = normalizeMapPinId(feature?.properties?.id);
+		if (!id) continue;
+		if (!merged.has(id)) {
+			merged.set(id, feature);
+			continue;
+		}
+		const prev = merged.get(id);
+		merged.set(id, {
+			...prev,
+			...feature,
+			geometry: feature?.geometry || prev?.geometry,
+			properties: {
+				...(prev?.properties || {}),
+				...(feature?.properties || {}),
+			},
+		});
+	}
+	return Array.from(merged.values());
+};
+
+const maybeEnsureHighlightedShop = ({
+	currentZoom,
+	shops = [],
+	features = [],
+}) =>
+	currentZoom >= ZONE_AGGREGATE_MAX_ZOOM
+		? ensureHighlightedShop(features, shops)
+		: features;
+
+const projectMapCoordinate = (coordinates) => {
+	if (!map.value || !Array.isArray(coordinates) || coordinates.length < 2) {
+		return null;
+	}
+	try {
+		return map.value.project(coordinates);
+	} catch {
+		return null;
+	}
+};
+
+const decorateAggregateFeatures = (features = [], fallbackLevel = "zone") =>
+	features.map((feature) => {
+		const aggregateLevel = String(
+			feature?.properties?.aggregate_level || fallbackLevel,
+		)
+			.trim()
+			.toLowerCase();
+		const defaultScale =
+			aggregateLevel === THAILAND_AGGREGATE_LEVEL
+				? 2.45
+				: aggregateLevel === "province"
+					? 1.9
+					: 1.24;
+		return {
+			...feature,
+			properties: {
+				...(feature?.properties || {}),
+				pin_type: "giant",
+				pin_state: aggregateLevel,
+				aggregate_level: aggregateLevel,
+				is_event: true,
+				sign_scale:
+					Number(feature?.properties?.sign_scale ?? defaultScale) ||
+					defaultScale,
+			},
+		};
+	});
+
+const buildProvinceFallbackFeatures = (features = []) => {
+	if (!Array.isArray(features) || features.length === 0) return [];
+	return decorateAggregateFeatures(
+		buildMapPinPresentation({
+			features,
+			projector: projectMapCoordinate,
+			zoom: 0,
+		}).features,
+		"province",
+	);
+};
+
+const buildViewportAggregateFeatures = ({ currentZoom, features = [] }) => {
+	if (!Array.isArray(features) || features.length === 0) return [];
+	return decorateAggregateFeatures(
+		buildMapPinPresentation({
+			features,
+			projector: projectMapCoordinate,
+			zoom: currentZoom,
+		}).features,
+		"zone",
+	);
+};
+
+const buildThailandAggregateFeatures = (features = []) => {
+	if (!Array.isArray(features) || features.length === 0) return [];
+	let weightedLatSum = 0;
+	let weightedLngSum = 0;
+	let weightSum = 0;
+	let shopCount = 0;
+	let dominantCount = 0;
+	let visibilityScore = 0;
+	let hasLive = false;
+
+	for (const feature of features) {
+		const lng = Number(feature?.geometry?.coordinates?.[0]);
+		const lat = Number(feature?.geometry?.coordinates?.[1]);
+		if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+		const bucketWeight =
+			Number(feature?.properties?.aggregate_shop_count ?? 1) || 1;
+		weightedLatSum += lat * bucketWeight;
+		weightedLngSum += lng * bucketWeight;
+		weightSum += bucketWeight;
+		shopCount += bucketWeight;
+		dominantCount +=
+			Number(feature?.properties?.aggregate_dominant_count ?? 0) || 0;
+		visibilityScore += Number(feature?.properties?.visibility_score ?? 0) || 0;
+		hasLive =
+			hasLive ||
+			String(feature?.properties?.pin_state || "")
+				.trim()
+				.toLowerCase() === "live";
+	}
+
+	if (!weightSum) return [];
+	const label = locale.value === "th" ? "ประเทศไทย" : "Thailand";
+	const formattedCount = shopCount.toLocaleString(
+		locale.value === "th" ? "th-TH" : "en-US",
+	);
+	const feature = toPinFeature({
+		id: "country:thailand",
+		name: label,
+		lat: weightedLatSum / weightSum,
+		lng: weightedLngSum / weightSum,
+		pin_type: "giant",
+		pin_state: THAILAND_AGGREGATE_LEVEL,
+		status: hasLive ? "LIVE" : "COUNTRY",
+		is_event: true,
+		visibility_score: visibilityScore,
+		aggregate_level: THAILAND_AGGREGATE_LEVEL,
+		aggregate_shop_count: shopCount,
+		aggregate_dominant_count: dominantCount,
+		sign_scale: 2.45,
+		pin_metadata: {
+			aggregate: true,
+			aggregate_level: THAILAND_AGGREGATE_LEVEL,
+		},
+		extraProperties: {
+			neon_line1: label,
+			neon_line2: `${formattedCount} venues`,
+			neon_subline: `${formattedCount} venues`,
+		},
+	});
+	return feature
+		? decorateAggregateFeatures([feature], THAILAND_AGGREGATE_LEVEL)
+		: [];
+};
+
+const reconcileFeatureStatesWithShops = (features = []) =>
+	features.map((feature) => {
+		const id = normalizeMapPinId(feature?.properties?.id);
+		if (!id) return feature;
+		const shop = shopsByIdRef.value.get(id) || shopStore.getShopById?.(id);
+		if (!shop) return feature;
+
+		const pinType = String(
+			feature?.properties?.pin_type ?? shop?.pin_type ?? "",
+		).toLowerCase();
+		if (pinType === "giant" || pinType === "event") {
+			return {
+				...feature,
+				properties: {
+					...(feature?.properties || {}),
+					pin_state: "event",
+					status: "LIVE",
+					is_event: true,
+				},
+			};
+		}
+
+		const scheduleStatus = resolveShopScheduleStatus(shop);
+		const schedulePinState = pinStateFromStatus(scheduleStatus);
+		return {
+			...feature,
+			properties: {
+				...(feature?.properties || {}),
+				pin_state: schedulePinState,
+				status: scheduleStatus,
+				is_live: scheduleStatus === "LIVE",
+			},
+		};
+	});
+
+const buildFallbackFeaturesFromShopsInBounds = ({
+	bounds,
+	shops = [],
+	allowedIds = allowedIdsRef.value,
+}) => {
+	if (!shops.length) return [];
+	const south = bounds.getSouth();
+	const west = bounds.getWest();
+	const north = bounds.getNorth();
+	const east = bounds.getEast();
+	const limit = 5000;
+	const features = [];
+
+	for (const shop of shops) {
+		if (!isAllowedMapPinId(shop?.id, allowedIds)) continue;
+		const lat = Number(shop?.lat ?? shop?.latitude);
+		const lng = Number(shop?.lng ?? shop?.longitude);
+		if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+		if (lat < south || lat > north || lng < west || lng > east) continue;
+
+		const feature = pinFeatureFromShop(shop);
+		if (!feature) continue;
+		features.push(feature);
+		if (features.length >= limit) break;
+	}
+
+	return features;
+};
+
+const applyFeaturesForRefresh = ({ seq, features = [] }) => {
+	if (seq !== pinsRefreshSeq) return;
+	if (!map.value) return;
+	const reconciled = reconcileFeatureStatesWithShops(features);
+	const laidOut = applyOrderedNeonLayout(reconciled, map.value);
+	const sourceData = {
+		type: "FeatureCollection",
+		features: laidOut,
+	};
+
+	if (isMapDebugLoggingEnabled()) {
+		const featuresWithNeon = laidOut.filter((f) => f?.properties?.neon_key);
+		mapDebugLog(
+			`[NeonDebug] applyFeatures called with ${laidOut.length} features, ${featuresWithNeon.length} have neon_key`,
+		);
+		if (featuresWithNeon.length > 0) {
+			mapDebugLog(
+				"[NeonDebug] Sample feature with neon:",
+				featuresWithNeon[0]?.properties,
+			);
+		}
+	}
+
+	applySourceData(PIN_SOURCE_ID, sourceData);
+	refreshSmartPulseTargets();
+};
+
+const buildProvinceModeFallback = ({
+	bounds,
+	currentZoom,
+	shops = [],
+	allowedIds = allowedIdsRef.value,
+}) => {
+	const cachedProvinceFeatures =
+		lastGoodProvinceAggregateFeatures.length > 0
+			? lastGoodProvinceAggregateFeatures
+			: buildProvinceFallbackFeatures(
+					lastGoodPinFeatures.length > 0
+						? lastGoodPinFeatures
+						: buildFallbackFeaturesFromShopsInBounds({
+								bounds,
+								shops,
+								allowedIds,
+							}),
+				);
+	return currentZoom < COUNTRY_AGGREGATE_MAX_ZOOM
+		? buildThailandAggregateFeatures(cachedProvinceFeatures)
+		: cachedProvinceFeatures;
+};
+
+const buildViewportDisplayFeatures = ({
+	currentZoom,
+	shops = [],
+	features = [],
+}) => {
+	if (!Array.isArray(features) || features.length === 0) return [];
+	return currentZoom < ZONE_AGGREGATE_MAX_ZOOM
+		? buildViewportAggregateFeatures({ currentZoom, features })
+		: maybeEnsureHighlightedShop({ currentZoom, shops, features });
+};
+
+const buildViewportFallbackFeatures = ({
+	bounds,
+	currentZoom,
+	shops = [],
+	allowedIds = allowedIdsRef.value,
+	sourceFeatures = lastGoodPinFeatures,
+}) => {
+	const localFallback = buildFallbackFeaturesFromShopsInBounds({
+		bounds,
+		shops,
+		allowedIds,
+	});
+	return localFallback.length
+		? buildViewportDisplayFeatures({
+				currentZoom,
+				shops,
+				features: localFallback,
+			})
+		: buildViewportDisplayFeatures({
+				currentZoom,
+				shops,
+				features: sourceFeatures,
+			});
+};
+
+const createRefreshPinsContext = (seq) => ({
+	seq,
+	bounds: map.value.getBounds(),
+	currentZoom: map.value.getZoom(),
+	shops: Array.isArray(props.shops) ? props.shops : [],
+	allowedIds: allowedIdsRef.value,
+});
+
+const refreshPins = async ({ localOnly = false } = {}) => {
 	if (!isMapOperational()) return;
 	if (props.isGiantPinView) return;
 
 	const seq = ++pinsRefreshSeq;
-	const b = map.value.getBounds();
-	const currentZoom = map.value.getZoom();
-	const shops = Array.isArray(props.shops) ? props.shops : [];
-	const allowedIds = allowedIdsRef.value;
-	const normalizeId = (value) => String(value ?? "").trim();
-
-	const isAllowedId = (id) => {
-		const idStr = normalizeId(id);
-		if (!idStr) return false;
-		if (allowedIds === null) return true;
-		return allowedIds.has(idStr);
-	};
-	const isCoinCollectedForId = (id) => {
-		const collected = shopStore.collectedCoins;
-		if (!collected?.has) return false;
-		if (collected.has(id)) return true;
-		const idStr = String(id ?? "").trim();
-		if (idStr && collected.has(idStr)) return true;
-		const idNum = Number(idStr);
-		if (Number.isFinite(idNum) && collected.has(idNum)) return true;
-		return false;
-	};
-	const resolvePinHasCoin = (id, rawHasCoin) => {
-		const collected = isCoinCollectedForId(id);
-		if (rawHasCoin === null || rawHasCoin === undefined) {
-			return !collected;
-		}
-		if (typeof rawHasCoin === "boolean") {
-			return rawHasCoin && !collected;
-		}
-		const raw = String(rawHasCoin).trim().toLowerCase();
-		if (raw === "true" || raw === "1") return !collected;
-		if (raw === "false" || raw === "0") return false;
-		return !collected;
-	};
-
-	const resolveFeaturePinState = ({
-		pin_state,
-		pin_type,
-		is_event,
-		status,
-	}) => {
-		const aggregateStates = new Set([
-			THAILAND_AGGREGATE_LEVEL,
-			"province",
-			"zone",
-		]);
-		const pinStateRaw = String(pin_state || "")
-			.trim()
-			.toLowerCase();
-		const pinTypeRaw = String(pin_type || "")
-			.trim()
-			.toLowerCase();
-		const statusRaw = String(status || "")
-			.trim()
-			.toLowerCase();
-		if (aggregateStates.has(pinStateRaw)) return pinStateRaw;
-		const eventLike =
-			Boolean(is_event) ||
-			pinStateRaw === "event" ||
-			pinTypeRaw === "event" ||
-			pinTypeRaw === "giant";
-		if (eventLike) return "event";
-		// Marker color should follow schedule/manual shop status, not transient hotspot flags.
-		const liveLike = pinStateRaw === "live" || statusRaw === "live";
-		if (liveLike) return "live";
-		if (
-			pinStateRaw === "open" ||
-			statusRaw === "open" ||
-			statusRaw === "active"
-		) {
-			return "open";
-		}
-		if (pinStateRaw === "tonight" || statusRaw === "tonight") {
-			return "tonight";
-		}
-		return "off";
-	};
-
-	const pinStateFromStatus = (statusValue) => {
-		const s = String(statusValue || "")
-			.trim()
-			.toUpperCase();
-		if (s === "LIVE") return "live";
-		if (s === "ACTIVE" || s === "OPEN") return "open";
-		if (s === "TONIGHT") return "tonight";
-		return "off";
-	};
-
-	const resolveShopScheduleStatus = (shop) => {
-		if (!shop || typeof shop !== "object") return "OFF";
-		const now = new Date(nowTick.value);
-		const manualStatus = String(
-			shop.originalStatus ?? shop.statusRaw ?? shop.status ?? "",
-		)
-			.trim()
-			.toUpperCase();
-		try {
-			return String(
-				calculateShopStatus({ ...shop, originalStatus: manualStatus }, now),
-			).toUpperCase();
-		} catch {
-			return manualStatus || "OFF";
-		}
-	};
-
-	const toPinFeature = ({
-		id,
-		name,
-		lat,
-		lng,
-		pin_type,
-		pin_state,
-		verified,
-		glow,
-		boost,
-		giant,
-		has_coin,
-		visibility_score,
-		image,
-		status,
-		is_event,
-		is_live,
-		shop, // Full shop object for neon sign generation
-		province,
-		district,
-		aggregate_level,
-		aggregate_shop_count,
-		aggregate_dominant_count,
-		promotion_score,
-		sign_scale,
-		pin_metadata,
-		extraProperties = {},
-	}) => {
-		const latNum = Number(lat);
-		const lngNum = Number(lng);
-		if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) return null;
-		if (latNum < -90 || latNum > 90 || lngNum < -180 || lngNum > 180)
-			return null;
-
-		const idStr = String(id ?? "").trim();
-		if (!idStr) return null;
-		const normalizedPinState = resolveFeaturePinState({
-			pin_state,
-			pin_type,
-			is_event,
-			is_live,
-			status,
-		});
-		const normalizedPinType =
-			String(pin_type || "")
-				.trim()
-				.toLowerCase() || "normal";
-
-		// Generate neon sign properties if shop object is provided
-		const neonProps = shop
-			? toNeonFeatureProperties(shop, {
-					selectedShopId: props.highlightedShopId,
-					experimentId: "stable",
-					signatureVersion: "2-stable",
-					clientVersion: import.meta.env.VITE_APP_VERSION || "unknown",
-				})
-			: {};
-
-		return {
-			type: "Feature",
-			geometry: { type: "Point", coordinates: [lngNum, latNum] },
-			properties: {
-				id: idStr,
-				name: name || "",
-				pin_type: normalizedPinType,
-				pin_state: normalizedPinState,
-				verified: Boolean(verified),
-				glow: Boolean(glow),
-				boost: Boolean(boost),
-				giant: Boolean(giant),
-				has_coin: Boolean(has_coin),
-				visibility_score: Number(visibility_score ?? 0) || 0,
-				is_event: normalizedPinState === "event",
-				is_live:
-					normalizedPinState === "live" || liveVenueRefs.value.has(idStr),
-				status:
-					String(status || "")
-						.trim()
-						.toUpperCase() ||
-					{
-						country: "COUNTRY",
-						province: "PROVINCE",
-						zone: "ZONE",
-						live: "LIVE",
-						open: "ACTIVE",
-						tonight: "TONIGHT",
-					}[normalizedPinState] ||
-					"OFF",
-				vibe_score: Number(visibility_score ?? 0) || 0,
-				image: image || null,
-				province: province ?? shop?.province ?? shop?.Province ?? null,
-				district: district ?? shop?.district ?? shop?.Zone ?? null,
-				aggregate_level: aggregate_level || null,
-				aggregate_shop_count: Number(aggregate_shop_count ?? 0) || 0,
-				aggregate_dominant_count: Number(aggregate_dominant_count ?? 0) || 0,
-				promotion_score: Number(promotion_score ?? 0) || 0,
-				sign_scale: Number(sign_scale ?? 1) || 1,
-				pin_metadata: pin_metadata ?? null,
-				// Add neon sign properties
-				...neonProps,
-				...extraProperties,
-			},
-		};
-	};
-
-	const pinFeatureFromShop = (shop) => {
-		if (!shop) return null;
-		const pinTypeRaw = String(shop.pin_type || "").toLowerCase();
-		const isGiant =
-			pinTypeRaw === "giant" ||
-			shop.is_giant_active === true ||
-			shop.isGiantPin === true ||
-			shop.giantActive === true;
-		const scheduleStatus = resolveShopScheduleStatus(shop);
-		const schedulePinState = pinStateFromStatus(scheduleStatus);
-
-		return toPinFeature({
-			id: shop.id,
-			name: shop.name,
-			lat: shop.lat ?? shop.latitude,
-			lng: shop.lng ?? shop.longitude,
-			pin_type: isGiant ? "giant" : pinTypeRaw || "normal",
-			pin_state: isGiant ? "event" : schedulePinState,
-			verified: shop.is_verified || shop.verifiedActive || shop.verified_active,
-			glow: shop.is_glowing || shop.glowActive || shop.glow_active,
-			boost: shop.is_boost_active || shop.boostActive || shop.boost_active,
-			giant: isGiant || shop.giant_active,
-			has_coin: resolvePinHasCoin(shop.id, shop.has_coin ?? shop.hasCoin),
-			visibility_score: shop.visibility_score ?? shop.visibilityScore,
-			image: shop.Image_URL1 || shop.coverImage || shop.image_urls?.[0],
-			status: scheduleStatus,
-			is_event: isGiant || Boolean(shop.is_event),
-			is_live: scheduleStatus === "LIVE",
-			shop, // Pass full shop object for neon sign generation
-			province: shop.province ?? shop.Province,
-			district: shop.district ?? shop.Zone,
-		});
-	};
-
-	const pinFeatureFromRpc = (p) => {
-		if (!p) return null;
-		return toPinFeature({
-			id: p.id,
-			name: p.name,
-			lat: p.lat,
-			lng: p.lng,
-			pin_type: p.pinType || p.pin_type,
-			pin_state: p.pinState || p.pin_state,
-			verified: p.verifiedActive,
-			glow: p.glowActive,
-			boost: p.boostActive,
-			giant: p.giantActive,
-			has_coin: resolvePinHasCoin(p.id, p.hasCoin ?? p.has_coin),
-			visibility_score: p.visibilityScore,
-			image: p.coverImage,
-			status: p.status,
-			is_event: p.isEvent || p.is_event,
-			is_live: p.isLive || p.is_live,
-			province: p.province,
-			district: p.district ?? p.zone,
-			aggregate_level: p.aggregateLevel || p.aggregate_level,
-			aggregate_shop_count: p.aggregateShopCount ?? p.aggregate_shop_count,
-			aggregate_dominant_count:
-				p.aggregateDominantCount ?? p.aggregate_dominant_count,
-			promotion_score: p.promotionScore ?? p.promotion_score,
-			sign_scale: p.signScale ?? p.sign_scale,
-			pin_metadata: p.pinMetadata ?? p.pin_metadata,
-		});
-	};
-
-	const ensureHighlightedShop = (features) => {
-		const highlightedId =
-			props.highlightedShopId != null
-				? normalizeId(props.highlightedShopId)
-				: null;
-		if (!highlightedId) return features;
-		const shop =
-			shops.find((s) => normalizeId(s?.id) === highlightedId) ||
-			shopStore.getShopById?.(highlightedId);
-		const feature = pinFeatureFromShop(shop);
-		if (!feature) return features;
-
-		const next = [...features];
-		const idx = next.findIndex(
-			(f) => String(f?.properties?.id ?? "") === highlightedId,
-		);
-		if (idx >= 0) {
-			next[idx] = feature;
-		} else {
-			next.unshift(feature);
-		}
-		return next;
-	};
-
-	const mergeFeaturesById = (baseFeatures = [], overlayFeatures = []) => {
-		const merged = new Map();
-		for (const feature of baseFeatures) {
-			const id = String(feature?.properties?.id ?? "").trim();
-			if (!id) continue;
-			merged.set(id, feature);
-		}
-		for (const feature of overlayFeatures) {
-			const id = String(feature?.properties?.id ?? "").trim();
-			if (!id) continue;
-			if (!merged.has(id)) {
-				merged.set(id, feature);
-				continue;
-			}
-			const prev = merged.get(id);
-			merged.set(id, {
-				...prev,
-				...feature,
-				geometry: feature?.geometry || prev?.geometry,
-				properties: {
-					...(prev?.properties || {}),
-					...(feature?.properties || {}),
-				},
-			});
-		}
-		return Array.from(merged.values());
-	};
-
-	const maybeEnsureHighlightedShop = (features = []) =>
-		currentZoom >= ZONE_AGGREGATE_MAX_ZOOM
-			? ensureHighlightedShop(features)
-			: features;
-
-	const projectMapCoordinate = (coordinates) => {
-		if (!map.value || !Array.isArray(coordinates) || coordinates.length < 2) {
-			return null;
-		}
-		try {
-			return map.value.project(coordinates);
-		} catch {
-			return null;
-		}
-	};
-
-	const decorateAggregateFeatures = (features = [], fallbackLevel = "zone") =>
-		features.map((feature) => {
-			const aggregateLevel = String(
-				feature?.properties?.aggregate_level || fallbackLevel,
-			)
-				.trim()
-				.toLowerCase();
-			const defaultScale =
-				aggregateLevel === THAILAND_AGGREGATE_LEVEL
-					? 2.45
-					: aggregateLevel === "province"
-						? 1.9
-						: 1.24;
-			return {
-				...feature,
-				properties: {
-					...(feature?.properties || {}),
-					pin_type: "giant",
-					pin_state: aggregateLevel,
-					aggregate_level: aggregateLevel,
-					is_event: true,
-					sign_scale:
-						Number(feature?.properties?.sign_scale ?? defaultScale) ||
-						defaultScale,
-				},
-			};
-		});
-
-	const buildProvinceFallbackFeatures = (features = []) => {
-		if (!Array.isArray(features) || features.length === 0) return [];
-		return decorateAggregateFeatures(
-			buildMapPinPresentation({
-				features,
-				projector: projectMapCoordinate,
-				zoom: 0,
-			}).features,
-			"province",
-		);
-	};
-
-	const buildViewportAggregateFeatures = (features = []) => {
-		if (!Array.isArray(features) || features.length === 0) return [];
-		return decorateAggregateFeatures(
-			buildMapPinPresentation({
-				features,
-				projector: projectMapCoordinate,
-				zoom: currentZoom,
-			}).features,
-			"zone",
-		);
-	};
-
-	const buildThailandAggregateFeatures = (features = []) => {
-		if (!Array.isArray(features) || features.length === 0) return [];
-		let weightedLatSum = 0;
-		let weightedLngSum = 0;
-		let weightSum = 0;
-		let shopCount = 0;
-		let dominantCount = 0;
-		let visibilityScore = 0;
-		let hasLive = false;
-
-		for (const feature of features) {
-			const lng = Number(feature?.geometry?.coordinates?.[0]);
-			const lat = Number(feature?.geometry?.coordinates?.[1]);
-			if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-			const bucketWeight =
-				Number(feature?.properties?.aggregate_shop_count ?? 1) || 1;
-			weightedLatSum += lat * bucketWeight;
-			weightedLngSum += lng * bucketWeight;
-			weightSum += bucketWeight;
-			shopCount += bucketWeight;
-			dominantCount +=
-				Number(feature?.properties?.aggregate_dominant_count ?? 0) || 0;
-			visibilityScore +=
-				Number(feature?.properties?.visibility_score ?? 0) || 0;
-			hasLive =
-				hasLive ||
-				String(feature?.properties?.pin_state || "")
-					.trim()
-					.toLowerCase() === "live";
-		}
-
-		if (!weightSum) return [];
-		const label = locale.value === "th" ? "ประเทศไทย" : "Thailand";
-		const formattedCount = shopCount.toLocaleString(
-			locale.value === "th" ? "th-TH" : "en-US",
-		);
-		const feature = toPinFeature({
-			id: "country:thailand",
-			name: label,
-			lat: weightedLatSum / weightSum,
-			lng: weightedLngSum / weightSum,
-			pin_type: "giant",
-			pin_state: THAILAND_AGGREGATE_LEVEL,
-			status: hasLive ? "LIVE" : "COUNTRY",
-			is_event: true,
-			visibility_score: visibilityScore,
-			aggregate_level: THAILAND_AGGREGATE_LEVEL,
-			aggregate_shop_count: shopCount,
-			aggregate_dominant_count: dominantCount,
-			sign_scale: 2.45,
-			pin_metadata: {
-				aggregate: true,
-				aggregate_level: THAILAND_AGGREGATE_LEVEL,
-			},
-			extraProperties: {
-				neon_line1: label,
-				neon_line2: `${formattedCount} venues`,
-				neon_subline: `${formattedCount} venues`,
-			},
-		});
-		return feature
-			? decorateAggregateFeatures([feature], THAILAND_AGGREGATE_LEVEL)
-			: [];
-	};
-
-	const reconcileFeatureStatesWithShops = (features = []) =>
-		features.map((feature) => {
-			const id = String(feature?.properties?.id ?? "").trim();
-			if (!id) return feature;
-			const shop = shopsByIdRef.value.get(id) || shopStore.getShopById?.(id);
-			if (!shop) return feature;
-
-			const pinType = String(
-				feature?.properties?.pin_type ?? shop?.pin_type ?? "",
-			).toLowerCase();
-			if (pinType === "giant" || pinType === "event") {
-				return {
-					...feature,
-					properties: {
-						...(feature?.properties || {}),
-						pin_state: "event",
-						status: "LIVE",
-						is_event: true,
-					},
-				};
-			}
-
-			const scheduleStatus = resolveShopScheduleStatus(shop);
-			const schedulePinState = pinStateFromStatus(scheduleStatus);
-			return {
-				...feature,
-				properties: {
-					...(feature?.properties || {}),
-					pin_state: schedulePinState,
-					status: scheduleStatus,
-					is_live: scheduleStatus === "LIVE",
-				},
-			};
-		});
-
-	const buildFallbackFeaturesFromShopsInBounds = () => {
-		if (!shops?.length) return [];
-		const south = b.getSouth();
-		const west = b.getWest();
-		const north = b.getNorth();
-		const east = b.getEast();
-
-		const limit = 5000;
-
-		const features = [];
-		for (const shop of shops) {
-			if (!isAllowedId(shop?.id)) continue;
-
-			const lat = Number(shop?.lat ?? shop?.latitude);
-			const lng = Number(shop?.lng ?? shop?.longitude);
-			if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-			if (lat < south || lat > north || lng < west || lng > east) continue;
-
-			const feature = pinFeatureFromShop(shop);
-			if (!feature) continue;
-			features.push(feature);
-			if (features.length >= limit) break;
-		}
-		return features;
-	};
-
-	const applyFeatures = (features) => {
-		if (seq !== pinsRefreshSeq) return;
-		if (!map.value) return;
-		const reconciled = reconcileFeatureStatesWithShops(features);
-		const laidOut = applyOrderedNeonLayout(reconciled, map.value);
-		const sourceData = {
-			type: "FeatureCollection",
-			features: laidOut,
-		};
-
-		// Debug: Log feature application
-		if (isMapDebugLoggingEnabled()) {
-			const featuresWithNeon = laidOut.filter((f) => f?.properties?.neon_key);
-			mapDebugLog(
-				`[NeonDebug] applyFeatures called with ${laidOut.length} features, ${featuresWithNeon.length} have neon_key`,
-			);
-			if (featuresWithNeon.length > 0) {
-				mapDebugLog(
-					"[NeonDebug] Sample feature with neon:",
-					featuresWithNeon[0]?.properties,
-				);
-			}
-		}
-
-		applySourceData(PIN_SOURCE_ID, sourceData);
-
-		// Add neon sign layers after source data is applied
-		if (map.value.isStyleLoaded?.()) {
-			addNeonSignLayers(PIN_SOURCE_ID, sourceData);
-		}
-
-		refreshSmartPulseTargets();
-	};
+	const refreshState = createRefreshPinsContext(seq);
+	const { bounds, currentZoom, shops, allowedIds } = refreshState;
 
 	if (IS_E2E) {
-		const fallback = maybeEnsureHighlightedShop(
-			buildFallbackFeaturesFromShopsInBounds(),
-		);
-		applyFeatures(fallback);
+		const fallback = maybeEnsureHighlightedShop({
+			currentZoom,
+			shops,
+			features: buildFallbackFeaturesFromShopsInBounds({
+				bounds,
+				shops,
+				allowedIds,
+			}),
+		});
+		applyFeaturesForRefresh({ seq, features: fallback });
 		return;
 	}
 
@@ -2360,24 +2467,13 @@ const refreshPins = async () => {
 	pinsAbortController = new AbortController();
 	const { signal } = pinsAbortController;
 
-	const buildProvinceModeFallback = () => {
-		const cachedProvinceFeatures =
-			lastGoodProvinceAggregateFeatures.length > 0
-				? lastGoodProvinceAggregateFeatures
-				: buildProvinceFallbackFeatures(
-						lastGoodPinFeatures.length > 0
-							? lastGoodPinFeatures
-							: buildFallbackFeaturesFromShopsInBounds(),
-					);
-		return currentZoom < COUNTRY_AGGREGATE_MAX_ZOOM
-			? buildThailandAggregateFeatures(cachedProvinceFeatures)
-			: cachedProvinceFeatures;
-	};
-
 	if (currentZoom < PROVINCE_AGGREGATE_MAX_ZOOM) {
-		const immediateProvinceFallback = buildProvinceModeFallback();
+		const immediateProvinceFallback = buildProvinceModeFallback(refreshState);
 		if (immediateProvinceFallback.length > 0) {
-			applyFeatures(immediateProvinceFallback);
+			applyFeaturesForRefresh({
+				seq,
+				features: immediateProvinceFallback,
+			});
 		}
 
 		try {
@@ -2402,46 +2498,52 @@ const refreshPins = async () => {
 					: provinceFeatures.length > 0
 						? provinceFeatures
 						: lastGoodProvinceAggregateFeatures;
-			applyFeatures(lowZoomFeatures);
+			applyFeaturesForRefresh({ seq, features: lowZoomFeatures });
 		} catch (err) {
 			if (isExpectedAbortError(err, { signal })) return;
 			mapDebugWarn(
 				"Province aggregate RPC failed, using cached aggregate fallback:",
 				err?.message || err,
 			);
-			const fallback = buildProvinceModeFallback();
-			applyFeatures(fallback);
+			applyFeaturesForRefresh({
+				seq,
+				features: buildProvinceModeFallback(refreshState),
+			});
 		}
 		return;
 	}
 
-	const buildViewportDisplayFeatures = (features = []) => {
-		if (!Array.isArray(features) || features.length === 0) return [];
-		return currentZoom < ZONE_AGGREGATE_MAX_ZOOM
-			? buildViewportAggregateFeatures(features)
-			: maybeEnsureHighlightedShop(features);
-	};
-
-	if (Date.now() < mapPinsRpcDisabledUntil) {
-		const localFallback = buildFallbackFeaturesFromShopsInBounds();
-		const fallback = localFallback.length
-			? buildViewportDisplayFeatures(localFallback)
-			: buildViewportDisplayFeatures(lastGoodPinFeatures);
-		applyFeatures(fallback);
+	if (localOnly) {
+		applyFeaturesForRefresh({
+			seq,
+			features: buildViewportFallbackFeatures(refreshState),
+		});
 		return;
 	}
 
-	// ★ Instant-pins: show fallback data immediately so the map is never empty
-	// while waiting for the RPC. If we have cached RPC data, use it; otherwise
-	// build from the shops prop. RPC data will upgrade these when it arrives.
-	const localFallbackFeatures = buildFallbackFeaturesFromShopsInBounds();
-	const immediateFallback = buildViewportDisplayFeatures(
-		lastGoodPinFeatures.length > 0
-			? lastGoodPinFeatures
-			: localFallbackFeatures,
-	);
+	if (Date.now() < mapPinsRpcDisabledUntil) {
+		applyFeaturesForRefresh({
+			seq,
+			features: buildViewportFallbackFeatures(refreshState),
+		});
+		return;
+	}
+
+	const localFallbackFeatures = buildFallbackFeaturesFromShopsInBounds({
+		bounds,
+		shops,
+		allowedIds,
+	});
+	const immediateFallback = buildViewportDisplayFeatures({
+		currentZoom,
+		shops,
+		features:
+			lastGoodPinFeatures.length > 0
+				? lastGoodPinFeatures
+				: localFallbackFeatures,
+	});
 	if (immediateFallback.length > 0) {
-		applyFeatures(immediateFallback);
+		applyFeaturesForRefresh({ seq, features: immediateFallback });
 	}
 
 	if (isFrontendOnlyDevMode()) {
@@ -2453,10 +2555,10 @@ const refreshPins = async () => {
 
 	try {
 		const pins = await getMapPins({
-			p_min_lat: b.getSouth(),
-			p_min_lng: b.getWest(),
-			p_max_lat: b.getNorth(),
-			p_max_lng: b.getEast(),
+			p_min_lat: bounds.getSouth(),
+			p_min_lng: bounds.getWest(),
+			p_max_lat: bounds.getNorth(),
+			p_max_lng: bounds.getEast(),
 			p_zoom: currentZoom,
 			signal,
 		});
@@ -2464,7 +2566,7 @@ const refreshPins = async () => {
 		if (seq !== pinsRefreshSeq) return;
 
 		const rpcFeatures = (pins || [])
-			.filter((p) => isAllowedId(p?.id))
+			.filter((pin) => isAllowedMapPinId(pin?.id, allowedIds))
 			.map(pinFeatureFromRpc)
 			.filter(Boolean);
 		const mergedFeatures = mergeFeaturesById(
@@ -2475,11 +2577,19 @@ const refreshPins = async () => {
 			lastGoodPinFeatures = mergedFeatures;
 		}
 
-		let features = buildViewportDisplayFeatures(mergedFeatures);
+		let features = buildViewportDisplayFeatures({
+			currentZoom,
+			shops,
+			features: mergedFeatures,
+		});
 		if (!features.length && lastGoodPinFeatures.length) {
-			features = buildViewportDisplayFeatures(lastGoodPinFeatures);
+			features = buildViewportDisplayFeatures({
+				currentZoom,
+				shops,
+				features: lastGoodPinFeatures,
+			});
 		}
-		applyFeatures(features);
+		applyFeaturesForRefresh({ seq, features });
 	} catch (err) {
 		if (isExpectedAbortError(err, { signal })) return;
 		const statusCode = Number(err?.status || err?.code || 0);
@@ -2489,17 +2599,14 @@ const refreshPins = async () => {
 		if (isServerError) {
 			mapPinsRpcDisabledUntil = Date.now() + 60_000;
 		}
-		// On failure, fallback data is already displayed — only log the error
 		mapDebugWarn(
 			"Map pins RPC failed, using displayed fallback:",
 			err?.message || err,
 		);
-		// Re-apply with latest fallback to ensure consistency
-		const localFallback = buildFallbackFeaturesFromShopsInBounds();
-		const fallback = localFallback.length
-			? buildViewportDisplayFeatures(localFallback)
-			: buildViewportDisplayFeatures(lastGoodPinFeatures);
-		applyFeatures(fallback);
+		applyFeaturesForRefresh({
+			seq,
+			features: buildViewportFallbackFeatures(refreshState),
+		});
 	}
 };
 
@@ -2595,7 +2702,7 @@ const updatePopupUi = (distance, duration) => {
 					? `${Math.round(distance)} m`
 					: `${(distance / 1000).toFixed(1)} km`;
 			const timeTxt = `${Math.round(duration / 60)} min`;
-			distLabel.innerHTML = `📍 ${distTxt} (${timeTxt})`;
+			distLabel.textContent = `📍 ${distTxt} (${timeTxt})`;
 		}
 	}
 };
@@ -2775,7 +2882,7 @@ watch(
 			if (!vibeMarkersMap.has(effect.id)) {
 				const el = document.createElement("div");
 				el.className = "vibe-float-marker";
-				el.innerHTML = effect.emoji;
+				el.textContent = String(effect.emoji || "");
 
 				const marker = new maplibregl.Marker({
 					element: el,
@@ -2824,18 +2931,16 @@ watch(
 			if (el) el.style.opacity = shouldHide ? "0" : "1";
 		});
 
-		// Toggle MapLibre Layers (Clusters & Points)
+		// Toggle MapLibre layers that are active in the non-cluster pin mode.
 		if (map.value && isMapReady.value) {
 			const opacity = shouldHide ? 0 : 1;
 			const textOpacity = shouldHide ? 0 : 1;
 
 			const layers = [
-				CLUSTER_LAYER_ID,
 				PIN_LAYER_ID,
 				SELECTED_PIN_LAYER_ID,
 				"pin-coins",
 				"pin-coins-fallback",
-				CLUSTER_COUNT_LAYER_ID,
 				"pin-glow",
 				"pin-smart-pulse",
 				"giant-glow",
@@ -2994,21 +3099,25 @@ const setupMapLayers = async () => {
 				],
 				"icon-allow-overlap": true,
 				"icon-anchor": "bottom",
-				"text-field": ["get", "name"], // Show name for ALL pins
-				"text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
-				"text-offset": [0, 1.2],
-				"text-anchor": "top",
-				"text-size": [
-					"case",
-					["==", ["get", "aggregate_level"], THAILAND_AGGREGATE_LEVEL],
-					17,
-					["==", ["get", "aggregate_level"], "province"],
-					14,
-					["==", ["get", "aggregate_level"], "zone"],
-					12,
-					12,
-				],
-				"text-optional": true,
+				...(MAP_TEXT_LABELS_ENABLED
+					? {
+							"text-field": ["get", "name"],
+							"text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
+							"text-offset": [0, 1.2],
+							"text-anchor": "top",
+							"text-size": [
+								"case",
+								["==", ["get", "aggregate_level"], THAILAND_AGGREGATE_LEVEL],
+								17,
+								["==", ["get", "aggregate_level"], "province"],
+								14,
+								["==", ["get", "aggregate_level"], "zone"],
+								12,
+								12,
+							],
+							"text-optional": true,
+						}
+					: {}),
 			},
 			paint: {
 				"text-color": "#ffffff",
@@ -3151,8 +3260,6 @@ const setupMapLayers = async () => {
 	if (map.value.getLayer("giant-glow")) map.value.removeLayer("giant-glow");
 	if (map.value.getLayer("tap-ripples-layer"))
 		map.value.removeLayer("tap-ripples-layer");
-	if (map.value.getLayer("sentient-pulse-ring"))
-		map.value.removeLayer("sentient-pulse-ring");
 	if (map.value.getSource("tap-ripples")) map.value.removeSource("tap-ripples");
 
 	map.value.setPitch(pitch.value);
@@ -3225,11 +3332,9 @@ const setupMapLayers = async () => {
 		});
 	}
 
-	// 7. Initialize neon sign layers (will be populated when shop data is loaded)
-	// The layers are created here but sprites are generated on-demand in applyFeatures
+	// 7. Register neon sign layers once per style after the pin source exists.
 	if (map.value.isStyleLoaded?.()) {
-		// Neon sign layers will be added when shop data is first applied
-		// This ensures the PIN_SOURCE_ID exists before adding neon layers
+		addNeonSignLayers(PIN_SOURCE_ID);
 	}
 };
 
@@ -3336,10 +3441,9 @@ const webGLSupported = ref(true);
 const shouldShowMapLoadingSkeleton = computed(
 	() =>
 		mapInitRequested.value &&
-		!isMapUiReady.value &&
+		!isMapReady.value &&
 		!isTokenInvalid.value &&
 		webGLSupported.value &&
-		!devSafeMapPreviewMode.value &&
 		!maplessMode.value,
 );
 const mapA11yLabel = computed(() => {
@@ -3347,9 +3451,6 @@ const mapA11yLabel = computed(() => {
 		return tt("map.token_error.title", "Map unavailable");
 	if (!webGLSupported.value && !maplessMode.value) {
 		return tt("map.webgl_error.title", "Map unavailable");
-	}
-	if (devSafeMapPreviewMode.value) {
-		return tt("map.dev_preview.title", "Stable local preview mode");
 	}
 	if (maplessMode.value) return tt("map.mapless.unavailable", "List mode");
 	if (shouldShowMapLoadingSkeleton.value || showMapRecoveryHint.value) {
@@ -3384,11 +3485,6 @@ const queueMapResize = (force = false) => {
 let resizeObserver = null;
 onMounted(() => {
 	mapDebugLog("🗺️ Initializing MapLibre Core...");
-	syncLocalDevMapRendererMode();
-	if (devSafeMapPreviewMode.value) {
-		activateDevSafeMapPreview();
-		return;
-	}
 	initMapOnce();
 	if (!trafficRefreshInterval) {
 		trafficRefreshInterval = window.setInterval(() => {
@@ -3457,18 +3553,185 @@ const closeActivePopup = () => {
 	}
 	activePopup.value = null;
 	activePopupShopId.value = "";
+	popupSettleState.value = "idle";
 };
-const getPopupLiftOffset = () => {
-	if (typeof window === "undefined") return 64;
-	const isMobile = window.innerWidth < 768;
-	// NeonPinSign selected: tip(9px*1.28=11.5) + board(43px*1.28=55) = ~66.5px total
-	// ns__name center from board top ≈ 8px pad + 7.5px = ~15.5px * 1.28 = ~20px
-	// name Y from pin = 66.5 - 20 = ~46.5px → offset ≈ 47px so popup tip points at name
-	return isMobile ? 47 : 51;
+const POPUP_SAFE_BUFFER_PX = 16;
+const POPUP_AUTOPAN_BUFFER_PX = 18;
+const POPUP_SECOND_PASS_DELAY_MS = 140;
+let activeSelectionFlightSeq = 0;
+let popupRepairTimer = null;
+const clearPopupRepairTimer = () => {
+	if (popupRepairTimer) {
+		clearTimeout(popupRepairTimer);
+		popupRepairTimer = null;
+	}
+};
+const getPopupLiftOffset = (item) => {
+	const pinType = String(item?.pin_type || "")
+		.trim()
+		.toLowerCase();
+	if (
+		pinType === "giant" ||
+		item?.is_giant_active === true ||
+		item?.isGiantPin === true
+	) {
+		return 64;
+	}
+	if (pinType === "event") return 56;
+	if (String(item?.status || "").toUpperCase() === "LIVE" || item?.isLive) {
+		return 42;
+	}
+	if (item?.isPromoted === true || item?.boostActive === true) {
+		return 40;
+	}
+	return 36;
+};
+const getSelectionChromeBounds = (surface = "preview") => {
+	const mapInstance = map.value;
+	const mapHost = mapContainer.value || mapInstance?.getContainer?.();
+	const mapRect = mapHost?.getBoundingClientRect?.();
+	if (!mapRect) return null;
+	const headerRect = document
+		.querySelector(".smart-header")
+		?.getBoundingClientRect?.();
+	const searchRect = document
+		.querySelector('[data-testid="search-input"]')
+		?.getBoundingClientRect?.();
+	const bottomFeedRect = document
+		.querySelector('[data-testid="bottom-feed"]')
+		?.getBoundingClientRect?.();
+	const modalRect = document
+		.querySelector('[data-testid="vibe-modal"]')
+		?.getBoundingClientRect?.();
+
+	const chromeBottom = Math.max(
+		Math.round(mapRect.top + Number(props.uiTopOffset || 0)),
+		Math.round(headerRect?.bottom || 0),
+		Math.round(searchRect?.bottom || 0),
+	);
+	const previewBottom = Math.min(
+		Math.round(mapRect.bottom - Number(props.uiBottomOffset || 0)),
+		Math.round(bottomFeedRect?.top || mapRect.bottom),
+	);
+	const detailBottom = Math.min(
+		previewBottom,
+		Math.round(modalRect?.top || previewBottom),
+	);
+	const safeTop = Math.max(
+		Math.round(mapRect.top + POPUP_SAFE_BUFFER_PX),
+		chromeBottom + POPUP_SAFE_BUFFER_PX,
+	);
+	const safeBottom = Math.max(
+		safeTop + 120,
+		Math.min(
+			Math.round(mapRect.bottom - POPUP_SAFE_BUFFER_PX),
+			(surface === "detail" ? detailBottom : previewBottom) -
+				POPUP_SAFE_BUFFER_PX,
+		),
+	);
+	return {
+		mapRect,
+		safeTop,
+		safeBottom,
+	};
+};
+const getSelectionFlightGeometry = (surface = "preview") => {
+	const chromeBounds = getSelectionChromeBounds(surface);
+	if (!chromeBounds) return null;
+	const { mapRect, safeTop, safeBottom } = chromeBounds;
+	const containerHeight = mapRect.height;
+	const topPad = Math.max(0, Math.round(safeTop - mapRect.top));
+	const bottomPad = Math.max(0, Math.round(mapRect.bottom - safeBottom));
+	const usableHeight = Math.max(180, safeBottom - safeTop);
+	const targetPinViewportY =
+		safeTop + usableHeight * (surface === "detail" ? 0.5 : 0.7);
+	const targetPinContainerY = targetPinViewportY - mapRect.top;
+	const offsetY = Math.round(containerHeight / 2 - targetPinContainerY);
+	return {
+		topPad,
+		bottomPad,
+		offsetY,
+	};
+};
+const measurePopupOverflow = (popupEl, surface = "preview") => {
+	const chromeBounds = getSelectionChromeBounds(surface);
+	if (!chromeBounds) return null;
+	const popupRect = popupEl?.getBoundingClientRect?.();
+	if (!popupRect) return null;
+	return {
+		chromeBounds,
+		overflowTop: Math.ceil(chromeBounds.safeTop - popupRect.top),
+		overflowBottom: Math.ceil(popupRect.bottom - chromeBounds.safeBottom),
+	};
+};
+const applyPopupViewportClamp = (popupEl, overflowState) => {
+	if (!popupEl || !overflowState) return false;
+	const shiftY =
+		overflowState.overflowTop > 0
+			? overflowState.overflowTop + POPUP_SAFE_BUFFER_PX
+			: overflowState.overflowBottom > 0
+				? -(overflowState.overflowBottom + POPUP_SAFE_BUFFER_PX)
+				: 0;
+	if (!shiftY) return false;
+	popupEl.dataset.popupClampY = String(shiftY);
+	popupEl.style.marginTop = `${shiftY}px`;
+	return true;
+};
+const keepPopupAbovePin = (popup, item, { surface = "preview" } = {}) => {
+	const popupEl = popup?.getElement?.();
+	const mapInstance = map.value;
+	const mapHost = mapContainer.value || mapInstance?.getContainer?.();
+	if (!popupEl || !mapInstance || !mapHost) return null;
+
+	popupEl.style.zIndex = "6050";
+	popupEl.dataset.anchorPolicy = "above-pin";
+	popupEl.dataset.popupLift = String(getPopupLiftOffset(item));
+
+	const overflowState = measurePopupOverflow(popupEl, surface);
+	if (!overflowState) return null;
+	const { overflowTop, overflowBottom } = overflowState;
+
+	if (overflowTop <= 0 && overflowBottom <= 0) {
+		popupSettleState.value = "settled";
+		return {
+			corrected: false,
+			overflowTop,
+			overflowBottom,
+		};
+	}
+	if (typeof mapInstance.panBy !== "function") {
+		return {
+			corrected: false,
+			overflowTop,
+			overflowBottom,
+		};
+	}
+
+	try {
+		const deltaY =
+			overflowTop > 0
+				? -(overflowTop + POPUP_AUTOPAN_BUFFER_PX)
+				: overflowBottom + POPUP_AUTOPAN_BUFFER_PX;
+		mapInstance.panBy([0, deltaY], {
+			duration: 280,
+			essential: true,
+			easing: (t) => 1 - (1 - t) ** 2,
+		});
+	} catch {
+		// fail-open: popup stays lifted even if map cannot pan right now
+	}
+	return {
+		corrected: true,
+		overflowTop,
+		overflowBottom,
+	};
 };
 
 // ✅ Show Popup for Item (Fixed button handling)
-const showPopup = (item, { force = false, remember = true } = {}) => {
+const showPopup = (
+	item,
+	{ force = false, remember = true, surface = "preview" } = {},
+) => {
 	const shopId = normalizePopupShopId(item?.id);
 	const isSameShopPopupOpen =
 		Boolean(shopId) &&
@@ -3489,12 +3752,12 @@ const showPopup = (item, { force = false, remember = true } = {}) => {
 	// Guard: Ensure both map and maplibregl are ready
 	if (!map.value || !maplibregl) {
 		mapDebugWarn("⚠️ Map or maplibregl not ready for popup");
-		return false;
+		return null;
 	}
 
 	const lng = Number(item?.lng ?? item?.longitude);
 	const lat = Number(item?.lat ?? item?.latitude);
-	if (!Number.isFinite(lng) || !Number.isFinite(lat)) return false;
+	if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
 
 	closeActivePopup();
 
@@ -3503,7 +3766,7 @@ const showPopup = (item, { force = false, remember = true } = {}) => {
 		closeOnClick: false,
 		className: "vibe-maplibre-popup",
 		maxWidth: "384px",
-		offset: [0, -getPopupLiftOffset()],
+		offset: [0, -getPopupLiftOffset(item)],
 		anchor: "bottom",
 	})
 		.setLngLat([lng, lat])
@@ -3522,9 +3785,11 @@ const showPopup = (item, { force = false, remember = true } = {}) => {
 		}
 	});
 
-	// ✅ Give popup time to mount before any measurements
+	// Give popup time to mount before measuring for top-safe autopan.
 	requestAnimationFrame(() => {
-		// Popup height measurement removed - was causing unused variable warning
+		requestAnimationFrame(() => {
+			keepPopupAbovePin(popup, item, { surface });
+		});
 	});
 
 	// Attach event listeners with delay for DOM to be ready
@@ -3532,8 +3797,7 @@ const showPopup = (item, { force = false, remember = true } = {}) => {
 		const popupEl = popup.getElement();
 		if (!popupEl) return;
 
-		// Ensure popup is above modal backdrop (6000) but below modal content (6100)
-		popupEl.style.zIndex = "6050";
+		keepPopupAbovePin(popup, item, { surface });
 
 		// Close button
 		const closeBtn = popupEl.querySelector(".popup-close-btn");
@@ -3574,7 +3838,206 @@ const showPopup = (item, { force = false, remember = true } = {}) => {
 			rideBtn.ontouchend = onRideClick;
 		}
 	}, 100);
+	return popup;
+};
+
+const waitForMapMotionSettled = (requestId, timeoutMs = 1_600) =>
+	new Promise((resolve) => {
+		const mapInstance = map.value;
+		if (!mapInstance) {
+			resolve(false);
+			return;
+		}
+		let settled = false;
+		let timeoutId = null;
+		const cleanup = () => {
+			if (timeoutId) clearTimeout(timeoutId);
+			mapInstance.off?.("moveend", handleSettled);
+			mapInstance.off?.("idle", handleSettled);
+		};
+		const finish = (didSettle) => {
+			if (settled) return;
+			settled = true;
+			cleanup();
+			resolve(didSettle);
+		};
+		const handleSettled = () => {
+			if (activeSelectionFlightSeq !== requestId) {
+				finish(false);
+				return;
+			}
+			requestAnimationFrame(() => {
+				requestAnimationFrame(() => {
+					finish(true);
+				});
+			});
+		};
+
+		if (!mapInstance.isMoving?.() && !mapInstance.isEasing?.()) {
+			handleSettled();
+			return;
+		}
+
+		timeoutId = setTimeout(() => {
+			finish(false);
+		}, timeoutMs);
+		mapInstance.on?.("moveend", handleSettled);
+		mapInstance.on?.("idle", handleSettled);
+	});
+
+const settlePopupAfterMount = async (
+	popup,
+	item,
+	{ requestId, surface = "preview" } = {},
+) => {
+	if (!popup) return false;
+	clearPopupRepairTimer();
+	popupSettleState.value = "popup-settling";
+	const runRepairPass = async () => {
+		await new Promise((resolve) => {
+			requestAnimationFrame(() => {
+				resolve();
+			});
+		});
+		if (activeSelectionFlightSeq !== requestId) return false;
+		const repairState = keepPopupAbovePin(popup, item, { surface });
+		if (repairState?.corrected) {
+			await waitForMapMotionSettled(requestId, 900);
+		}
+		return repairState;
+	};
+	let repairState = await runRepairPass();
+	await new Promise((resolve) => {
+		popupRepairTimer = window.setTimeout(() => {
+			popupRepairTimer = null;
+			resolve();
+		}, POPUP_SECOND_PASS_DELAY_MS);
+	});
+	if (activeSelectionFlightSeq !== requestId) return false;
+	repairState = await runRepairPass();
+	if (
+		activeSelectionFlightSeq === requestId &&
+		repairState &&
+		(repairState.overflowTop > 0 || repairState.overflowBottom > 0)
+	) {
+		await new Promise((resolve) => {
+			popupRepairTimer = window.setTimeout(() => {
+				popupRepairTimer = null;
+				resolve();
+			}, POPUP_SECOND_PASS_DELAY_MS);
+		});
+		if (activeSelectionFlightSeq !== requestId) return false;
+		repairState = await runRepairPass();
+	}
+	const popupEl = popup?.getElement?.();
+	const finalOverflow = measurePopupOverflow(popupEl, surface);
+	if (
+		activeSelectionFlightSeq === requestId &&
+		popupEl &&
+		finalOverflow &&
+		(finalOverflow.overflowTop > 0 || finalOverflow.overflowBottom > 0)
+	) {
+		applyPopupViewportClamp(popupEl, finalOverflow);
+		repairState = {
+			...finalOverflow,
+			corrected: false,
+			clamped: true,
+		};
+	}
+	popupSettleState.value =
+		repairState &&
+		(repairState.overflowTop > 0 || repairState.overflowBottom > 0)
+			? repairState.clamped
+				? "settled-clamped"
+				: "settled-with-overflow"
+			: "settled";
 	return true;
+};
+
+const resolveSelectionIntentShop = (intent) => {
+	const normalizedId = normalizeMapPinId(intent?.shopId);
+	if (!normalizedId) return null;
+	return (
+		shopStore.getShopById?.(normalizedId) ||
+		props.shops?.find((shop) => normalizeMapPinId(shop?.id) === normalizedId) ||
+		null
+	);
+};
+
+const runSelectionIntent = async (intent) => {
+	if (!intent || !map.value || !publicMapReady.value) return;
+	const requestId = Number(intent.requestId || Date.now());
+	activeSelectionFlightSeq = requestId;
+	selectionSourceLabel.value = String(intent.source || "unknown");
+	cameraRequestId.value = String(requestId);
+	popupSettleState.value = "pending";
+	clearPopupRepairTimer();
+	const shop = resolveSelectionIntentShop(intent);
+	if (!shop) return;
+	const lat = Number(intent?.coords?.[0] ?? shop?.lat ?? shop?.latitude);
+	const lng = Number(intent?.coords?.[1] ?? shop?.lng ?? shop?.longitude);
+	const surface = intent.surface === "detail" ? "detail" : "preview";
+
+	buildingPopupShop.value = shop;
+	syncBuildingPopupContent(shop);
+	updateBuildingInfoPopupPosition(true);
+	closeActivePopup();
+	map.value.stop?.();
+
+	if (
+		intent.cameraMode !== "none" &&
+		Number.isFinite(lat) &&
+		Number.isFinite(lng)
+	) {
+		const geometry = getSelectionFlightGeometry(surface);
+		popupSettleState.value = "camera-pending";
+		try {
+			flyToCore({
+				center: [lng, lat],
+				zoom: Math.max(
+					map.value.getZoom?.() || 16.1,
+					surface === "detail" ? 16.2 : 16.05,
+				),
+				pitch: 60,
+				bearing: bearing.value,
+				essential: true,
+				duration: 850,
+				curve: 1,
+				easing: (t) => t * (2 - t),
+				offset: [0, geometry?.offsetY || 0],
+				padding: {
+					top: geometry?.topPad || 0,
+					bottom: geometry?.bottomPad || 0,
+					left: 0,
+					right: 0,
+				},
+			});
+		} catch (error) {
+			mapDebugWarn("Selection flight failed:", error);
+		}
+		await waitForMapMotionSettled(
+			requestId,
+			surface === "detail" ? 1_900 : 1_500,
+		);
+	}
+
+	if (activeSelectionFlightSeq !== requestId) return;
+	if (props.isGiantPinView || intent.popupMode === "none") {
+		popupSettleState.value = "idle";
+		return;
+	}
+
+	popupSettleState.value = "popup-mounting";
+	const popup = showPopup(shop, {
+		force: true,
+		remember: surface !== "detail",
+		surface,
+	});
+	if (!popup) {
+		popupSettleState.value = "idle";
+		return;
+	}
+	await settlePopupAfterMount(popup, shop, { requestId, surface });
 };
 
 const updateMarkers = () => {
@@ -3667,7 +4130,6 @@ const handleAggregatePinTap = ({ aggregateLevel, feature }) => {
 // ✅ Map Interactions moved to useMapInteractions
 const {
 	handlePointClick,
-	handleClusterClick,
 	handleMarkerClick: handleMarkerClickCore,
 	setPointer,
 	resetPointer,
@@ -3681,7 +4143,7 @@ const {
 	enableTapRipple: false,
 	pinLayerId: PIN_LAYER_ID,
 	pinHitboxLayerId: PIN_HITBOX_LAYER_ID,
-	clusterLayerId: CLUSTER_LAYER_ID,
+	enableClusters: false,
 	pinSourceId: PIN_SOURCE_ID,
 	onPinTap: () => sentient?.onManualPinTap?.(),
 	onAggregateTap: handleAggregatePinTap,
@@ -3715,8 +4177,14 @@ const initSentientMap = async () => {
 	sentient.attach();
 	return sentient;
 };
-queueMapIdleTask(preloadSentientMap, 1200);
-queueMapIdleTask(initSentientMap, 2200);
+queueMapIdleTask(() => {
+	if (shouldPreferSmoothMobileRuntime.value) return;
+	return preloadSentientMap();
+}, 1200);
+queueMapIdleTask(() => {
+	if (shouldPreferSmoothMobileRuntime.value) return;
+	return initSentientMap();
+}, 2200);
 
 // ── God-Tier Engine Layers ────────────────────────────────────
 // Wave 3: Task 3.1 — useDollyZoom async-loaded via idle queue (no onUnmounted = safe)
@@ -3900,12 +4368,13 @@ useNeonPinsLayer(
 // Deferred feature init — loads heatmap, weather, vibe effects after map idle
 let _deferredFeaturesInitialized = false;
 const initDeferredFeatures = async () => {
-	if (_deferredFeaturesInitialized) return;
+	if (_deferredFeaturesInitialized || deferredFeaturesDisposed) return;
 	_deferredFeaturesInitialized = true;
 
 	if (featureFlagStore.isEnabled("enable_map_heatmap")) {
 		try {
 			const mod = await import("../../composables/map/useMapHeatmap");
+			if (deferredFeaturesDisposed) return;
 			_heatmapInstance = mod.useMapHeatmap(map, allowHeatmap, shopsByIdRef);
 		} catch (err) {
 			mapDebugWarn("Heatmap failed:", err);
@@ -3918,16 +4387,17 @@ const initDeferredFeatures = async () => {
 	) {
 		try {
 			const mod = await import("../../composables/useWeather");
+			if (deferredFeaturesDisposed) return;
 			_weatherInstance = mod.useWeather({ getMapCenter: getWeatherCenter });
 			// Sync reactive refs from deferred instance
-			watch(
+			registerDeferredFeatureWatch(
 				() => _weatherInstance?.weatherCondition?.value,
 				(val) => {
 					if (val !== undefined) weatherCondition.value = val;
 				},
 				{ immediate: true },
 			);
-			watch(
+			registerDeferredFeatureWatch(
 				() => _weatherInstance?.isNight?.value,
 				(val) => {
 					if (val !== undefined) isWeatherNight.value = val;
@@ -3942,9 +4412,10 @@ const initDeferredFeatures = async () => {
 	if (featureFlagStore.isEnabled("enable_vibe_effects") || !IS_E2E) {
 		try {
 			const mod = await import("../../composables/useVibeEffects");
+			if (deferredFeaturesDisposed) return;
 			_vibeEffectsInstance = mod.useVibeEffects();
 			// Sync activeVibeEffects ref from deferred instance
-			watch(
+			registerDeferredFeatureWatch(
 				() => _vibeEffectsInstance?.activeVibeEffects?.value,
 				(val) => {
 					if (Array.isArray(val)) activeVibeEffects.value = val;
@@ -3976,6 +4447,7 @@ scheduleIdleTask(
 );
 scheduleIdleTask(
 	async () => {
+		if (shouldPreferSmoothMobileRuntime.value) return;
 		try {
 			await applyTerrainAndAtmosphere();
 		} catch (err) {
@@ -3993,21 +4465,39 @@ const setupMapInteractions = () => {
 
 const handleMarkerClick = (item) => {
 	handleMarkerClickCore(item);
-	showPopup(item, { force: true }); // Keep local popup logic
 };
 
+const emitMapStatus = () => {
+	emit("map-ready-change", {
+		ready: Boolean(isMapReady.value),
+		contentReady: Boolean(isMapContentReady.value),
+		publicReady: Boolean(publicMapReady.value),
+		styleMode: RESOLVED_STYLE_MODE,
+		activeStyleUrl: activeStyleUrl.value || currentStyleUrl.value || "",
+		selectionSource: selectionSourceLabel.value,
+		cameraRequestId: cameraRequestId.value,
+		popupSettleState: popupSettleState.value,
+		contentState: mapContentState.value,
+	});
+};
+
+watch(
+	[
+		isMapReady,
+		isMapContentReady,
+		activeStyleUrl,
+		selectionSourceLabel,
+		cameraRequestId,
+		popupSettleState,
+	],
+	() => {
+		emitMapStatus();
+	},
+	{ immediate: true },
+);
+
 // ✅ Setup Map Interactions & Watch for Ready (Performance Fix)
-watch([isMapReady, devSafeMapPreviewMode], ([ready, previewReady]) => {
-	emit("map-ready-change", Boolean(ready || previewReady));
-	if (ready && !mapContextRecovering.value && !mapReadyReported.value) {
-		mapReadyReported.value = true;
-		webglRecoveryAttempts.value = 0;
-		reportMapLifecycle("ready", {
-			elapsedMs: mapInitStartedAt.value
-				? Date.now() - mapInitStartedAt.value
-				: 0,
-		});
-	}
+watch(isMapReady, (ready) => {
 	if (!ready || !map.value || !isMapOperational()) return;
 	queueMapResize(true);
 	setupMapInteractions();
@@ -4068,6 +4558,17 @@ watch([isMapReady, devSafeMapPreviewMode], ([ready, previewReady]) => {
 		} else {
 			setTimeout(_reportPerfMetrics, 2000);
 		}
+	});
+});
+
+watch(publicMapReady, (ready) => {
+	if (!ready || mapContextRecovering.value || mapReadyReported.value) return;
+	mapReadyReported.value = true;
+	webglRecoveryAttempts.value = 0;
+	reportMapLifecycle("ready", {
+		elapsedMs: mapInitStartedAt.value ? Date.now() - mapInitStartedAt.value : 0,
+		styleMode: RESOLVED_STYLE_MODE,
+		activeStyleUrl: activeStyleUrl.value || currentStyleUrl.value || "",
 	});
 });
 
@@ -4308,31 +4809,21 @@ watch(selectedShopVisitors, (value) => {
 });
 
 const shopRefreshSignature = (shops) => {
-	if (!Array.isArray(shops) || shops.length === 0) return "";
-	let count = 0;
-	let sumHash = 0;
-	let xorHash = 0;
-	const hashRow = (row) => {
-		let hash = 2166136261;
-		for (let i = 0; i < row.length; i += 1) {
-			hash ^= row.charCodeAt(i);
-			hash = Math.imul(hash, 16777619) >>> 0;
-		}
-		return hash >>> 0;
-	};
-	for (const shop of shops) {
+	if (!Array.isArray(shops) || shops.length === 0) return "0";
+	const encodeSample = (shop) => {
+		if (!shop || typeof shop !== "object") return "na";
 		const id = String(shop?.id ?? "").trim();
 		const lat = Number(shop?.lat ?? shop?.latitude);
 		const lng = Number(shop?.lng ?? shop?.longitude);
 		const status = String(shop?.status ?? "");
 		const latSig = Number.isFinite(lat) ? lat.toFixed(4) : "na";
 		const lngSig = Number.isFinite(lng) ? lng.toFixed(4) : "na";
-		const rowHash = hashRow(`${id}:${latSig}:${lngSig}:${status}`);
-		sumHash = (sumHash + rowHash) >>> 0;
-		xorHash ^= rowHash;
-		count += 1;
-	}
-	return `${count}:${sumHash.toString(36)}:${(xorHash >>> 0).toString(36)}`;
+		return `${id}:${latSig}:${lngSig}:${status}`;
+	};
+	const first = shops[0];
+	const middle = shops[Math.floor(shops.length / 2)];
+	const last = shops[shops.length - 1];
+	return `${shops.length}:${encodeSample(first)}:${encodeSample(middle)}:${encodeSample(last)}`;
 };
 
 watch(
@@ -4341,6 +4832,7 @@ watch(
 		if (!Array.isArray(newShops)) {
 			shopsByIdRef.value = new Map();
 			allowedIdsRef.value = null;
+			neonFeaturePropsCache.clear();
 			return;
 		}
 		const nextMap = new Map();
@@ -4352,6 +4844,11 @@ watch(
 		shopsByIdRef.value = nextMap;
 		allowedIdsRef.value =
 			newShops.length === 0 ? new Set() : new Set(nextMap.keys());
+		for (const id of neonFeaturePropsCache.keys()) {
+			if (!nextMap.has(id)) {
+				neonFeaturePropsCache.delete(id);
+			}
+		}
 
 		const nextSig = shopRefreshSignature(newShops);
 		const prevSig = shopRefreshSignature(oldShops);
@@ -4382,7 +4879,7 @@ watch(
 	() => {
 		if (!map.value || !isMapReady.value) return;
 		requestUpdateMarkers();
-		scheduleMapRefresh({ allowSameViewport: true });
+		scheduleMapRefresh({ allowSameViewport: true, localOnly: true });
 	},
 	{ deep: false },
 );
@@ -4407,8 +4904,10 @@ watch(
 		syncSoundZoneFromSelection();
 		syncBuildingInfoPopupFromSelection();
 		if (!newId) {
-			// Keep pin popup visible (don't call closeActivePopup here)
-			// Popup will be replaced when a different shop is selected
+			selectionSourceLabel.value = "none";
+			cameraRequestId.value = "0";
+			popupSettleState.value = "idle";
+			closeActivePopup();
 			hideBuildingInfoPopup();
 			return;
 		}
@@ -4489,47 +4988,20 @@ watch(
 		_setPinFocus(newId);
 
 		if (shop) {
-			// Fix 1H: skip regular popup when giant pin modal is open
-			if (!props.isGiantPinView) {
-				showPopup(shop);
-			}
 			buildingPopupShop.value = shop;
 			syncBuildingPopupContent(shop);
 			updateBuildingInfoPopupPosition(true);
-			if (!map.value) return;
-			const shopLng = Number(shop.lng);
-			const shopLat = Number(shop.lat);
-			if (!Number.isFinite(shopLng) || !Number.isFinite(shopLat)) return;
-			// ✅ Only run internal flyTo when the parent has NOT already initiated one.
-			// props.flySkipInternal is set to true by useAppLogic.applyShopSelection when
-			// smoothFlyTo is called, preventing two concurrent conflicting animations.
-			if (props.flySkipInternal) return;
-			// ✅ Smooth Pan to Shop — pin ล็อคอยู่กลาง visible area
-			const containerH = mapContainer.value?.clientHeight || 600;
-			const topPad = Number(props.uiTopOffset || 0);
-			const bottomPad = Number(props.uiBottomOffset || 0);
-			const visibleH = containerH - topPad - bottomPad;
-			const targetPinY = topPad + visibleH * 0.4;
-			const offsetY = Math.round(containerH / 2 - targetPinY);
-			flyToCore({
-				center: [shopLng, shopLat],
-				zoom: Math.max(map.value.getZoom?.() || 16.1, 16.1), // Keep current zoom if it's already tight
-				pitch: 60,
-				bearing: bearing.value,
-				essential: true,
-				duration: 800, // 0.8s smooth
-				curve: 1, // Prevent zoom-out/zoom-in
-				easing: (t) => t * (2 - t), // ease-out quad
-				offset: [0, offsetY],
-				padding: {
-					top: topPad,
-					bottom: bottomPad,
-					left: 0,
-					right: 0,
-				},
-			});
 		}
 	},
+);
+
+watch(
+	[() => props.selectionIntent, publicMapReady],
+	async ([intent, ready]) => {
+		if (!ready || !intent) return;
+		await runSelectionIntent(intent);
+	},
+	{ deep: false, immediate: true },
 );
 
 watch(
@@ -4568,6 +5040,8 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+	deferredFeaturesDisposed = true;
+	stopDeferredFeatureWatches();
 	if (mapInitRequested.value && !isMapReady.value) {
 		reportMapLifecycle("unmounted_before_ready", {
 			reason: "teardown_before_ready",
@@ -4610,6 +5084,7 @@ onUnmounted(() => {
 	}
 	queuedPinsRefreshForce = false;
 	queuedPinsRefreshAllowSameViewport = false;
+	queuedPinsRefreshLocalOnly = false;
 	lastViewportKey = "";
 	lastMapRefreshAt = 0;
 	lastForcedMapRefreshAt = 0;
@@ -4623,6 +5098,13 @@ onUnmounted(() => {
 	if (motionMediaQuery) {
 		motionMediaQuery.removeEventListener?.("change", handleMotionChange);
 		motionMediaQuery = null;
+	}
+	if (pointerPrecisionMediaQuery) {
+		pointerPrecisionMediaQuery.removeEventListener?.(
+			"change",
+			handlePointerPrecisionChange,
+		);
+		pointerPrecisionMediaQuery = null;
 	}
 	if (resizeObserver) {
 		resizeObserver.disconnect();
@@ -4640,6 +5122,17 @@ onUnmounted(() => {
 		routeAbortController.abort();
 		routeAbortController = null;
 	}
+	_heatmapInstance?.removeHeatmapLayer?.();
+	_heatmapInstance?.stopBreathing?.();
+	_heatmapInstance = null;
+	_weatherInstance = null;
+	_vibeEffectsInstance = null;
+	_dollyZoomInstance = null;
+	activeVibeEffects.value = [];
+	neonFeaturePropsCache.clear();
+	lastGoodPinFeatures = [];
+	lastGoodProvinceAggregateFeatures = [];
+	styleApplySeq = 0;
 	clearVibeEffectMarkers();
 
 	if (nowTickInterval) {
@@ -4691,7 +5184,14 @@ defineExpose({
 <template>
   <div
     data-testid="map-shell"
-    :data-map-ready="isMapUiReady ? 'true' : 'false'"
+    :data-map-ready="publicMapReady ? 'true' : 'false'"
+    :data-map-shell-ready="isMapReady ? 'true' : 'false'"
+    :data-map-content-ready="isMapContentReady ? 'true' : 'false'"
+    :data-map-style-mode="RESOLVED_STYLE_MODE"
+    :data-map-active-style-url="activeStyleUrl || currentStyleUrl || ''"
+    :data-map-selection-source="selectionSourceLabel"
+    :data-map-camera-request-id="cameraRequestId"
+    :data-map-popup-settle-state="popupSettleState"
     :data-map-init-requested="mapInitRequested ? 'true' : 'false'"
     :data-map-token-invalid="isTokenInvalid ? 'true' : 'false'"
     :aria-label="mapA11yLabel"
@@ -4725,77 +5225,12 @@ defineExpose({
     />
 
     <div
-      v-if="devSafeMapPreviewMode"
-      class="absolute inset-0 z-[1050] overflow-hidden bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.16),transparent_42%),linear-gradient(180deg,rgba(9,9,11,0.96),rgba(2,6,23,0.98))]"
+      v-if="IS_DEV_BUILD && RESOLVED_STYLE_MODE === 'quiet'"
+      class="absolute top-4 left-4 z-[2300] rounded-full border border-amber-300/40 bg-amber-500/15 px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-amber-100"
       role="status"
       aria-live="polite"
     >
-      <div class="absolute inset-0 dev-safe-preview-grid" aria-hidden="true"></div>
-      <div class="absolute inset-0 dev-safe-preview-sheen" aria-hidden="true"></div>
-
-      <button
-        v-for="pin in devSafePreviewPins"
-        :key="pin.id"
-        type="button"
-        data-testid="dev-preview-pin"
-        class="absolute z-[2] -translate-x-1/2 -translate-y-1/2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 rounded-full"
-        :class="pin.isHighlighted ? 'scale-110' : ''"
-        :style="{ top: pin.top, left: pin.left }"
-        :aria-label="pin.name"
-        @click="handleDevSafePreviewPinClick(pin.shop)"
-      >
-        <span
-          class="dev-safe-preview-pin"
-          :class="{ 'dev-safe-preview-pin--highlighted': pin.isHighlighted }"
-        ></span>
-      </button>
-
-      <div
-        class="absolute inset-x-4 bottom-4 z-[3] md:inset-x-auto md:left-6 md:max-w-md rounded-3xl border border-cyan-400/15 bg-slate-950/82 px-4 py-4 text-white shadow-2xl shadow-cyan-950/30 backdrop-blur-xl"
-      >
-        <div class="flex items-start justify-between gap-4">
-          <div>
-            <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-300/80">
-              {{ tt("map.dev_preview.badge", "Stable local preview") }}
-            </p>
-            <h2 class="mt-2 text-lg font-black leading-tight">
-              {{ tt("map.dev_preview.title", "Chromium local dev now skips WebGL by default") }}
-            </h2>
-            <p class="mt-2 text-sm leading-relaxed text-slate-300">
-              {{ tt("map.dev_preview.desc", "This preview keeps localhost fast and console-clean. Production, E2E, and explicit WebGL opt-in still use the full MapLibre renderer.") }}
-            </p>
-          </div>
-          <div class="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-right">
-            <div class="text-[10px] uppercase tracking-[0.2em] text-white/45">
-              {{ tt("map.dev_preview.visible", "Visible pins") }}
-            </div>
-            <div class="text-2xl font-black text-cyan-200">
-              {{ devSafePreviewPins.length }}
-            </div>
-          </div>
-        </div>
-
-        <div
-          v-if="!devSafePreviewPins.length"
-          class="mt-4 rounded-2xl border border-dashed border-white/10 bg-white/5 px-4 py-3 text-sm text-white/60"
-        >
-          {{ tt("map.dev_preview.empty", "No venue coordinates are available yet, so the local preview stays in placeholder mode.") }}
-        </div>
-
-        <div class="mt-4 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            data-testid="dev-preview-open-webgl"
-            class="rounded-2xl bg-cyan-400 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200"
-            @click="enableFullMapForCurrentSession"
-          >
-            {{ tt("map.dev_preview.open_webgl", "Open full WebGL map") }}
-          </button>
-          <span class="text-xs text-white/45">
-            {{ tt("map.dev_preview.note", "Use this only when you need to inspect real WebGL behavior in this browser session.") }}
-          </span>
-        </div>
-      </div>
+      Quiet map preview
     </div>
 
     <div
@@ -4836,7 +5271,7 @@ defineExpose({
     </div>
 
     <div
-      v-if="allowViewportGlow && !devSafeMapPreviewMode && !maplessMode"
+      v-if="allowViewportGlow && !maplessMode"
       class="absolute inset-0 z-[2] pointer-events-none viewport-focus-glow"
       :style="{ opacity: viewportGlowOpacity }"
     ></div>
@@ -4845,7 +5280,7 @@ defineExpose({
 
     <!-- ✅ WebGL Not Supported Fallback - HIGH Z-INDEX to cover all UI -->
     <div
-      v-if="!webGLSupported && !maplessMode && !devSafeMapPreviewMode"
+      v-if="!webGLSupported && !maplessMode"
       class="fixed inset-0 z-[6000] flex items-center justify-center bg-gradient-to-br from-zinc-900 via-zinc-800 to-black"
       role="alertdialog"
       aria-modal="true"
@@ -4936,12 +5371,12 @@ defineExpose({
 
     <!-- ✅ Entertainment Atmosphere Effects (simplified) -->
     <div
-      v-if="!devSafeMapPreviewMode && !maplessMode"
+      v-if="!maplessMode"
       class="absolute inset-0 z-[1] pointer-events-none transition-colors duration-500"
     ></div>
 
     <div
-      v-if="!devSafeMapPreviewMode && !maplessMode"
+      v-if="!maplessMode"
       class="absolute inset-0 z-[1] pointer-events-none overflow-hidden"
     >
       <!-- Fireflies -->
@@ -5004,7 +5439,7 @@ defineExpose({
       class="sr-only"
     >
       <li
-        v-for="(shop, index) in props.shops"
+        v-for="(shop, index) in props.shops?.slice(0, 50)"
         :key="shop.id"
         tabindex="0"
         role="listitem"
@@ -5020,7 +5455,6 @@ defineExpose({
 <style>
 /* MapLibre Popup Overrides */
 .maplibregl-popup {
-  position: relative;
   z-index: 3000 !important;
 }
 
@@ -5042,7 +5476,11 @@ defineExpose({
   border-top-color: rgba(24, 24, 27, 0.95) !important;
   border-width: 10px 8px 0 8px !important;
   filter: drop-shadow(0 4px 8px rgba(0, 229, 255, 0.35));
-  margin-top: -1px;
+  margin: -1px auto 0 !important;
+}
+
+.vibe-maplibre-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+  align-self: center;
 }
 
 .vibe-maplibre-popup .maplibregl-popup-content {
@@ -5059,45 +5497,6 @@ defineExpose({
     rgba(2, 6, 23, 0.42) 100%
   );
   transition: opacity 220ms ease;
-}
-
-.dev-safe-preview-grid {
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(125deg, rgba(34, 211, 238, 0.12), transparent 48%);
-  background-size:
-    72px 72px,
-    72px 72px,
-    100% 100%;
-  opacity: 0.42;
-}
-
-.dev-safe-preview-sheen {
-  background:
-    radial-gradient(circle at 18% 24%, rgba(56, 189, 248, 0.18), transparent 28%),
-    radial-gradient(circle at 78% 68%, rgba(16, 185, 129, 0.12), transparent 24%);
-  mix-blend-mode: screen;
-  opacity: 0.85;
-}
-
-.dev-safe-preview-pin {
-  display: block;
-  width: 16px;
-  height: 16px;
-  border-radius: 9999px;
-  border: 2px solid rgba(255, 255, 255, 0.88);
-  background: linear-gradient(180deg, #22d3ee 0%, #2563eb 100%);
-  box-shadow:
-    0 0 0 8px rgba(34, 211, 238, 0.12),
-    0 12px 28px rgba(8, 145, 178, 0.32);
-}
-
-.dev-safe-preview-pin--highlighted {
-  background: linear-gradient(180deg, #fde047 0%, #f97316 100%);
-  box-shadow:
-    0 0 0 10px rgba(251, 191, 36, 0.16),
-    0 12px 28px rgba(249, 115, 22, 0.34);
 }
 
 /* Coin badge with bounce animation - canonical definition */
