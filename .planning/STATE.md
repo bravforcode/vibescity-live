@@ -5,7 +5,7 @@
 - **Phase:** 2 - Anonymous Identity + Claim Flow
 - **Plan:** 04 auto-tasks complete (MAP-02 glow ring implemented), awaiting checkpoint: human verification
 - **Status:** In progress - Plans 01/02/03/04-auto done; checkpoint Task 3 (end-to-end verification) pending
-- **Last activity:** 2026-03-22 - Plan 02-04 auto-tasks complete (addClaimedGlowLayer + MapLibreContainer wired)
+- **Last activity:** 2026-03-29 - Completed quick task 1: adjust neonpinsign z-position to appear above detail modal
 
 ## Project Reference
 
@@ -67,7 +67,13 @@ See: .planning/PROJECT.md (updated 2026-03-22)
 - Phase 3: LOW/MEDIUM - GPS projection and PhotoSwipe are well-documented; VenueDetailDrawer layout needs design decisions
 - Phase 4: HIGH - admin moderation pipeline has open design questions (resolve before planning)
 
+### Quick Tasks Completed
+
+| # | Description                                   | Date       | Directory                                                                                         |
+|---|-----------------------------------------------|------------|---------------------------------------------------------------------------------------------------|
+| 1 | Adjust NeonPinSign Y-position above VibeModal | 2026-03-29 | [1-adjust-neonpinsign-z-position-to-appear-](./quick/1-adjust-neonpinsign-z-position-to-appear-/) |
+
 ## Last Session
 
-- **Timestamp:** 2026-03-22
-- **Stopped At:** Completed 02-04 auto-tasks (MAP-02 glow ring) - checkpoint Task 3 (end-to-end human verification) pending. User must commit files then verify full Phase 2 flow in browser.
+- **Timestamp:** 2026-03-29
+- **Stopped At:** Completed quick task 1 — NeonPinSign Y-clamping above VibeModal surface.
