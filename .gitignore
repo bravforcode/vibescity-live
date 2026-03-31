@@ -94,6 +94,10 @@ tests/e2e/screenshots/
 # Temporary and system files that are not needed in version control
 .worktrees/
 .venv/
+.vercel_python_packages/
+tmp_deploy/
+vercel_deploy/
+vercel_final/
 *.bak
 *.swp
 *.swo
@@ -263,3 +267,6 @@ oldest_header.vue
 *_diff.txt
 review-decisions.auto.json
 mig_list.txt
+
+.vercel
+.env*.local
