@@ -4,18 +4,7 @@
 vibecity.live/
 
 # Git worktrees & agent-generated dirs
-.worktrees/
-.codex-*/
-.vercel-main-*/
-.vercel-prod-*/
-ux-ui-agent-skills/
-.loki/
-.ruff_cache/
-.venv/
-.venv*/
-.vercel_python_packages/
-.planning/
-.agent/
+# .agent/
 .storybook/
 storybook-static/
 k6-tests/
@@ -30,12 +19,23 @@ tests/
 supabase/
 docs/
 tmp/
+.worktrees/
+.codex-*/
+.vercel-main-*/
+.vercel-prod-*/
+ux-ui-agent-skills/
+.loki/
+.ruff_cache/
+.venv/
+.venv*/
+.vercel_python_packages/
+.planning/
 
 # Node Modules
 node_modules/
 
 # Build Output
-dist/
+# dist/
 dist-ssr/
 
 # Local Environment Variables
