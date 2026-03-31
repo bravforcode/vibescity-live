@@ -15,6 +15,7 @@ requests>=2.31.0
 h3>=4.4.0
 pillow>=10.4.0
 slowapi>=0.1.9
+tenacity>=8.2.3
 prometheus-client>=0.20.0
 opentelemetry-api>=1.26.0
 opentelemetry-sdk>=1.26.0

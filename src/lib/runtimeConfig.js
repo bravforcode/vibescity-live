@@ -1,17 +1,74 @@
 import i18n from "@/i18n.js";
 
-const LOCALHOST_PATTERN = /(localhost|127\.0\.0\.1)/i;
+const LOCALHOST_PATTERN = /(localhost|127\.0\.0\.1|\[::1\]|::1)/i;
 const PLACEHOLDER_PATTERN = /<[^>]+>/; // Detects <api-app>, <your-key>, etc.
+
+const normalizeHostname = (value) =>
+	String(value ?? "")
+		.trim()
+		.replace(/^\[/, "")
+		.replace(/\]$/, "")
+		.toLowerCase();
+
+const parseIpv4Hostname = (value) => {
+	const normalized = normalizeHostname(value);
+	if (!/^\d{1,3}(?:\.\d{1,3}){3}$/.test(normalized)) return null;
+	const octets = normalized.split(".").map((segment) => Number(segment));
+	return octets.every((segment) => Number.isInteger(segment) && segment <= 255)
+		? octets
+		: null;
+};
+
+const isLoopbackBrowserHostname = (value) => {
+	const normalized = normalizeHostname(value);
+	if (!normalized) return false;
+	if (normalized === "localhost" || normalized === "::1") return true;
+	const octets = parseIpv4Hostname(normalized);
+	return Array.isArray(octets) ? octets[0] === 127 : false;
+};
+
+export const isLocalBrowserHostname = (value) => {
+	const normalized = normalizeHostname(value);
+	if (!normalized) return false;
+	if (isLoopbackBrowserHostname(normalized)) return true;
+	if (normalized.endsWith(".local")) return true;
+	const octets = parseIpv4Hostname(normalized);
+	if (!Array.isArray(octets)) return false;
+	const [first, second] = octets;
+	if (first === 10) return true;
+	if (first === 192 && second === 168) return true;
+	if (first === 172 && second >= 16 && second <= 31) return true;
+	if (first === 169 && second === 254) return true;
+	return false;
+};
+
+export const getCurrentBrowserHostname = () =>
+	typeof window !== "undefined"
+		? normalizeHostname(window.location?.hostname)
+		: "";
+
+const parseEnvBoolean = (value) => {
+	const raw = String(value ?? "")
+		.trim()
+		.toLowerCase();
+	if (!raw) return null;
+	if (["1", "true", "yes", "on"].includes(raw)) return true;
+	if (["0", "false", "no", "off"].includes(raw)) return false;
+	return null;
+};
+
 const IS_E2E = import.meta.env?.VITE_E2E === "true";
 const API_DEV_PROXY_ENABLED = import.meta.env?.VITE_API_PROXY_DEV === "true";
+const VISITOR_BOOTSTRAP_DEV_ENABLED =
+	import.meta.env?.VITE_VISITOR_BOOTSTRAP_DEV === "true";
+const DIRECTIONS_DEV_ENABLED = import.meta.env?.VITE_DIRECTIONS_DEV === "true";
 const WS_REQUIRED = import.meta.env?.VITE_WS_REQUIRED === "true";
 const WS_DEV_AUTOCONNECT = import.meta.env?.VITE_WS_DEV_AUTOCONNECT === "true";
 const WS_CONFIG_DEBUG = import.meta.env?.VITE_WS_CONFIG_DEBUG === "true";
-const LOCAL_DEV_MAP_RENDERER = import.meta.env?.VITE_LOCAL_DEV_MAP_RENDERER;
-const LOCAL_DEV_MAP_RENDERER_SESSION_KEY = "vibecity.dev.mapRenderer";
-const IS_LOCAL_HOST =
-	typeof window !== "undefined" &&
-	LOCALHOST_PATTERN.test(window.location.hostname);
+const LOCAL_DEV_REAL_GEO_ENABLED = parseEnvBoolean(
+	import.meta.env?.VITE_LOCAL_DEV_REAL_GEO,
+);
+const IS_LOCAL_HOST = isLocalBrowserHostname(getCurrentBrowserHostname());
 
 const trimTrailingSlash = (value) => value.replace(/\/+$/, "");
 
@@ -29,12 +86,12 @@ const rewriteLocalhostHostnameForDev = (rawValue) => {
 	if (!import.meta.env.DEV) return rawValue;
 	if (typeof window === "undefined") return rawValue;
 
-	const currentHost = sanitize(window.location?.hostname);
-	if (!currentHost || LOCALHOST_PATTERN.test(currentHost)) return rawValue;
+	const currentHost = getCurrentBrowserHostname();
+	if (!currentHost || isLoopbackBrowserHostname(currentHost)) return rawValue;
 
 	try {
 		const url = new URL(rawValue);
-		if (LOCALHOST_PATTERN.test(url.hostname)) {
+		if (isLoopbackBrowserHostname(url.hostname)) {
 			url.hostname = currentHost;
 			return url.toString();
 		}
@@ -48,7 +105,7 @@ const rewriteLocalhostHostnameForDev = (rawValue) => {
 const shouldPreferDevApiProxy = (rawValue) => {
 	if (!import.meta.env.DEV || typeof window === "undefined") return false;
 	if (!API_DEV_PROXY_ENABLED) return false;
-	if (!LOCALHOST_PATTERN.test(window.location.hostname)) return false;
+	if (!isLocalBrowserHostname(window.location.hostname)) return false;
 
 	const value = sanitize(rawValue);
 	if (!value) return true;
@@ -60,7 +117,7 @@ const shouldPreferDevApiProxy = (rawValue) => {
 			window.location.origin,
 		);
 		const sameOrigin = url.origin === window.location.origin;
-		const localTarget = LOCALHOST_PATTERN.test(url.hostname);
+		const localTarget = isLocalBrowserHostname(url.hostname);
 		return !sameOrigin && !localTarget;
 	} catch {
 		return false;
@@ -170,82 +227,18 @@ export const getApiV1BaseUrl = () => {
 
 export const getDirectApiBaseUrl = () => resolveExplicitApiBaseUrl();
 
-export const isFrontendOnlyDevMode = () => false;
+export const isFrontendOnlyDevMode = () =>
+	!IS_E2E &&
+	IS_LOCAL_HOST &&
+	!API_DEV_PROXY_ENABLED &&
+	!VISITOR_BOOTSTRAP_DEV_ENABLED &&
+	!DIRECTIONS_DEV_ENABLED;
 
-const normalizeLocalDevMapRendererMode = (value) => {
-	const normalized = sanitize(value).toLowerCase();
-	if (["preview", "mapless", "safe"].includes(normalized)) return "preview";
-	if (["webgl", "full", "map"].includes(normalized)) return "webgl";
-	return "auto";
-};
+export const shouldPreferRealLocalDevLocation = () =>
+	isFrontendOnlyDevMode() && LOCAL_DEV_REAL_GEO_ENABLED !== false;
 
-const getNavigatorFingerprint = () => {
-	if (typeof navigator === "undefined") return "";
-	const brands = Array.isArray(navigator.userAgentData?.brands)
-		? navigator.userAgentData.brands
-				.map((entry) => entry?.brand || "")
-				.join(" ")
-		: "";
-	return `${brands} ${navigator.userAgent || ""}`.trim();
-};
-
-const readSessionLocalDevMapRendererMode = () => {
-	if (typeof window === "undefined") return "auto";
-	try {
-		return normalizeLocalDevMapRendererMode(
-			window.sessionStorage.getItem(LOCAL_DEV_MAP_RENDERER_SESSION_KEY),
-		);
-	} catch {
-		return "auto";
-	}
-};
-
-export const persistLocalDevMapRendererMode = (mode) => {
-	if (typeof window === "undefined") return;
-	const normalized = normalizeLocalDevMapRendererMode(mode);
-	try {
-		if (normalized === "auto") {
-			window.sessionStorage.removeItem(LOCAL_DEV_MAP_RENDERER_SESSION_KEY);
-			return;
-		}
-		window.sessionStorage.setItem(
-			LOCAL_DEV_MAP_RENDERER_SESSION_KEY,
-			normalized,
-		);
-	} catch {
-		// Ignore storage failures in locked-down browsers.
-	}
-};
-
-export const isChromiumFamilyBrowser = () => {
-	const fingerprint = getNavigatorFingerprint().toLowerCase();
-	if (!fingerprint) return false;
-	return (
-		fingerprint.includes("chrome") ||
-		fingerprint.includes("chromium") ||
-		fingerprint.includes("crios") ||
-		fingerprint.includes("edg") ||
-		fingerprint.includes("opera") ||
-		fingerprint.includes("opr")
-	);
-};
-
-export const getLocalDevMapRendererMode = () => {
-	if (!isFrontendOnlyDevMode() || IS_E2E) return "webgl";
-
-	const sessionMode = readSessionLocalDevMapRendererMode();
-	if (sessionMode !== "auto") return sessionMode;
-
-	const configuredMode = normalizeLocalDevMapRendererMode(
-		LOCAL_DEV_MAP_RENDERER,
-	);
-	if (configuredMode !== "auto") return configuredMode;
-
-	return isChromiumFamilyBrowser() ? "preview" : "webgl";
-};
-
-export const shouldUseDevSafeMapPreview = () =>
-	getLocalDevMapRendererMode() === "preview";
+export const shouldUseDeterministicLocalDevLocation = () =>
+	isFrontendOnlyDevMode() && LOCAL_DEV_REAL_GEO_ENABLED === false;
 
 export const getSupabaseEdgeBaseUrl = () => {
 	const explicitEdge = sanitize(import.meta.env.VITE_SUPABASE_EDGE_URL);

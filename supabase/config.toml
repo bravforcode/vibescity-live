@@ -1,25 +1,28 @@
 project_id = "vibe-city-live"
 
+# Public ingress/webhook functions are intentionally JWT-free and must enforce
+# their own signature, origin, idempotency, or rate-limit controls inside the
+# handler. Keep these comments aligned with scripts/release/config/function-allowlist.json.
 [functions.webhook-handler]
-verify_jwt = false
+verify_jwt = false # Third-party webhooks validate a shared secret or signed payload.
 
 [functions.stripe-webhook]
-verify_jwt = false
+verify_jwt = false # Stripe signs webhook payloads; JWT is not available from Stripe.
 
 [functions.create-checkout-session]
-verify_jwt = false # Anonymous checkout is still supported.
+verify_jwt = false # Anonymous checkout is supported; redirect hosts are allowlisted server-side.
 
 [functions.create-manual-order]
-verify_jwt = false # Manual transfer intake remains public-by-design.
+verify_jwt = false # Manual transfer intake remains public-by-design with backend validation.
 
 [functions.analytics-ingest]
-verify_jwt = false
+verify_jwt = false # Browser telemetry uses origin allowlists plus server-side input validation.
 
 [functions.pii-audit-ingest]
-verify_jwt = false
+verify_jwt = false # Public ingest is origin-gated; admin reads still require JWT + PIN.
 
 [functions.easyslip-healthcheck]
-verify_jwt = false # Deprecated: EasySlip no longer used
+verify_jwt = false # Deprecated rollback healthcheck path; disable entirely when EasySlip is removed.
 
 [functions.admin-local-ads]
 verify_jwt = true
@@ -49,7 +52,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.seo-sitemap]
-verify_jwt = false
+verify_jwt = false # Public sitemap generation for crawlers; no user data is exposed.
 
 [functions.coin-action]
 verify_jwt = true

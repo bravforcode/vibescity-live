@@ -81,6 +81,18 @@ const sanitizeUrl = (url) => {
 const sanitizeId = (value) =>
 	String(value ?? "").replace(/[^a-zA-Z0-9_-]/g, "");
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+const createSvgElement = (tagName, attributes = {}) => {
+	const element = document.createElementNS(SVG_NS, tagName);
+	Object.entries(attributes).forEach(([key, value]) => {
+		if (value !== undefined && value !== null) {
+			element.setAttribute(key, String(value));
+		}
+	});
+	return element;
+};
+
 /**
  * Creates the HTML string for the Mapbox Popup
  */
@@ -93,6 +105,16 @@ export const createPopupHTML = ({
 	_tt, // translation function
 }) => {
 	const media = resolveVenueMedia(item || {});
+	const rawMediaCounts =
+		item?.media_counts ||
+		item?.mediaCounts ||
+		(media?.counts && typeof media.counts === "object" ? media.counts : null) ||
+		{};
+	const realImageCount = Number(rawMediaCounts?.images || 0);
+	const realVideoCount = Number(rawMediaCounts?.videos || 0);
+	const realTotalCount = Number(
+		rawMediaCounts?.total || realImageCount + realVideoCount,
+	);
 	const pinState = String(item?.pin_state || "").toLowerCase();
 	const isLive =
 		pinState === "live" ||
@@ -153,10 +175,25 @@ export const createPopupHTML = ({
 			? "from-purple-800 via-violet-700 to-indigo-800"
 			: "from-zinc-800 via-zinc-700 to-zinc-800";
 
-	// Venue image (uses primary image from Supabase or Google Places)
-	const imageUrl = sanitizeUrl(
-		media?.primaryImage || item?.Image_URL1 || item?.image_url || "",
-	);
+	const mediaBadges = [];
+	if (realImageCount > 0) {
+		mediaBadges.push(
+			`<span class="rounded-full border border-cyan-400/35 bg-cyan-500/15 px-2 py-0.5 text-[8px] font-black uppercase text-cyan-100">IMG ${realImageCount}</span>`,
+		);
+	}
+	if (realVideoCount > 0) {
+		mediaBadges.push(
+			`<span class="rounded-full border border-fuchsia-400/35 bg-fuchsia-500/15 px-2 py-0.5 text-[8px] font-black uppercase text-fuchsia-100">VID ${realVideoCount}</span>`,
+		);
+	}
+	if (!mediaBadges.length) {
+		mediaBadges.push(
+			`<span class="rounded-full border border-white/15 bg-black/35 px-2 py-0.5 text-[8px] font-bold uppercase text-white/80">${realTotalCount > 0 ? `Gallery ${realTotalCount}` : "No media"}</span>`,
+		);
+	}
+
+	// Real venue image only
+	const imageUrl = sanitizeUrl(media?.primaryImage || "");
 	const fallbackPoster = `
 		<div class="absolute inset-0 bg-gradient-to-br ${stripGradient}" style="opacity:0.95;"></div>
 		<div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.12),transparent_42%)]"></div>
@@ -165,14 +202,13 @@ export const createPopupHTML = ({
 				<p class="truncate text-[8px] font-black uppercase tracking-[0.24em] text-white/65">${safeCategory}</p>
 				<p class="mt-1 truncate text-[11px] font-black text-white">${safeName || "Venue"}</p>
 			</div>
-			<span class="rounded-full border border-white/15 bg-black/25 px-2 py-0.5 text-[8px] font-bold uppercase text-white/80">Media</span>
 		</div>
 	`;
 	const imageHtml = `
 		<div
 			class="relative overflow-hidden"
 			data-testid="popup-media"
-			style="height:clamp(72px,18vw,88px);flex-shrink:0;background:#0f172a;"
+			style="height:clamp(90px,20vw,100px);flex-shrink:0;background:#0f172a;"
 		>
 			${fallbackPoster}
 			${
@@ -180,11 +216,14 @@ export const createPopupHTML = ({
 					? `<img src="${imageUrl}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;" loading="lazy" decoding="async" onerror="this.remove()">`
 					: ""
 			}
+			<div class="absolute right-2 bottom-2 z-[1] flex flex-wrap items-center justify-end gap-1">
+				${mediaBadges.join("")}
+			</div>
 		</div>
 	`;
 
 	return `
-    <div class="vibe-popup bg-zinc-900/95 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.7)] border border-white/10 overflow-hidden w-[180px] backdrop-blur-sm" data-shop-id="${safeShopId}" style="position:relative;">
+    <div class="vibe-popup bg-zinc-900/95 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.7)] border border-white/10 overflow-hidden w-[230px]" data-shop-id="${safeShopId}" style="position:relative;">
 
       <div data-testid="popup-live-bar" class="relative h-8 bg-gradient-to-r ${stripGradient} flex items-center gap-1 px-2">
         ${statusBadge}
@@ -236,18 +275,26 @@ export const createMarkerElement = ({
 	el.dataset.shopId = sanitizeId(item.id);
 	el.style.pointerEvents = "auto";
 
-	// escapeHtml applied to all user-supplied strings before innerHTML insertion
-	const safeName = escapeHtml(item.name || "VIBE");
+	const safeName = String(item.name || "VIBE");
 	const truncated = safeName.length > 14 ? safeName.substring(0, 14) : safeName;
 
-	const coinHtml = hasCoins
-		? '<div class="neon-coin-float lottie-coin-target"></div>'
-		: "";
-	const badgeHtml = isLive ? '<span class="neon-sign-badge">LIVE</span>' : "";
-	const textHtml = `<span class="neon-sign-text">${truncated}</span>`;
+	if (hasCoins) {
+		const coin = document.createElement("div");
+		coin.className = "neon-coin-float lottie-coin-target";
+		el.appendChild(coin);
+	}
 
-	// All interpolated values are either static class strings or escapeHtml-sanitized
-	el.innerHTML = coinHtml + textHtml + badgeHtml;
+	const text = document.createElement("span");
+	text.className = "neon-sign-text";
+	text.textContent = truncated;
+	el.appendChild(text);
+
+	if (isLive) {
+		const badge = document.createElement("span");
+		badge.className = "neon-sign-badge";
+		badge.textContent = "LIVE";
+		el.appendChild(badge);
+	}
 
 	return el;
 };
@@ -260,52 +307,117 @@ export const createGiantPinElement = (event) => {
 	el.className = "giant-pin-marker";
 	el.dataset.eventId = sanitizeId(event.id);
 	const safeEventId = sanitizeId(event.id);
-	const safeLabel = escapeHtml(event.shortName || event.name || "Event");
-	const safeIconUrl = sanitizeUrl(event.icon);
 
-	// Premium SVG-based event marker
-	el.innerHTML = `
-    <div class="giant-pin-wrapper">
-      <svg class="giant-pin-svg" width="80" height="100" viewBox="0 0 80 100" fill="none">
-        <defs>
-          <linearGradient id="eventGrad-${safeEventId}" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#8B5CF6"/>
-            <stop offset="50%" stop-color="#EC4899"/>
-            <stop offset="100%" stop-color="#F43F5E"/>
-          </linearGradient>
-          <filter id="eventGlow-${safeEventId}" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="4" result="blur"/>
-            <feMerge>
-              <feMergeNode in="blur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
-          <filter id="eventInner-${safeEventId}">
-            <feOffset dx="0" dy="2"/>
-            <feGaussianBlur stdDeviation="2"/>
-            <feComposite operator="out" in="SourceGraphic"/>
-            <feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.3 0"/>
-            <feBlend in="SourceGraphic"/>
-          </filter>
-        </defs>
-        <circle cx="40" cy="35" r="30" fill="none" stroke="url(#eventGrad-${safeEventId})" stroke-width="2" opacity="0.5" class="pulse-ring"/>
-        <circle cx="40" cy="35" r="28" fill="url(#eventGrad-${safeEventId})" filter="url(#eventGlow-${safeEventId})"/>
-        <ellipse cx="40" cy="28" rx="16" ry="10" fill="white" opacity="0.2"/>
-        <circle cx="40" cy="35" r="18" fill="rgba(255,255,255,0.15)"/>
-        <path d="M30 55 L40 75 L50 55" fill="url(#eventGrad-${safeEventId})" filter="url(#eventGlow-${safeEventId})"/>
-      </svg>
-      <div class="giant-pin-icon-overlay" style="display:flex;align-items:center;justify-content:center;height:100%;border-radius:50%;overflow:hidden;">
-        ${
-					event.coverImage || event.cover_image || event.Image_URL1
-						? `<img src="${event.coverImage || event.cover_image || event.Image_URL1}" class="w-full h-full object-cover" />`
-						: safeIconUrl
-							? `<img src="${safeIconUrl}" class="w-7 h-7 object-contain" />`
-							: `<span style="font-size: 24px;">${escapeHtml(event.icon || "🎪")}</span>`
-				}
-      </div>
-      <div class="giant-pin-label-new">${safeLabel}</div>
-    </div>
-  `;
+	const wrapper = document.createElement("div");
+	wrapper.className = "giant-pin-wrapper";
+
+	const svg = createSvgElement("svg", {
+		class: "giant-pin-svg",
+		width: "72",
+		height: "92",
+		viewBox: "0 0 72 92",
+		fill: "none",
+	});
+
+	const defs = createSvgElement("defs");
+	const gradient = createSvgElement("linearGradient", {
+		id: `eventGrad-${safeEventId}`,
+		x1: "0%",
+		y1: "0%",
+		x2: "100%",
+		y2: "100%",
+	});
+	gradient.append(
+		createSvgElement("stop", { offset: "0%", "stop-color": "#8B5CF6" }),
+		createSvgElement("stop", { offset: "50%", "stop-color": "#EC4899" }),
+		createSvgElement("stop", { offset: "100%", "stop-color": "#F43F5E" }),
+	);
+
+	const glowFilter = createSvgElement("filter", {
+		id: `eventGlow-${safeEventId}`,
+		x: "-50%",
+		y: "-50%",
+		width: "200%",
+		height: "200%",
+	});
+	const glowBlur = createSvgElement("feGaussianBlur", {
+		stdDeviation: "4",
+		result: "blur",
+	});
+	const glowMerge = createSvgElement("feMerge");
+	glowMerge.append(
+		createSvgElement("feMergeNode", { in: "blur" }),
+		createSvgElement("feMergeNode", { in: "SourceGraphic" }),
+	);
+	glowFilter.append(glowBlur, glowMerge);
+
+	const innerFilter = createSvgElement("filter", {
+		id: `eventInner-${safeEventId}`,
+	});
+	innerFilter.append(
+		createSvgElement("feOffset", { dx: "0", dy: "2" }),
+		createSvgElement("feGaussianBlur", { stdDeviation: "2" }),
+		createSvgElement("feComposite", {
+			operator: "out",
+			in: "SourceGraphic",
+		}),
+		createSvgElement("feColorMatrix", {
+			type: "matrix",
+			values: "0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.3 0",
+		}),
+		createSvgElement("feBlend", { in: "SourceGraphic" }),
+	);
+
+	defs.append(gradient, glowFilter, innerFilter);
+
+	svg.append(
+		defs,
+		createSvgElement("circle", {
+			cx: "36",
+			cy: "31",
+			r: "24",
+			fill: "none",
+			stroke: `url(#eventGrad-${safeEventId})`,
+			"stroke-width": "2",
+			opacity: "0.45",
+			class: "pulse-ring",
+		}),
+		createSvgElement("circle", {
+			cx: "36",
+			cy: "31",
+			r: "22",
+			fill: `url(#eventGrad-${safeEventId})`,
+			filter: `url(#eventGlow-${safeEventId})`,
+		}),
+		createSvgElement("ellipse", {
+			cx: "36",
+			cy: "25",
+			rx: "12",
+			ry: "8",
+			fill: "white",
+			opacity: "0.24",
+		}),
+		createSvgElement("circle", {
+			cx: "36",
+			cy: "31",
+			r: "12",
+			fill: "rgba(255,255,255,0.15)",
+		}),
+		createSvgElement("circle", {
+			cx: "36",
+			cy: "31",
+			r: "6",
+			fill: "rgba(255,255,255,0.22)",
+		}),
+		createSvgElement("path", {
+			d: "M28 49 L36 69 L44 49",
+			fill: `url(#eventGrad-${safeEventId})`,
+			filter: `url(#eventGlow-${safeEventId})`,
+		}),
+	);
+
+	wrapper.append(svg);
+	el.appendChild(wrapper);
 
 	el.style.cursor = "pointer";
 	return el;

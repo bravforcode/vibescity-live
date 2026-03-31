@@ -18,9 +18,11 @@ const THRESHOLD = 80;
 // State tracking
 let startY = 0;
 let isDragging = false;
+let activePointerId = null;
 let resetTimeout = null; // ✅ Store timeout ID for cleanup
 
-const onTouchStart = (e) => {
+const onPointerDown = (e) => {
+	if (e.pointerType === "mouse") return;
 	// Only trigger if at top of scroll (use || not &&)
 	if (
 		window.scrollY > 0 ||
@@ -28,14 +30,15 @@ const onTouchStart = (e) => {
 	)
 		return;
 
-	startY = e.touches[0].clientY;
+	startY = e.clientY;
 	isDragging = true;
+	activePointerId = e.pointerId;
 };
 
-const onTouchMove = (e) => {
-	if (!isDragging) return;
+const onPointerMove = (e) => {
+	if (!isDragging || e.pointerId !== activePointerId) return;
 
-	const currentY = e.touches[0].clientY;
+	const currentY = e.clientY;
 	const diff = currentY - startY;
 
 	// Only pull down
@@ -50,14 +53,13 @@ const onTouchMove = (e) => {
 		} else if (pullDistance.value < THRESHOLD && isReadyToRefresh.value) {
 			isReadyToRefresh.value = false;
 		}
-
-		// Always prevent native pull-to-refresh when actively handling
-		if (e.cancelable) e.preventDefault();
 	}
 };
 
-const onTouchEnd = () => {
+const onPointerUp = (e) => {
+	if (e.pointerId !== activePointerId) return;
 	isDragging = false;
+	activePointerId = null;
 	if (isReadyToRefresh.value) {
 		pullDistance.value = THRESHOLD; // Snap to loading position
 		successFeedback();
@@ -97,9 +99,11 @@ onBeforeUnmount(() => {
     ref="containerRef"
     data-testid="pull-refresh"
     class="pull-refresh-wrapper relative"
-    @touchstart.passive="onTouchStart"
-    @touchmove="onTouchMove"
-    @touchend="onTouchEnd"
+    style="touch-action: pan-x pinch-zoom; overscroll-behavior-y: contain"
+    @pointerdown.passive="onPointerDown"
+    @pointermove="onPointerMove"
+    @pointerup.passive="onPointerUp"
+    @pointercancel.passive="onPointerUp"
   >
     <!-- Spinner Area -->
     <div

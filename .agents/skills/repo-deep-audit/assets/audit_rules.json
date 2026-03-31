@@ -1,0 +1,170 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "merge-conflict-marker",
+      "severity": "critical",
+      "description": "File still contains Git merge conflict markers.",
+      "path_globs": ["**/*"],
+      "extensions": ["*"],
+      "regex": "^(<{7}|={7}|>{7})( .*)?$",
+      "flags": ["MULTILINE"],
+      "remediation": "Resolve the merge conflict and rerun validation."
+    },
+    {
+      "id": "hardcoded-secret",
+      "severity": "critical",
+      "description": "File appears to contain a hardcoded secret or private key.",
+      "path_globs": ["**/*"],
+      "extensions": ["*"],
+      "regex": "(BEGIN (RSA|EC|OPENSSH) PRIVATE KEY|-----BEGIN PRIVATE KEY-----|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z\\-_]{35}|sk_[A-Za-z0-9]{16,})",
+      "flags": ["IGNORECASE"],
+      "remediation": "Remove the secret from source control and rotate the credential."
+    },
+    {
+      "id": "verify-jwt-disabled",
+      "severity": "high",
+      "description": "Supabase Edge function disables JWT verification.",
+      "path_globs": ["**/*.toml", "**/*.yaml", "**/*.yml"],
+      "extensions": [".toml", ".yaml", ".yml"],
+      "regex": "verify_jwt\\s*=\\s*false",
+      "flags": ["IGNORECASE"],
+      "remediation": "Document the exception or re-enable JWT verification."
+    },
+    {
+      "id": "csp-unsafe",
+      "severity": "high",
+      "description": "Content Security Policy allows unsafe script execution.",
+      "path_globs": ["**/*.json", "**/*.js", "**/*.mjs", "**/*.ts"],
+      "extensions": [".json", ".js", ".mjs", ".ts"],
+      "regex": "unsafe-eval|unsafe-inline",
+      "flags": ["IGNORECASE"],
+      "remediation": "Replace unsafe directives with nonces, hashes, or tighter allowlists."
+    },
+    {
+      "id": "todo-fixme-hack",
+      "severity": "medium",
+      "description": "File contains TODO, FIXME, HACK, or XXX debt markers.",
+      "path_globs": ["**/*"],
+      "extensions": ["*"],
+      "regex": "\\b(TODO|FIXME|HACK|XXX)\\b",
+      "flags": ["IGNORECASE"],
+      "remediation": "Convert the note into a tracked task or resolve it."
+    },
+    {
+      "id": "console-debug",
+      "severity": "medium",
+      "description": "User-facing source still contains console debugging.",
+      "path_globs": ["src/**/*", "backend/**/*", "scripts/**/*"],
+      "extensions": [".js", ".jsx", ".ts", ".tsx", ".vue", ".mjs", ".cjs", ".py"],
+      "regex": "\\bconsole\\.(log|debug|trace)\\s*\\(",
+      "flags": ["IGNORECASE"],
+      "remediation": "Remove debug logging or gate it behind a controlled debug flag."
+    },
+    {
+      "id": "debugger-statement",
+      "severity": "high",
+      "description": "Source contains a debugger statement.",
+      "path_globs": ["src/**/*", "backend/**/*", "scripts/**/*"],
+      "extensions": [".js", ".jsx", ".ts", ".tsx", ".vue", ".mjs", ".cjs"],
+      "regex": "\\bdebugger\\s*;",
+      "flags": [],
+      "remediation": "Remove the debugger statement before shipping."
+    },
+    {
+      "id": "ts-any",
+      "severity": "medium",
+      "description": "TypeScript file uses the any type directly.",
+      "path_globs": ["**/*.ts", "**/*.tsx", "**/*.vue"],
+      "extensions": [".ts", ".tsx", ".vue"],
+      "regex": ":\\s*any\\b|<any>|\\bArray<any>\\b",
+      "flags": [],
+      "remediation": "Replace any with a real type, a generic, or an unknown plus narrowing."
+    },
+    {
+      "id": "ts-ignore",
+      "severity": "high",
+      "description": "TypeScript suppression comment is present.",
+      "path_globs": ["**/*.ts", "**/*.tsx", "**/*.vue"],
+      "extensions": [".ts", ".tsx", ".vue"],
+      "regex": "@ts-ignore|@ts-nocheck",
+      "flags": ["IGNORECASE"],
+      "remediation": "Replace the suppression with a real type fix or a narrower escape hatch."
+    },
+    {
+      "id": "unsafe-eval-api",
+      "severity": "high",
+      "description": "Source uses eval or Function constructor.",
+      "path_globs": ["src/**/*", "backend/**/*", "scripts/**/*"],
+      "extensions": [".js", ".jsx", ".ts", ".tsx", ".vue", ".mjs", ".cjs"],
+      "regex": "\\beval\\s*\\(|new\\s+Function\\s*\\(",
+      "flags": ["IGNORECASE"],
+      "remediation": "Replace dynamic code execution with explicit control flow."
+    },
+    {
+      "id": "unsafe-html",
+      "severity": "high",
+      "description": "Frontend source uses raw HTML rendering APIs.",
+      "path_globs": ["src/**/*"],
+      "extensions": [".js", ".jsx", ".ts", ".tsx", ".vue"],
+      "regex": "\\bv-html\\b|\\.innerHTML\\b",
+      "flags": ["IGNORECASE"],
+      "remediation": "Sanitize the content or replace raw HTML rendering with structured markup."
+    },
+    {
+      "id": "python-bare-except",
+      "severity": "high",
+      "description": "Python file has a bare except clause.",
+      "path_globs": ["backend/**/*", "scripts/**/*"],
+      "extensions": [".py"],
+      "regex": "^\\s*except\\s*:\\s*$",
+      "flags": ["MULTILINE"],
+      "remediation": "Catch specific exception types and log or handle them intentionally."
+    },
+    {
+      "id": "python-broad-except",
+      "severity": "medium",
+      "description": "Python file catches Exception or BaseException broadly.",
+      "path_globs": ["backend/**/*", "scripts/**/*"],
+      "exclude_path_globs": [
+        "backend/scripts/manage_memory.py",
+        "backend/scripts/schema_tools.py",
+        "backend/scripts/test_connect.py",
+        "backend/scripts/triad_doctor.py",
+        "backend/scripts/data_pipeline.py"
+      ],
+      "extensions": [".py"],
+      "regex": "^\\s*except\\s+(Exception|BaseException)\\b",
+      "flags": ["MULTILINE"],
+      "remediation": "Narrow the exception scope and handle expected failures explicitly."
+    },
+    {
+      "id": "python-print-debug",
+      "severity": "low",
+      "description": "Python file contains print-based debugging.",
+      "path_globs": ["backend/**/*", "scripts/**/*"],
+      "exclude_path_globs": [
+        "backend/scripts/manage_memory.py",
+        "backend/scripts/schema_tools.py",
+        "backend/scripts/test_connect.py",
+        "backend/scripts/triad_doctor.py",
+        "backend/scripts/data_pipeline.py"
+      ],
+      "extensions": [".py"],
+      "regex": "\\bprint\\s*\\(",
+      "flags": [],
+      "remediation": "Replace print debugging with structured logging when needed."
+    },
+    {
+      "id": "sql-destructive-ddl",
+      "severity": "high",
+      "description": "SQL contains destructive DDL or a broad data removal pattern.",
+      "path_globs": ["**/*.sql"],
+      "extensions": [".sql"],
+      "content_mode": "strip_sql_comments",
+      "regex": "\\b(DROP\\s+TABLE|TRUNCATE\\s+TABLE|DELETE\\s+FROM\\s+[A-Za-z0-9_\\.\"]+\\s*;)\\b",
+      "flags": ["IGNORECASE"],
+      "remediation": "Verify the statement is intentional, guarded, reversible, and documented."
+    }
+  ]
+}

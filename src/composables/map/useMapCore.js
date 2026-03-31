@@ -6,11 +6,26 @@ import { useInteractionState } from "../useInteractionState";
 import { isMapContentReadyForMode } from "./mapContentReadiness";
 import { normalizeMapStyleMode } from "./mapStyleMode";
 
-// Env-driven style URL: prefer custom style, then fallback, then safe public default
-const MAP_STYLE =
-	import.meta.env.VITE_MAP_STYLE_URL ||
-	import.meta.env.VITE_MAP_STYLE_FALLBACK_URL ||
-	"https://demotiles.maplibre.org/style.json";
+// Public runtime must stay on the same-origin neon style unless callers opt into
+// something else explicitly via useMapCore options.
+const MAP_STYLE = "/map-styles/vibecity-neon.json";
+const PRIVATE_BROWSER_HOST_PATTERN =
+	/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.|169\.254\.|::1$|.+\.local$)/i;
+
+const shouldExposeMapDebug = () => {
+	if (import.meta.env.DEV) return true;
+	if (typeof window === "undefined") return false;
+	return PRIVATE_BROWSER_HOST_PATTERN.test(
+		String(window.location?.hostname || "")
+			.trim()
+			.toLowerCase(),
+	);
+};
+
+const syncMapDebugHandle = (mapInstance = null) => {
+	if (!shouldExposeMapDebug() || typeof window === "undefined") return;
+	window.__vibecityMapDebug = mapInstance ?? null;
+};
 
 const MAPLIBRE_SUPPRESSED_WARN_PATTERNS = [
 	[
@@ -27,6 +42,7 @@ const MAPLIBRE_PIN_IMAGE_WARN_SNIPPETS = [
 	"could not be loaded. Please make sure you have added the image with map.addImage()",
 	'You can provide missing images by listening for the "styleimagemissing" map event.',
 ];
+const MAPLIBRE_BASEMAP_PLACEHOLDER_IMAGE_IDS = ["office"];
 const MAPLIBRE_TRANSIENT_PIN_IMAGE_IDS = [
 	"pin-normal",
 	"pin-grey",
@@ -50,8 +66,16 @@ const shouldSuppressMaplibreFeaturesetWarn = (args) => {
 	);
 	if (matchesKnownPattern) return true;
 	if (message.includes(MAPLIBRE_TRANSIENT_TOUCH_WARN)) return true;
-	return (
+	const isKnownPinImageWarning =
 		MAPLIBRE_TRANSIENT_PIN_IMAGE_IDS.some((id) =>
+			message.includes(`"${id}"`),
+		) &&
+		MAPLIBRE_PIN_IMAGE_WARN_SNIPPETS.every((snippet) =>
+			message.includes(snippet),
+		);
+	if (isKnownPinImageWarning) return true;
+	return (
+		MAPLIBRE_BASEMAP_PLACEHOLDER_IMAGE_IDS.some((id) =>
 			message.includes(`"${id}"`),
 		) &&
 		MAPLIBRE_PIN_IMAGE_WARN_SNIPPETS.every((snippet) =>
@@ -112,10 +136,7 @@ export function useMapCore(containerRef, options = {}) {
 	const PRIMARY_STYLE_URL =
 		resolveStyleUrl(options.primaryStyleUrl) || MAP_STYLE;
 	const FALLBACK_STYLE_URL =
-		resolveStyleUrl(options.fallbackStyleUrl) ||
-		import.meta.env.VITE_MAP_STYLE_FALLBACK_URL ||
-		PRIMARY_STYLE_URL ||
-		"https://demotiles.maplibre.org/style.json";
+		resolveStyleUrl(options.fallbackStyleUrl) || PRIMARY_STYLE_URL || MAP_STYLE;
 	const STYLE_ENDPOINT_PATH = "/styles/v1/";
 	const EMPTY_VECTOR_TILE_DATA_URI = "data:application/x-protobuf;base64,";
 	const MAP_RESOURCE_HOST_SNIPPETS = [
@@ -220,6 +241,11 @@ export function useMapCore(containerRef, options = {}) {
 		"pin-boost": "/images/pins/pin-red.png",
 		"pin-giant": "/images/pins/pin-purple.png",
 	};
+	const createTransparentStyleImage = (size = 1) => ({
+		width: size,
+		height: size,
+		data: new Uint8Array(size * size * 4),
+	});
 	const pendingPinImages = new Set();
 	const warnedMissingTerrainSources = new Set();
 	const reportPinImageRegistrationFailure = (
@@ -427,6 +453,7 @@ export function useMapCore(containerRef, options = {}) {
 				},
 			}),
 		);
+		syncMapDebugHandle(map.value);
 
 		const canvas = map.value.getCanvas?.() || null;
 		const canvasContainer = map.value.getCanvasContainer?.() || null;
@@ -605,13 +632,26 @@ export function useMapCore(containerRef, options = {}) {
 				return;
 			}
 
-			// Genuine errors
-			console.error("MapLibre Error:", e);
+			// Genuine errors: surface the real message instead of the minified wrapper.
+			console.error(
+				"MapLibre Error:",
+				e?.error?.message || e?.message || e?.error || e,
+			);
 		});
 
 		// Handle missing images (loaded on demand for symbol layers)
 		map.value.on("styleimagemissing", (e) => {
 			const id = e.id;
+			if (MAPLIBRE_BASEMAP_PLACEHOLDER_IMAGE_IDS.includes(id)) {
+				if (map.value && !map.value.hasImage(id)) {
+					try {
+						map.value.addImage(id, createTransparentStyleImage());
+					} catch {
+						// Ignore duplicate image races during style transitions.
+					}
+				}
+				return;
+			}
 			const url = PIN_IMAGES[id];
 			if (
 				url &&
@@ -656,6 +696,7 @@ export function useMapCore(containerRef, options = {}) {
 			map.value.remove();
 			map.value = null;
 		}
+		syncMapDebugHandle(null);
 		clearContentReadyTimers();
 		uninstallMaplibreWarnFilter();
 	});

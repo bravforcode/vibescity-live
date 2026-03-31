@@ -7,6 +7,7 @@ export function useScrollSync({
 	mobileCardScrollRef,
 	onScrollDecelerate, // ✅ Track intent on deceleration
 	onCenteredShopCommit,
+	enableInitialCenteredShopCommit = true,
 }) {
 	const normalizeId = (value) => {
 		if (value === null || value === undefined) return null;
@@ -28,8 +29,25 @@ export function useScrollSync({
 	let cachedContainerWidth = 0;
 	let cachedCardCount = 0;
 	let metricsFrame = 0;
+	let metricsRetryTimeout = null;
 	let resizeObserver = null;
 	let hasCommittedInitialCenteredShop = false;
+	let initialMetricRetryCount = 0;
+	const MAX_INITIAL_METRIC_RETRIES = 8;
+
+	const shouldAutoCommitInitialCenteredShop = () => {
+		if (hasCommittedInitialCenteredShop) return false;
+		if (!enableInitialCenteredShopCommit) return false;
+		if (normalizeId(activeShopId.value)) return false;
+		return Boolean(mobileCardScrollRef.value && cachedCardMetrics.length > 0);
+	};
+
+	const shouldRetryInitialMetricCapture = () => {
+		if (hasCommittedInitialCenteredShop) return false;
+		if (!enableInitialCenteredShopCommit) return false;
+		if (normalizeId(activeShopId.value)) return false;
+		return Boolean(mobileCardScrollRef.value);
+	};
 
 	const disconnectMetricObserver = () => {
 		if (resizeObserver) {
@@ -102,7 +120,24 @@ export function useScrollSync({
 		if (metricsFrame) return;
 		metricsFrame = window.requestAnimationFrame(() => {
 			metricsFrame = 0;
-			refreshCardMetrics();
+			const hasMetrics = refreshCardMetrics();
+			if (hasMetrics) {
+				initialMetricRetryCount = 0;
+			} else if (
+				shouldRetryInitialMetricCapture() &&
+				initialMetricRetryCount < MAX_INITIAL_METRIC_RETRIES
+			) {
+				initialMetricRetryCount += 1;
+				if (metricsRetryTimeout) clearTimeout(metricsRetryTimeout);
+				metricsRetryTimeout = window.setTimeout(() => {
+					metricsRetryTimeout = null;
+					scheduleMetricRefresh();
+				}, 48);
+				return;
+			}
+			if (shouldAutoCommitInitialCenteredShop()) {
+				commitCenteredShop();
+			}
 		});
 	};
 
@@ -277,6 +312,7 @@ export function useScrollSync({
 	const cleanup = () => {
 		if (settleTimeout) clearTimeout(settleTimeout);
 		if (programmaticTimeout) clearTimeout(programmaticTimeout);
+		if (metricsRetryTimeout) clearTimeout(metricsRetryTimeout);
 		if (metricsFrame) {
 			window.cancelAnimationFrame(metricsFrame);
 			metricsFrame = 0;

@@ -211,7 +211,7 @@
 		"place_name_placeholder": "เช่น The Rooftop Bar",
 		"category": "หมวดหมู่",
 		"province": "จังหวัด",
-		"province_placeholder": "เช่น เชียงใหม่",
+		"province_placeholder": "เช่น กรุงเทพฯ เชียงใหม่ ภูเก็ต",
 		"earn_rewards": "รับรางวัล!",
 		"earn_desc": "รับ +{coins} เหรียญ & +{xp} XP สำหรับทุกสถานที่ที่ได้รับการอนุมัติ",
 		"location": "ตำแหน่ง",
@@ -341,6 +341,12 @@
 		"select": "เลือกร้าน",
 		"about": "เกี่ยวกับ",
 		"current_vibe": "บรรยากาศตอนนี้",
+		"featured_shop": "ร้านหลัก",
+		"now_showing": "กำลังแสดง",
+		"preview_hint": "แตะการ์ดเพื่อสลับร้านหลัก",
+		"preview_action": "แตะเพื่อพรีวิว",
+		"photo_count": "{count} ภาพ",
+		"video_count": "{count} วิดีโอ",
 		"shops_inside": "{count} ร้านในอาคาร",
 		"shops_in_building": "ร้านค้าในอาคาร",
 		"no_phone": "ไม่มีเบอร์โทร",
@@ -399,15 +405,6 @@
 		},
 		"mapless": {
 			"unavailable": "อุปกรณ์นี้ไม่รองรับแผนที่"
-		},
-		"dev_preview": {
-			"badge": "โหมดพรีวิวโลคอลที่นิ่งกว่า",
-			"title": "Chromium บน local dev จะข้าม WebGL โดยอัตโนมัติ",
-			"desc": "โหมดพรีวิวนี้ทำให้ localhost โหลดไวขึ้นและคอนโซลเงียบขึ้น ส่วน production, E2E และการเปิด WebGL แบบ opt-in ยังใช้ MapLibre เต็มรูปแบบตามเดิม",
-			"visible": "พินที่แสดง",
-			"empty": "ยังไม่มีพิกัดสถานที่ที่พร้อมใช้งาน จึงแสดงพรีวิว placeholder ไปก่อน",
-			"open_webgl": "เปิดแผนที่ WebGL เต็มรูปแบบ",
-			"note": "ใช้เมื่อจำเป็นต้องตรวจพฤติกรรม WebGL จริงใน browser session นี้เท่านั้น"
 		},
 		"token_error": {
 			"title": "โทเคนแผนที่ผิดพลาด",

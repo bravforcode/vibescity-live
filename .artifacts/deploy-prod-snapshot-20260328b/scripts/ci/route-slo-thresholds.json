@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "notes": "Route-level SLO thresholds for synthetic postdeploy monitor. public.venues remains source of truth; no DB schema dependency.",
+  "endpoints": [
+    {
+      "endpoint_key": "api_health",
+      "method": "GET",
+      "path": "/health",
+      "required": true,
+      "max_latency_ms_p95": 2000,
+      "allowed_statuses_read_only": [200],
+      "allowed_statuses_write_mode": [200]
+    },
+    {
+      "endpoint_key": "api_checkout_session",
+      "method": "GET",
+      "path": "/api/v1/payments/create-checkout-session",
+      "required": true,
+      "max_latency_ms_p95": 4000,
+      "allowed_statuses_read_only": [200, 401, 403, 405],
+      "allowed_statuses_write_mode": [200, 400, 401, 403, 422]
+    },
+    {
+      "endpoint_key": "api_manual_order",
+      "method": "GET",
+      "path": "/api/v1/payments/manual-order",
+      "required": true,
+      "max_latency_ms_p95": 4000,
+      "allowed_statuses_read_only": [200, 401, 403, 405],
+      "allowed_statuses_write_mode": [200, 400, 401, 403, 422]
+    },
+    {
+      "endpoint_key": "edge_checkout_session",
+      "method": "GET",
+      "path": "/functions/v1/create-checkout-session",
+      "required": false,
+      "max_latency_ms_p95": 6000,
+      "allowed_statuses_read_only": [200, 401, 403, 405],
+      "allowed_statuses_write_mode": [200, 400, 401, 403, 422]
+    },
+    {
+      "endpoint_key": "edge_get_order_status",
+      "method": "GET",
+      "path": "/functions/v1/get-order-status",
+      "required": false,
+      "max_latency_ms_p95": 6000,
+      "allowed_statuses_read_only": [200, 400, 401, 403, 404, 405],
+      "allowed_statuses_write_mode": [200, 400, 401, 403, 404, 422]
+    }
+  ]
+}

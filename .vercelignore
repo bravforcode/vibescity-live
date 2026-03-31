@@ -11,6 +11,9 @@ vibecity.live/
 ux-ui-agent-skills/
 .loki/
 .ruff_cache/
+.venv/
+.venv*/
+.vercel_python_packages/
 .planning/
 .agent/
 .storybook/
@@ -24,10 +27,8 @@ test-results/
 playwright-report*/
 e2e/
 tests/
-backend/
 supabase/
 docs/
-scripts/
 tmp/
 
 # Node Modules
@@ -50,6 +51,8 @@ pnpm-debug.log*
 
 # OS Files
 .DS_Store
+backend/.venv/
+backend/.pytest_cache/
 
 # Data files (Exclude extremely large ones if needed)
 # public/data/*.geojson

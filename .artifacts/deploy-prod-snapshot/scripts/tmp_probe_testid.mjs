@@ -1,0 +1,10 @@
+import { chromium } from "playwright";
+const browser = await chromium.launch({ headless: true });
+const page = await browser.newPage();
+await page.goto("http://localhost:5417", { waitUntil: "domcontentloaded" });
+await page.waitForTimeout(3000);
+const byTestIdCount = await page.getByTestId("btn-filter").count();
+const cssCount = await page.locator('[data-testid="btn-filter"]').count();
+const cssVisible = await page.locator('[data-testid="btn-filter"]').first().isVisible().catch(() => false);
+console.log(JSON.stringify({ byTestIdCount, cssCount, cssVisible }, null, 2));
+await browser.close();

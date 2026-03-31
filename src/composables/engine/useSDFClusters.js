@@ -177,8 +177,25 @@ export function useSDFClusters(map) {
 		const radius = getPinRadius();
 		const now = performance.now();
 
+		const bounds = map.getBounds();
+		// Expand bounds slightly to prevent edge-popping during rapid pans
+		const sw = bounds.getSouthWest();
+		const ne = bounds.getNorthEast();
+		const minLng = sw.lng - 0.02;
+		const maxLng = ne.lng + 0.02;
+		const minLat = sw.lat - 0.02;
+		const maxLat = ne.lat + 0.02;
+
 		const pins = shops
-			.filter((s) => s.longitude != null && s.latitude != null)
+			.filter((s) => {
+				if (s.longitude == null || s.latitude == null) return false;
+				return (
+					s.longitude >= minLng &&
+					s.longitude <= maxLng &&
+					s.latitude >= minLat &&
+					s.latitude <= maxLat
+				);
+			})
 			.map((s, i) => {
 				const pt = map.project([s.longitude, s.latitude]);
 				let sx = pt.x;

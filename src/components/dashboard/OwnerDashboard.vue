@@ -38,7 +38,51 @@ const activeTab = ref("overview");
 const tabs = [
 	{ id: "overview", label: "Overview", icon: BarChart3 },
 	{ id: "venues", label: "My Venues", icon: MapPin },
+	{ id: "partner", label: "Partner Program", icon: Users },
 ];
+
+const handleTabClick = (tabId) => {
+	if (tabId === "partner") {
+		router.push("/partner");
+		return;
+	}
+	activeTab.value = tabId;
+};
+
+const normalizeVenueStats = (payload, venue) => {
+	const stat = Array.isArray(payload) ? payload[0] || {} : payload || {};
+	return {
+		...stat,
+		live_visitors: Number(stat.live_visitors ?? stat.live_count ?? 0),
+		total_views: Number(
+			stat.total_views ?? venue?.total_views ?? venue?.view_count ?? 0,
+		),
+	};
+};
+
+const isVenueStatsParamMismatch = (error, expectedParam) =>
+	String(error?.code || "").toUpperCase() === "PGRST202" &&
+	String(error?.message || "").includes(`get_venue_stats(${expectedParam})`);
+
+const fetchVenueStatsCompat = async (venue) => {
+	const attempts = [
+		{ params: { p_shop_id: venue.id }, paramName: "p_shop_id" },
+		{ params: { p_venue_id: venue.id }, paramName: "p_venue_id" },
+	];
+
+	for (const { params, paramName } of attempts) {
+		const { data, error } = await supabase.rpc("get_venue_stats", params);
+		if (!error) {
+			return normalizeVenueStats(data, venue);
+		}
+		if (isVenueStatsParamMismatch(error, paramName)) {
+			continue;
+		}
+		throw error;
+	}
+
+	return normalizeVenueStats(null, venue);
+};
 
 const openPromote = (venue) => {
 	promotingVenue.value = venue;
@@ -93,16 +137,18 @@ const fetchDashboardData = async () => {
 
 		// Fetch all venue stats in parallel (was sequential N+1)
 		const statsResults = await Promise.all(
-			venues.value.map((venue) =>
-				supabase.rpc("get_venue_stats", { p_shop_id: venue.id }),
-			),
+			venues.value.map(async (venue) => {
+				try {
+					return await fetchVenueStatsCompat(venue);
+				} catch {
+					return normalizeVenueStats(null, venue);
+				}
+			}),
 		);
-		statsResults.forEach(({ data: stat }, i) => {
-			if (stat) {
-				totalLive += stat.live_visitors ?? 0;
-				totalViews += stat.total_views ?? 0;
-				venues.value[i].stats = stat;
-			}
+		statsResults.forEach((stat, i) => {
+			totalLive += stat.live_visitors ?? 0;
+			totalViews += stat.total_views ?? 0;
+			venues.value[i].stats = stat;
 		});
 
 		stats.value = {
@@ -126,10 +172,10 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="relative z-50 isolate min-h-screen overflow-x-hidden w-full bg-zinc-950 text-white">
+  <div data-testid="owner-dashboard-root" class="relative z-50 isolate min-h-screen overflow-x-hidden w-full bg-zinc-950 text-white">
 
     <!-- Top Bar -->
-    <div class="sticky top-0 z-10 bg-zinc-950/90 backdrop-blur-xl border-b border-white/8 px-4 py-3 flex items-center gap-3">
+    <div data-testid="owner-dashboard-hero" class="sticky top-0 z-10 bg-zinc-950/90 backdrop-blur-xl border-b border-white/8 px-4 py-3 flex items-center gap-3">
       <button
         @click="safeExit"
         class="w-9 h-9 flex items-center justify-center rounded-xl bg-white/8 hover:bg-white/14 active:scale-95 transition-all"
@@ -152,13 +198,13 @@ onMounted(() => {
     </div>
 
     <!-- Tab Bar -->
-    <div class="relative z-10 pointer-events-auto flex gap-1 px-4 pt-4 pb-2">
+    <div class="relative z-10 pointer-events-auto flex gap-1 px-4 pt-4 pb-2 overflow-x-auto no-scrollbar">
       <button
         v-for="tab in tabs"
         :key="tab.id"
-        @click="activeTab = tab.id"
+        @click="handleTabClick(tab.id)"
         style="touch-action: manipulation"
-        class="touch-manipulation select-none flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all"
+        class="touch-manipulation select-none flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap"
         :class="activeTab === tab.id
           ? 'bg-violet-600/30 text-violet-300 border border-violet-500/40'
           : 'text-white/40 hover:text-white/70 hover:bg-white/5'"
@@ -200,10 +246,10 @@ onMounted(() => {
     <div v-else class="pb-10">
 
       <!-- ── OVERVIEW TAB ── -->
-      <div v-if="activeTab === 'overview'" class="px-4 space-y-4 pt-2">
+      <div v-if="activeTab === 'overview'" data-testid="owner-venue-panel" class="px-4 space-y-4 pt-2">
 
         <!-- Stats Grid -->
-        <div class="grid grid-cols-2 gap-3">
+        <div data-testid="owner-kpi-strip" class="grid grid-cols-2 gap-3">
           <!-- Live Visitors -->
           <div class="min-w-0 stat-card p-4 rounded-2xl relative overflow-hidden">
             <div class="absolute top-0 right-0 w-20 h-20 bg-green-500/15 rounded-full blur-xl -mr-4 -mt-4 pointer-events-none"></div>
@@ -262,6 +308,56 @@ onMounted(() => {
             </div>
             <div class="text-3xl font-black text-white">{{ venues.length }}</div>
             <div class="text-[11px] text-white/40 mt-1">Listed on map</div>
+          </div>
+        </div>
+
+        <!-- Partner Program Card -->
+        <div
+          class="p-5 rounded-2xl bg-white/5 border border-white/10 relative overflow-hidden group cursor-pointer active:scale-[0.98] transition-all"
+          @click="router.push('/partner')"
+        >
+          <div class="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none transition-opacity group-hover:opacity-100 opacity-50"></div>
+          <div class="flex items-start justify-between relative z-10">
+            <div class="flex gap-4">
+              <div class="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0">
+                <Users class="w-6 h-6 text-emerald-400" />
+              </div>
+              <div>
+                <h3 class="text-base font-black text-white flex items-center gap-2">
+                  Partner Program
+                  <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold tracking-wider">EARN</span>
+                </h3>
+                <p class="text-xs text-white/50 mt-1 leading-relaxed max-w-[240px]">
+                  Invite other businesses to VibeCity and earn up to 40% commission on every boost.
+                </p>
+              </div>
+            </div>
+            <ChevronLeft class="w-5 h-5 text-white/20 rotate-180" />
+          </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="space-y-3">
+          <h3 class="text-xs font-bold uppercase tracking-widest text-white/30 ml-1">Quick Actions</h3>
+          <div class="grid grid-cols-2 gap-3">
+            <button
+              @click="activeTab = 'venues'"
+              class="p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/8 transition-all flex flex-col gap-2 items-start"
+            >
+              <div class="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center">
+                <Edit3 class="w-4 h-4 text-violet-400" />
+              </div>
+              <span class="text-xs font-bold text-white">Edit Venues</span>
+            </button>
+            <button
+              @click="fetchDashboardData"
+              class="p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/8 transition-all flex flex-col gap-2 items-start"
+            >
+              <div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                <RefreshCw class="w-4 h-4 text-blue-400" />
+              </div>
+              <span class="text-xs font-bold text-white">Refresh Stats</span>
+            </button>
           </div>
         </div>
 

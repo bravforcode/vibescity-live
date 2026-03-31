@@ -15,10 +15,34 @@ const DEFAULT_SYNC_LIMIT = 200;
 const SHEET_DAILY = "Daily Stats";
 const SHEET_TH = "TH Slips";
 const SHEET_FOREIGN = "International Slips";
+const SHEET_VENUES = "Venues";
+const SHEET_USERS = "Users";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 
 const DAILY_HEADERS = ["date", "sessions_count", "new_users_count"];
+const VENUES_HEADERS = [
+  "id",
+  "name",
+  "category",
+  "status",
+  "is_verified",
+  "owner_id",
+  "created_at",
+  "updated_at",
+  "description",
+  "address",
+];
+const USERS_HEADERS = [
+  "user_id",
+  "email",
+  "display_name",
+  "username",
+  "coins",
+  "xp",
+  "level",
+  "created_at",
+];
 const SLIP_HEADERS = [
   "order_created_at",
   "order_id",
@@ -73,9 +97,11 @@ type SyncResponseStats = {
   th: SyncStats;
   foreign: SyncStats;
   daily: SyncStats;
+  venues: SyncStats;
+  users: SyncStats;
 };
 
-type SyncScope = "all" | "th" | "foreign";
+type SyncScope = "all" | "th" | "foreign" | "venues" | "users";
 
 type LedgerRow = {
   source_pk: string;
@@ -98,6 +124,8 @@ const createResponseStats = (): SyncResponseStats => ({
   th: createEmptyStats(),
   foreign: createEmptyStats(),
   daily: createEmptyStats(),
+  venues: createEmptyStats(),
+  users: createEmptyStats(),
 });
 
 const asIsoDate = (value: unknown) => {
@@ -591,7 +619,7 @@ const syncOrderBatch = async (
     else foreignOrders.push(order);
   }
 
-  if (scope !== "foreign") {
+  if (scope === "all" || scope === "th") {
     const ids = thOrders.map((o) => String(o.id));
     const ledger = await loadLedgerMap(adminClient, "orders", SHEET_TH, ids);
     for (const order of thOrders) {
@@ -652,7 +680,7 @@ const syncOrderBatch = async (
     }
   }
 
-  if (scope !== "th") {
+  if (scope === "all" || scope === "foreign") {
     const ids = foreignOrders.map((o) => String(o.id));
     const ledger = await loadLedgerMap(adminClient, "orders", SHEET_FOREIGN, ids);
     for (const order of foreignOrders) {
@@ -712,6 +740,142 @@ const syncOrderBatch = async (
       });
     }
   }
+};
+
+const syncVenuesBatch = async (
+  adminClient: ReturnType<typeof createClient>,
+  spreadsheetId: string,
+  token: string,
+  venues: Array<Record<string, unknown>>,
+  stats: SyncResponseStats,
+) => {
+  const ids = venues.map((v) => String(v.id));
+  const ledger = await loadLedgerMap(adminClient, "venues", SHEET_VENUES, ids);
+
+  for (const venue of venues) {
+    const values = [
+      venue.id || "",
+      venue.name || "",
+      venue.category || "",
+      venue.status || "pending",
+      venue.is_verified ? "true" : "false",
+      venue.owner_id || "",
+      venue.created_at || "",
+      venue.updated_at || "",
+      venue.description || "",
+      venue.address || "",
+    ];
+    await runRowSync(adminClient, spreadsheetId, token, {
+      sourceTable: "venues",
+      sourcePk: String(venue.id),
+      sheetName: SHEET_VENUES,
+      values,
+      stats: stats.venues,
+      ledgerMap: ledger,
+    });
+  }
+};
+
+const syncUsersBatch = async (
+  adminClient: ReturnType<typeof createClient>,
+  spreadsheetId: string,
+  token: string,
+  profiles: Array<Record<string, unknown>>,
+  stats: SyncResponseStats,
+) => {
+  const ids = profiles.map((p) => String(p.user_id || p.id));
+  const ledger = await loadLedgerMap(adminClient, "user_profiles", SHEET_USERS, ids);
+
+  for (const profile of profiles) {
+    const values = [
+      profile.user_id || profile.id || "",
+      profile.email || "",
+      profile.display_name || profile.full_name || "",
+      profile.username || "",
+      asNumber(profile.coins, 0),
+      asNumber(profile.xp, 0),
+      asNumber(profile.level, 0),
+      profile.created_at || "",
+    ];
+    await runRowSync(adminClient, spreadsheetId, token, {
+      sourceTable: "user_profiles",
+      sourcePk: String(profile.user_id || profile.id),
+      sheetName: SHEET_USERS,
+      values,
+      stats: stats.users,
+      ledgerMap: ledger,
+    });
+  }
+};
+
+const pullAndApplyChanges = async (
+  adminClient: ReturnType<typeof createClient>,
+  spreadsheetId: string,
+  token: string,
+) => {
+  // Pull changes from SHEET_VENUES
+  const venuesData = await readSheetValues(spreadsheetId, SHEET_VENUES, token);
+  if (venuesData.length > 1) {
+    const headers = venuesData[0].map(normalizeHeaderValue);
+    const statusIdx = headers.indexOf("status");
+    const idIdx = headers.indexOf("id");
+
+    if (statusIdx !== -1 && idIdx !== -1) {
+      for (let i = 1; i < venuesData.length; i++) {
+        const row = venuesData[i];
+        const id = String(row[idIdx]);
+        const newStatus = normalizeHeaderValue(row[statusIdx]);
+
+        // Check if status changed in DB
+        const { data: currentVenue } = await adminClient
+          .from("venues")
+          .select("status,owner_id")
+          .eq("id", id)
+          .single();
+
+        if (currentVenue && normalizeHeaderValue(currentVenue.status) !== newStatus) {
+          if (newStatus === "active" || newStatus === "approved") {
+            // Apply approval
+            await adminClient
+              .from("venues")
+              .update({ status: "active", is_verified: true })
+              .eq("id", id);
+
+            if (currentVenue.owner_id) {
+              await adminClient.rpc("grant_rewards", {
+                target_user_id: currentVenue.owner_id,
+                reward_coins: 100,
+                reward_xp: 500,
+                action_name: "approve_shop",
+              });
+            }
+          } else if (newStatus === "rejected" || newStatus === "archived") {
+            await adminClient
+              .from("venues")
+              .update({ status: "archived" })
+              .eq("id", id);
+          }
+        }
+      }
+    }
+  }
+
+  // Add more pull logic for Slips if needed...
+};
+
+const readSheetValues = async (
+  spreadsheetId: string,
+  sheetName: string,
+  token: string,
+) => {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!A:ZZ`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data.values || []) as unknown[][];
 };
 
 serve(async (req) => {
@@ -847,6 +1011,11 @@ serve(async (req) => {
     await ensureHeaderRow(googleSheetId, SHEET_DAILY, DAILY_HEADERS, googleToken);
     await ensureHeaderRow(googleSheetId, SHEET_TH, SLIP_HEADERS, googleToken);
     await ensureHeaderRow(googleSheetId, SHEET_FOREIGN, SLIP_HEADERS, googleToken);
+    await ensureHeaderRow(googleSheetId, SHEET_VENUES, VENUES_HEADERS, googleToken);
+    await ensureHeaderRow(googleSheetId, SHEET_USERS, USERS_HEADERS, googleToken);
+
+    // Pull changes from Sheets first
+    await pullAndApplyChanges(adminClient, googleSheetId, googleToken);
 
     const now = new Date();
     const toIso = asIsoDate(body.to) || now.toISOString();
@@ -860,44 +1029,93 @@ serve(async (req) => {
       throw new Error("Invalid range: from must be before to");
     }
 
+    // --- Sync Orders ---
     const timeColumn = mode === "incremental" ? "updated_at" : "created_at";
     let offset = 0;
 
-    while (true) {
-      let slipsQuery = adminClient
-        .from("orders")
-        .select(
-          `id,sku,amount,status,slip_url,created_at,updated_at,visitor_id,user_id,payment_method,metadata,
-           slip_audit!left(
-             buyer_country,buyer_email,buyer_full_name,buyer_phone,buyer_address_line1,buyer_address_line2,
-             buyer_province,buyer_district,buyer_postal,consent_personal_data,ip_address,ip_hash,user_agent,
-             geo_country,geo_region,geo_city,geo_postal,geo_timezone,geo_loc,geo_org,created_at
-           )`,
-        )
-        .order("created_at", { ascending: true })
-        .order("id", { ascending: true })
-        .range(offset, offset + limit - 1);
+    if (scope === "all" || scope === "th" || scope === "foreign") {
+      while (true) {
+        let slipsQuery = adminClient
+          .from("orders")
+          .select(
+            `id,sku,amount,status,slip_url,created_at,updated_at,visitor_id,user_id,payment_method,metadata,
+             slip_audit!left(
+               buyer_country,buyer_email,buyer_full_name,buyer_phone,buyer_address_line1,buyer_address_line2,
+               buyer_province,buyer_district,buyer_postal,consent_personal_data,ip_address,ip_hash,user_agent,
+               geo_country,geo_region,geo_city,geo_postal,geo_timezone,geo_loc,geo_org,created_at
+             )`,
+          )
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true })
+          .range(offset, offset + limit - 1);
 
-      if (fromIso) slipsQuery = slipsQuery.gte(timeColumn, fromIso);
-      if (toIso) slipsQuery = slipsQuery.lte(timeColumn, toIso);
+        if (fromIso) slipsQuery = slipsQuery.gte(timeColumn, fromIso);
+        if (toIso) slipsQuery = slipsQuery.lte(timeColumn, toIso);
 
-      const { data: rawOrders, error: ordersError } = await slipsQuery;
-      if (ordersError) throw ordersError;
+        const { data: rawOrders, error: ordersError } = await slipsQuery;
+        if (ordersError) throw ordersError;
 
-      const orders = (rawOrders || []) as Array<Record<string, unknown>>;
-      if (!orders.length) break;
+        const orders = (rawOrders || []) as Array<Record<string, unknown>>;
+        if (!orders.length) break;
 
-      await syncOrderBatch(
-        adminClient,
-        googleSheetId,
-        googleToken,
-        orders,
-        scope,
-        stats,
-      );
+        await syncOrderBatch(
+          adminClient,
+          googleSheetId,
+          googleToken,
+          orders,
+          scope,
+          stats,
+        );
 
-      if (orders.length < limit) break;
-      offset += limit;
+        if (orders.length < limit) break;
+        offset += limit;
+      }
+    }
+
+    // --- Sync Venues ---
+    if (scope === "all" || scope === "venues") {
+      let venueOffset = 0;
+      while (true) {
+        let venueQuery = adminClient
+          .from("venues")
+          .select("id,name,category,status,is_verified,owner_id,created_at,updated_at,description,address")
+          .order("created_at", { ascending: true })
+          .range(venueOffset, venueOffset + limit - 1);
+
+        if (fromIso) venueQuery = venueQuery.gte(timeColumn, fromIso);
+        if (toIso) venueQuery = venueQuery.lte(timeColumn, toIso);
+
+        const { data: venues, error: venuesError } = await venueQuery;
+        if (venuesError) throw venuesError;
+        if (!venues || !venues.length) break;
+
+        await syncVenuesBatch(adminClient, googleSheetId, googleToken, venues, stats);
+        if (venues.length < limit) break;
+        venueOffset += limit;
+      }
+    }
+
+    // --- Sync Users ---
+    if (scope === "all" || scope === "users") {
+      let userOffset = 0;
+      while (true) {
+        let userQuery = adminClient
+          .from("user_profiles")
+          .select("user_id,email,display_name,username,coins,xp,level,created_at,updated_at")
+          .order("created_at", { ascending: true })
+          .range(userOffset, userOffset + limit - 1);
+
+        if (fromIso) userQuery = userQuery.gte(timeColumn, fromIso);
+        if (toIso) userQuery = userQuery.lte(timeColumn, toIso);
+
+        const { data: users, error: usersError } = await userQuery;
+        if (usersError) throw usersError;
+        if (!users || !users.length) break;
+
+        await syncUsersBatch(adminClient, googleSheetId, googleToken, users, stats);
+        if (users.length < limit) break;
+        userOffset += limit;
+      }
     }
 
     const dailyDate =

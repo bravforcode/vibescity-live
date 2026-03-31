@@ -13,6 +13,7 @@ from starlette.requests import Request
 from app.core.auth import verify_user
 from app.core.cache import user_profile_cache
 from app.core.rate_limit import limiter
+from app.core.resilience import retry_external_api
 from app.core.supabase import supabase
 
 router = APIRouter()
@@ -56,15 +57,19 @@ def grant_rewards(user_id: str, action: str) -> dict | None:
     # S5: invalidate cached profile so next read reflects new coin/xp balance
     user_profile_cache.pop(user_id, None)
     try:
-        result = supabase.rpc(
-            "grant_rewards",
-            {
-                "target_user_id": user_id,
-                "reward_coins": reward["coins"],
-                "reward_xp": reward["xp"],
-                "action_name": action,
-            },
-        ).execute()
+        @retry_external_api
+        def call_grant_rewards_rpc():
+            return supabase.rpc(
+                "grant_rewards",
+                {
+                    "target_user_id": user_id,
+                    "reward_coins": reward["coins"],
+                    "reward_xp": reward["xp"],
+                    "action_name": action,
+                },
+            ).execute()
+        
+        result = call_grant_rewards_rpc()
         data = getattr(result, "data", None)
         if isinstance(data, dict) and data.get("success"):
             return data

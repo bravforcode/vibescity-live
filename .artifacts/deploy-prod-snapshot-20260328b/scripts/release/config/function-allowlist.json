@@ -1,0 +1,24 @@
+{
+  "functions": [
+    { "name": "webhook-handler", "verify_jwt": false },
+    { "name": "stripe-webhook", "verify_jwt": false },
+    { "name": "create-checkout-session", "verify_jwt": false },
+    { "name": "create-manual-order", "verify_jwt": false },
+    { "name": "analytics-ingest", "verify_jwt": false },
+    { "name": "pii-audit-ingest", "verify_jwt": false },
+    { "name": "easyslip-healthcheck", "verify_jwt": false },
+    { "name": "admin-local-ads", "verify_jwt": true },
+    { "name": "admin-sheet-sync", "verify_jwt": true },
+    { "name": "admin-slip-dashboard", "verify_jwt": true },
+    { "name": "admin-slip-export", "verify_jwt": true },
+    { "name": "admin-analytics-dashboard", "verify_jwt": true },
+    { "name": "admin-analytics-export", "verify_jwt": true },
+    { "name": "admin-pii-audit-dashboard", "verify_jwt": true },
+    { "name": "admin-pii-audit-export", "verify_jwt": true },
+    { "name": "admin-pii-audit-access-export", "verify_jwt": true },
+    { "name": "seo-sitemap", "verify_jwt": false },
+    { "name": "coin-action", "verify_jwt": true },
+    { "name": "get-order-status", "verify_jwt": true },
+    { "name": "manage-subscription", "verify_jwt": true }
+  ]
+}

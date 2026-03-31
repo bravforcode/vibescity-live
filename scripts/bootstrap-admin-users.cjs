@@ -25,7 +25,17 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
 	auth: { autoRefreshToken: false, persistSession: false },
 });
 
-const defaultEmails = ["nxme176@gmail.com", "omchai.g44@gmail.com"];
+const parseEmails = (raw) =>
+	String(raw || "")
+		.split(",")
+		.map((email) =>
+			String(email || "")
+				.trim()
+				.toLowerCase(),
+		)
+		.filter(Boolean);
+
+const defaultEmails = parseEmails(env.ADMIN_BOOTSTRAP_EMAILS || "");
 const args = process.argv.slice(2);
 const shouldResetPassword = args.includes("--reset-password");
 const shouldRecreate = args.includes("--recreate");
@@ -41,11 +51,12 @@ for (let index = 0; index < args.length; index += 1) {
 	}
 	rawEmails.push(arg);
 }
-const targetEmails = (rawEmails.length
-	? rawEmails
-	: defaultEmails
-)
-	.map((email) => String(email || "").trim().toLowerCase())
+const targetEmails = (rawEmails.length ? rawEmails : defaultEmails)
+	.map((email) =>
+		String(email || "")
+			.trim()
+			.toLowerCase(),
+	)
 	.filter(Boolean);
 
 const generateTempPassword = () =>
@@ -55,11 +66,17 @@ async function findUserByEmail(email) {
 	let page = 1;
 	const perPage = 200;
 	while (true) {
-		const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
+		const { data, error } = await supabase.auth.admin.listUsers({
+			page,
+			perPage,
+		});
 		if (error) throw error;
 		const users = data?.users || [];
 		const hit = users.find(
-			(user) => String(user.email || "").trim().toLowerCase() === email,
+			(user) =>
+				String(user.email || "")
+					.trim()
+					.toLowerCase() === email,
 		);
 		if (hit) return hit;
 		if (users.length < perPage) return null;
@@ -68,13 +85,19 @@ async function findUserByEmail(email) {
 }
 
 async function ensureAdmin(email, options = {}) {
-	const { resetPassword = false, recreate = false, passwordOverride = "" } = options;
+	const {
+		resetPassword = false,
+		recreate = false,
+		passwordOverride = "",
+	} = options;
 	const existing = await findUserByEmail(email);
 	const resolvedPassword =
 		String(passwordOverride || "").trim() || generateTempPassword();
 
 	if (existing && recreate) {
-		const { error: deleteError } = await supabase.auth.admin.deleteUser(existing.id);
+		const { error: deleteError } = await supabase.auth.admin.deleteUser(
+			existing.id,
+		);
 		if (deleteError) throw new Error(`${email}: ${deleteError.message}`);
 	}
 
@@ -125,7 +148,9 @@ async function ensureAdmin(email, options = {}) {
 
 async function main() {
 	if (!targetEmails.length) {
-		throw new Error("No target emails provided");
+		throw new Error(
+			"No target emails provided. Pass emails as CLI args or set ADMIN_BOOTSTRAP_EMAILS.",
+		);
 	}
 
 	const results = [];

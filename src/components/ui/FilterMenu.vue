@@ -157,7 +157,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <Transition name="filter-backdrop">
+  <Transition name="filter-backdrop" appear>
     <div
       v-if="isOpen"
       role="dialog"
@@ -208,7 +208,7 @@ onUnmounted(() => {
           <button
             @click="close"
             aria-label="Close filter menu"
-            class="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-white transition-colors"
+            class="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:bg-white/20 active:scale-95"
           >
             <X class="w-4 h-4" aria-hidden="true" />
           </button>
@@ -228,7 +228,7 @@ onUnmounted(() => {
               @click="toggleCategory(cat.id)"
               :aria-pressed="selectedSet.has(cat.id)"
               :aria-label="`${cat.label}, ${selectedSet.has(cat.id) ? 'selected' : 'not selected'}`"
-              class="cat-btn relative flex flex-col items-center gap-2 py-4 px-3 rounded-2xl transition-all duration-200 active:scale-95 border-2"
+              class="cat-btn relative flex flex-col items-center gap-2 rounded-2xl border-2 px-3 py-4 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 active:scale-95"
               :class="[
                 selectedSet.has(cat.id)
                   ? `bg-gradient-to-br ${cat.gradient} border-white/30 text-white shadow-lg ${cat.glow} selected`
@@ -274,7 +274,7 @@ onUnmounted(() => {
               v-if="selectedCount > 0"
               @click="clearAll"
               aria-label="Clear all filters"
-              class="w-full py-3 rounded-xl bg-white/8 hover:bg-white/12 active:scale-[0.98] text-white/80 font-bold text-sm uppercase tracking-wide transition-all"
+              class="w-full rounded-xl bg-white/8 py-3 text-sm font-bold uppercase tracking-wide text-white/80 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:bg-white/12 active:scale-[0.98]"
             >
               Clear All
             </button>
@@ -283,7 +283,7 @@ onUnmounted(() => {
           <button
             @click="applyFilters"
             aria-label="Apply selected filters"
-            class="w-full py-3.5 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-black text-sm uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-violet-500/30"
+            class="w-full rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 py-3.5 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-violet-500/30 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:opacity-90 active:scale-[0.98]"
           >
             {{ selectedCount > 0 ? `Show Results (${selectedCount})` : 'Show All' }}
           </button>
@@ -366,5 +366,19 @@ onUnmounted(() => {
 
 .shadow-glow {
   box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .filter-sheet,
+  .filter-backdrop-enter-active,
+  .filter-backdrop-leave-active,
+  .check-pop-enter-active,
+  .check-pop-leave-active,
+  .fade-scale-enter-active,
+  .fade-scale-leave-active,
+  .cat-btn {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 </style>

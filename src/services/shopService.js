@@ -1,5 +1,8 @@
 import i18n from "@/i18n.js";
-import { getApiV1BaseUrl, isFrontendOnlyDevMode } from "../lib/runtimeConfig";
+import {
+	isFrontendOnlyDevMode,
+	isLocalBrowserHostname,
+} from "../lib/runtimeConfig";
 import { isSupabaseSchemaCacheError, supabase } from "../lib/supabase";
 import { isAppDebugLoggingEnabled } from "../utils/debugFlags";
 import {
@@ -20,7 +23,16 @@ let realMediaEndpointUnavailable = false;
 let realVenueMediaIndexCache = null;
 let realVenueMediaIndexFetchedAt = 0;
 let realVenueMediaIndexPromise = null;
+let staticRealVenueMediaIndexPromise = null;
 const REAL_MEDIA_INDEX_TTL_MS = 5 * 60 * 1000;
+const STATIC_REAL_MEDIA_INDEX_URL = "/data/venues-real-media-index.json";
+const MAP_PINS_API_LIMIT = 500;
+
+const shouldPreferStaticRealMedia = () =>
+	typeof window !== "undefined" &&
+	(isFrontendOnlyDevMode() ||
+		(import.meta.env.PROD &&
+			!isLocalBrowserHostname(window.location.hostname)));
 
 const normalizeMediaItem = (item) => {
 	if (!item || typeof item !== "object") return null;
@@ -103,6 +115,74 @@ const buildMediaCounts = ({ images = [], videos = [], media = [] } = {}) => {
 	};
 };
 
+const shouldDisableRealMediaEndpoint = (status) =>
+	[404, 405, 422].includes(Number(status));
+
+const shouldPreferSameOriginMapPins = () =>
+	import.meta.env.PROD &&
+	typeof window !== "undefined" &&
+	!isLocalBrowserHostname(window.location.hostname);
+
+const normalizeMapPinRecord = (item) => ({
+	id: item.id,
+	name: item.name,
+	lat: item.lat,
+	lng: item.lng,
+	pinType: item.pin_type ?? item.pinType,
+	pinState: item.pin_state ?? item.pinState,
+	pinMetadata: item.pin_metadata ?? item.pinMetadata,
+	verifiedActive: item.verified_active ?? item.verifiedActive,
+	glowActive: item.glow_active ?? item.glowActive,
+	boostActive: item.boost_active ?? item.boostActive,
+	giantActive: item.giant_active ?? item.giantActive,
+	hasCoin:
+		typeof item.has_coin === "boolean"
+			? item.has_coin
+			: typeof item.hasCoin === "boolean"
+				? item.hasCoin
+				: null,
+	visibilityScore: item.visibility_score ?? item.visibilityScore,
+	coverImage: item.cover_image ?? item.coverImage,
+	status: item.status,
+	isEvent: item.is_event ?? item.isEvent,
+	isLive: item.is_live ?? item.isLive,
+	province: item.province,
+	district: item.district ?? item.zone,
+	aggregateLevel: item.aggregate_level ?? item.aggregateLevel,
+	aggregateShopCount: item.aggregate_shop_count ?? item.aggregateShopCount,
+	aggregateDominantCount:
+		item.aggregate_dominant_count ?? item.aggregateDominantCount,
+	promotionScore: item.promotion_score ?? item.promotionScore,
+	signScale: item.sign_scale ?? item.signScale,
+});
+
+const fetchMapPinsViaApi = async ({
+	p_min_lat,
+	p_min_lng,
+	p_max_lat,
+	p_max_lng,
+	p_zoom,
+	signal,
+}) => {
+	const params = new URLSearchParams({
+		bbox: `${p_min_lng},${p_min_lat},${p_max_lng},${p_max_lat}`,
+		zoom: String(Math.round(p_zoom)),
+		limit: String(MAP_PINS_API_LIMIT),
+	});
+	const response = await apiFetch(`/venues?${params.toString()}`, {
+		includeVisitor: false,
+		signal,
+	});
+	if (!response.ok) {
+		const error = new Error(`map-pins-api-${response.status}`);
+		error.status = response.status;
+		throw error;
+	}
+	const payload = await response.json().catch(() => ({}));
+	const rows = Array.isArray(payload?.venues) ? payload.venues : [];
+	return rows.map(normalizeMapPinRecord);
+};
+
 const normalizeRealVenueMediaRecord = (payload) => {
 	if (!payload || typeof payload !== "object") return null;
 
@@ -158,6 +238,12 @@ const normalizeRealVenueMediaRecord = (payload) => {
 	};
 };
 
+const setRealVenueMediaIndexCache = (nextIndex) => {
+	realVenueMediaIndexCache = nextIndex instanceof Map ? nextIndex : new Map();
+	realVenueMediaIndexFetchedAt = Date.now();
+	return realVenueMediaIndexCache;
+};
+
 const updateRealVenueMediaIndexRecord = (record) => {
 	if (!record?.shopId) return;
 	if (!(realVenueMediaIndexCache instanceof Map)) {
@@ -165,6 +251,70 @@ const updateRealVenueMediaIndexRecord = (record) => {
 	}
 	realVenueMediaIndexCache.set(String(record.shopId), record);
 	realVenueMediaIndexFetchedAt = Date.now();
+};
+
+const buildRealVenueMediaIndex = (rows) => {
+	const nextIndex = new Map();
+	rows.forEach((row) => {
+		const normalized = normalizeRealVenueMediaRecord(row);
+		if (normalized?.shopId) {
+			nextIndex.set(String(normalized.shopId), normalized);
+		}
+	});
+	return nextIndex;
+};
+
+const loadStaticRealVenueMediaIndex = async ({ force = false } = {}) => {
+	const now = Date.now();
+	if (
+		!force &&
+		realVenueMediaIndexCache instanceof Map &&
+		now - realVenueMediaIndexFetchedAt < REAL_MEDIA_INDEX_TTL_MS
+	) {
+		return realVenueMediaIndexCache;
+	}
+
+	if (staticRealVenueMediaIndexPromise) {
+		return staticRealVenueMediaIndexPromise;
+	}
+
+	staticRealVenueMediaIndexPromise = (async () => {
+		try {
+			if (typeof fetch !== "function") {
+				return new Map();
+			}
+
+			const response = await fetch(STATIC_REAL_MEDIA_INDEX_URL, {
+				cache: "no-store",
+				headers: {
+					Accept: "application/json",
+				},
+			});
+			if (!response.ok) {
+				return new Map();
+			}
+
+			const payload = await response.json();
+			const rows = Array.isArray(payload?.rows)
+				? payload.rows
+				: Array.isArray(payload?.data)
+					? payload.data
+					: [];
+			return setRealVenueMediaIndexCache(buildRealVenueMediaIndex(rows));
+		} catch (error) {
+			if (!isExpectedAbortError(error)) {
+				logUnexpectedNetworkError(
+					"Error loading static real venue media index:",
+					error,
+				);
+			}
+			return new Map();
+		} finally {
+			staticRealVenueMediaIndexPromise = null;
+		}
+	})();
+
+	return staticRealVenueMediaIndexPromise;
 };
 
 export const mergeVenueRowWithRealMedia = (row, mediaRecord) => {
@@ -271,7 +421,7 @@ const mapShopData = (item, index) => {
 		goldenEnd: item.end_golden_time || "",
 
 		// Zone & Building
-		Province: item.province || item.Province || "เชียงใหม่",
+		Province: item.province || item.Province || "",
 		Zone: item.district || item.zone || item.Zone || null, // Map district to Zone for backward compat
 		Building: item.building || item.Building || null,
 		Floor: item.floor || item.Floor || null,
@@ -326,13 +476,26 @@ export const getShops = async (province = "ทุกจังหวัด") => {
  * Fetch normalized real media for a single venue from the backend API.
  */
 export const getRealVenueMedia = async (venueId) => {
-	if (!venueId || realMediaEndpointUnavailable || isFrontendOnlyDevMode()) {
+	if (!venueId) {
 		return null;
+	}
+
+	const normalizedVenueId = String(venueId).trim();
+	if (shouldPreferStaticRealMedia()) {
+		const staticIndex = await loadStaticRealVenueMediaIndex();
+		const staticRecord = staticIndex.get(normalizedVenueId);
+		if (staticRecord) {
+			return staticRecord;
+		}
+	}
+	if (realMediaEndpointUnavailable) {
+		const staticIndex = await loadStaticRealVenueMediaIndex();
+		return staticIndex.get(normalizedVenueId) || null;
 	}
 
 	try {
 		const response = await apiFetch(
-			`/shops/${venueId}/media?hydrate_missing_image=false`,
+			`/shops/${venueId}/media?hydrate_missing_image=false&require_complete=true`,
 			{
 				headers: {
 					Accept: "application/json",
@@ -340,10 +503,11 @@ export const getRealVenueMedia = async (venueId) => {
 			},
 		);
 		if (!response.ok) {
-			if (response.status === 404) {
+			if (shouldDisableRealMediaEndpoint(response.status)) {
 				realMediaEndpointUnavailable = true;
 			}
-			return null;
+			const staticIndex = await loadStaticRealVenueMediaIndex({ force: true });
+			return staticIndex.get(normalizedVenueId) || null;
 		}
 		const data = await response.json();
 		const normalized = normalizeRealVenueMediaRecord(data);
@@ -354,14 +518,19 @@ export const getRealVenueMedia = async (venueId) => {
 		if (isExpectedAbortError(error)) {
 			return null;
 		}
+		realMediaEndpointUnavailable = true;
 		logUnexpectedNetworkError("Error fetching real venue media:", error);
-		return null;
+		const staticIndex = await loadStaticRealVenueMediaIndex();
+		return staticIndex.get(normalizedVenueId) || null;
 	}
 };
 
 export const getRealVenueMediaIndex = async ({ force = false } = {}) => {
-	if (realMediaEndpointUnavailable || isFrontendOnlyDevMode()) {
-		return new Map();
+	if (shouldPreferStaticRealMedia()) {
+		return loadStaticRealVenueMediaIndex({ force });
+	}
+	if (realMediaEndpointUnavailable) {
+		return loadStaticRealVenueMediaIndex({ force });
 	}
 
 	const now = Date.now();
@@ -380,7 +549,7 @@ export const getRealVenueMediaIndex = async ({ force = false } = {}) => {
 	realVenueMediaIndexPromise = (async () => {
 		try {
 			const response = await apiFetch(
-				"/shops/media?limit=5000&offset=0&include_missing=true",
+				"/shops/media?limit=5000&offset=0&include_missing=false&require_complete=true",
 				{
 					headers: {
 						Accept: "application/json",
@@ -388,32 +557,24 @@ export const getRealVenueMediaIndex = async ({ force = false } = {}) => {
 				},
 			);
 			if (!response.ok) {
-				if (response.status === 404) {
+				if (shouldDisableRealMediaEndpoint(response.status)) {
 					realMediaEndpointUnavailable = true;
 				}
-				return new Map();
+				return loadStaticRealVenueMediaIndex({ force: true });
 			}
 
 			const payload = await response.json();
 			const rows = Array.isArray(payload?.data) ? payload.data : [];
-			const nextIndex = new Map();
-			rows.forEach((row) => {
-				const normalized = normalizeRealVenueMediaRecord(row);
-				if (normalized?.shopId) {
-					nextIndex.set(String(normalized.shopId), normalized);
-				}
-			});
-			realVenueMediaIndexCache = nextIndex;
-			realVenueMediaIndexFetchedAt = Date.now();
-			return nextIndex;
+			return setRealVenueMediaIndexCache(buildRealVenueMediaIndex(rows));
 		} catch (error) {
 			if (!isExpectedAbortError(error)) {
+				realMediaEndpointUnavailable = true;
 				logUnexpectedNetworkError(
 					"Error fetching real venue media index:",
 					error,
 				);
 			}
-			return new Map();
+			return loadStaticRealVenueMediaIndex();
 		} finally {
 			realVenueMediaIndexPromise = null;
 		}
@@ -638,7 +799,8 @@ export const getMapPins = async ({
 
 	try {
 		const now = Date.now();
-		if (mapPinsCircuitOpenUntil > now) {
+		const preferSameOriginApi = shouldPreferSameOriginMapPins();
+		if (!preferSameOriginApi && mapPinsCircuitOpenUntil > now) {
 			warnMapPins("Map pins RPC temporarily paused after repeated timeouts");
 			return mapPinsLastGoodPins;
 		}
@@ -653,38 +815,43 @@ export const getMapPins = async ({
 			timeoutController.abort();
 		}, MAP_PINS_TIMEOUT_MS);
 
-		let rpcQuery = supabase.rpc("get_map_pins", {
-			p_min_lat,
-			p_min_lng,
-			p_max_lat,
-			p_max_lng,
-			p_zoom: Math.round(p_zoom),
-		});
-		rpcQuery = rpcQuery.abortSignal(timeoutController.signal);
-		const { data, error } = await rpcQuery;
+		let mapped = null;
+		let preferredLaneError = null;
 
-		if (error) throw error;
+		if (preferSameOriginApi) {
+			try {
+				mapped = await fetchMapPinsViaApi({
+					p_min_lat,
+					p_min_lng,
+					p_max_lat,
+					p_max_lng,
+					p_zoom,
+					signal: timeoutController.signal,
+				});
+			} catch (error) {
+				preferredLaneError = error;
+			}
+		}
 
-		const mapped = (data || []).map((item) => ({
-			id: item.id,
-			name: item.name,
-			lat: item.lat,
-			lng: item.lng,
-			pinType: item.pin_type,
-			pinMetadata: item.pin_metadata, // { giant_category, model_scale }
-			verifiedActive: item.verified_active,
-			glowActive: item.glow_active,
-			boostActive: item.boost_active,
-			giantActive: item.giant_active,
-			hasCoin:
-				typeof item.has_coin === "boolean"
-					? item.has_coin
-					: typeof item.hasCoin === "boolean"
-						? item.hasCoin
-						: null,
-			visibilityScore: item.visibility_score,
-			coverImage: item.cover_image,
-		}));
+		if (!Array.isArray(mapped)) {
+			let rpcQuery = supabase.rpc("get_map_pins", {
+				p_min_lat,
+				p_min_lng,
+				p_max_lat,
+				p_max_lng,
+				p_zoom: Math.round(p_zoom),
+			});
+			rpcQuery = rpcQuery.abortSignal(timeoutController.signal);
+			const { data, error } = await rpcQuery;
+			if (error) {
+				if (preferredLaneError) {
+					error.cause = preferredLaneError;
+				}
+				throw error;
+			}
+			mapped = (data || []).map(normalizeMapPinRecord);
+		}
+
 		resetMapPinsCircuit();
 		if (mapped.length > 0) mapPinsLastGoodPins = mapped;
 		return mapped;

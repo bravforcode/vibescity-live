@@ -129,15 +129,21 @@ def test_list_shop_media_includes_all_shops_and_merges_sources():
     payload = service.list_shop_media(limit=10, offset=0, include_missing=True)
 
     assert payload["summary"]["total_shops"] == 3
+    assert payload["summary"]["total_shops_scanned"] == 3
     assert payload["summary"]["shops_with_media"] == 2
+    assert payload["summary"]["shops_with_complete_media"] == 1
+    assert payload["summary"]["shops_missing_complete_media"] == 2
 
     by_id = {item["shop_id"]: item for item in payload["data"]}
     assert by_id["v1"]["images"] == ["https://cdn.example.com/kai-1.jpg"]
     assert by_id["v1"]["videos"] == ["https://cdn.example.com/kai.mp4"]
+    assert by_id["v1"]["coverage"]["has_complete_media"] is True
     assert by_id["v2"]["images"] == ["https://ugc.example.com/momo-1.jpg"]
     assert by_id["v2"]["coverage"]["has_images"] is True
     assert by_id["v2"]["coverage"]["has_videos"] is False
+    assert by_id["v2"]["coverage"]["has_complete_media"] is False
     assert by_id["v3"]["coverage"]["has_media"] is False
+    assert by_id["v3"]["coverage"]["missing_complete_media"] is True
 
 
 def test_get_shop_media_stays_real_only_when_media_is_missing():
@@ -167,6 +173,48 @@ def test_get_shop_media_stays_real_only_when_media_is_missing():
     assert payload["images"] == []
     assert payload["coverage"]["has_images"] is False
     assert payload["coverage"]["has_media"] is False
+    assert payload["coverage"]["has_complete_media"] is False
+
+
+def test_require_complete_filters_incomplete_rows_from_index_and_detail():
+    service = VenueMediaService(
+        client=_FakeClient(
+            {
+                "venues": [
+                    {
+                        "id": "v1",
+                        "name": "Complete Shop",
+                        "slug": "complete-shop",
+                        "image_urls": ["https://cdn.example.com/complete.jpg"],
+                        "video_url": "https://cdn.example.com/complete.mp4",
+                        "social_links": {},
+                    },
+                    {
+                        "id": "v2",
+                        "name": "Image Only Shop",
+                        "slug": "image-only-shop",
+                        "image_urls": ["https://cdn.example.com/image-only.jpg"],
+                        "video_url": "",
+                        "social_links": {},
+                    },
+                ],
+                "venue_photos": [],
+            }
+        )
+    )
+
+    payload = service.list_shop_media(
+        limit=10,
+        offset=0,
+        include_missing=False,
+        require_complete=True,
+    )
+
+    assert payload["summary"]["total_shops"] == 1
+    assert payload["summary"]["total_shops_scanned"] == 2
+    assert payload["summary"]["shops_with_complete_media"] == 1
+    assert [item["shop_id"] for item in payload["data"]] == ["v1"]
+    assert asyncio.run(service.get_shop_media("v2", require_complete=True)) is None
 
 
 def test_social_profiles_do_not_count_as_videos_without_post_urls():
@@ -218,14 +266,21 @@ def test_shop_media_routes_return_media_contract(client, monkeypatch):
             },
             "summary": {
                 "total_shops": 0,
+                "total_shops_scanned": 0,
                 "shops_with_images": 0,
                 "shops_with_videos": 0,
                 "shops_with_media": 0,
+                "shops_with_complete_media": 0,
+                "shops_missing_complete_media": 0,
             },
         },
     )
 
-    async def _fake_get_shop_media(_shop_id, hydrate_missing_image=False):
+    async def _fake_get_shop_media(
+        _shop_id,
+        hydrate_missing_image=False,
+        require_complete=False,
+    ):
         return {
             "shop_id": "abc",
             "name": "ABC",
@@ -245,8 +300,10 @@ def test_shop_media_routes_return_media_contract(client, monkeypatch):
                 "has_images": True,
                 "has_videos": False,
                 "has_media": True,
+                "has_complete_media": False,
                 "missing_images": False,
                 "missing_videos": True,
+                "missing_complete_media": True,
             },
             "social_links": {},
         }

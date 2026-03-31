@@ -3,6 +3,7 @@ import generatePayload from "promptpay-qr";
 import QrcodeVue from "qrcode.vue";
 import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { RefreshCw, Users, CreditCard, Gift, Landmark, User, Share2, ChevronUp } from "lucide-vue-next";
 import ErrorBoundary from "@/components/ui/ErrorBoundary.vue";
 import { usePermission } from "@/composables/usePermission";
 import {
@@ -736,40 +737,41 @@ onUnmounted(() => {
 
 <template>
   <main
-    class="relative z-50 isolate min-h-dvh overflow-x-hidden w-full max-w-full px-4 pb-8 pt-20 text-white md:px-6 md:pt-24"
+    class="relative z-50 isolate min-h-dvh overflow-x-hidden w-full max-w-full px-4 pb-8 pt-20 text-white md:px-6 md:pt-24 bg-zinc-950"
     :aria-label="$t('auto.k_203425a5')"
     data-testid="partner-dashboard-root"
   >
-    <div class="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[#08091a]" aria-hidden="true">
-      <div class="absolute -right-20 -top-24 h-80 w-80 rounded-full bg-emerald-500/20 blur-[100px]" />
-      <div class="absolute -left-24 -top-20 h-72 w-72 rounded-full bg-blue-500/20 blur-[100px]" />
-      <div class="absolute bottom-[-160px] left-1/4 h-96 w-96 rounded-full bg-cyan-500/15 blur-[110px]" />
+    <!-- Simplified background gradients to match OwnerDashboard theme -->
+    <div class="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-zinc-950" aria-hidden="true">
+      <div class="absolute -right-20 -top-24 h-80 w-80 rounded-full bg-violet-500/10 blur-[100px]" />
+      <div class="absolute -left-24 -top-20 h-72 w-72 rounded-full bg-fuchsia-500/10 blur-[100px]" />
     </div>
 
     <div class="mx-auto flex w-full max-w-7xl flex-col gap-4 md:gap-5">
-      <header class="relative overflow-hidden rounded-2xl border border-white/10 bg-gray-900/90 p-5 shadow-2xl backdrop-blur-xl md:p-6">
-        <div class="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-transparent to-blue-500/10" />
+      <header class="relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-5 shadow-2xl backdrop-blur-xl md:p-6">
+        <div class="pointer-events-none absolute inset-0 bg-gradient-to-br from-violet-500/10 via-transparent to-fuchsia-500/10" />
         <div class="relative z-10 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div class="space-y-2">
-            <p class="text-[11px] font-black uppercase tracking-[0.3em] text-white/55">{{ $t('auto.k_b0128d7d') }}</p>
+            <p class="text-[11px] font-black uppercase tracking-[0.3em] text-white/55">Partner Program</p>
             <h1 class="text-2xl font-black leading-tight md:text-3xl">
-              <span class="bg-gradient-to-r from-emerald-300 to-cyan-300 bg-clip-text text-transparent">{{ $t('auto.k_d76cf692') }}</span>
+              <span class="bg-gradient-to-r from-violet-300 to-fuchsia-300 bg-clip-text text-transparent">Creator Hub</span>
             </h1>
-            <p class="max-w-2xl text-sm text-white/70 md:text-base">{{ $t('auto.k_e810bff8') }}</p>
+            <p class="max-w-2xl text-sm text-white/70 md:text-base">Manage your referrals, payouts, and partner status.</p>
           </div>
 
           <div class="flex items-center gap-2">
             <button
               type="button"
-              class="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs font-bold text-white/80 transition hover:bg-white/10"
+              class="rounded-xl border border-white/10 bg-white/8 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-white/14 active:scale-95"
               :disabled="isLoading"
               @click="loadDashboard({ force: true, reason: 'manual_refresh', allowBackgroundRetry: false })"
             >
+              <RefreshCw v-if="isLoading" class="w-3 h-3 animate-spin inline mr-1" />
               Refresh
             </button>
             <button
               type="button"
-              class="rounded-xl bg-gradient-to-r from-emerald-600 to-cyan-600 px-3 py-2 text-xs font-black text-white shadow-lg transition hover:scale-[1.02] active:scale-[0.98]"
+              class="rounded-xl bg-white/8 border border-white/15 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-white/14 active:scale-95"
               @click="exitPartnerDashboard"
             >
               Exit
@@ -865,39 +867,63 @@ onUnmounted(() => {
             :aria-label="$t('auto.k_d89ccc97')"
             data-testid="partner-stat-strip"
           >
-            <article class="min-w-0 rounded-2xl border border-white/10 bg-black/30 p-4">
-              <p class="text-[11px] font-black uppercase tracking-[0.2em] text-white/60">Access</p>
+            <article class="min-w-0 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-md relative overflow-hidden">
+              <div class="absolute top-0 right-0 w-16 h-16 bg-blue-500/10 rounded-full blur-xl -mr-4 -mt-4 pointer-events-none"></div>
+              <p class="text-[11px] font-black uppercase tracking-[0.2em] text-white/50 flex items-center gap-1.5">
+                <CreditCard class="w-3 h-3 text-blue-400" />
+                Access
+              </p>
               <p
                 class="mt-2 text-lg font-black"
-                :class="hasAccess ? 'text-emerald-300' : 'text-amber-300'"
+                :class="hasAccess ? 'text-emerald-400' : 'text-amber-400'"
               >
                 {{ hasAccess ? "PAID" : "UNPAID" }}
               </p>
             </article>
 
-            <article class="min-w-0 rounded-2xl border border-white/10 bg-black/30 p-4">
-              <p class="text-[11px] font-black uppercase tracking-[0.2em] text-white/60">Status</p>
+            <article class="min-w-0 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-md relative overflow-hidden">
+              <div class="absolute top-0 right-0 w-16 h-16 bg-violet-500/10 rounded-full blur-xl -mr-4 -mt-4 pointer-events-none"></div>
+              <p class="text-[11px] font-black uppercase tracking-[0.2em] text-white/50 flex items-center gap-1.5">
+                <Users class="w-3 h-3 text-violet-400" />
+                Status
+              </p>
               <p class="mt-2 text-lg font-black text-white">{{ statusLabel }}</p>
             </article>
 
-            <article class="min-w-0 rounded-2xl border border-white/10 bg-black/30 p-4">
-              <p class="text-[11px] font-black uppercase tracking-[0.2em] text-white/60">Renews</p>
+            <article class="min-w-0 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-md relative overflow-hidden">
+              <div class="absolute top-0 right-0 w-16 h-16 bg-fuchsia-500/10 rounded-full blur-xl -mr-4 -mt-4 pointer-events-none"></div>
+              <p class="text-[11px] font-black uppercase tracking-[0.2em] text-white/50 flex items-center gap-1.5">
+                <Clock class="w-3 h-3 text-fuchsia-400" />
+                Renews
+              </p>
               <p class="mt-2 text-sm font-bold text-white/90">{{ formatDate(status.current_period_end) }}</p>
             </article>
 
-            <article class="min-w-0 rounded-2xl border border-white/10 bg-black/30 p-4">
-              <p class="text-[11px] font-black uppercase tracking-[0.2em] text-white/60">{{ $t('auto.k_7842dd7e') }}</p>
+            <article class="min-w-0 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-md relative overflow-hidden">
+              <div class="absolute top-0 right-0 w-16 h-16 bg-cyan-500/10 rounded-full blur-xl -mr-4 -mt-4 pointer-events-none"></div>
+              <p class="text-[11px] font-black uppercase tracking-[0.2em] text-white/50 flex items-center gap-1.5">
+                <Gift class="w-3 h-3 text-cyan-400" />
+                Orders
+              </p>
               <p class="mt-2 text-lg font-black text-white">{{ Number(summary?.total_orders || 0) }}</p>
             </article>
 
-            <article class="min-w-0 rounded-2xl border border-white/10 bg-black/30 p-4">
-              <p class="text-[11px] font-black uppercase tracking-[0.2em] text-white/60">Verified</p>
+            <article class="min-w-0 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-md relative overflow-hidden">
+              <div class="absolute top-0 right-0 w-16 h-16 bg-indigo-500/10 rounded-full blur-xl -mr-4 -mt-4 pointer-events-none"></div>
+              <p class="text-[11px] font-black uppercase tracking-[0.2em] text-white/50 flex items-center gap-1.5">
+                <Star class="w-3 h-3 text-indigo-400" />
+                Verified
+              </p>
               <p class="mt-2 text-lg font-black text-white">{{ Number(summary?.verified_orders || 0) }}</p>
             </article>
 
-            <article class="min-w-0 rounded-2xl border border-white/10 bg-black/30 p-4">
-              <p class="text-[11px] font-black uppercase tracking-[0.2em] text-white/60">{{ $t('auto.k_220b1871') }}</p>
-              <p class="mt-2 text-sm font-black text-emerald-300">{{ totalPaidDisplay }}</p>
+            <article class="min-w-0 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-md relative overflow-hidden">
+              <div class="absolute top-0 right-0 w-16 h-16 bg-emerald-500/10 rounded-full blur-xl -mr-4 -mt-4 pointer-events-none"></div>
+              <p class="text-[11px] font-black uppercase tracking-[0.2em] text-white/50 flex items-center gap-1.5">
+                <TrendingUp class="w-3 h-3 text-emerald-400" />
+                Earnings
+              </p>
+              <p class="mt-2 text-sm font-black text-emerald-400">{{ totalPaidDisplay }}</p>
               <button
                 v-if="canRevealSensitive"
                 type="button"
@@ -910,37 +936,43 @@ onUnmounted(() => {
           </section>
 
           <section
-            class="rounded-2xl border border-white/10 bg-gray-900/90 p-4 shadow-2xl backdrop-blur-xl md:p-5"
+            class="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl md:p-5"
             data-testid="partner-subscription-panel"
           >
             <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div>
-                <h2 class="text-lg font-black text-white">Subscription</h2>
-                <p class="mt-1 text-sm text-white/55">{{ $t('auto.k_8bd0ab97') }}</p>
-                <p v-if="!hasAccess" class="mt-1 text-xs text-amber-200">{{ paywallReason }}</p>
+              <div class="flex gap-3">
+                <div class="w-10 h-10 rounded-xl bg-violet-500/20 flex items-center justify-center shrink-0">
+                  <CreditCard class="w-5 h-5 text-violet-400" />
+                </div>
+                <div>
+                  <h2 class="text-lg font-black text-white">Subscription</h2>
+                  <p class="mt-0.5 text-sm text-white/55">Manage your billing and tier access.</p>
+                  <p v-if="!hasAccess" class="mt-1 text-xs text-amber-300/80">{{ paywallReason }}</p>
+                </div>
               </div>
 
               <div class="grid gap-2 sm:grid-cols-2">
                 <button
                   type="button"
-                  class="rounded-xl bg-gradient-to-r from-emerald-600 to-cyan-600 px-4 py-3 text-sm font-black text-white shadow-lg transition hover:scale-[1.01] active:scale-[0.98] disabled:opacity-60"
+                  class="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-violet-500/25 transition hover:scale-[1.01] active:scale-[0.98] disabled:opacity-60"
                   :disabled="isStartingSubscription"
                   :data-testid="!hasAccess ? 'partner-gate-cta' : undefined"
                   @click="startPartnerSubscription"
                 >
+                  <Rocket v-if="!hasAccess" class="w-4 h-4 inline mr-1.5" />
                   {{
                     isStartingSubscription
                       ? "Opening checkout..."
                       : hasAccess
                         ? "Manage Subscription"
-                        : "Pay with Card / PromptPay"
+                        : "Join Partner Program"
                   }}
                 </button>
 
                 <button
                   v-if="!hasAccess"
                   type="button"
-                  class="rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-bold text-white transition hover:bg-white/15"
+                  class="rounded-xl border border-white/15 bg-white/8 px-4 py-3 text-sm font-bold text-white transition hover:bg-white/14"
                   @click="showManualPayment = !showManualPayment"
                 >
                   {{ showManualPayment ? "Hide Transfer Info" : "Bank Transfer / QR" }}
@@ -949,27 +981,27 @@ onUnmounted(() => {
             </div>
 
             <div v-if="showManualPayment && !hasAccess" class="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
-              <div class="mb-4 flex rounded-xl border border-white/10 bg-black/40 p-1">
+              <div class="mb-4 flex rounded-xl border border-white/10 bg-white/5 p-1">
                 <button
                   type="button"
                   class="flex-1 rounded-lg px-3 py-2 text-xs font-bold transition"
-                  :class="paymentTab === 'qr' ? 'bg-white text-black' : 'text-white/65 hover:text-white'"
+                  :class="paymentTab === 'qr' ? 'bg-white text-black shadow-sm' : 'text-white/65 hover:text-white'"
                   @click="paymentTab = 'qr'"
                 >
-                  {{ $t('auto.k_334aaf1b') }}
+                  QR PromptPay
                 </button>
                 <button
                   type="button"
                   class="flex-1 rounded-lg px-3 py-2 text-xs font-bold transition"
-                  :class="paymentTab === 'bank' ? 'bg-white text-black' : 'text-white/65 hover:text-white'"
+                  :class="paymentTab === 'bank' ? 'bg-white text-black shadow-sm' : 'text-white/65 hover:text-white'"
                   @click="paymentTab = 'bank'"
                 >
-                  {{ $t('auto.k_24cd9456') }}
+                  Bank Transfer
                 </button>
               </div>
 
-              <div v-if="paymentTab === 'qr'" class="flex flex-col items-center gap-2 rounded-xl bg-white p-4 text-black">
-                <div class="rounded-lg bg-white p-2">
+              <div v-if="paymentTab === 'qr'" class="flex flex-col items-center gap-2 rounded-xl bg-white p-6 text-black">
+                <div class="rounded-lg bg-white p-2 border border-gray-100">
                   <qrcode-vue
                     v-if="qrPayload"
                     :value="qrPayload"
@@ -977,79 +1009,89 @@ onUnmounted(() => {
                     level="H"
                   />
                 </div>
-                <p class="text-xs font-black">{{ $t('auto.k_b1b13573') }} {{ PARTNER_PRICE.toLocaleString() }} THB</p>
-                <p class="text-xs text-gray-600">{{ $t('auto.k_31b8251a') }} {{ PROMPTPAY_ID }}</p>
+                <p class="text-sm font-black mt-2">{{ PARTNER_PRICE.toLocaleString() }} THB</p>
+                <p class="text-xs text-gray-500 font-medium">PromptPay ID: {{ PROMPTPAY_ID }}</p>
               </div>
 
-              <div v-else class="space-y-2 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white">
-                <div class="flex items-center justify-between gap-3">
-                  <span class="text-white/60">{{ $t('auto.k_e41a07b6') }}</span>
-                  <span class="font-bold">{{ BANK_NAME }}</span>
+              <div v-else class="space-y-3 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white">
+                <div class="flex items-center justify-between gap-3 border-b border-white/5 pb-2">
+                  <span class="text-white/40 text-xs uppercase tracking-wider font-bold">Bank</span>
+                  <span class="font-bold text-blue-300">{{ BANK_NAME }}</span>
                 </div>
-                <div class="flex items-center justify-between gap-3">
-                  <span class="text-white/60">{{ $t('auto.k_a86d4ce5') }}</span>
+                <div class="flex items-center justify-between gap-3 border-b border-white/5 pb-2">
+                  <span class="text-white/40 text-xs uppercase tracking-wider font-bold">Account</span>
                   <button
                     type="button"
-                    class="rounded-lg border border-white/20 bg-black/30 px-3 py-2 font-mono text-xs text-white transition hover:bg-white/10"
+                    class="rounded-lg border border-white/20 bg-black/30 px-3 py-2 font-mono text-xs text-white transition hover:bg-white/10 flex items-center gap-2"
                     @click="copyAccountNumber"
                   >
                     {{ BANK_ACCOUNT_DISPLAY }}
+                    <Share2 class="w-3 h-3 text-white/40" />
                   </button>
                 </div>
-                <div class="flex items-center justify-between gap-3">
-                  <span class="text-white/60">{{ $t('auto.k_993dc46f') }}</span>
+                <div class="flex items-center justify-between gap-3 border-b border-white/5 pb-2">
+                  <span class="text-white/40 text-xs uppercase tracking-wider font-bold">Name</span>
                   <span class="font-bold">{{ ACCOUNT_NAME }}</span>
                 </div>
                 <div class="flex items-center justify-between gap-3">
-                  <span class="text-white/60">Amount</span>
-                  <span class="font-black text-emerald-300">{{ PARTNER_PRICE.toLocaleString() }} THB</span>
+                  <span class="text-white/40 text-xs uppercase tracking-wider font-bold">Amount</span>
+                  <span class="font-black text-emerald-400">{{ PARTNER_PRICE.toLocaleString() }} THB</span>
                 </div>
               </div>
 
-              <p class="mt-3 text-xs text-white/60">{{ $t('auto.k_bd2e6383') }}</p>
+              <p class="mt-4 text-[10px] text-white/40 leading-relaxed text-center">
+                After transfer, your account will be verified automatically within 24 hours.
+              </p>
             </div>
           </section>
 
           <div
-            class="flex rounded-2xl border border-white/10 bg-black/40 p-1"
+            class="flex rounded-2xl border border-white/10 bg-white/5 p-1 backdrop-blur-md"
             role="tablist"
             :aria-label="$t('auto.k_922f6a8e')"
             data-testid="partner-tab-bar"
           >
             <button
               role="tab"
-              class="flex-1 rounded-xl px-3 py-2 text-sm font-bold transition"
-              :class="activeTab === 'profile' ? 'bg-white text-black' : 'text-white/65 hover:text-white'"
+              class="flex-1 rounded-xl px-3 py-2 text-sm font-bold transition flex items-center justify-center gap-2"
+              :class="activeTab === 'profile' ? 'bg-white text-black shadow-lg' : 'text-white/65 hover:text-white hover:bg-white/5'"
               :aria-selected="activeTab === 'profile'"
               @click="activeTab = 'profile'"
             >
-              {{ $t('auto.k_d2aa39c5') }}
+              <User class="w-4 h-4" />
+              Profile
             </button>
             <button
               role="tab"
-              class="flex-1 rounded-xl px-3 py-2 text-sm font-bold transition"
-              :class="activeTab === 'payout' ? 'bg-white text-black' : 'text-white/65 hover:text-white'"
+              class="flex-1 rounded-xl px-3 py-2 text-sm font-bold transition flex items-center justify-center gap-2"
+              :class="activeTab === 'payout' ? 'bg-white text-black shadow-lg' : 'text-white/65 hover:text-white hover:bg-white/5'"
               :aria-selected="activeTab === 'payout'"
               @click="activeTab = 'payout'"
             >
-              {{ $t('auto.k_4a3af5a') }}
+              <Landmark class="w-4 h-4" />
+              Payout
             </button>
           </div>
 
           <div class="grid grid-cols-1 gap-4 md:grid-cols-2" data-testid="partner-forms-grid">
             <article
-              class="rounded-2xl border border-white/10 bg-gray-900/90 p-4 shadow-2xl backdrop-blur-xl"
+              class="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl"
               role="tabpanel"
               :class="activeTab !== 'profile' ? 'hidden md:block' : ''"
               :aria-label="$t('auto.k_a5d87ce4')"
             >
               <div class="flex items-center justify-between gap-3">
-                <div>
-                  <h3 class="text-base font-black text-white">{{ $t('auto.k_a5d87ce4') }}</h3>
-                  <p class="text-sm text-white/55">{{ $t('auto.k_e5b7e934') }}</p>
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center">
+                    <User class="w-4 h-4 text-violet-400" />
+                  </div>
+                  <div>
+                    <h3 class="text-base font-black text-white">Profile</h3>
+                    <p class="text-[10px] text-white/50 uppercase tracking-wider">Public identity</p>
+                  </div>
                 </div>
                 <span
-                  class="rounded-full border px-2 py-1 text-[11px] font-bold uppercase"
+                  class="rounded-full border px-2 py-1 text-[10px] font-bold uppercase"
                   :class="
                     hasAccess
                       ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-200'
@@ -1060,34 +1102,36 @@ onUnmounted(() => {
                 </span>
               </div>
 
-              <div class="mt-4 space-y-3">
-                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
-                  {{ $t('auto.k_ce42c7ac') }}
+              <div class="mt-4 space-y-4">
+                <div class="space-y-1.5">
+                  <label class="text-[11px] font-bold uppercase tracking-wider text-white/40 ml-1">Display Name</label>
                   <input
                     v-model.trim="profileForm.displayName"
                     type="text"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-white/40 outline-none focus:border-emerald-400"
-                    :placeholder="$t('auto.k_3a0663bd')"
+                    class="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white placeholder:text-white/20 outline-none focus:border-violet-500/50 transition-colors"
+                    placeholder="Enter your partner name"
                     :disabled="isSavingProfile || isStartingSubscription"
                   />
-                </label>
+                </div>
 
-                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
-                  {{ $t('auto.k_8023bef5') }}
-                  <input
-                    v-model.trim="profileForm.referralCode"
-                    type="text"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-white/40 outline-none focus:border-emerald-400"
-                    :placeholder="$t('auto.k_a6c1cc8d')"
-                    :disabled="isSavingProfile || isStartingSubscription"
-                  />
-                </label>
+                <div class="space-y-1.5">
+                  <label class="text-[11px] font-bold uppercase tracking-wider text-white/40 ml-1">Referral Code</label>
+                  <div class="relative">
+                    <input
+                      v-model.trim="profileForm.referralCode"
+                      type="text"
+                      class="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white placeholder:text-white/20 outline-none focus:border-violet-500/50 transition-colors"
+                      placeholder="e.g. VIBE123"
+                      :disabled="isSavingProfile || isStartingSubscription"
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div class="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div class="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <button
                   type="button"
-                  class="rounded-xl bg-gradient-to-r from-emerald-600 to-cyan-600 px-4 py-3 text-sm font-black text-white shadow-lg transition hover:scale-[1.01] active:scale-[0.98] disabled:opacity-60"
+                  class="rounded-xl bg-violet-600 hover:bg-violet-500 px-4 py-3 text-sm font-black text-white shadow-lg transition active:scale-95 disabled:opacity-50"
                   :disabled="isSavingProfile || isStartingSubscription || !canManageProfile"
                   @click="createOrUpdateProfile"
                 >
@@ -1095,55 +1139,64 @@ onUnmounted(() => {
                     isSavingProfile
                       ? "Saving..."
                       : hasAccess
-                        ? "Save Profile"
+                        ? "Save Changes"
                         : "Unlock & Save"
                   }}
                 </button>
                 <button
                   type="button"
-                  class="rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-bold text-white transition hover:bg-white/15 disabled:opacity-60"
+                  class="rounded-xl border border-white/15 bg-white/8 px-4 py-3 text-sm font-bold text-white transition hover:bg-white/14 active:scale-95 disabled:opacity-50"
                   :disabled="!referralLink"
                   @click="copyReferralLink"
                 >
-                  {{ $t('auto.k_a6a045fc') }}
+                  <Share2 class="w-4 h-4 inline mr-1.5" />
+                  Copy Link
                 </button>
               </div>
 
-              <div v-if="referralLink" class="mt-4 rounded-xl border border-white/10 bg-black/30 p-3">
-                <span class="text-[11px] font-bold uppercase tracking-wide text-white/60">{{ $t('auto.k_520dd2c1') }}</span>
-                <p class="mt-1 break-all text-sm text-white">{{ referralLink }}</p>
+              <div v-if="referralLink" class="mt-4 rounded-xl border border-violet-500/20 bg-violet-500/5 p-3">
+                <div class="flex items-center gap-2 mb-1">
+                  <Share2 class="w-3 h-3 text-violet-400" />
+                  <span class="text-[10px] font-bold uppercase tracking-wide text-violet-300/70">Referral URL</span>
+                </div>
+                <p class="break-all text-xs text-white/80 font-mono">{{ referralLink }}</p>
               </div>
             </article>
 
             <article
-              class="rounded-2xl border border-white/10 bg-gray-900/90 p-4 shadow-2xl backdrop-blur-xl"
+              class="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl"
               role="tabpanel"
               :class="activeTab !== 'payout' ? 'hidden md:block' : ''"
               :aria-label="$t('auto.k_4a3af5a')"
             >
               <div class="flex items-center justify-between gap-3">
-                <div>
-                  <h3 class="text-base font-black text-white">{{ $t('auto.k_4a3af5a') }}</h3>
-                  <p class="text-sm text-white/55">{{ $t('auto.k_c2f76f18') }}</p>
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                    <Landmark class="w-4 h-4 text-blue-400" />
+                  </div>
+                  <div>
+                    <h3 class="text-base font-black text-white">Payout</h3>
+                    <p class="text-[10px] text-white/50 uppercase tracking-wider">Bank & PromptPay</p>
+                  </div>
                 </div>
                 <span
-                  class="rounded-full border px-2 py-1 text-[11px] font-bold uppercase"
+                  class="rounded-full border px-2 py-1 text-[10px] font-bold uppercase"
                   :class="
                     hasAccess
                       ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-200'
-                      : 'border-rose-500/40 bg-rose-500/20 text-rose-200'
+                      : 'border-amber-500/40 bg-amber-500/20 text-amber-200'
                   "
                 >
                   {{ hasAccess ? "Unlocked" : "Locked" }}
                 </span>
               </div>
 
-              <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                <label class="block text-xs font-bold uppercase tracking-wide text-white/60 lg:col-span-2">
-                  {{ $t('auto.k_d9fb161b') }}
+              <div class="mt-4 space-y-4">
+                <div class="space-y-1.5">
+                  <label class="text-[11px] font-bold uppercase tracking-wider text-white/40 ml-1">Bank Provider</label>
                   <select
                     v-model="bankForm.bankCode"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400"
+                    class="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-blue-500/50 transition-colors"
                     :disabled="isSavingBank || isStartingSubscription"
                   >
                     <option
@@ -1154,141 +1207,45 @@ onUnmounted(() => {
                       {{ bank.code }} - {{ bank.name }}
                     </option>
                   </select>
-                </label>
+                </div>
 
-                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
-                  {{ $t('auto.k_993dc46f') }}
-                  <input
-                    v-model.trim="bankForm.accountName"
-                    type="text"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400"
-                    :disabled="isSavingBank || isStartingSubscription"
-                  />
-                </label>
+                <div class="grid grid-cols-2 gap-3">
+                  <div class="space-y-1.5">
+                    <label class="text-[11px] font-bold uppercase tracking-wider text-white/40 ml-1">Account Name</label>
+                    <input
+                      v-model.trim="bankForm.accountName"
+                      type="text"
+                      class="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-blue-500/50 transition-colors"
+                      :disabled="isSavingBank || isStartingSubscription"
+                    />
+                  </div>
 
-                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
-                  {{ $t('auto.k_a86d4ce5') }}
-                  <input
-                    v-model.trim="bankForm.accountNumber"
-                    type="text"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white outline-none focus:border-cyan-400"
-                    :disabled="isSavingBank || isStartingSubscription"
-                  />
-                </label>
+                  <div class="space-y-1.5">
+                    <label class="text-[11px] font-bold uppercase tracking-wider text-white/40 ml-1">Account Number</label>
+                    <input
+                      v-model.trim="bankForm.accountNumber"
+                      type="text"
+                      class="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 font-mono text-sm text-white outline-none focus:border-blue-500/50 transition-colors"
+                      :disabled="isSavingBank || isStartingSubscription"
+                    />
+                  </div>
+                </div>
 
-                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
-                  {{ $t('auto.k_2315e84') }}
+                <div class="space-y-1.5">
+                  <label class="text-[11px] font-bold uppercase tracking-wider text-white/40 ml-1">PromptPay ID</label>
                   <input
                     v-model.trim="bankForm.promptpayId"
                     type="text"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white outline-none focus:border-cyan-400"
+                    class="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 font-mono text-sm text-white outline-none focus:border-blue-500/50 transition-colors"
+                    placeholder="Mobile or Tax ID"
                     :disabled="isSavingBank || isStartingSubscription"
                   />
-                </label>
-
-                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
-                  Bank Country
-                  <select
-                    v-model="bankForm.bankCountry"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400"
-                    :disabled="isSavingBank || isStartingSubscription"
-                  >
-                    <option
-                      v-for="country in countryOptions"
-                      :key="country.code"
-                      :value="country.code"
-                    >
-                      {{ country.name }}
-                    </option>
-                  </select>
-                </label>
-
-                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
-                  Currency
-                  <select
-                    v-model="bankForm.currency"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400"
-                    :disabled="isSavingBank || isStartingSubscription"
-                  >
-                    <option
-                      v-for="code in currencyOptions"
-                      :key="code"
-                      :value="code"
-                    >
-                      {{ code }}
-                    </option>
-                  </select>
-                </label>
-
-                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
-                  Account Type
-                  <select
-                    v-model="bankForm.accountType"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400"
-                    :disabled="isSavingBank || isStartingSubscription"
-                  >
-                    <option value="savings">Savings</option>
-                    <option value="current">Current</option>
-                    <option value="business">Business</option>
-                    <option value="other">Other</option>
-                  </select>
-                </label>
-
-                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
-                  Bank Name (International)
-                  <input
-                    v-model.trim="bankForm.bankName"
-                    type="text"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-white/40 outline-none focus:border-cyan-400"
-                    :placeholder="isThaiPayout ? 'Optional' : 'Required for foreign payouts'"
-                    :disabled="isSavingBank || isStartingSubscription"
-                  />
-                </label>
-
-                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
-                  Branch Name
-                  <input
-                    v-model.trim="bankForm.branchName"
-                    type="text"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400"
-                    :disabled="isSavingBank || isStartingSubscription"
-                  />
-                </label>
-
-                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
-                  SWIFT Code
-                  <input
-                    v-model.trim="bankForm.swiftCode"
-                    type="text"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white outline-none focus:border-cyan-400"
-                    :disabled="isSavingBank || isStartingSubscription"
-                  />
-                </label>
-
-                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
-                  IBAN
-                  <input
-                    v-model.trim="bankForm.iban"
-                    type="text"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white outline-none focus:border-cyan-400"
-                    :disabled="isSavingBank || isStartingSubscription"
-                  />
-                </label>
-
-                <label class="block text-xs font-bold uppercase tracking-wide text-white/60">
-                  Routing Number
-                  <input
-                    v-model.trim="bankForm.routingNumber"
-                    type="text"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white outline-none focus:border-cyan-400"
-                    :disabled="isSavingBank || isStartingSubscription"
-                  />
-                </label>
+                </div>
               </div>
 
               <button
                 type="button"
-                class="mt-4 w-full rounded-xl bg-gradient-to-r from-emerald-600 to-cyan-600 px-4 py-3 text-sm font-black text-white shadow-lg transition hover:scale-[1.01] active:scale-[0.98] disabled:opacity-60"
+                class="mt-6 w-full rounded-xl bg-blue-600 hover:bg-blue-500 px-4 py-3 text-sm font-black text-white shadow-lg transition active:scale-95 disabled:opacity-50"
                 :disabled="isSavingBank || isStartingSubscription || !canEditBank"
                 @click="saveBank"
               >
@@ -1296,51 +1253,61 @@ onUnmounted(() => {
                   isSavingBank
                     ? "Saving..."
                     : hasAccess
-                      ? "Save Payment Details"
-                      : "Unlock & Save Details"
+                      ? "Update Payout Info"
+                      : "Unlock & Save"
                 }}
               </button>
             </article>
           </div>
 
           <section
-            class="rounded-2xl border border-white/10 bg-gray-900/90 p-4 shadow-2xl backdrop-blur-xl"
+            class="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl relative overflow-hidden"
             data-testid="partner-orders-panel"
           >
-            <h3 class="text-base font-black text-white">
-              {{ $t('auto.k_30f69cb3') }}
-              <span class="ml-1 rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-[11px] font-bold text-white/70">90d</span>
-            </h3>
+            <div class="absolute top-0 right-0 w-32 h-32 bg-violet-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center">
+                  <Gift class="w-4 h-4 text-violet-400" />
+                </div>
+                <h3 class="text-base font-black text-white">Recent Activity</h3>
+              </div>
+              <span class="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold text-white/50">90 Days</span>
+            </div>
 
-            <ul class="mt-3 space-y-2">
+            <ul class="space-y-2.5">
               <li
                 v-for="order in orders"
                 :key="order.id"
-                class="rounded-xl border border-white/10 bg-black/30 p-3"
+                class="rounded-xl border border-white/5 bg-black/20 p-4 transition hover:bg-black/30"
               >
-                <div class="flex items-center justify-between gap-3">
-                  <p class="text-sm font-bold text-white">{{ order.sku || "partner_program" }}</p>
-                  <p class="text-sm font-black text-emerald-300">{{ formatMoney(order.amount) }}</p>
+                <div class="flex items-center justify-between gap-3 mb-2">
+                  <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-violet-400"></div>
+                    <p class="text-sm font-bold text-white">{{ order.sku === 'partner_program' ? 'Partner Program' : order.sku }}</p>
+                  </div>
+                  <p class="text-sm font-black text-emerald-400">+{{ formatMoney(order.amount) }}</p>
                 </div>
-                <div class="mt-1 flex items-center justify-between gap-3 text-xs">
+                <div class="flex items-center justify-between gap-3 text-[10px]">
                   <span
-                    class="rounded-full border px-2 py-0.5 font-bold uppercase"
+                    class="rounded-full px-2 py-0.5 font-bold uppercase tracking-tight"
                     :class="{
-                      'border-emerald-500/40 bg-emerald-500/20 text-emerald-200': ['paid', 'succeeded', 'active'].includes(order.status),
-                      'border-amber-500/40 bg-amber-500/20 text-amber-200': order.status === 'pending',
-                      'border-rose-500/40 bg-rose-500/20 text-rose-200': ['failed', 'canceled'].includes(order.status),
+                      'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20': ['paid', 'succeeded', 'active'].includes(order.status),
+                      'bg-amber-500/10 text-amber-400 border border-amber-500/20': order.status === 'pending',
+                      'bg-rose-500/10 text-rose-400 border border-rose-500/20': ['failed', 'canceled'].includes(order.status),
                     }"
                   >
                     {{ order.status }}
                   </span>
-                  <span class="text-white/55">{{ formatDate(order.created_at) }}</span>
+                  <span class="text-white/30 font-medium">{{ formatDate(order.created_at) }}</span>
                 </div>
               </li>
               <li
                 v-if="orders.length === 0"
-                class="rounded-xl border border-white/10 bg-black/30 p-3 text-sm text-white/55"
+                class="py-12 text-center rounded-xl border border-dashed border-white/10"
               >
-                {{ $t('auto.k_e86cd544') }}
+                <Gift class="w-8 h-8 text-white/10 mx-auto mb-2" />
+                <p class="text-xs text-white/30">No orders found yet</p>
               </li>
             </ul>
           </section>

@@ -1,9 +1,12 @@
 import { onUnmounted } from "vue";
 import coinAnimation from "@/assets/animations/coin.json";
+import { CITY_DEFAULTS } from "@/config/cityConfig";
 
 const pendingMapImages = new Set();
 const TRAFFIC_SOURCE_ID = "traffic-roads-local";
 const TRAFFIC_ROADS_DATA_URL = "/data/chiangmai-main-roads-lanes.geojson";
+const TRAFFIC_ROADS_COVERAGE_BOUNDS = CITY_DEFAULTS.chiangMai.bounds;
+const LOCAL_NEON_ROAD_LAYER_IDS = ["neon-roads-outer", "neon-roads-inner"];
 
 // Flow dash arrays for animated roads
 const FLOW_DASH_FRAMES = [];
@@ -23,8 +26,24 @@ export function useMapLayers(map, options = {}) {
 	const coinMinZoom = Number.isFinite(Number(options.coinMinZoom))
 		? Number(options.coinMinZoom)
 		: 12.5;
+	const trafficMinVisibleZoom = Number.isFinite(
+		Number(options.trafficMinVisibleZoom),
+	)
+		? Number(options.trafficMinVisibleZoom)
+		: 12;
+	const renderTextLabels = options.renderTextLabels !== false;
 
 	const canRunEffects = () => resolveEffectsMode() !== "off";
+	const resolveTrafficFlowQuality = () => {
+		const quality =
+			typeof options.trafficFlowQuality === "function"
+				? options.trafficFlowQuality()
+				: options.trafficFlowQuality;
+		if (quality === "off" || quality === "lite" || quality === "full") {
+			return quality;
+		}
+		return canRunEffects() ? "full" : "off";
+	};
 	const trafficDebugEnabled =
 		import.meta.env.DEV ||
 		import.meta.env.VITE_E2E === "true" ||
@@ -57,6 +76,68 @@ export function useMapLayers(map, options = {}) {
 		return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 	};
 
+	const isWithinBounds = (lat, lng, bounds) =>
+		Boolean(bounds) &&
+		lat >= bounds.south &&
+		lat <= bounds.north &&
+		lng >= bounds.west &&
+		lng <= bounds.east;
+
+	const resolveCoverageLocation = (userLocation = null) => {
+		const userLat = toFiniteNumber(userLocation?.lat ?? userLocation?.[0]);
+		const userLng = toFiniteNumber(userLocation?.lng ?? userLocation?.[1]);
+		if (userLat !== null && userLng !== null) {
+			return { lat: userLat, lng: userLng };
+		}
+
+		const currentCenter = map.value?.getCenter?.();
+		const centerLat = toFiniteNumber(currentCenter?.lat);
+		const centerLng = toFiniteNumber(currentCenter?.lng);
+		if (centerLat !== null && centerLng !== null) {
+			return { lat: centerLat, lng: centerLng };
+		}
+
+		return null;
+	};
+
+	const hasLocalTrafficCoverage = (userLocation = null) => {
+		const location = resolveCoverageLocation(userLocation);
+		if (!location) return false;
+		return isWithinBounds(
+			location.lat,
+			location.lng,
+			TRAFFIC_ROADS_COVERAGE_BOUNDS,
+		);
+	};
+
+	const clearLocalTrafficSubset = (mapInstance = map.value) => {
+		if (!mapInstance?.getSource?.(TRAFFIC_SOURCE_ID)) return;
+		const empty = { type: "FeatureCollection", features: [] };
+		if (scheduler) scheduler(TRAFFIC_SOURCE_ID, empty);
+		else mapInstance.getSource(TRAFFIC_SOURCE_ID).setData(empty);
+	};
+
+	const removeLocalTrafficRoadCoverage = (mapInstance = map.value) => {
+		if (!mapInstance) return;
+		for (const layerId of LOCAL_NEON_ROAD_LAYER_IDS) {
+			if (mapInstance.getLayer(layerId)) {
+				try {
+					mapInstance.removeLayer(layerId);
+				} catch {
+					// Ignore style transition races.
+				}
+			}
+		}
+		if (mapInstance.getSource("neon-roads")) {
+			try {
+				mapInstance.removeSource("neon-roads");
+			} catch {
+				// Ignore style transition races.
+			}
+		}
+		clearLocalTrafficSubset(mapInstance);
+	};
+
 	const loadRoadsGeoJson = async () => {
 		if (fullRoadsGeoJson) return fullRoadsGeoJson;
 		if (!fullRoadsPromise) {
@@ -83,6 +164,24 @@ export function useMapLayers(map, options = {}) {
 				});
 		}
 		return fullRoadsPromise;
+	};
+
+	const isMapStyleUsable = (mapInstance) => {
+		if (!mapInstance) return false;
+		try {
+			if (mapInstance.isStyleLoaded?.() || mapInstance.loaded?.()) return true;
+			const style =
+				typeof mapInstance.getStyle === "function"
+					? mapInstance.getStyle()
+					: null;
+			const layerCount = Array.isArray(style?.layers) ? style.layers.length : 0;
+			const sourceCount = style?.sources
+				? Object.keys(style.sources).length
+				: 0;
+			return layerCount > 0 && sourceCount > 0;
+		} catch {
+			return false;
+		}
 	};
 
 	const featureIntersectsRadius = (feature, centerLat, centerLng, radiusKm) => {
@@ -151,14 +250,22 @@ export function useMapLayers(map, options = {}) {
 
 	const addNeonRoads = () => {
 		if (!map.value) return;
-		if (!map.value.isStyleLoaded?.()) {
+		if (!isMapStyleUsable(map.value)) {
 			map.value.once("style.load", addNeonRoads);
+			return;
+		}
+		if (!hasLocalTrafficCoverage()) {
+			removeLocalTrafficRoadCoverage();
 			return;
 		}
 		if (map.value.getSource("neon-roads")) return;
 
 		map.value.once("idle", () => {
 			if (!map.value) return;
+			if (!hasLocalTrafficCoverage()) {
+				removeLocalTrafficRoadCoverage();
+				return;
+			}
 			if (map.value.getSource("neon-roads")) return; // double-check after idle
 			try {
 				map.value.addSource("neon-roads", {
@@ -250,6 +357,7 @@ export function useMapLayers(map, options = {}) {
 	let coinAnimationHardDisabled = false;
 	let lottiePlayerPromise = null;
 	let fallbackCoinCanvas = null;
+	let fallbackCoinStyleImage = null;
 	const COIN_IMAGE_ID = "coin-anim";
 	const COIN_FRAME_SIZE = 64;
 	const COIN_PIXEL_RATIO = 2;
@@ -297,12 +405,56 @@ export function useMapLayers(map, options = {}) {
 		return fallbackCoinCanvas;
 	};
 
+	const getFallbackCoinStyleImage = () => {
+		if (fallbackCoinStyleImage) return fallbackCoinStyleImage;
+		const size = COIN_FRAME_SIZE;
+		const center = size / 2;
+		const outerRadius = size * 0.34;
+		const strokeInnerRadius = outerRadius - 2.5;
+		const innerRadius = size * 0.16;
+		const data = new Uint8Array(size * size * 4);
+		for (let y = 0; y < size; y += 1) {
+			for (let x = 0; x < size; x += 1) {
+				const dx = x + 0.5 - center;
+				const dy = y + 0.5 - center;
+				const distance = Math.hypot(dx, dy);
+				if (distance > outerRadius) continue;
+				const offset = (y * size + x) * 4;
+				if (distance >= strokeInnerRadius) {
+					data[offset] = 255;
+					data[offset + 1] = 255;
+					data[offset + 2] = 255;
+					data[offset + 3] = 107;
+					continue;
+				}
+				data[offset] = 250;
+				data[offset + 1] = 204;
+				data[offset + 2] = 21;
+				data[offset + 3] = 255;
+				if (distance <= innerRadius) {
+					data[offset] = 255;
+					data[offset + 1] = 255;
+					data[offset + 2] = 255;
+					data[offset + 3] = 56;
+				}
+			}
+		}
+		fallbackCoinStyleImage = { width: size, height: size, data };
+		return fallbackCoinStyleImage;
+	};
+
 	const ensureFallbackCoinImage = () => {
 		if (!map.value || !map.value.isStyleLoaded?.()) return;
-		const canvas = getFallbackCoinCanvas();
-		if (!canvas) return;
+		const image = getFallbackCoinStyleImage();
+		if (!image) return;
 		try {
-			syncCoinImage(canvas);
+			if (!map.value.hasImage(COIN_IMAGE_ID)) {
+				map.value.addImage(COIN_IMAGE_ID, image, {
+					pixelRatio: COIN_PIXEL_RATIO,
+				});
+			} else {
+				map.value.updateImage(COIN_IMAGE_ID, image);
+			}
 		} catch {
 			// Ignore style transitions; fallback will retry on next style/load tick.
 		}
@@ -568,6 +720,10 @@ export function useMapLayers(map, options = {}) {
 				return true;
 			}
 
+			if (!map.value.hasImage(COIN_IMAGE_ID) && !renderTextLabels) {
+				return false;
+			}
+
 			map.value.addLayer(
 				{
 					id: layerId,
@@ -576,17 +732,32 @@ export function useMapLayers(map, options = {}) {
 					minzoom: coinMinZoom,
 					filter: ["all", ["!", ["has", "point_count"]]],
 					layout: {
-						"text-field": "🪙",
-						"text-size": 14,
-						"text-offset": [3.0, -7.0],
-						"text-allow-overlap": true,
-						"text-ignore-placement": true,
+						...(map.value.hasImage(COIN_IMAGE_ID)
+							? {
+									"icon-image": COIN_IMAGE_ID,
+									"icon-size": 0.56,
+									"icon-anchor": "bottom",
+									"icon-offset": [45, -100],
+									"icon-allow-overlap": true,
+									"icon-ignore-placement": true,
+								}
+							: renderTextLabels
+								? {
+										"text-field": "🪙",
+										"text-size": 14,
+										"text-offset": [3.0, -7.0],
+										"text-allow-overlap": true,
+										"text-ignore-placement": true,
+									}
+								: {}),
 					},
-					paint: {
-						"text-color": "#facc15",
-						"text-halo-color": "rgba(0,0,0,0.56)",
-						"text-halo-width": 1.5,
-					},
+					paint: renderTextLabels
+						? {
+								"text-color": "#facc15",
+								"text-halo-color": "rgba(0,0,0,0.56)",
+								"text-halo-width": 1.5,
+							}
+						: {},
 				},
 				beforeId || undefined,
 			);
@@ -672,7 +843,7 @@ export function useMapLayers(map, options = {}) {
 			}
 
 			// Cluster count labels
-			if (!map.value.getLayer("cluster-count")) {
+			if (renderTextLabels && !map.value.getLayer("cluster-count")) {
 				map.value.addLayer({
 					id: "cluster-count",
 					type: "symbol",
@@ -722,13 +893,17 @@ export function useMapLayers(map, options = {}) {
 						"icon-allow-overlap": true,
 						"icon-ignore-placement": true,
 						"icon-anchor": "bottom",
-						"text-field": ["get", "name"],
-						"text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
-						"text-offset": [0, 0.8],
-						"text-anchor": "top",
-						"text-size": 11,
-						"text-max-width": 8,
-						"text-allow-overlap": true,
+						...(renderTextLabels
+							? {
+									"text-field": ["get", "name"],
+									"text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
+									"text-offset": [0, 0.8],
+									"text-anchor": "top",
+									"text-size": 11,
+									"text-max-width": 8,
+									"text-allow-overlap": true,
+								}
+							: {}),
 					},
 					paint: {
 						"text-color": "#ffffff",
@@ -870,13 +1045,76 @@ export function useMapLayers(map, options = {}) {
 		"road-flow-core",
 		"road-flow-pulse",
 	];
+	const FLOW_CAR_SOURCE_ID = "road-flow-cars";
+	const FLOW_CAR_ICON_ID = "road-flow-car-icon";
+	const FLOW_CAR_LAYER_IDS = [
+		"road-flow-car-glow",
+		"road-flow-car-core",
+		"road-flow-car-symbol",
+	];
 	const NEON_ROAD_SOURCE_ID = "neon-roads";
 	const GLOBAL_ROAD_SOURCE_ID = "composite";
 	const GLOBAL_ROAD_SOURCE_LAYER = "road";
+	const MAX_FLOW_CAR_MODELS = 40;
+	const MAX_ROUTE_CANDIDATES = 40;
+	const MAX_ROUTE_POINTS = 16;
+	const MIN_ROUTE_LENGTH = 0.00005;
+	const ROAD_FLOW_TICK_MS = 96;
+	const CAR_POINT_UPDATE_MS = 150;
+	const CAR_VIEWPORT_REBIND_MS = 180;
+	const resolveTrafficFlowConfig = () => {
+		const quality = resolveTrafficFlowQuality();
+		if (quality === "lite") {
+			return {
+				quality,
+				enabled: true,
+				maxCarModels: 26,
+				tickMs: 96,
+				pointUpdateMs: 96,
+				minVisibleZoom: Math.max(trafficMinVisibleZoom, 12),
+			};
+		}
+		if (quality === "full") {
+			return {
+				quality,
+				enabled: true,
+				maxCarModels: MAX_FLOW_CAR_MODELS,
+				tickMs: ROAD_FLOW_TICK_MS,
+				pointUpdateMs: CAR_POINT_UPDATE_MS,
+				minVisibleZoom: trafficMinVisibleZoom,
+			};
+		}
+		return {
+			quality: "off",
+			enabled: false,
+			maxCarModels: 0,
+			tickMs: ROAD_FLOW_TICK_MS,
+			pointUpdateMs: CAR_POINT_UPDATE_MS,
+			minVisibleZoom: trafficMinVisibleZoom,
+		};
+	};
 	const ROAD_CLASS_FILTER = [
 		"match",
 		["get", "class"],
-		["motorway", "trunk", "primary", "secondary", "tertiary", "street"],
+		[
+			"motorway",
+			"motorway_link",
+			"trunk",
+			"trunk_link",
+			"primary",
+			"primary_link",
+			"secondary",
+			"secondary_link",
+			"tertiary",
+			"tertiary_link",
+			"street",
+			"street_limited",
+			"residential",
+			"service",
+			"minor",
+			"living_street",
+			"unclassified",
+		],
 		true,
 		false,
 	];
@@ -892,11 +1130,107 @@ export function useMapLayers(map, options = {}) {
 	];
 	let carAnimFrame = null;
 	let carVisibilityListener = null;
+	let carViewportListener = null;
 	let activeCarSourceKey = "";
+	let activeCarRouteSignature = "";
+	let activeCarViewportSignature = "";
 	let carRetryTimer = null;
+	let carRebindTimer = null;
 	let carRetryAttempts = 0;
 	let pendingCarSourceId = TRAFFIC_SOURCE_ID;
+	let animatedCarModels = [];
+	let lastTrafficSubsetGeoJson = { type: "FeatureCollection", features: [] };
 	const MAX_CAR_RETRY_ATTEMPTS = 40;
+	let flowCarStyleImage = null;
+
+	const getFlowCarStyleImage = () => {
+		if (flowCarStyleImage || typeof document === "undefined") {
+			return flowCarStyleImage;
+		}
+		const width = 44;
+		const height = 22;
+		const canvas = document.createElement("canvas");
+		canvas.width = width;
+		canvas.height = height;
+		const ctx = canvas.getContext("2d");
+		if (!ctx) return null;
+
+		const bodyX = 8;
+		const bodyY = 5;
+		const bodyWidth = 28;
+		const bodyHeight = 12;
+		const radius = bodyHeight / 2;
+
+		ctx.clearRect(0, 0, width, height);
+		ctx.shadowColor = "rgba(250, 204, 21, 0.9)";
+		ctx.shadowBlur = 10;
+		ctx.fillStyle = "#fde68a";
+		ctx.beginPath();
+		ctx.moveTo(bodyX + radius, bodyY);
+		ctx.lineTo(bodyX + bodyWidth - radius, bodyY);
+		ctx.quadraticCurveTo(
+			bodyX + bodyWidth,
+			bodyY,
+			bodyX + bodyWidth,
+			bodyY + radius,
+		);
+		ctx.lineTo(bodyX + bodyWidth, bodyY + bodyHeight - radius);
+		ctx.quadraticCurveTo(
+			bodyX + bodyWidth,
+			bodyY + bodyHeight,
+			bodyX + bodyWidth - radius,
+			bodyY + bodyHeight,
+		);
+		ctx.lineTo(bodyX + radius, bodyY + bodyHeight);
+		ctx.quadraticCurveTo(
+			bodyX,
+			bodyY + bodyHeight,
+			bodyX,
+			bodyY + bodyHeight - radius,
+		);
+		ctx.lineTo(bodyX, bodyY + radius);
+		ctx.quadraticCurveTo(bodyX, bodyY, bodyX + radius, bodyY);
+		ctx.fill();
+
+		ctx.shadowBlur = 0;
+		ctx.fillStyle = "#ffffff";
+		ctx.beginPath();
+		ctx.moveTo(width - 8, height / 2);
+		ctx.lineTo(width - 17, 6);
+		ctx.lineTo(width - 17, height - 6);
+		ctx.closePath();
+		ctx.fill();
+
+		ctx.fillStyle = "rgba(255,255,255,0.78)";
+		ctx.fillRect(12, 8, 9, 2);
+		ctx.fillRect(24, 8, 6, 2);
+
+		flowCarStyleImage = ctx.getImageData(0, 0, width, height);
+		return flowCarStyleImage;
+	};
+
+	const ensureFlowCarSymbolImage = (mapInstance) => {
+		if (!mapInstance) return false;
+		if (mapInstance.hasImage?.(FLOW_CAR_ICON_ID)) return true;
+		const image = getFlowCarStyleImage();
+		if (!image) {
+			updateTrafficDebug({
+				stage: "skip:car-icon-image-unavailable",
+				hasDocument: typeof document !== "undefined",
+			});
+			return false;
+		}
+		try {
+			mapInstance.addImage(FLOW_CAR_ICON_ID, image, { pixelRatio: 2 });
+			return true;
+		} catch (error) {
+			updateTrafficDebug({
+				stage: "error:add-car-icon-image",
+				message: error instanceof Error ? error.message : String(error),
+			});
+			return mapInstance.hasImage?.(FLOW_CAR_ICON_ID) ?? false;
+		}
+	};
 
 	const resetCarRetry = () => {
 		carRetryAttempts = 0;
@@ -928,7 +1262,7 @@ export function useMapLayers(map, options = {}) {
 	const removeCarLayers = () => {
 		const m = map.value;
 		if (!m) return;
-		for (const layerId of FLOW_LAYER_IDS) {
+		for (const layerId of [...FLOW_LAYER_IDS, ...FLOW_CAR_LAYER_IDS]) {
 			if (m.getLayer(layerId)) {
 				try {
 					m.removeLayer(layerId);
@@ -937,16 +1271,36 @@ export function useMapLayers(map, options = {}) {
 				}
 			}
 		}
+		if (m.getSource(FLOW_CAR_SOURCE_ID)) {
+			try {
+				m.removeSource(FLOW_CAR_SOURCE_ID);
+			} catch {
+				// Ignore style transition races.
+			}
+		}
+		animatedCarModels = [];
+		activeCarRouteSignature = "";
+		activeCarViewportSignature = "";
 	};
 
 	const resolveRoadSourceConfig = (m, sourceId = TRAFFIC_SOURCE_ID) => {
 		if (sourceId && m.getSource(sourceId)) {
-			return {
-				sourceId,
-				sourceLayer: null,
-				filter: null,
-				key: `${sourceId}:local`,
-			};
+			const styleSource =
+				typeof m.getStyle === "function"
+					? m.getStyle()?.sources?.[sourceId]
+					: null;
+			if (
+				sourceId === TRAFFIC_SOURCE_ID ||
+				sourceId === NEON_ROAD_SOURCE_ID ||
+				styleSource?.type === "geojson"
+			) {
+				return {
+					sourceId,
+					sourceLayer: null,
+					filter: null,
+					key: `${sourceId}:local`,
+				};
+			}
 		}
 		if (m.getSource(NEON_ROAD_SOURCE_ID)) {
 			return {
@@ -956,37 +1310,63 @@ export function useMapLayers(map, options = {}) {
 				key: `${NEON_ROAD_SOURCE_ID}:geojson`,
 			};
 		}
-		if (m.getSource(GLOBAL_ROAD_SOURCE_ID)) {
+		if (
+			sourceId === GLOBAL_ROAD_SOURCE_ID &&
+			m.getSource(GLOBAL_ROAD_SOURCE_ID)
+		) {
+			const styleLayers = m.getStyle?.()?.layers || [];
+			const renderedLayerIds = styleLayers
+				.filter(
+					(layer) =>
+						layer.source === GLOBAL_ROAD_SOURCE_ID &&
+						layer.type === "line" &&
+						!(layer.id || "").startsWith("road-flow-") &&
+						(String(layer.id || "")
+							.toLowerCase()
+							.includes("road") ||
+							String(layer["source-layer"] || "")
+								.toLowerCase()
+								.includes("road")),
+				)
+				.map((l) => l.id);
+
 			return {
 				sourceId: GLOBAL_ROAD_SOURCE_ID,
 				sourceLayer: GLOBAL_ROAD_SOURCE_LAYER,
 				filter: ROAD_CLASS_FILTER,
 				key: `${GLOBAL_ROAD_SOURCE_ID}:${GLOBAL_ROAD_SOURCE_LAYER}`,
+				renderedLayerIds,
 			};
 		}
 		try {
 			const styleLayers = m.getStyle?.()?.layers;
-			const fallbackRoadLayer = Array.isArray(styleLayers)
-				? styleLayers.find((layer) => {
-						if (!layer || layer.type !== "line") return false;
-						if (!layer.source || layer.id?.startsWith("road-flow-"))
-							return false;
-						const layerId = String(layer.id || "").toLowerCase();
-						const sourceLayer = String(
-							layer["source-layer"] || "",
-						).toLowerCase();
-						return layerId.includes("road") || sourceLayer.includes("road");
-					})
-				: null;
+			const isRoadLineLayer = (layer) => {
+				if (!layer || layer.type !== "line") return false;
+				if (!layer.source || layer.id?.startsWith("road-flow-")) return false;
+				const layerId = String(layer.id || "").toLowerCase();
+				const sourceLayer = String(layer["source-layer"] || "").toLowerCase();
+				return layerId.includes("road") || sourceLayer.includes("road");
+			};
+			const fallbackRoadLayers = Array.isArray(styleLayers)
+				? styleLayers.filter(isRoadLineLayer)
+				: [];
+			const fallbackRoadLayer = fallbackRoadLayers[0];
 			const sourceIdCandidate = fallbackRoadLayer?.source;
 			if (sourceIdCandidate && m.getSource(sourceIdCandidate)) {
 				const sourceLayerCandidate =
 					fallbackRoadLayer?.["source-layer"] ?? null;
+				// Collect layer IDs from the style that already render road data — used
+				// as a reliable fallback for queryRenderedFeatures when tile source
+				// queries return empty (e.g. tiles still loading on first call).
+				const renderedLayerIds = fallbackRoadLayers
+					.filter((l) => l.source === sourceIdCandidate)
+					.map((l) => l.id);
 				return {
 					sourceId: sourceIdCandidate,
 					sourceLayer: sourceLayerCandidate,
 					filter: sourceLayerCandidate ? ROAD_CLASS_FILTER : null,
 					key: `${sourceIdCandidate}:${sourceLayerCandidate || "line"}`,
+					renderedLayerIds,
 				};
 			}
 		} catch {
@@ -995,7 +1375,7 @@ export function useMapLayers(map, options = {}) {
 		return null;
 	};
 
-	const ensureRoadFlowLayers = (m, sourceConfig) => {
+	const ensureRoadFlowLayers = (m, sourceConfig, flowConfig) => {
 		const sourceDef = sourceConfig.sourceLayer
 			? {
 					source: sourceConfig.sourceId,
@@ -1005,6 +1385,7 @@ export function useMapLayers(map, options = {}) {
 		const flowFilter = sourceConfig.filter
 			? ["all", sourceConfig.filter]
 			: undefined;
+		const isLite = flowConfig.quality === "lite";
 
 		if (!m.getLayer("road-flow-glow")) {
 			m.addLayer({
@@ -1014,12 +1395,20 @@ export function useMapLayers(map, options = {}) {
 				...(flowFilter ? { filter: flowFilter } : {}),
 				paint: {
 					"line-color": "#22d3ee",
-					"line-opacity": 0.55,
-					"line-width": ["interpolate", ["linear"], ["zoom"], 9, 3.0, 16, 8.0],
-					"line-blur": 2.5,
+					"line-opacity": isLite ? 0.7 : 0.76,
+					"line-width": [
+						"interpolate",
+						["linear"],
+						["zoom"],
+						9,
+						isLite ? 4.0 : 4.2,
+						16,
+						isLite ? 9.8 : 10.5,
+					],
+					"line-blur": isLite ? 3.2 : 3.4,
 					"line-dasharray": FLOW_DASH_FRAMES[0],
 				},
-				minzoom: 9,
+				minzoom: flowConfig.minVisibleZoom,
 			});
 		}
 
@@ -1031,11 +1420,19 @@ export function useMapLayers(map, options = {}) {
 				...(flowFilter ? { filter: flowFilter } : {}),
 				paint: {
 					"line-color": "#facc15",
-					"line-opacity": 0.95,
-					"line-width": ["interpolate", ["linear"], ["zoom"], 9, 1.5, 16, 4.5],
+					"line-opacity": 1,
+					"line-width": [
+						"interpolate",
+						["linear"],
+						["zoom"],
+						9,
+						isLite ? 2.3 : 2.2,
+						16,
+						isLite ? 6.1 : 5.8,
+					],
 					"line-dasharray": FLOW_DASH_FRAMES[0],
 				},
-				minzoom: 9,
+				minzoom: flowConfig.minVisibleZoom,
 			});
 		}
 
@@ -1047,24 +1444,445 @@ export function useMapLayers(map, options = {}) {
 				...(flowFilter ? { filter: flowFilter } : {}),
 				paint: {
 					"line-color": "#f472b6",
-					"line-opacity": 0.45,
-					"line-width": ["interpolate", ["linear"], ["zoom"], 9, 2.0, 16, 5.5],
-					"line-blur": 1.2,
+					"line-opacity": isLite ? 0.56 : 0.62,
+					"line-width": [
+						"interpolate",
+						["linear"],
+						["zoom"],
+						9,
+						isLite ? 3.1 : 3.0,
+						16,
+						isLite ? 6.6 : 6.8,
+					],
+					"line-blur": isLite ? 1.6 : 1.6,
 					"line-dasharray": FLOW_DASH_FRAMES[2],
 				},
-				minzoom: 9,
+				minzoom: flowConfig.minVisibleZoom,
 			});
 		}
 	};
 
-	const addCarAnimation = ({ sourceId = TRAFFIC_SOURCE_ID } = {}) => {
+	const sampleRoadCoordinates = (coords = []) => {
+		const points = Array.isArray(coords) ? coords : [];
+		if (points.length < 2) return [];
+		const sampled = [];
+		const step = Math.max(1, Math.floor(points.length / MAX_ROUTE_POINTS));
+		for (let i = 0; i < points.length; i += step) {
+			const lng = toFiniteNumber(points[i]?.[0]);
+			const lat = toFiniteNumber(points[i]?.[1]);
+			if (lng === null || lat === null) continue;
+			sampled.push([lng, lat]);
+		}
+		const lastCoord = points[points.length - 1];
+		const lastLng = toFiniteNumber(lastCoord?.[0]);
+		const lastLat = toFiniteNumber(lastCoord?.[1]);
+		if (lastLng !== null && lastLat !== null) {
+			const lastSample = sampled[sampled.length - 1];
+			if (
+				!lastSample ||
+				lastSample[0] !== lastLng ||
+				lastSample[1] !== lastLat
+			) {
+				sampled.push([lastLng, lastLat]);
+			}
+		}
+		return sampled;
+	};
+
+	const getRoadCoordinateSets = (feature) => {
+		const geometry = feature?.geometry;
+		if (!geometry) return [];
+		if (geometry.type === "LineString") {
+			return [sampleRoadCoordinates(geometry.coordinates)];
+		}
+		if (geometry.type === "MultiLineString") {
+			return (
+				Array.isArray(geometry.coordinates) ? geometry.coordinates : []
+			).map((line) => sampleRoadCoordinates(line));
+		}
+		return [];
+	};
+
+	const measureRouteLength = (coords = []) => {
+		let total = 0;
+		for (let i = 1; i < coords.length; i += 1) {
+			const dx = coords[i][0] - coords[i - 1][0];
+			const dy = coords[i][1] - coords[i - 1][1];
+			total += Math.hypot(dx, dy);
+		}
+		return total;
+	};
+
+	const resolveAnimatedRoadFeatures = ({
+		mapInstance,
+		sourceConfig,
+		roadGeoJson = null,
+	}) => {
+		try {
+			if (
+				typeof mapInstance?.queryRenderedFeatures === "function" &&
+				mapInstance.getLayer?.("road-flow-core")
+			) {
+				const renderedFeatures = mapInstance
+					.queryRenderedFeatures(undefined, {
+						layers: ["road-flow-core"],
+					})
+					.filter((feature) => {
+						const geometryType = feature?.geometry?.type;
+						return (
+							geometryType === "LineString" ||
+							geometryType === "MultiLineString"
+						);
+					});
+				if (renderedFeatures.length) {
+					return renderedFeatures;
+				}
+			}
+		} catch {
+			// Fallback to source data below.
+		}
+		if (Array.isArray(roadGeoJson?.features)) {
+			return roadGeoJson.features;
+		}
+		if (
+			sourceConfig.sourceId === TRAFFIC_SOURCE_ID &&
+			Array.isArray(lastTrafficSubsetGeoJson?.features)
+		) {
+			return lastTrafficSubsetGeoJson.features;
+		}
+		if (
+			sourceConfig.sourceId === NEON_ROAD_SOURCE_ID &&
+			Array.isArray(fullRoadsGeoJson?.features)
+		) {
+			return fullRoadsGeoJson.features;
+		}
+		if (typeof mapInstance?.querySourceFeatures !== "function") {
+			return [];
+		}
+		try {
+			const queryOptions = {};
+			if (sourceConfig.sourceLayer) {
+				queryOptions.sourceLayer = sourceConfig.sourceLayer;
+			}
+			if (sourceConfig.filter) {
+				queryOptions.filter = sourceConfig.filter;
+			}
+			const sourceFeatures = mapInstance.querySourceFeatures(
+				sourceConfig.sourceId,
+				Object.keys(queryOptions).length ? queryOptions : undefined,
+			);
+			if (sourceFeatures.length) return sourceFeatures;
+		} catch {
+			// Fall through to rendered-layer query below.
+		}
+		// Final fallback: query already-rendered base road layers from the map style
+		// (e.g. roads-minor, roads-major). These are reliably populated whenever
+		// the map is visually showing roads — unlike freshly-added flow layers or
+		// tile-source queries that depend on network timing.
+		try {
+			const renderedLayerIds = Array.isArray(sourceConfig.renderedLayerIds)
+				? sourceConfig.renderedLayerIds.filter(
+						(id) =>
+							typeof mapInstance.getLayer === "function" &&
+							mapInstance.getLayer(id),
+					)
+				: [];
+			if (
+				renderedLayerIds.length &&
+				typeof mapInstance.queryRenderedFeatures === "function"
+			) {
+				const fallbackFeatures = mapInstance
+					.queryRenderedFeatures(undefined, { layers: renderedLayerIds })
+					.filter((f) => {
+						const t = f?.geometry?.type;
+						return t === "LineString" || t === "MultiLineString";
+					});
+				if (fallbackFeatures.length) return fallbackFeatures;
+			}
+		} catch {
+			// Ignore — return empty array below.
+		}
+		return [];
+	};
+
+	const buildAnimatedCarModels = (
+		features = [],
+		maxCarModels = MAX_FLOW_CAR_MODELS,
+	) => {
+		if (!features.length) return [];
+
+		const candidates = [];
+		const featureStep = Math.max(
+			1,
+			Math.floor(features.length / MAX_ROUTE_CANDIDATES),
+		);
+		for (
+			let featureIndex = 0;
+			featureIndex < features.length &&
+			candidates.length < MAX_ROUTE_CANDIDATES;
+			featureIndex += featureStep
+		) {
+			for (const coords of getRoadCoordinateSets(features[featureIndex])) {
+				if (coords.length < 2) continue;
+				const totalLength = measureRouteLength(coords);
+				if (!Number.isFinite(totalLength) || totalLength < MIN_ROUTE_LENGTH) {
+					continue;
+				}
+				const cumulativeLengths = [0];
+				for (let i = 1; i < coords.length; i += 1) {
+					const dx = coords[i][0] - coords[i - 1][0];
+					const dy = coords[i][1] - coords[i - 1][1];
+					cumulativeLengths.push(
+						cumulativeLengths[cumulativeLengths.length - 1] +
+							Math.hypot(dx, dy),
+					);
+				}
+				candidates.push({ coords, cumulativeLengths, totalLength });
+				if (candidates.length >= MAX_ROUTE_CANDIDATES) break;
+			}
+		}
+
+		if (!candidates.length) return [];
+
+		const models = [];
+		const desiredCars = Math.min(
+			maxCarModels,
+			Math.max(Math.min(maxCarModels, candidates.length * 8), 14),
+		);
+		const routeStep = Math.max(1, Math.floor(candidates.length / desiredCars));
+		for (let modelIndex = 0; modelIndex < desiredCars; modelIndex += 1) {
+			const candidateIndex = (modelIndex * routeStep) % candidates.length;
+			const route = candidates[candidateIndex];
+			const seed = candidateIndex + modelIndex * 17;
+			const variant = seed % 4;
+			models.push({
+				...route,
+				progress:
+					((modelIndex / Math.max(1, desiredCars)) * 0.82 +
+						((seed * 0.097) % 1) +
+						1) %
+					1,
+				speed: 0.022 + (seed % 5) * 0.007,
+				direction: seed % 2 === 0 ? 1 : -1,
+				color:
+					variant === 0
+						? "#fde68a"
+						: variant === 1
+							? "#fb7185"
+							: variant === 2
+								? "#7dd3fc"
+								: "#ffffff",
+				glowColor:
+					variant === 0
+						? "#f59e0b"
+						: variant === 1
+							? "#f472b6"
+							: variant === 2
+								? "#22d3ee"
+								: "#a855f7",
+			});
+		}
+
+		return models;
+	};
+
+	const interpolateCarState = (model) => {
+		if (!model || model.coords.length < 2) return null;
+		const targetDistance = model.totalLength * model.progress;
+		let segmentIndex = 1;
+		while (
+			segmentIndex < model.cumulativeLengths.length &&
+			model.cumulativeLengths[segmentIndex] < targetDistance
+		) {
+			segmentIndex += 1;
+		}
+		const endIndex = Math.min(segmentIndex, model.coords.length - 1);
+		const startIndex = Math.max(0, endIndex - 1);
+		const startDistance = model.cumulativeLengths[startIndex] ?? 0;
+		const endDistance = model.cumulativeLengths[endIndex] ?? model.totalLength;
+		const span = Math.max(1e-6, endDistance - startDistance);
+		const t = Math.min(1, Math.max(0, (targetDistance - startDistance) / span));
+		const startCoord = model.coords[startIndex];
+		const endCoord = model.coords[endIndex];
+		const dx = endCoord[0] - startCoord[0];
+		const dy = endCoord[1] - startCoord[1];
+		const bearing = (Math.atan2(dx, dy) * 180) / Math.PI;
+		return {
+			coordinates: [startCoord[0] + dx * t, startCoord[1] + dy * t],
+			bearing: (bearing + 360) % 360,
+		};
+	};
+
+	const buildAnimatedCarFeatureCollection = (models, elapsedMs) => {
+		const features = [];
+		const len = models.length;
+		
+		// PERFORMANCE FIX: Use for loop instead of map/filter for large arrays.
+		// Avoid object spread inside hot loop.
+		for (let i = 0; i < len; i++) {
+			const model = models[i];
+			model.progress = (model.progress + model.direction * model.speed * (Math.max(16, elapsedMs) / 1000)) % 1;
+			if (model.progress < 0) model.progress += 1;
+			
+			const state = interpolateCarState(model);
+			if (!state) continue;
+			
+			features.push({
+				type: "Feature",
+				id: `road-car-${i}`,
+				properties: {
+					color: model.color,
+					glowColor: model.glowColor,
+					bearing: state.bearing,
+				},
+				geometry: {
+					type: "Point",
+					coordinates: state.coordinates,
+				},
+			});
+		}
+		
+		return {
+			type: "FeatureCollection",
+			features,
+		};
+	};
+
+	const setCarPointSourceData = (mapInstance, data) => {
+		const source = mapInstance?.getSource?.(FLOW_CAR_SOURCE_ID);
+		source?.setData?.(data);
+	};
+
+	const ensureCarPointSourceAndLayers = (m, flowConfig) => {
+		const isLite = flowConfig.quality === "lite";
+		if (!m.getSource(FLOW_CAR_SOURCE_ID)) {
+			m.addSource(FLOW_CAR_SOURCE_ID, {
+				type: "geojson",
+				data: { type: "FeatureCollection", features: [] },
+			});
+		}
+
+		if (!m.getLayer("road-flow-car-glow")) {
+			m.addLayer({
+				id: "road-flow-car-glow",
+				type: "circle",
+				source: FLOW_CAR_SOURCE_ID,
+				paint: {
+					"circle-color": ["coalesce", ["get", "glowColor"], "#22d3ee"],
+					"circle-radius": [
+						"interpolate",
+						["linear"],
+						["zoom"],
+						9,
+						isLite ? 4.6 : 4.1,
+						16,
+						isLite ? 9.4 : 8.6,
+					],
+					"circle-blur": isLite ? 1.05 : 1.1,
+					"circle-opacity": isLite ? 0.84 : 0.74,
+					"circle-pitch-scale": "viewport",
+				},
+				minzoom: flowConfig.minVisibleZoom,
+			});
+		}
+
+		if (!m.getLayer("road-flow-car-core")) {
+			m.addLayer({
+				id: "road-flow-car-core",
+				type: "circle",
+				source: FLOW_CAR_SOURCE_ID,
+				paint: {
+					"circle-color": ["coalesce", ["get", "color"], "#fef08a"],
+					"circle-radius": [
+						"interpolate",
+						["linear"],
+						["zoom"],
+						9,
+						isLite ? 2.8 : 2.4,
+						16,
+						isLite ? 5.6 : 4.8,
+					],
+					"circle-opacity": 0.96,
+					"circle-stroke-color": "rgba(255,255,255,0.82)",
+					"circle-stroke-width": isLite ? 0.95 : 0.75,
+					"circle-pitch-scale": "viewport",
+				},
+				minzoom: flowConfig.minVisibleZoom,
+			});
+		}
+
+		if (ensureFlowCarSymbolImage(m)) {
+			if (!m.getLayer("road-flow-car-symbol")) {
+				m.addLayer({
+					id: "road-flow-car-symbol",
+					type: "symbol",
+					source: FLOW_CAR_SOURCE_ID,
+					layout: {
+						"icon-image": FLOW_CAR_ICON_ID,
+						"icon-size": [
+							"interpolate",
+							["linear"],
+							["zoom"],
+							9,
+							isLite ? 0.46 : 0.42,
+							16,
+							isLite ? 0.92 : 0.82,
+						],
+						"icon-rotate": ["coalesce", ["get", "bearing"], 0],
+						"icon-rotation-alignment": "map",
+						"icon-pitch-alignment": "viewport",
+						"icon-offset": [0, -0.3],
+						"icon-allow-overlap": true,
+						"icon-ignore-placement": true,
+						"icon-keep-upright": false,
+					},
+					paint: {
+						"icon-opacity": isLite ? 0.96 : 0.92,
+					},
+					minzoom: flowConfig.minVisibleZoom,
+				});
+			} else {
+				// Layer exists but maybe hidden or image lost?
+				try {
+					m.setLayoutProperty("road-flow-car-symbol", "visibility", "visible");
+					m.setLayoutProperty("road-flow-car-symbol", "icon-image", FLOW_CAR_ICON_ID);
+				} catch (e) {
+					// Ignore
+				}
+			}
+		}
+	};
+
+	const scheduleCarViewportRebind = () => {
+		if (typeof window === "undefined" || carRebindTimer) return;
+		carRebindTimer = window.setTimeout(() => {
+			carRebindTimer = null;
+			addCarAnimation({ sourceId: pendingCarSourceId });
+		}, CAR_VIEWPORT_REBIND_MS);
+	};
+
+	const ensureCarViewportListener = (mapInstance) => {
+		if (!mapInstance || carViewportListener) return;
+		carViewportListener = () => {
+			scheduleCarViewportRebind();
+		};
+		mapInstance.on("moveend", carViewportListener);
+		mapInstance.on("zoomend", carViewportListener);
+	};
+
+	const addCarAnimation = ({
+		sourceId = TRAFFIC_SOURCE_ID,
+		roadGeoJson = null,
+		routeSignature = "",
+	} = {}) => {
 		const m = map.value;
+		pendingCarSourceId = sourceId;
 		if (!m) {
 			updateTrafficDebug({ stage: "skip:no-map", sourceId });
 			return;
 		}
-		if (!m.isStyleLoaded?.()) {
-			updateTrafficDebug({ stage: "skip:style-not-loaded", sourceId });
+		if (!isMapStyleUsable(m)) {
+			updateTrafficDebug({ stage: "skip:style-not-usable", sourceId });
 			scheduleCarAnimationRetry(sourceId);
 			return;
 		}
@@ -1072,6 +1890,32 @@ export function useMapLayers(map, options = {}) {
 			typeof window !== "undefined" &&
 			typeof window.matchMedia === "function" &&
 			window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+		const flowConfig = resolveTrafficFlowConfig();
+		if (!flowConfig.enabled) {
+			updateTrafficDebug({
+				stage: "skip:flow-disabled",
+				sourceId,
+				quality: flowConfig.quality,
+			});
+			stopCarAnimation();
+			return;
+		}
+		const currentZoom = Number(m.getZoom?.() ?? 0);
+		if (
+			Number.isFinite(currentZoom) &&
+			currentZoom < flowConfig.minVisibleZoom
+		) {
+			ensureCarViewportListener(m);
+			updateTrafficDebug({
+				stage: "skip:min-visible-zoom",
+				sourceId,
+				quality: flowConfig.quality,
+				zoom: currentZoom,
+				minVisibleZoom: flowConfig.minVisibleZoom,
+			});
+			stopCarAnimation();
+			return;
+		}
 		const sourceConfig = resolveRoadSourceConfig(m, sourceId);
 		if (!sourceConfig) {
 			updateTrafficDebug({
@@ -1082,26 +1926,138 @@ export function useMapLayers(map, options = {}) {
 			scheduleCarAnimationRetry(sourceId);
 			return;
 		}
+		const center = m.getCenter?.();
+		const viewportSignature = sourceConfig.sourceLayer
+			? `${Math.round(Number(center?.lng || 0) * 50)}:${Math.round(Number(center?.lat || 0) * 50)}:${Math.round(Number(m.getZoom?.() || 0) * 4)}`
+			: "";
+		const effectiveRouteSignature =
+			routeSignature && sourceConfig.sourceLayer
+				? `${routeSignature}:${viewportSignature}`
+				: routeSignature ||
+					`${sourceConfig.key}:${viewportSignature}:${Array.isArray(roadGeoJson?.features) ? roadGeoJson.features.length : Array.isArray(lastTrafficSubsetGeoJson?.features) ? lastTrafficSubsetGeoJson.features.length : 0}`;
 
 		if (activeCarSourceKey !== sourceConfig.key) {
 			removeCarLayers();
 			activeCarSourceKey = sourceConfig.key;
-		}
-		if (m.getLayer("road-flow-core")) {
-			if (!carAnimFrame && !prefersReduceMotion) {
-				removeCarLayers();
-			} else {
-				resetCarRetry();
-				updateTrafficDebug({
-					stage: "skip:already-mounted",
-					sourceId: sourceConfig.sourceId,
-					sourceLayer: sourceConfig.sourceLayer || null,
-				});
-				return;
-			}
+			activeCarRouteSignature = "";
+			activeCarViewportSignature = "";
 		}
 		try {
-			ensureRoadFlowLayers(m, sourceConfig);
+			ensureRoadFlowLayers(m, sourceConfig, flowConfig);
+			ensureCarPointSourceAndLayers(m, flowConfig);
+			const renderedFlowRoadCount =
+				typeof m.queryRenderedFeatures === "function" &&
+				m.getLayer("road-flow-core")
+					? m.queryRenderedFeatures(undefined, {
+							layers: ["road-flow-core"],
+						}).length
+					: 0;
+			const renderedCarCount =
+				typeof m.queryRenderedFeatures === "function" &&
+				m.getLayer("road-flow-car-core")
+					? m.queryRenderedFeatures(undefined, {
+							layers: ["road-flow-car-core"],
+						}).length
+					: 0;
+			const shouldRebuildCars =
+				activeCarRouteSignature !== effectiveRouteSignature ||
+				!m.getSource(FLOW_CAR_SOURCE_ID) ||
+				!m.getLayer("road-flow-car-core") ||
+				animatedCarModels.length === 0 ||
+				(sourceConfig.sourceId === TRAFFIC_SOURCE_ID &&
+					renderedFlowRoadCount > 0 &&
+					renderedCarCount === 0);
+			const hasCarVisualStack = Boolean(
+				m.getLayer("road-flow-car-glow") &&
+					m.getLayer("road-flow-car-core") &&
+					m.getLayer("road-flow-car-symbol") &&
+					m.hasImage?.(FLOW_CAR_ICON_ID),
+			);
+			if (!hasCarVisualStack) {
+				updateTrafficDebug({
+					stage: "repair:car-visual-stack",
+					sourceId: sourceConfig.sourceId,
+					sourceLayer: sourceConfig.sourceLayer || null,
+					quality: flowConfig.quality,
+					hasCarGlow: Boolean(m.getLayer("road-flow-car-glow")),
+					hasCarCore: Boolean(m.getLayer("road-flow-car-core")),
+					hasCarSymbol: Boolean(m.getLayer("road-flow-car-symbol")),
+					hasCarImage: Boolean(m.hasImage?.(FLOW_CAR_ICON_ID)),
+				});
+				scheduleCarAnimationRetry(sourceConfig.sourceId);
+			}
+			if (
+				m.getLayer("road-flow-core") &&
+				!shouldRebuildCars &&
+				hasCarVisualStack &&
+				animatedCarModels.length > 0 &&
+				renderedCarCount > 0
+			) {
+				if (carAnimFrame || prefersReduceMotion) {
+					resetCarRetry();
+					updateTrafficDebug({
+						stage: "skip:already-mounted",
+						sourceId: sourceConfig.sourceId,
+						sourceLayer: sourceConfig.sourceLayer || null,
+						carCount: animatedCarModels.length,
+						quality: flowConfig.quality,
+						hasCarSymbol: true,
+					});
+					return;
+				}
+				// Animation was stopped but visual stack is intact — fall through to restart
+			}
+			if (shouldRebuildCars) {
+				const roadFeatures = resolveAnimatedRoadFeatures({
+					mapInstance: m,
+					sourceConfig,
+					roadGeoJson,
+				});
+				animatedCarModels = buildAnimatedCarModels(
+					roadFeatures,
+					flowConfig.maxCarModels,
+				);
+				activeCarRouteSignature = effectiveRouteSignature;
+				activeCarViewportSignature = viewportSignature;
+				setCarPointSourceData(
+					m,
+					buildAnimatedCarFeatureCollection(animatedCarModels, 16),
+				);
+				if (!animatedCarModels.length) {
+					updateTrafficDebug({
+						stage: "retry:no-car-models-yet",
+						sourceId: sourceConfig.sourceId,
+						sourceLayer: sourceConfig.sourceLayer || null,
+						quality: flowConfig.quality,
+					});
+					// Fast path: retry immediately once the map finishes loading all tiles.
+					// This fires before the timeout-based retry and avoids the full backoff
+					// delay when road features simply weren't rendered yet.
+					if (typeof m.once === "function" && !m.__carIdleRetryPending) {
+						m.__carIdleRetryPending = true;
+						m.once("idle", () => {
+							m.__carIdleRetryPending = false;
+							addCarAnimation({ sourceId: sourceConfig.sourceId });
+						});
+					}
+					scheduleCarAnimationRetry(sourceConfig.sourceId);
+					return;
+				}
+				if (
+					sourceConfig.sourceId === TRAFFIC_SOURCE_ID &&
+					renderedFlowRoadCount > 0 &&
+					renderedCarCount === 0
+				) {
+					updateTrafficDebug({
+						stage: "retry:reseed-visible-local-cars",
+						sourceId: sourceConfig.sourceId,
+						sourceLayer: sourceConfig.sourceLayer || null,
+						quality: flowConfig.quality,
+					});
+					scheduleCarAnimationRetry(sourceConfig.sourceId);
+					return;
+				}
+			}
 
 			if (prefersReduceMotion) {
 				resetCarRetry();
@@ -1109,6 +2065,8 @@ export function useMapLayers(map, options = {}) {
 					stage: "mounted:static",
 					sourceId: sourceConfig.sourceId,
 					sourceLayer: sourceConfig.sourceLayer || null,
+					quality: flowConfig.quality,
+					carCount: animatedCarModels.length,
 				});
 				return;
 			}
@@ -1117,77 +2075,120 @@ export function useMapLayers(map, options = {}) {
 				stage: "mounted:animated",
 				sourceId: sourceConfig.sourceId,
 				sourceLayer: sourceConfig.sourceLayer || null,
+				quality: flowConfig.quality,
+				carCount: animatedCarModels.length,
 			});
 
 			let phase = 0;
 			let lastTs = performance.now();
 			let dashFrameIndex = 0;
-			let lastDashUpdateAt = 0;
+			let lastCarPointUpdateAt = 0;
+			const scheduleNextTick = () => {
+				if (typeof window !== "undefined") {
+					carAnimFrame = window.requestAnimationFrame(() => animate(performance.now()));
+					return;
+				}
+				carAnimFrame = setTimeout(
+					() => animate(performance.now()),
+					flowConfig.tickMs,
+				);
+			};
 
 			const animate = (ts = performance.now()) => {
 				if (!m || !m.getLayer("road-flow-core")) {
 					carAnimFrame = null;
 					return;
 				}
+				// The road-flow-car-symbol layer must exist for cars to render
+				if (!m.getLayer("road-flow-car-symbol")) {
+					// Attempt a one-time repair if the layer went missing
+					ensureCarPointSourceAndLayers(m, flowConfig);
+					if (!m.getLayer("road-flow-car-symbol")) {
+						carAnimFrame = null;
+						return;
+					}
+				}
 				if (typeof document !== "undefined" && document.hidden) {
 					carAnimFrame = null;
 					return;
 				}
+				if (sourceConfig.sourceLayer) {
+					const center = m.getCenter?.();
+					const nextViewportSignature = `${Math.round(Number(center?.lng || 0) * 50)}:${Math.round(Number(center?.lat || 0) * 50)}:${Math.round(Number(m.getZoom?.() || 0) * 4)}`;
+					if (
+						nextViewportSignature &&
+						nextViewportSignature !== activeCarViewportSignature
+					) {
+						activeCarViewportSignature = nextViewportSignature;
+						scheduleCarViewportRebind();
+					}
+				}
 				const dt = Math.max(0, ts - lastTs);
 				lastTs = ts;
 				phase = (phase + dt * 0.0048) % (Math.PI * 2);
-
-				// Throttle paint updates to ~10fps for visible traffic motion
-				if (ts - lastDashUpdateAt >= 95) {
-					lastDashUpdateAt = ts;
-					dashFrameIndex = (dashFrameIndex + 1) % FLOW_DASH_FRAMES.length;
-					const nextDash = FLOW_DASH_FRAMES[dashFrameIndex];
-					const pulseDash =
-						FLOW_DASH_FRAMES[(dashFrameIndex + 2) % FLOW_DASH_FRAMES.length];
+				dashFrameIndex = (dashFrameIndex + 1) % FLOW_DASH_FRAMES.length;
+				const nextDash = FLOW_DASH_FRAMES[dashFrameIndex];
+				const pulseDash =
+					FLOW_DASH_FRAMES[(dashFrameIndex + 2) % FLOW_DASH_FRAMES.length];
+				try {
+					if (m.getLayer("road-flow-core")) {
+						m.setPaintProperty("road-flow-core", "line-dasharray", nextDash);
+						m.setPaintProperty(
+							"road-flow-core",
+							"line-opacity",
+							0.88 + Math.abs(Math.sin(phase)) * 0.08,
+						);
+					}
+					if (m.getLayer("road-flow-glow")) {
+						m.setPaintProperty("road-flow-glow", "line-dasharray", nextDash);
+						m.setPaintProperty(
+							"road-flow-glow",
+							"line-opacity",
+							0.45 + Math.abs(Math.sin(phase)) * 0.12,
+						);
+					}
+					if (m.getLayer("road-flow-pulse")) {
+						m.setPaintProperty("road-flow-pulse", "line-dasharray", pulseDash);
+						m.setPaintProperty(
+							"road-flow-pulse",
+							"line-opacity",
+							0.18 + Math.abs(Math.sin(phase + 1.0)) * 0.14,
+						);
+					}
+				} catch {
+					// Ignore layer updates during style transitions.
+				}
+				if (
+					animatedCarModels.length &&
+					(lastCarPointUpdateAt === 0 ||
+						ts - lastCarPointUpdateAt >= flowConfig.pointUpdateMs)
+				) {
+					const elapsedSinceCars =
+						ts - lastCarPointUpdateAt || flowConfig.pointUpdateMs;
+					lastCarPointUpdateAt = ts;
 					try {
-						if (m.getLayer("road-flow-core")) {
-							m.setPaintProperty("road-flow-core", "line-dasharray", nextDash);
-							m.setPaintProperty(
-								"road-flow-core",
-								"line-opacity",
-								0.88 + Math.abs(Math.sin(phase)) * 0.08,
-							);
-						}
-						if (m.getLayer("road-flow-glow")) {
-							m.setPaintProperty("road-flow-glow", "line-dasharray", nextDash);
-							m.setPaintProperty(
-								"road-flow-glow",
-								"line-opacity",
-								0.45 + Math.abs(Math.sin(phase)) * 0.12,
-							);
-						}
-						if (m.getLayer("road-flow-pulse")) {
-							m.setPaintProperty(
-								"road-flow-pulse",
-								"line-dasharray",
-								pulseDash,
-							);
-							m.setPaintProperty(
-								"road-flow-pulse",
-								"line-opacity",
-								0.18 + Math.abs(Math.sin(phase + 1.0)) * 0.14,
-							);
-						}
+						setCarPointSourceData(
+							m,
+							buildAnimatedCarFeatureCollection(
+								animatedCarModels,
+								elapsedSinceCars,
+							),
+						);
 					} catch {
-						// Ignore layer updates during style transitions.
+						// Ignore source update races during style transitions.
 					}
 				}
-				carAnimFrame = requestAnimationFrame(animate);
+				scheduleNextTick();
 			};
 
 			const startCarLoop = () => {
 				if (carAnimFrame) return;
 				lastTs = performance.now();
-				carAnimFrame = requestAnimationFrame(animate);
+				animate(lastTs);
 			};
 			const stopCarLoop = () => {
 				if (!carAnimFrame) return;
-				cancelAnimationFrame(carAnimFrame);
+				clearTimeout(carAnimFrame);
 				carAnimFrame = null;
 			};
 			startCarLoop();
@@ -1230,6 +2231,7 @@ export function useMapLayers(map, options = {}) {
 					});
 				}
 			}
+			ensureCarViewportListener(m);
 		} catch (e) {
 			updateTrafficDebug({
 				stage: "error:add-flow-animation",
@@ -1245,18 +2247,31 @@ export function useMapLayers(map, options = {}) {
 		force = false,
 	} = {}) => {
 		const m = map.value;
-		if (!m || !m.isStyleLoaded?.()) return false;
+		if (!m || !isMapStyleUsable(m)) return false;
 
 		const userLat = toFiniteNumber(userLocation?.lat ?? userLocation?.[0]);
 		const userLng = toFiniteNumber(userLocation?.lng ?? userLocation?.[1]);
+		const nationwideSignature =
+			userLat !== null && userLng !== null
+				? `nationwide:${userLat.toFixed(3)}:${userLng.toFixed(3)}:${radiusKm}`
+				: "nationwide:no-location";
 		if (userLat === null || userLng === null) {
 			lastTrafficSignature = "";
-			if (m.getSource(TRAFFIC_SOURCE_ID)) {
-				const empty = { type: "FeatureCollection", features: [] };
-				if (scheduler) scheduler(TRAFFIC_SOURCE_ID, empty);
-				else m.getSource(TRAFFIC_SOURCE_ID).setData(empty);
-			}
-			addCarAnimation({ sourceId: NEON_ROAD_SOURCE_ID });
+			clearLocalTrafficSubset(m);
+			addCarAnimation({
+				sourceId: GLOBAL_ROAD_SOURCE_ID,
+				routeSignature: nationwideSignature,
+			});
+			return true;
+		}
+
+		if (!hasLocalTrafficCoverage({ lat: userLat, lng: userLng })) {
+			lastTrafficSignature = "";
+			removeLocalTrafficRoadCoverage(m);
+			addCarAnimation({
+				sourceId: GLOBAL_ROAD_SOURCE_ID,
+				routeSignature: nationwideSignature,
+			});
 			return true;
 		}
 
@@ -1268,11 +2283,15 @@ export function useMapLayers(map, options = {}) {
 		) {
 			return true;
 		}
+		if (!m.getSource("neon-roads")) {
+			addNeonRoads();
+		}
 
 		const fullGeo = await loadRoadsGeoJson();
 		if (!map.value || map.value !== m) return false;
 		const subset = buildTrafficSubset(fullGeo, userLat, userLng, radiusKm);
 		lastTrafficSignature = signature;
+		lastTrafficSubsetGeoJson = subset;
 
 		if (!m.getSource(TRAFFIC_SOURCE_ID)) {
 			m.addSource(TRAFFIC_SOURCE_ID, { type: "geojson", data: subset });
@@ -1283,17 +2302,25 @@ export function useMapLayers(map, options = {}) {
 		}
 
 		if (!subset.features.length) {
-			addCarAnimation({ sourceId: NEON_ROAD_SOURCE_ID });
+			addCarAnimation({
+				sourceId: NEON_ROAD_SOURCE_ID,
+				roadGeoJson: fullGeo,
+				routeSignature: "neon-roads:full",
+			});
 			return true;
 		}
 
-		addCarAnimation({ sourceId: TRAFFIC_SOURCE_ID });
+		addCarAnimation({
+			sourceId: TRAFFIC_SOURCE_ID,
+			roadGeoJson: subset,
+			routeSignature: signature,
+		});
 		return true;
 	};
 
 	const stopCarAnimation = () => {
 		if (carAnimFrame) {
-			cancelAnimationFrame(carAnimFrame);
+			clearTimeout(carAnimFrame);
 			carAnimFrame = null;
 		}
 		if (carVisibilityListener) {
@@ -1301,6 +2328,15 @@ export function useMapLayers(map, options = {}) {
 				document.removeEventListener("visibilitychange", carVisibilityListener);
 			}
 			carVisibilityListener = null;
+		}
+		if (carViewportListener && map.value) {
+			map.value.off("moveend", carViewportListener);
+			map.value.off("zoomend", carViewportListener);
+			carViewportListener = null;
+		}
+		if (carRebindTimer) {
+			clearTimeout(carRebindTimer);
+			carRebindTimer = null;
 		}
 		resetCarRetry();
 		removeCarLayers();

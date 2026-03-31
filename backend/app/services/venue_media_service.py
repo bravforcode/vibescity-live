@@ -17,7 +17,8 @@ class VenueMediaService:
     _VENUE_SELECT_PRIMARY = (
         'id,name,slug,category,status,province,district,latitude,longitude,'
         'image_urls,"Image_URL1","Image_URL2",image_url_1,image_url_2,'
-        'video_url,"Video_URL",cinematic_video_url,ig_url,fb_url,tiktok_url,social_links'
+        'video_url,"Video_URL",cinematic_video_url,ig_url,fb_url,tiktok_url,social_links,'
+        'storefront_image_url'
     )
     _VENUE_SELECT_FALLBACK = (
         'id,name,slug,category,status,province,district,latitude,longitude,'
@@ -269,6 +270,7 @@ class VenueMediaService:
             "district": row.get("district") or "",
             "latitude": self._coerce_float(row.get("latitude")),
             "longitude": self._coerce_float(row.get("longitude")),
+            "storefront_image_url": self._normalize_url(row.get("storefront_image_url")),
             "images": images,
             "videos": videos,
             "video_url": videos[0] if videos else "",
@@ -283,10 +285,21 @@ class VenueMediaService:
                 "has_images": bool(images),
                 "has_videos": bool(videos),
                 "has_media": bool(media_items),
+                "has_complete_media": bool(images) and bool(videos),
                 "missing_images": not bool(images),
                 "missing_videos": not bool(videos),
+                "missing_complete_media": not (bool(images) and bool(videos)),
             },
         }
+
+    def _has_complete_media(self, payload: dict) -> bool:
+        coverage = payload.get("coverage") if isinstance(payload, dict) else None
+        if isinstance(coverage, dict) and coverage.get("has_complete_media") is True:
+            return True
+        counts = payload.get("counts") if isinstance(payload, dict) else None
+        if not isinstance(counts, dict):
+            return False
+        return int(counts.get("images") or 0) > 0 and int(counts.get("videos") or 0) > 0
 
     def list_shop_media(
         self,
@@ -294,19 +307,24 @@ class VenueMediaService:
         limit: int = 1000,
         offset: int = 0,
         include_missing: bool = True,
+        require_complete: bool = False,
     ) -> dict:
         rows = self._fetch_venue_rows()
         venue_ids = [str(row.get("id")) for row in rows if row.get("id") is not None]
         approved_photos = self._fetch_approved_photos(venue_ids)
 
-        payloads = [
+        all_payloads = [
             self._build_payload(row, approved_photos.get(str(row.get("id")), []))
             for row in rows
             if row.get("id") is not None
         ]
 
+        payloads = list(all_payloads)
+
         if not include_missing:
             payloads = [item for item in payloads if item["coverage"]["has_media"]]
+        if require_complete:
+            payloads = [item for item in payloads if self._has_complete_media(item)]
 
         total = len(payloads)
         sliced = payloads[offset : offset + limit]
@@ -322,9 +340,16 @@ class VenueMediaService:
             },
             "summary": {
                 "total_shops": total,
+                "total_shops_scanned": len(all_payloads),
                 "shops_with_images": sum(1 for item in payloads if item["coverage"]["has_images"]),
                 "shops_with_videos": sum(1 for item in payloads if item["coverage"]["has_videos"]),
                 "shops_with_media": sum(1 for item in payloads if item["coverage"]["has_media"]),
+                "shops_with_complete_media": sum(
+                    1 for item in all_payloads if item["coverage"]["has_complete_media"]
+                ),
+                "shops_missing_complete_media": sum(
+                    1 for item in all_payloads if not item["coverage"]["has_complete_media"]
+                ),
             },
         }
 
@@ -333,6 +358,7 @@ class VenueMediaService:
         shop_id: str,
         *,
         hydrate_missing_image: bool = False,
+        require_complete: bool = False,
     ) -> dict | None:
         rows = await asyncio.to_thread(self._fetch_venue_rows, shop_id)
         if not rows:
@@ -345,6 +371,8 @@ class VenueMediaService:
         # Keep the query flag for backward compatibility, but do not hydrate from
         # external fallbacks. This endpoint is authoritative real media only.
         _ = hydrate_missing_image
+        if require_complete and not self._has_complete_media(payload):
+            return None
         return payload
 
 

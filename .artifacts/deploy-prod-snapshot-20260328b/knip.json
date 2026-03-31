@@ -1,0 +1,35 @@
+{
+  "$schema": "./node_modules/knip/schema.json",
+  "entry": [
+    "src/main.js",
+    "src/App.vue",
+    "src/router/index.js",
+    ".storybook/main.js",
+    "src/**/*.stories.js"
+  ],
+  "project": [
+    "src/**/*.{js,vue}",
+    ".storybook/**/*.js"
+  ],
+  "vue": true,
+  "rsbuild": true,
+  "storybook": true,
+  "playwright": true,
+  "vitest": true,
+  "ignore": [
+    "supabase/**",
+    "backend/**",
+    "scripts/**",
+    "k6-tests/**",
+    ".venv/**",
+    "dist/**",
+    "coverage/**",
+    "playwright-report/**",
+    "test-results/**",
+    "public/sw.js",
+    "src/sw.js"
+  ],
+  "ignoreBinaries": [
+    "k6"
+  ]
+}

@@ -1,6 +1,7 @@
 import hashlib
 import json
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -33,9 +34,18 @@ class VenuePin(BaseModel):
     name: str
     lat: float
     lng: float
-    category: str
+    category: str = ""
     rating: float | None = None
     is_live: bool = False
+    pin_type: str | None = None
+    pin_state: str | None = None
+    pin_metadata: dict[str, Any] | None = None
+    visibility_score: int | None = None
+    verified_active: bool = False
+    glow_active: bool = False
+    boost_active: bool = False
+    giant_active: bool = False
+    cover_image: str | None = None
 
 
 class VenuesResponse(BaseModel):
@@ -76,26 +86,44 @@ async def get_venues(
     bbox: str = Query(..., examples=["100.5,13.5,101.0,14.0"], description="minLng,minLat,maxLng,maxLat"),
     zoom: float = Query(12.0, ge=3, le=22),
     limit: int = Query(200, ge=1, le=500),
+    use_cache: bool = Query(True, description="Use Materialized View for faster retrieval"),
 ):
     mn_lng, mn_lat, mx_lng, mx_lat = _parse_bbox(bbox)
     limit = min(limit, 500)
 
     try:
         sb = _get_supabase()
-        resp = (
-            sb.rpc(
-                "get_map_pins",
-                {
-                    "min_lng": mn_lng, "min_lat": mn_lat,
-                    "max_lng": mx_lng, "max_lat": mx_lat,
-                    "zoom_level": zoom,
-                    "max_results": limit,
-                },
+        
+        # VC-101: Use Materialized View for static tile data if use_cache is True
+        if use_cache:
+            # Query from materialized view directly for high-performance tile generation
+            # Note: This assumes the schema matches mv_venue_geodata
+            resp = (
+                sb.table("mv_venue_geodata")
+                .select("*")
+                .filter("location", "ov", f"SRID=4326;POLYGON(({mn_lng} {mn_lat},{mn_lng} {mx_lat},{mx_lng} {mx_lat},{mx_lng} {mn_lat},{mn_lng} {mn_lat}))")
+                .limit(limit)
+                .execute()
             )
-            .execute()
-        )
-        rows = resp.data or []
-    except Exception:
+            rows = resp.data or []
+        else:
+            # Fallback to real-time RPC for dynamic data
+            resp = (
+                sb.rpc(
+                    "get_map_pins",
+                    {
+                        "p_min_lng": mn_lng,
+                        "p_min_lat": mn_lat,
+                        "p_max_lng": mx_lng,
+                        "p_max_lat": mx_lat,
+                        "p_zoom": round(zoom),
+                    },
+                )
+                .execute()
+            )
+            rows = (resp.data or [])[:limit]
+    except Exception as exc:
+        logger.error(f"Error fetching venues: {exc}")
         rows = []
 
     venues = [
@@ -107,6 +135,15 @@ async def get_venues(
             category=r.get("category", ""),
             rating=r.get("rating"),
             is_live=bool(r.get("is_live", False)),
+            pin_type=r.get("pin_type"),
+            pin_state=r.get("pin_state"),
+            pin_metadata=r.get("pin_metadata"),
+            visibility_score=r.get("visibility_score"),
+            verified_active=bool(r.get("verified_active", False)),
+            glow_active=bool(r.get("glow_active", False)),
+            boost_active=bool(r.get("boost_active", False)),
+            giant_active=bool(r.get("giant_active", False)),
+            cover_image=r.get("cover_image"),
         )
         for r in rows
     ]

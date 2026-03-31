@@ -12,6 +12,7 @@ on:
           - smoke
           - full
           - map-required
+          - mobile-contracts
 
 jobs:
   test:
@@ -44,6 +45,8 @@ jobs:
         run: |
           if [ "${{ inputs.lane }}" = "map-required" ]; then
             npm run test:e2e:map-required
+          elif [ "${{ inputs.lane }}" = "mobile-contracts" ]; then
+            npm run test:e2e:mobile-contracts
           elif [ "${{ inputs.lane }}" = "full" ]; then
             npm run test:e2e
           else

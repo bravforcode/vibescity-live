@@ -149,12 +149,12 @@ export function useMapLogic({
 			zoom: isDesktopLayout.value ? 15.5 : 16.0,
 			pitch: 60, // 3D tilt without showing beyond map world
 			bearing: 0,
-			speed: 0.5, // 0.8 -> 0.5 (Slower/Smoother)
-			curve: 1.5, // 1.2 -> 1.5 (More gradual zoom)
+			speed: 0.7,
+			curve: 1.2,
 			essential: true,
 			offset: [0, -mobileBottomOffset],
 			padding: { top: 0, bottom: 0, left: 0, right: 0 },
-			maxDuration: 2500, // Cap duration for long flights
+			maxDuration: 2000,
 		};
 
 		// Execute Fly
@@ -175,14 +175,25 @@ export function useMapLogic({
 		}
 	};
 
-	const handleLocateMe = (selectFeedback) => {
+	const handleLocateMe = (selectFeedback, options = {}) => {
 		if (selectFeedback) selectFeedback();
-		if (mapRef.value && userLocation?.value) {
-			if (typeof mapRef.value.focusLocation === "function") {
-				mapRef.value.focusLocation(userLocation.value, 17);
+		const locateTarget = Array.isArray(options?.coords)
+			? options.coords
+			: userLocation?.value;
+		if (mapRef.value && Array.isArray(locateTarget)) {
+			const lngLat = [locateTarget[1], locateTarget[0]];
+			if (typeof mapRef.value.locateUser === "function") {
+				mapRef.value.locateUser(lngLat, 17, 0, {
+					refine: Boolean(options?.refine),
+				});
+			} else if (typeof mapRef.value.focusLocation === "function") {
+				mapRef.value.focusLocation(lngLat, 17, 60, 0, {
+					cameraMode: "locate",
+					duration: options?.refine ? 900 : 1200,
+				});
 			} else {
 				// Fallback if focusLocation is not exposed but flyTo is
-				smoothFlyTo(userLocation.value);
+				smoothFlyTo(locateTarget);
 			}
 		}
 	};

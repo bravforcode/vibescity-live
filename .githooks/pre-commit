@@ -4,6 +4,14 @@ set -eu
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
+echo "[pre-commit] Running Biome check (JS/TS/Vue)..."
+npm run lint
+
+echo "[pre-commit] Running Ruff check (Python)..."
+if [ -d "backend" ]; then
+    cd backend && ruff check . && ruff format --check . && cd ..
+fi
+
 echo "[pre-commit] Running gitleaks scan..."
 GITLEAKS_MODE=staged node scripts/ci/secret-scan-gitleaks.mjs
 

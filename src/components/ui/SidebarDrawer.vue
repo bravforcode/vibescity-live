@@ -11,6 +11,7 @@ import {
 	Gift,
 	Handshake,
 	Heart,
+	LogOut,
 	Megaphone,
 	Settings,
 	Volume2,
@@ -64,6 +65,7 @@ const emit = defineEmits([
 	"open-daily-checkin",
 	"open-lucky-wheel",
 	"open-favorites",
+	"logout",
 ]);
 
 const { selectFeedback, successFeedback } = useHaptics();
@@ -127,7 +129,7 @@ defineExpose({ close });
 
 <template>
   <div class="sd-root" role="presentation" data-testid="sidebar-drawer-shell">
-    <Transition name="sd-backdrop">
+    <Transition name="sd-backdrop" appear>
       <div role="button" tabindex="0"
         v-if="isOpen"
         class="sd-backdrop"
@@ -136,7 +138,7 @@ defineExpose({ close });
       />
     </Transition>
 
-    <Transition name="sd-panel">
+    <Transition name="sd-panel" appear>
       <aside
         v-if="isOpen"
         ref="drawerRef"
@@ -335,6 +337,21 @@ defineExpose({ close });
             <button
               type="button"
               class="sd-item sd-item--ghost"
+              data-testid="sidebar-logout"
+              :aria-label="$t('profile.sign_out') || 'Sign out'"
+              @click="emit('logout'); close();"
+            >
+              <span class="sd-item-icon sd-item-icon--ghost">
+                <LogOut class="w-5 h-5" aria-hidden="true" />
+              </span>
+              <span class="sd-item-text">
+                <span class="sd-item-label">{{ $t('profile.sign_out') || 'Sign out' }}</span>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              class="sd-item sd-item--ghost"
               data-testid="sidebar-open-settings"
               :aria-label="$t('auto.k_1336b4d6')"
               @click="showSettingsPanel = true; selectFeedback();"
@@ -515,16 +532,21 @@ defineExpose({ close });
   color: rgba(255 255 255 / 0.55);
   background: rgba(255 255 255 / 0.06);
   border: 1px solid rgba(255 255 255 / 0.08);
-  transition: background 0.15s, color 0.15s, transform 0.12s;
+  transition:
+    background 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .sd-close-btn:hover {
   background: rgba(255 255 255 / 0.12);
   color: #fff;
+  transform: translateY(-2px);
 }
 
 .sd-close-btn:active {
-  transform: scale(0.9);
+  transform: scale(0.92);
 }
 
 .sd-close-btn:focus-visible {
@@ -575,7 +597,11 @@ defineExpose({ close });
   border-radius: 14px;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: background 0.18s, border-color 0.18s, transform 0.12s, box-shadow 0.18s;
+  transition:
+    background 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1);
   text-align: left;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
@@ -584,6 +610,10 @@ defineExpose({ close });
 
 .sd-item:active {
   transform: scale(0.98) translateZ(0);
+}
+
+.sd-item:hover {
+  transform: translateX(2px);
 }
 
 .sd-item:focus-visible {
@@ -764,11 +794,15 @@ defineExpose({ close });
 }
 
 .sd-backdrop-enter-active {
-  transition: opacity 0.35s ease;
+  transition:
+    opacity 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    backdrop-filter 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .sd-backdrop-leave-active {
-  transition: opacity 0.25s ease;
+  transition:
+    opacity 0.22s cubic-bezier(0.4, 0, 1, 1),
+    backdrop-filter 0.22s cubic-bezier(0.4, 0, 1, 1);
 }
 
 .sd-backdrop-enter-from,
@@ -777,17 +811,23 @@ defineExpose({ close });
 }
 
 .sd-panel-enter-active {
-  transition: transform 0.48s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+  transition:
+    transform 0.44s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform, opacity;
 }
 
 .sd-panel-leave-active {
-  transition: transform 0.32s cubic-bezier(0.7, 0, 0.84, 0), opacity 0.25s ease;
+  transition:
+    transform 0.28s cubic-bezier(0.4, 0, 1, 1),
+    opacity 0.22s cubic-bezier(0.4, 0, 1, 1);
+  will-change: transform, opacity;
 }
 
 .sd-panel-enter-from,
 .sd-panel-leave-to {
-  transform: translateX(-100%);
-  opacity: 0.6;
+  transform: translateX(-24px) scale(0.985);
+  opacity: 0;
 }
 
 @media (max-width: 480px) {

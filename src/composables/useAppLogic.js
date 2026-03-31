@@ -1,8 +1,13 @@
 import { storeToRefs } from "pinia";
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { DEFAULT_OG_TITLE } from "../config/appMeta";
+import {
+	normalizeGiantPinPayload,
+	resolveCanonicalBuilding,
+	resolveVenueBuildingId,
+} from "../domain/venue/giantPinContext";
 import i18n from "../i18n.js";
 import { setClientCookie } from "../lib/cookies";
 import { supabase } from "../lib/supabase";
@@ -46,6 +51,7 @@ import { useUILogic } from "./useUILogic";
 
 const IS_STRICT_MAP_E2E = import.meta.env.VITE_E2E_MAP_REQUIRED === "true";
 const DEEPLINK_NOT_FOUND_DEDUPE_MS = 3500;
+const AUTO_OPENED_DETAIL_SESSION_KEY = "vibecity.autoOpenedDetailShopIds";
 let lastDeepLinkNotFoundKey = "";
 let lastDeepLinkNotFoundAt = 0;
 
@@ -76,6 +82,56 @@ const looksLikeVenueId = (value) => {
 		return true;
 	}
 	return /^[0-9a-f-]{12,}$/i.test(raw);
+};
+
+export const normalizeAutoOpenedDetailId = (value) => {
+	if (value === null || value === undefined) return null;
+	const normalized = String(value).trim();
+	return normalized || null;
+};
+
+export const restoreAutoOpenedDetailShopIds = (storage) => {
+	if (!storage?.getItem) return new Set();
+	try {
+		const raw = storage.getItem(AUTO_OPENED_DETAIL_SESSION_KEY);
+		if (!raw) return new Set();
+		const ids = JSON.parse(raw);
+		if (!Array.isArray(ids)) return new Set();
+		return new Set(
+			ids.map((id) => normalizeAutoOpenedDetailId(id)).filter(Boolean),
+		);
+	} catch {
+		return new Set();
+	}
+};
+
+export const persistAutoOpenedDetailShopIds = (storage, ids) => {
+	if (!storage?.setItem || !(ids instanceof Set)) return;
+	try {
+		storage.setItem(
+			AUTO_OPENED_DETAIL_SESSION_KEY,
+			JSON.stringify([...ids].filter(Boolean)),
+		);
+	} catch {
+		// ignore sessionStorage failures
+	}
+};
+
+export const shouldAutoOpenDetailAfterFlight = ({
+	shopId,
+	source,
+	surface,
+	selectedShopId = null,
+	openedShopIds = new Set(),
+} = {}) => {
+	const normalizedId = normalizeAutoOpenedDetailId(shopId);
+	if (!normalizedId) return false;
+	if (surface !== "preview") return false;
+	if (normalizeAutoOpenedDetailId(selectedShopId) === normalizedId)
+		return false;
+	if (source === "sentient") return !openedShopIds.has(normalizedId);
+	if (source !== "carousel" && source !== "startup") return false;
+	return !openedShopIds.has(normalizedId);
 };
 
 export function useAppLogic() {
@@ -158,11 +214,14 @@ export function useAppLogic() {
 	} = storeToRefs(shopStore);
 
 	// ✅ Location from new store
-	const { userLocation } = storeToRefs(locationStore);
+	const { userLocation, isMockLocation } = storeToRefs(locationStore);
 
-	watch(userLocation, (loc) => {
+	watch([userLocation, isMockLocation], ([loc, isMock]) => {
 		if (loc) {
 			userPrefsStore.saveFirstVisit(loc);
+		}
+		if (!isMock && Array.isArray(loc)) {
+			void shopStore.refreshLocationScopedFeed?.();
 		}
 	});
 
@@ -183,7 +242,7 @@ export function useAppLogic() {
 		bottomUiHeight,
 		userLocation, // Now reactive from locationStore
 	});
-	const { mapRef, smoothFlyTo, handleLocateMe, getNearbyPins } = mapLogic;
+	const { mapRef, smoothFlyTo, handleLocateMe } = mapLogic;
 
 	// --- 4. Init Event Logic ---
 	const eventLogic = useEventLogic();
@@ -208,6 +267,8 @@ export function useAppLogic() {
 	const errorMessage = ref(null);
 	const activeFloor = ref("GF");
 	const activeBuilding = ref(null);
+	const activeDrawerContext = ref(null);
+	const activeDrawerBuilding = ref(null);
 	const activeProvince = ref(null);
 	const activeZone = ref(null);
 	const isOwnerDashboardOpen = ref(false);
@@ -218,12 +279,170 @@ export function useAppLogic() {
 	const mapSelectionIntent = ref(null);
 	const legendHeight = computed(() => bottomUiHeight.value || 0);
 	const activeFilters = computed(() => [...activeCategories.value]);
-	const openedDetailShopIds = new Set();
+	const openedDetailShopIds = reactive(new Set());
+	const markDetailOpened = (id) => {
+		const normalized = normalizeAutoOpenedDetailId(id);
+		if (!normalized) return;
+		openedDetailShopIds.add(normalized);
+	};
 	let mapSelectionRequestSeq = 0;
+	let hasBootstrappedStartupPreview = false;
 	let handleCenteredShopCommit = null;
+	let drawerStateResetTimerId = null;
 	const DETAIL_AUTO_REOPEN_COOLDOWN_MS = 900;
-	let startupPreviewBootstrapped = false;
+	const STARTUP_LOCATION_PRIME_TIMEOUT_MS = 2500;
 	let centeredDetailAutoOpenSuppressedUntil = 0;
+	const normalizeDrawerBuildingId = (value) => {
+		if (value === null || value === undefined) return null;
+		const normalized = String(value).trim();
+		return normalized || null;
+	};
+	const cancelDrawerStateReset = () => {
+		if (drawerStateResetTimerId === null) return;
+		clearTimeout(drawerStateResetTimerId);
+		drawerStateResetTimerId = null;
+	};
+	const createMallDrawerContext = ({
+		source = "map",
+		buildingId = null,
+		buildingName = null,
+		initialShopId = null,
+	} = {}) => {
+		const normalizedBuildingId = normalizeDrawerBuildingId(buildingId);
+		const normalizedInitialShopId = normalizeVenueId(initialShopId);
+		return {
+			contextId: [
+				"mall",
+				source || "map",
+				normalizedBuildingId || "unresolved",
+				normalizedInitialShopId || "none",
+			].join(":"),
+			mode: "mall",
+			source: source || "map",
+			buildingId: normalizedBuildingId,
+			buildingName:
+				typeof buildingName === "string" && buildingName.trim()
+					? buildingName.trim()
+					: null,
+			representativeShopId: null,
+			initialShopId: normalizedInitialShopId,
+		};
+	};
+	const buildDrawerBuilding = (building, drawerContext) => {
+		const source = building && typeof building === "object" ? building : {};
+		const buildingId =
+			normalizeDrawerBuildingId(source.id) ||
+			normalizeDrawerBuildingId(source.key) ||
+			normalizeDrawerBuildingId(drawerContext?.buildingId);
+		const buildingName =
+			(typeof source.name === "string" && source.name.trim()) ||
+			(typeof source.building_name === "string" &&
+				source.building_name.trim()) ||
+			(typeof drawerContext?.buildingName === "string" &&
+				drawerContext.buildingName.trim()) ||
+			null;
+		if (
+			!buildingId &&
+			!buildingName &&
+			source.lat === undefined &&
+			source.lng === undefined &&
+			source.latitude === undefined &&
+			source.longitude === undefined
+		) {
+			return null;
+		}
+		return {
+			...source,
+			id: source.id ?? buildingId,
+			key: source.key ?? buildingId,
+			name: source.name ?? buildingName,
+			lat: source.lat ?? source.latitude ?? null,
+			lng: source.lng ?? source.longitude ?? null,
+		};
+	};
+	const setDrawerState = ({
+		canonicalBuilding = null,
+		drawerContext = null,
+		drawerBuilding = null,
+		open = false,
+		floor,
+	} = {}) => {
+		cancelDrawerStateReset();
+		activeBuilding.value = canonicalBuilding;
+		activeDrawerContext.value = drawerContext;
+		activeDrawerBuilding.value = drawerBuilding || canonicalBuilding;
+		showMallDrawer.value = open;
+		if (floor !== undefined) {
+			activeFloor.value = floor;
+		}
+	};
+	const clearDrawerState = ({ resetFloor = false } = {}) => {
+		cancelDrawerStateReset();
+		activeBuilding.value = null;
+		activeDrawerContext.value = null;
+		activeDrawerBuilding.value = null;
+		if (resetFloor) {
+			activeFloor.value = "GF";
+		}
+	};
+	const closeMallDrawer = ({ resetFloor = true } = {}) => {
+		showMallDrawer.value = false;
+		cancelDrawerStateReset();
+		drawerStateResetTimerId = setTimeout(() => {
+			clearDrawerState({ resetFloor });
+		}, 220);
+	};
+	const resolveCanonicalBuildingForDrawer = (
+		buildingId,
+		fallbackBuilding = null,
+	) => {
+		const normalizedBuildingId = normalizeDrawerBuildingId(buildingId);
+		const canonicalBuilding = resolveCanonicalBuilding(
+			buildingsData.value,
+			normalizedBuildingId,
+		);
+		if (canonicalBuilding) return canonicalBuilding;
+		if (fallbackBuilding && typeof fallbackBuilding === "object") {
+			const fallbackId =
+				normalizeDrawerBuildingId(fallbackBuilding.id) ||
+				normalizeDrawerBuildingId(fallbackBuilding.key) ||
+				normalizedBuildingId;
+			return {
+				...fallbackBuilding,
+				id: fallbackBuilding.id ?? fallbackId,
+				key: fallbackBuilding.key ?? fallbackId,
+			};
+		}
+		return null;
+	};
+	const openMallDrawerForBuilding = ({
+		building = null,
+		source = "map",
+		initialShopId = null,
+		floor,
+	} = {}) => {
+		const buildingId =
+			normalizeDrawerBuildingId(building?.id) ||
+			normalizeDrawerBuildingId(building?.key);
+		const canonicalBuilding = resolveCanonicalBuildingForDrawer(
+			buildingId,
+			building,
+		);
+		if (!canonicalBuilding) return;
+		const drawerContext = createMallDrawerContext({
+			source,
+			buildingId: canonicalBuilding.id || canonicalBuilding.key || buildingId,
+			buildingName: canonicalBuilding.name || building?.name,
+			initialShopId,
+		});
+		setDrawerState({
+			canonicalBuilding,
+			drawerContext,
+			drawerBuilding: buildDrawerBuilding(canonicalBuilding, drawerContext),
+			open: true,
+			floor,
+		});
+	};
 	const suppressCenteredDetailAutoOpen = (
 		durationMs = DETAIL_AUTO_REOPEN_COOLDOWN_MS,
 	) => {
@@ -258,6 +477,53 @@ export function useAppLogic() {
 		window.setTimeout(() => {
 			task?.();
 		}, 180);
+	};
+	const awaitWithTimeout = async (task, timeoutMs) => {
+		const safeTimeoutMs = Math.max(0, Number(timeoutMs) || 0);
+		if (safeTimeoutMs <= 0) {
+			return Promise.resolve(task);
+		}
+		let timeoutId = null;
+		try {
+			return await Promise.race([
+				Promise.resolve(task),
+				new Promise((resolve) => {
+					timeoutId = setTimeout(() => resolve(null), safeTimeoutMs);
+				}),
+			]);
+		} finally {
+			if (timeoutId !== null) {
+				clearTimeout(timeoutId);
+			}
+		}
+	};
+	const primeStartupLocation = async () => {
+		const hasRealUserLocation =
+			Array.isArray(locationStore.userLocation) &&
+			!locationStore.isMockLocation;
+		if (hasRealUserLocation) {
+			if (!locationStore.isTracking) {
+				void locationStore.startWatching();
+			}
+			return locationStore.userLocation;
+		}
+		if (typeof navigator === "undefined" || !navigator.geolocation) {
+			locationStore.useDefaultLocation();
+			return locationStore.userLocation;
+		}
+		try {
+			await awaitWithTimeout(
+				locationStore.getCurrentPosition(),
+				STARTUP_LOCATION_PRIME_TIMEOUT_MS,
+			);
+		} catch {}
+		if (!locationStore.userLocation) {
+			locationStore.useDefaultLocation();
+		}
+		if (!locationStore.isTracking) {
+			void locationStore.startWatching();
+		}
+		return locationStore.userLocation;
 	};
 	const publishMapSelectionIntent = ({
 		shop = null,
@@ -314,6 +580,7 @@ export function useAppLogic() {
 		mobileCardScrollRef,
 		onScrollDecelerate: intentPredictor.recordCarouselDeceleration,
 		onCenteredShopCommit: (payload) => handleCenteredShopCommit?.(payload),
+		enableInitialCenteredShopCommit: !initialDeepLinkRequested,
 	});
 	const { handleHorizontalScroll, scrollToCard, onScrollStart, onScrollEnd } =
 		scrollSync;
@@ -556,11 +823,6 @@ export function useAppLogic() {
 		const str = String(value).trim();
 		return str ? str : null;
 	};
-	const markDetailOpened = (shopId) => {
-		const normalizedId = normalizeVenueId(shopId);
-		if (normalizedId) openedDetailShopIds.add(normalizedId);
-		return normalizedId;
-	};
 	const normalizeVenueSlug = (value) => {
 		if (value === null || value === undefined) return null;
 		const str = String(value).trim().toLowerCase();
@@ -666,6 +928,8 @@ export function useAppLogic() {
 			trackEvent = false,
 			trackEventType = "view_venue",
 			shouldSyncCarousel = true,
+			syncDrawerContext = true,
+			openMallDrawerOnBuilding = true,
 			selectionSource = syncRoute ? "detail" : "carousel",
 			selectionSurface = syncRoute ? "detail" : "preview",
 			cameraMode,
@@ -700,15 +964,29 @@ export function useAppLogic() {
 				scrollToCard(shopId);
 			}
 
-			// Detect Building/Mall context
-			const buildingKey = shop.Building;
-			const buildingRaw = buildingKey ? buildingsData.value[buildingKey] : null;
+			if (syncDrawerContext) {
+				const buildingId = resolveVenueBuildingId(shop);
+				const buildingRaw = resolveCanonicalBuildingForDrawer(
+					buildingId,
+					buildingId ? buildingsData.value?.[buildingId] : null,
+				);
 
-			if (buildingRaw) {
-				activeBuilding.value = { ...buildingRaw, key: buildingKey };
-				showMallDrawer.value = true;
-			} else {
-				activeBuilding.value = null;
+				if (buildingRaw) {
+					const drawerContext = createMallDrawerContext({
+						source: selectionSource,
+						buildingId: buildingRaw.id || buildingRaw.key || buildingId,
+						buildingName: buildingRaw.name,
+						initialShopId: normalizedId,
+					});
+					setDrawerState({
+						canonicalBuilding: buildingRaw,
+						drawerContext,
+						drawerBuilding: buildDrawerBuilding(buildingRaw, drawerContext),
+						open: openMallDrawerOnBuilding,
+					});
+				} else if (showMallDrawer.value) {
+					closeMallDrawer({ resetFloor: false });
+				}
 			}
 		}
 		publishMapSelectionIntent({
@@ -745,6 +1023,50 @@ export function useAppLogic() {
 		});
 	};
 
+	const handleGiantPreviewShopChange = (shop) => {
+		if (!shop) return;
+		applyShopSelection(shop.id, false, {
+			syncRoute: false,
+			trackEvent: false,
+			shouldSyncCarousel: false,
+			syncDrawerContext: false,
+			openMallDrawerOnBuilding: false,
+			selectionSource: "giant-carousel",
+			selectionSurface: "preview",
+			popupMode: "none",
+			shopOverride: shop,
+		});
+	};
+
+	const handleGiantOpenDetail = (shop) => {
+		if (!shop) return;
+		closeMallDrawer({ resetFloor: false });
+		nextTick(() => {
+			handleOpenDetail(shop, {
+				trackEvent: true,
+				trackEventType: "open_detail",
+				routeMode: "push",
+				selectionSource: "giant-detail",
+				syncDrawerContext: false,
+				openMallDrawerOnBuilding: false,
+			});
+		});
+	};
+
+	// Sentient map auto-select now hands off to the settled preview flight.
+	// The sentient controller already manages its own cooldown/re-entry rules.
+	const handleSentientAutoSelect = (shop) => {
+		if (!shop) return;
+		applyShopSelection(shop.id, false, {
+			syncRoute: false,
+			trackEvent: false,
+			selectionSource: "sentient",
+			selectionSurface: "preview",
+			popupMode: "compact",
+			shopOverride: shop,
+		});
+	};
+
 	const handleOpenDetail = (
 		shop,
 		{
@@ -752,15 +1074,26 @@ export function useAppLogic() {
 			trackEventType = "open_detail",
 			routeMode = "push",
 			selectionSource = "detail",
+			openShellMode = "defer",
+			syncDrawerContext = true,
+			openMallDrawerOnBuilding = true,
 		} = {},
 	) => {
 		if (!shop) {
 			closeDetailSheet({ syncRoute: false });
 			return;
 		}
-		markDetailOpened(shop.id);
 
 		const normalizedShopId = normalizeVenueId(shop.id);
+		
+		// PERFORMANCE FIX: Prevent opening the detail modal if it's already open for this shop.
+		// This avoids duplicate rendering and potential "hangs" when clicking multiple times.
+		if (selectedShop.value && normalizeVenueId(selectedShop.value.id) === normalizedShopId) {
+			return;
+		}
+
+		markDetailOpened(shop.id);
+
 		const openDetailShell = () => {
 			if (normalizeVenueId(selectedShop.value?.id) === normalizedShopId) return;
 			selectedShop.value = shop;
@@ -772,6 +1105,8 @@ export function useAppLogic() {
 				syncRouteMode: routeMode,
 				trackEvent,
 				trackEventType,
+				syncDrawerContext,
+				openMallDrawerOnBuilding,
 				selectionSource,
 				selectionSurface: "detail",
 				cameraMode: "detail-focus",
@@ -780,11 +1115,12 @@ export function useAppLogic() {
 			});
 		});
 
-		// Open the shell immediately, but keep the expensive map/store sync out of the input event.
-		if (typeof window !== "undefined") {
-			window.setTimeout(openDetailShell, 0);
-		} else {
+		// Deep links should mount the sheet as soon as we have the venue so the sign
+		// can clamp against the real modal surface on first open.
+		if (openShellMode === "immediate" || typeof window === "undefined") {
 			openDetailShell();
+		} else if (typeof window !== "undefined") {
+			window.setTimeout(openDetailShell, 0);
 		}
 
 		// Progressive enhancement: fetch full venue details lazily.
@@ -817,7 +1153,9 @@ export function useAppLogic() {
 
 	handleCenteredShopCommit = ({ shop, shopId, reason }) => {
 		const normalizedId = normalizeVenueId(shopId || shop?.id);
-		if (!shop || !normalizedId) return;
+		if (!normalizedId) return;
+		const resolvedShop = shop || shopStore.getShopById(normalizedId);
+		if (!resolvedShop) return;
 		if (
 			selectedShop.value &&
 			normalizeVenueId(selectedShop.value.id) === normalizedId
@@ -832,7 +1170,7 @@ export function useAppLogic() {
 			selectionSource,
 			selectionSurface: "preview",
 			popupMode: "compact",
-			shopOverride: shop,
+			shopOverride: resolvedShop,
 		});
 	};
 
@@ -843,6 +1181,38 @@ export function useAppLogic() {
 			trackEventType: "open_detail",
 			routeMode: IS_STRICT_MAP_E2E ? "replace" : "push",
 			selectionSource: "detail",
+		});
+	};
+
+	const handleSelectionFlightComplete = (payload = {}) => {
+		const normalizedId = normalizeVenueId(payload?.shopId ?? payload?.shop?.id);
+		
+		// If the source is carousel or map and we finished the flight, 
+		// we might want to auto-open the detail if it's not already open.
+		// The original logic was likely more aggressive.
+		
+		if (
+			!shouldAutoOpenDetailAfterFlight({
+				shopId: normalizedId,
+				source: payload?.source,
+				surface: payload?.surface,
+				selectedShopId: selectedShop.value?.id,
+				openedShopIds: openedDetailShopIds,
+			})
+		) {
+			// STRICT FIX: The user wants the detail modal to open ONLY ONCE per shop.
+			// We should respect openedDetailShopIds even for manual selections (carousel/marker)
+			// to prevent reopening if the user just closed it.
+			return;
+		}
+		
+		if (Date.now() < centeredDetailAutoOpenSuppressedUntil) return;
+		const resolvedShop = payload?.shop || shopStore.getShopById(normalizedId);
+		if (!resolvedShop) return;
+		handleOpenDetail(resolvedShop, {
+			trackEvent: false,
+			routeMode: "replace",
+			selectionSource: "auto-detect",
 		});
 	};
 
@@ -857,7 +1227,7 @@ export function useAppLogic() {
 			// smoothFlyTo([shop.lat, shop.lng]);
 			// Original used focusLocation with zoom 16
 			if (mapRef.value.focusLocation) {
-				mapRef.value.focusLocation([shop.lat, shop.lng], 16);
+				mapRef.value.focusLocation([shop.lng, shop.lat], 16);
 			}
 		}
 	};
@@ -886,6 +1256,34 @@ export function useAppLogic() {
 		immediate: true,
 	});
 
+	watch(
+		() => [
+			normalizeVenueId(activeShopId.value),
+			normalizeVenueId(mapSelectionIntent.value?.shopId),
+			normalizeVenueId(selectedShop.value?.id),
+		],
+		([activeId, intentShopId, selectedId]) => {
+			if (!activeId || selectedId) return;
+			if (intentShopId === activeId) return;
+			if (!shopStore.getShopById(activeId)) return;
+			runAfterNextPaint(() => {
+				const latestActiveId = normalizeVenueId(activeShopId.value);
+				const latestIntentId = normalizeVenueId(
+					mapSelectionIntent.value?.shopId,
+				);
+				const latestSelectedId = normalizeVenueId(selectedShop.value?.id);
+				if (!latestActiveId || latestSelectedId) return;
+				if (latestActiveId !== activeId) return;
+				if (latestIntentId === latestActiveId) return;
+				handleCenteredShopCommit({
+					shopId: latestActiveId,
+					reason: "startup",
+				});
+			});
+		},
+		{ immediate: true },
+	);
+
 	// Zone Audio
 	watch(activeCategories, (newCats) => {
 		if (newCats.length === 0) {
@@ -900,13 +1298,6 @@ export function useAppLogic() {
 		else if (["temple", "culture"].some((k) => cat.includes(k)))
 			setZone("temple");
 		else setZone("default");
-	});
-
-	// Mall/Building Drawer
-	watch(activeBuilding, (newVal) => {
-		if (newVal) {
-			showMallDrawer.value = true;
-		}
 	});
 
 	// Map Breathe Settle Animation
@@ -961,7 +1352,6 @@ export function useAppLogic() {
 	// Local Interval for time update
 	let timeInterval = null;
 	let popStateHandler = null;
-	let deepLinkTimer = null;
 	let searchBlurTimer = null;
 	let initRunSeq = 0;
 
@@ -988,10 +1378,6 @@ export function useAppLogic() {
 	const initApp = async () => {
 		// Clean up previous interval if exists
 		if (timeInterval) clearInterval(timeInterval);
-		if (deepLinkTimer) {
-			clearTimeout(deepLinkTimer);
-			deepLinkTimer = null;
-		}
 		const runSeq = ++initRunSeq;
 
 		isDataLoading.value = true;
@@ -1019,11 +1405,31 @@ export function useAppLogic() {
 			// Load saved coins/stats if needed
 			// (Assumed handled by shopStore persistence, but original had manual load)
 
-			// Fetch the minimum required data first so the app becomes interactive ASAP.
-			await shopStore.fetchShops();
+			// Prime user position and venue data together so startup centers on the user
+			// instead of the Thailand-wide fallback shell whenever geolocation is available.
+			await Promise.allSettled([
+				primeStartupLocation(),
+				shopStore.fetchShops(),
+			]);
+			await shopStore.refreshLocationScopedFeed?.();
 
 			// Mark primary UI as ready (events/stats can load in the background).
 			isDataLoading.value = false;
+
+			if (!initialDeepLinkRequested && !activeShopId.value) {
+				const startupShop =
+					shopStore.visibleShops?.[0] || shopStore.processedShops?.[0] || null;
+				if (startupShop) {
+					runAfterNextPaint(() => {
+						if (activeShopId.value || selectedShop.value) return;
+						handleCenteredShopCommit({
+							shop: startupShop,
+							shopId: startupShop.id,
+							reason: "startup",
+						});
+					});
+				}
+			}
 
 			// Background tasks (must not block initial interactivity).
 			void coinStore.fetchUserStats()?.catch?.(() => {});
@@ -1170,7 +1576,7 @@ export function useAppLogic() {
 				(await resolveVenueIdFromDb(deepLinkRef));
 
 			if (initialVenueId) {
-				deepLinkTimer = setTimeout(async () => {
+				const openInitialDeepLink = async () => {
 					if (runSeq !== initRunSeq) return;
 					let shop = shopStore.getShopById(initialVenueId);
 					if (!shop && typeof shopStore.fetchVenueDetail === "function") {
@@ -1214,8 +1620,13 @@ export function useAppLogic() {
 						trackEvent: true,
 						trackEventType: "deeplink_open",
 						routeMode: "replace",
+						openShellMode: "immediate",
 					});
-				}, 650);
+				};
+				runAfterNextPaint(() => {
+					if (runSeq !== initRunSeq) return;
+					void openInitialDeepLink();
+				});
 			}
 
 			// Intervals
@@ -1248,13 +1659,10 @@ export function useAppLogic() {
 
 	onUnmounted(() => {
 		prefetchEngine.stopEngine();
+		cancelDrawerStateReset();
 		if (timeInterval) {
 			clearInterval(timeInterval);
 			timeInterval = null;
-		}
-		if (deepLinkTimer) {
-			clearTimeout(deepLinkTimer);
-			deepLinkTimer = null;
 		}
 		if (searchBlurTimer) {
 			clearTimeout(searchBlurTimer);
@@ -1314,8 +1722,57 @@ export function useAppLogic() {
 		activeStatus,
 		activeShopId,
 	);
+	const isDefaultNearbyView = computed(
+		() =>
+			activeCategories.value.length === 0 &&
+			activeStatus.value === "ALL" &&
+			!String(shopStore.searchQuery || "").trim(),
+	);
+	const surfaceShops = computed(() =>
+		isDefaultNearbyView.value ? visibleShops.value : filteredShops.value,
+	);
+	const dedupeVenueList = (items = []) => {
+		const next = [];
+		const seen = new Set();
+		for (const shop of items) {
+			if (!shop || typeof shop !== "object") continue;
+			const key =
+				normalizeVenueId(shop.id) ||
+				String(shop.slug || shop.name || "").trim() ||
+				null;
+			if (!key || seen.has(key)) continue;
+			seen.add(key);
+			next.push(shop);
+		}
+		return next;
+	};
+	const mapShops = computed(() => {
+		const activeShop = shopStore.getShopById(activeShopId.value);
+		return dedupeVenueList([
+			selectedShop.value,
+			activeShop,
+			...surfaceShops.value,
+		]);
+	});
+	watch(
+		() => surfaceShops.value?.[0] || null,
+		(startupShop) => {
+			if (hasBootstrappedStartupPreview || initialDeepLinkRequested) return;
+			if (!startupShop || activeShopId.value || selectedShop.value) return;
+			hasBootstrappedStartupPreview = true;
+			runAfterNextPaint(() => {
+				if (activeShopId.value || selectedShop.value) return;
+				handleCenteredShopCommit({
+					shop: startupShop,
+					shopId: startupShop.id,
+					reason: "startup",
+				});
+			});
+		},
+		{ immediate: true },
+	);
 	const isInitialLoad = computed(
-		() => isDataLoading.value && filteredShops.value.length === 0,
+		() => isDataLoading.value && surfaceShops.value.length === 0,
 	);
 	const suggestedShops = computed(() =>
 		filteredShops.value
@@ -1340,30 +1797,6 @@ export function useAppLogic() {
 			: [];
 	};
 
-	watch(
-		() => shopStore.visibleShops,
-		(newShops) => {
-			if (startupPreviewBootstrapped) return;
-			if (initialDeepLinkRequested) return;
-			if (selectedShop.value) return;
-			if (normalizeVenueId(activeShopId.value)) return;
-			const firstShop = Array.isArray(newShops) ? newShops[0] : null;
-			if (!firstShop?.id) return;
-			startupPreviewBootstrapped = true;
-			runAfterNextPaint(() => {
-				applyShopSelection(firstShop.id, false, {
-					syncRoute: false,
-					trackEvent: false,
-					selectionSource: "startup",
-					selectionSurface: "preview",
-					popupMode: "compact",
-					shopOverride: firstShop,
-				});
-			});
-		},
-		{ deep: false },
-	);
-
 	const requestGeolocation = () => {
 		if (!locationStore.isTracking) {
 			locationStore.startWatching();
@@ -1384,24 +1817,62 @@ export function useAppLogic() {
 	};
 
 	const handleEnterIndoor = (shop) => {
-		if (!shop?.Building || !buildingsData.value?.[shop.Building]) return;
-		activeBuilding.value = {
-			...buildingsData.value[shop.Building],
-			key: shop.Building,
-		};
-		activeFloor.value = shop.floor || "GF";
-		showMallDrawer.value = true;
+		const buildingId = resolveVenueBuildingId(shop);
+		if (!buildingId) return;
+		const canonicalBuilding = resolveCanonicalBuildingForDrawer(
+			buildingId,
+			buildingsData.value?.[buildingId],
+		);
+		if (!canonicalBuilding) return;
+		openMallDrawerForBuilding({
+			building: canonicalBuilding,
+			source: "indoor",
+			initialShopId: shop?.id,
+			floor: shop?.Floor ?? shop?.floor ?? "GF",
+		});
 	};
 
 	const handleCloseFloorSelector = () => {
-		showMallDrawer.value = false;
-		activeFloor.value = "GF";
+		closeMallDrawer({ resetFloor: true });
 	};
 
 	const handleBuildingOpen = (building) => {
 		if (!building) return;
-		activeBuilding.value = building;
-		showMallDrawer.value = true;
+		const drawerContext = normalizeGiantPinPayload(
+			building,
+			processedShops.value,
+			buildingsData.value,
+		);
+		if (drawerContext.mode === "giant-pin") {
+			const canonicalBuilding = resolveCanonicalBuilding(
+				buildingsData.value,
+				drawerContext.buildingId,
+			);
+			setDrawerState({
+				canonicalBuilding,
+				drawerContext,
+				drawerBuilding: buildDrawerBuilding(
+					canonicalBuilding || building,
+					drawerContext,
+				),
+				open: true,
+			});
+			return;
+		}
+		const activeShopBuildingId = resolveVenueBuildingId(
+			shopStore.getShopById(activeShopId.value),
+		);
+		openMallDrawerForBuilding({
+			building:
+				resolveCanonicalBuildingForDrawer(drawerContext.buildingId, building) ||
+				building,
+			source: drawerContext.source || "map",
+			initialShopId:
+				activeShopBuildingId &&
+				activeShopBuildingId === drawerContext.buildingId
+					? activeShopId.value
+					: null,
+		});
 	};
 
 	const toggleLanguage = () => {
@@ -1433,7 +1904,77 @@ export function useAppLogic() {
 		tapFeedback();
 	};
 
-	const handleLocateMeWrapper = () => handleLocateMe(selectFeedback);
+	const getRealUserLocationSnapshot = () => {
+		if (
+			!Array.isArray(locationStore.userLocation) ||
+			locationStore.userLocation.length < 2 ||
+			locationStore.isMockLocation
+		) {
+			return null;
+		}
+		const lat = Number(locationStore.userLocation[0]);
+		const lng = Number(locationStore.userLocation[1]);
+		if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+			return null;
+		}
+		return [lat, lng];
+	};
+
+	const handleLocateMeWrapper = async () => {
+		const initialLocation = getRealUserLocationSnapshot();
+		const shouldPrimeFreshLocation =
+			!initialLocation ||
+			Boolean(locationStore.isStale) ||
+			!Number.isFinite(Number(locationStore.accuracy)) ||
+			Number(locationStore.accuracy) > 80;
+
+		if (initialLocation) {
+			handleLocateMe(selectFeedback, { coords: initialLocation });
+		} else {
+			selectFeedback();
+		}
+
+		if (!shouldPrimeFreshLocation) {
+			if (!locationStore.isTracking) {
+				requestGeolocation();
+			}
+			return;
+		}
+
+		try {
+			await awaitWithTimeout(
+				locationStore.getCurrentPosition(),
+				initialLocation ? 1800 : STARTUP_LOCATION_PRIME_TIMEOUT_MS,
+			);
+		} catch {}
+
+		if (!locationStore.isTracking) {
+			requestGeolocation();
+		}
+
+		const refreshedLocation = getRealUserLocationSnapshot();
+		if (!refreshedLocation) {
+			return;
+		}
+
+		if (!initialLocation) {
+			handleLocateMe(null, { coords: refreshedLocation });
+			return;
+		}
+
+		const movedKm = calculateDistance(
+			initialLocation[0],
+			initialLocation[1],
+			refreshedLocation[0],
+			refreshedLocation[1],
+		);
+		if (movedKm >= 0.015) {
+			handleLocateMe(null, {
+				coords: refreshedLocation,
+				refine: true,
+			});
+		}
+	};
 	const handleRefresh = async () => {
 		isRefreshing.value = true;
 		try {
@@ -1469,7 +2010,9 @@ export function useAppLogic() {
 		onScrollEnd,
 
 		// Stores & Data
-		shops: computed(() => shopStore.visibleShops),
+		shops: surfaceShops,
+		surfaceShops,
+		mapShops,
 		filteredShops,
 		suggestedShops,
 		currentTime,
@@ -1478,6 +2021,7 @@ export function useAppLogic() {
 		activeStatus,
 		activeFilters,
 		activeBuilding,
+		activeDrawerContext,
 		activeProvince,
 		activeZone,
 		favorites,
@@ -1486,6 +2030,7 @@ export function useAppLogic() {
 		nextLevelXP,
 		levelProgress,
 		userLocation,
+		isMockLocation,
 		selectedShop,
 		closeDetailSheet,
 		selectedShopCoords,
@@ -1510,15 +2055,20 @@ export function useAppLogic() {
 		// Methods
 		applyShopSelection,
 		handleMarkerClick,
+		handleGiantPreviewShopChange,
+		handleGiantOpenDetail,
 		handleCardClick,
 		handleCardHover,
 		handleOpenDetail,
+		handleSelectionFlightComplete,
+		handleSentientAutoSelect,
 		mapSelectionIntent,
 		handlePanelScroll,
 		handleSwipe,
 		handleEnterIndoor,
 		handleCloseFloorSelector,
 		handleBuildingOpen,
+		closeMallDrawer,
 		toggleFavorite,
 		isFavorited,
 		openRideModal,
@@ -1568,22 +2118,20 @@ export function useAppLogic() {
 		// Misc
 		carouselShops: computed(() => shopStore.visibleShops),
 		carouselShopIds: computed(() => shopStore.visibleShops.map((s) => s.id)),
-		nearbyPins: computed(() => getNearbyPins(filteredShops.value)),
+		nearbyPins: mapShops,
 		loadMoreVibes: () => {}, // Infinite scroll placeholder
 		retryLoad: () => globalThis.location.reload(),
 
 		// Template Compat
-		activeMall: activeBuilding,
+		activeMall: activeDrawerBuilding,
 		mallShops: computed(() => {
-			if (!activeBuilding.value) return [];
-			const targetKey = String(activeBuilding.value.key || "")
-				.trim()
-				.toLowerCase();
-			return shopStore.processedShops.filter(
-				(s) =>
-					String(s.Building || "")
-						.trim()
-						.toLowerCase() === targetKey,
+			const targetBuildingId =
+				normalizeDrawerBuildingId(activeDrawerContext.value?.buildingId) ||
+				normalizeDrawerBuildingId(activeDrawerBuilding.value?.id) ||
+				normalizeDrawerBuildingId(activeDrawerBuilding.value?.key);
+			if (!targetBuildingId) return [];
+			return processedShops.value.filter(
+				(shop) => resolveVenueBuildingId(shop) === targetBuildingId,
 			);
 		}),
 		activeFloor,

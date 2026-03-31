@@ -12,8 +12,29 @@ primary_region = "sin"
   force_https = true
   auto_stop_machines = "suspend"
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
   processes = ["api"]
+
+[[services]]
+  internal_port = 8000
+  protocol = "tcp"
+  processes = ["api"]
+
+  [[services.concurrency]]
+    type = "requests"
+    hard_limit = 250
+    soft_limit = 200
+
+  [[services.http_checks]]
+    interval = "10s"
+    timeout = "2s"
+    method = "get"
+    path = "/api/v1/health"
+
+# Horizontal Scaling Policy:
+# - Min 1 machine (Cold start prevention)
+# - Max 5 machines (Budget guardrail)
+# - Scale out when soft_limit (200 requests/s) is reached.
 
 [processes]
   api = "uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000"

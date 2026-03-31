@@ -117,6 +117,7 @@ export const useUserStore = defineStore(
 		const preferences = ref({
 			language: "en",
 			theme: "dark",
+			isSystemTheme: true, // Use system preference by default
 			notificationsEnabled: true,
 			hapticFeedback: true,
 			autoPlayVideos: true,
@@ -135,7 +136,12 @@ export const useUserStore = defineStore(
 		const isAdmin = computed(
 			() => hasAdminRole(authUser.value) || isAllowlistedAdmin(authUser.value),
 		);
-		const isDarkMode = computed(() => preferences.value.theme === "dark");
+		const isDarkMode = computed(() => {
+			if (preferences.value.isSystemTheme && typeof window !== "undefined") {
+				return window.matchMedia("(prefers-color-scheme: dark)").matches;
+			}
+			return preferences.value.theme === "dark";
+		});
 		const hasRole = (role) =>
 			roles.value.has(
 				String(role || "")
@@ -372,9 +378,15 @@ export const useUserStore = defineStore(
 		};
 		const setTheme = (theme) => {
 			preferences.value.theme = theme;
+			preferences.value.isSystemTheme = false; // Override system preference
 		};
 		const toggleDarkMode = () => {
-			preferences.value.theme = isDarkMode.value ? "light" : "dark";
+			const nextIsDark = !isDarkMode.value;
+			preferences.value.theme = nextIsDark ? "dark" : "light";
+			preferences.value.isSystemTheme = false;
+		};
+		const setUseSystemTheme = (val = true) => {
+			preferences.value.isSystemTheme = val;
 		};
 		const updatePreferences = (updates) => {
 			Object.assign(preferences.value, updates);
@@ -382,11 +394,10 @@ export const useUserStore = defineStore(
 
 		// Apply theme to document
 		watch(
-			() => preferences.value.theme,
-			(theme) => {
+			isDarkMode,
+			(isDark) => {
 				if (typeof document === "undefined") return;
 
-				const isDark = theme === "dark";
 				document.documentElement.classList.toggle("dark", isDark);
 
 				// Runtime theme hook for tokenized CSS (Night Neon default).
@@ -394,9 +405,22 @@ export const useUserStore = defineStore(
 
 				// Hint native UI controls where supported.
 				document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+
+				// Set global brightness variables based on accessibility guidelines
+				document.documentElement.style.setProperty("--vc-ui-brightness", isDark ? "1.0" : "0.95");
+				document.documentElement.style.setProperty("--vc-ui-contrast", isDark ? "1.0" : "1.05");
 			},
 			{ immediate: true },
 		);
+
+		// Watch for system preference changes
+		if (typeof window !== "undefined") {
+			window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+				if (preferences.value.isSystemTheme) {
+					// isDarkMode computed property will update automatically
+				}
+			});
+		}
 
 		return {
 			// State
@@ -432,6 +456,7 @@ export const useUserStore = defineStore(
 			setLanguage,
 			setTheme,
 			toggleDarkMode,
+			setUseSystemTheme,
 			updatePreferences,
 			// Lifecycle
 			cleanup,

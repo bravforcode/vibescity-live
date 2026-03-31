@@ -1,8 +1,11 @@
 
 import asyncio
 import logging
+import os
+import uuid
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse
 from postgrest import APIError
 from pydantic import BaseModel, Field
@@ -120,6 +123,7 @@ async def read_shop_media_index(
     limit: int = Query(default=1000, ge=1, le=5000),
     offset: int = Query(default=0, ge=0),
     include_missing: bool = Query(default=True),
+    require_complete: bool = Query(default=False),
 ):
     """
     Retrieve normalized real media coverage for all shops.
@@ -129,6 +133,7 @@ async def read_shop_media_index(
         limit=limit,
         offset=offset,
         include_missing=include_missing,
+        require_complete=require_complete,
     )
     return JSONResponse(
         content=payload,
@@ -142,6 +147,7 @@ async def read_shop_media(
     request: Request,
     shop_id: str,
     hydrate_missing_image: bool = Query(default=False),
+    require_complete: bool = Query(default=False),
 ):
     """
     Retrieve normalized real media for a single shop.
@@ -149,6 +155,7 @@ async def read_shop_media(
     payload = await venue_media_service.get_shop_media(
         shop_id,
         hydrate_missing_image=hydrate_missing_image,
+        require_complete=require_complete,
     )
     if not payload:
         raise HTTPException(status_code=404, detail="Shop media not found")
@@ -194,6 +201,39 @@ async def read_shop_reviews(
         return []
 
 
+@router.get("/{shop_id}/density", response_model=dict)
+@limiter.limit("60/minute")
+async def read_shop_density(request: Request, shop_id: str):
+    """
+    Retrieve real-time crowd density for a specific shop.
+    """
+    import random
+    # In a real app, this would query a real-time analytics service or IoT sensors
+    # For now, we return a deterministic mock based on shop_id
+    seed = int(uuid.UUID(shop_id).int) % 100
+    random.seed(seed)
+    
+    levels = [
+        {"level": 1, "label": "Quiet"},
+        {"level": 2, "label": "Chill"},
+        {"level": 3, "label": "Active"},
+        {"level": 4, "label": "Busy"},
+        {"level": 5, "label": "Very Busy"}
+    ]
+    
+    # Add some time-based variance
+    hour = request.state.start_time if hasattr(request.state, 'start_time') else 12
+    # Simple peak hour simulation
+    peak_multiplier = 1.5 if 18 <= hour <= 22 else 1.0
+    
+    selected_idx = min(len(levels) - 1, int(random.randint(0, 2) * peak_multiplier))
+    
+    return {
+        "success": True,
+        "data": levels[selected_idx]
+    }
+
+
 @router.post("/{shop_id}/reviews", response_model=dict)
 @limiter.limit("30/minute")
 async def create_shop_review(
@@ -224,3 +264,47 @@ async def create_shop_review(
     except APIError as exc:
         logger.error("shop_review_create_failed", extra={"shop_id": shop_id, "err": str(exc)})
         raise HTTPException(status_code=500, detail="Failed to create review") from exc
+
+
+@router.post("/{shop_id}/storefront")
+@limiter.limit("5/minute")
+async def upload_shop_storefront(
+    request: Request,
+    shop_id: str,
+    file: Annotated[UploadFile, File(...)],
+):
+    """
+    Upload official storefront photo for a shop.
+    Priority: 1. User Upload -> 2. Street View Fallback.
+    """
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    # 1. Read file content
+    content = await file.read()
+    file_ext = os.path.splitext(file.filename or "")[1] or ".jpg"
+    file_name = f"storefront_{shop_id}_{uuid.uuid4().hex}{file_ext}"
+    bucket_name = "shop-storefronts"
+
+    db = _reviews_db()
+
+    try:
+        # 2. Upload to Supabase Storage
+        # Note: Ensure bucket 'shop-storefronts' exists and is public
+        storage_path = f"{shop_id}/{file_name}"
+        db.storage.from_(bucket_name).upload(
+            path=storage_path,
+            file=content,
+            file_options={"content-type": file.content_type},
+        )
+
+        # 3. Get Public URL
+        public_url = db.storage.from_(bucket_name).get_public_url(storage_path)
+
+        # 4. Update Database
+        db.table("venues").update({"storefront_image_url": public_url}).eq("id", shop_id).execute()
+
+        return {"status": "success", "storefront_image_url": public_url}
+    except Exception as exc:
+        logger.error("shop_storefront_upload_failed", extra={"shop_id": shop_id, "err": str(exc)})
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(exc)}")

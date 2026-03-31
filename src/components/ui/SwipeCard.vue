@@ -19,8 +19,8 @@ import {
 	Heart,
 	ImageOff,
 	MapPin,
+	Play,
 	Share2,
-	Star,
 } from "lucide-vue-next";
 import {
 	computed,
@@ -95,6 +95,11 @@ const displayCategory = computed(
 const displayDistance = computed(() => {
 	const d = props.shop?.distance ?? props.shop?.Distance;
 	return d == null ? "Nearby" : `${Number(d).toFixed(1)} km`;
+});
+const displayTravelTime = computed(() => {
+	const t = props.shop?.travelTimeMin;
+	if (t === undefined || t === null) return null;
+	return `${t} min`;
 });
 const displayTime = computed(() => {
 	const o = props.shop?.openTime || props.shop?.OpenTime || "10:00";
@@ -345,8 +350,12 @@ const pullY = ref(0); // 0‥threshold  (pull-up distance, already eased)
 const isDragging = ref(false);
 
 // Spring easing: logarithmic resistance with a soft ceiling
-const PULL_MAX = 180;
-const easePull = (raw) => PULL_MAX * (1 - Math.exp(-Math.abs(raw) / 250));
+const PULL_MAX = 196;
+const easePull = (raw) => {
+	const magnitude = Math.abs(raw);
+	const eased = PULL_MAX * (1 - Math.exp(-magnitude / 220));
+	return Math.min(PULL_MAX, eased + Math.min(10, magnitude * 0.035));
+};
 
 // ── Pointer capture approach for bulletproof tracking ──
 
@@ -392,7 +401,7 @@ const onPointerMove = (e) => {
 	}
 
 	// Vertical — prevent page scroll
-	e.preventDefault();
+	if (e.cancelable) e.preventDefault();
 	isDragging.value = true;
 	activeTouchAction.value = "none";
 
@@ -480,10 +489,21 @@ const cardStyle = computed(() => ({
 	"--radius": `${24 + progress.value * 8}px`,
 	transform: `translate3d(0, calc(-1 * var(--pull)), 0) scale(var(--scale))`,
 	borderRadius: "var(--radius)",
+	boxShadow:
+		progress.value > 0.02
+			? `0 ${12 + Math.round(progress.value * 16)}px ${28 + Math.round(progress.value * 40)}px rgba(2, 6, 23, ${0.16 + progress.value * 0.24}), 0 4px 18px rgba(15, 23, 42, ${0.08 + progress.value * 0.14})`
+			: undefined,
 	transition: isDragging.value
 		? "none"
 		: "transform 0.55s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.35s ease",
 	willChange: isDragging.value ? "transform, border-radius" : "auto",
+}));
+const mediaLayerStyle = computed(() => ({
+	transform: `scale(${1 + progress.value * 0.045}) translate3d(0, ${Math.round(progress.value * -10)}px, 0)`,
+	transition: isDragging.value
+		? "none"
+		: "transform 0.55s cubic-bezier(0.16, 1, 0.3, 1)",
+	willChange: isDragging.value ? "transform" : "auto",
 }));
 
 const infoOpacity = computed(() =>
@@ -492,6 +512,20 @@ const infoOpacity = computed(() =>
 const handleOpacity = computed(() =>
 	Math.max(0, 1 - pullY.value / (props.threshold * 0.4)),
 );
+const infoPanelStyle = computed(() => ({
+	opacity: infoOpacity.value,
+	transform: `translate3d(0, ${Math.round(progress.value * -8)}px, 0)`,
+	transition: isDragging.value
+		? "none"
+		: "opacity 0.15s ease, transform 0.32s cubic-bezier(0.16, 1, 0.3, 1)",
+}));
+const handleWrapStyle = computed(() => ({
+	opacity: handleOpacity.value,
+	transform: `translate3d(0, ${Math.round(progress.value * -6)}px, 0)`,
+	transition: isDragging.value
+		? "none"
+		: "opacity 0.15s ease, transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)",
+}));
 
 // Release pill visibility (only show after meaningful pull)
 const pillOpacity = computed(() =>
@@ -503,6 +537,17 @@ const pillTransform = computed(
 	() =>
 		`translateY(${Math.min(0, -pullY.value * 0.12)}px) scale(${0.88 + progress.value * 0.14})`,
 );
+const pillStyle = computed(() => ({
+	opacity: pillOpacity.value,
+	transform: `${pillTransform.value} translateZ(0)`,
+	filter:
+		pillOpacity.value > 0.08
+			? `drop-shadow(0 10px 26px rgba(6, 182, 212, ${0.12 + pillOpacity.value * 0.22}))`
+			: undefined,
+	transition: isDragging.value
+		? "none"
+		: "opacity 0.18s ease, transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)",
+}));
 
 const handleManualExpand = (event) => {
 	const trigger =
@@ -530,7 +575,7 @@ const handleRootKeydown = (e) => {
     ref="container"
     data-testid="shop-card"
     class="sc-root"
-    :class="{ 'z-30': isSelected }"
+    :class="{ 'z-30': isSelected, 'sc-root--giant': isGiantPin }"
     :data-active="isActive ? 'true' : 'false'"
     :data-has-real-image="hasRealImage ? 'true' : 'false'"
     :data-card-visual="hasRealImage ? 'full-bleed' : 'placeholder'"
@@ -546,7 +591,7 @@ const handleRootKeydown = (e) => {
     ════════════════════════════════════════════ -->
     <div class="sc-surface" :style="[cardStyle, surfaceBackdropStyle]">
       <!-- ── Media Layer ─────────────────────────── -->
-      <div class="sc-media">
+      <div class="sc-media" :style="mediaLayerStyle">
         <video
           v-if="showVideo"
           ref="videoEl"
@@ -581,18 +626,11 @@ const handleRootKeydown = (e) => {
             >
               <ImageOff class="w-6 h-6" />
             </div>
-            <span class="text-[9px] uppercase tracking-widest font-bold"
-              >{{ displayCategory }}</span
-            >
+            <span class="text-[9px] uppercase tracking-widest font-bold">{{
+              displayCategory
+            }}</span>
           </div>
         </div>
-      </div>
-
-      <!-- ── Cinematic Depth Glows ───────────────── -->
-      <div class="sc-glows" aria-hidden="true">
-        <div class="sc-glow sc-glow--pink" />
-        <div class="sc-glow sc-glow--cyan" />
-        <div class="sc-glow sc-glow--amber" />
       </div>
 
       <!-- ── Base Gradient ──────────────────────── -->
@@ -622,7 +660,9 @@ const handleRootKeydown = (e) => {
           class="sc-badge sc-badge--giant"
           :aria-label="t('shop.giant_pin')"
         >
-          <Star class="w-3 h-3" aria-hidden="true" />{{ t("shop.giant_pin") }}
+          <Play class="w-3 h-3 fill-current" aria-hidden="true" />{{
+            t("shop.giant_pin")
+          }}
         </span>
       </div>
 
@@ -661,11 +701,7 @@ const handleRootKeydown = (e) => {
       </Transition>
 
       <!-- ── Info Panel ─────────────────────────── -->
-      <div
-        v-if="!isImmersive"
-        class="sc-info"
-        :style="{ opacity: infoOpacity, transition: 'opacity 0.15s ease' }"
-      >
+      <div v-if="!isImmersive" class="sc-info" :style="infoPanelStyle">
         <div class="sc-info-surface">
           <h4 class="sc-venue-name">{{ displayName }}</h4>
 
@@ -674,6 +710,10 @@ const handleRootKeydown = (e) => {
             <span class="sc-meta-item sc-meta-item--distance">
               <MapPin class="w-3 h-3 flex-shrink-0" aria-hidden="true" />
               {{ displayDistance }}
+            </span>
+            <span v-if="displayTravelTime" class="sc-meta-item sc-meta-item--time">
+              <Car class="w-3 h-3 flex-shrink-0" aria-hidden="true" />
+              {{ displayTravelTime }}
             </span>
             <span v-if="realImageCount > 0" class="sc-meta-item">
               IMG {{ realImageCount }}
@@ -723,7 +763,7 @@ const handleRootKeydown = (e) => {
     <div
       v-if="showExpand"
       class="sc-handle-wrap"
-      :style="{ opacity: handleOpacity }"
+      :style="handleWrapStyle"
       aria-hidden="true"
     >
       <div class="sc-handle" />
@@ -732,7 +772,7 @@ const handleRootKeydown = (e) => {
     <!-- ── Release Pill ──────────────────────────── -->
     <div
       class="sc-pill-wrap pointer-events-none"
-      :style="{ opacity: pillOpacity, transform: pillTransform }"
+      :style="pillStyle"
       :aria-hidden="pillOpacity < 0.15"
     >
       <button
@@ -742,7 +782,7 @@ const handleRootKeydown = (e) => {
         @click.stop="handleManualExpand"
       >
         <ChevronUp
-          class="w-4 h-4 text-indigo-400 animate-bounce"
+          class="w-4 h-4 text-cyan-300 animate-bounce"
           stroke-width="2.5"
         />
         <span>{{ t("shop.details") }}</span>
@@ -787,19 +827,14 @@ const handleRootKeydown = (e) => {
   height: 100%;
   border-radius: 24px;
   overflow: hidden;
-  background:
-    radial-gradient(circle at top, rgba(255 255 255 / 0.08), transparent 36%),
-    linear-gradient(180deg, #0c1017 0%, #06080d 100%);
-  border: 1px solid rgba(255 255 255 / 0.08);
-
-  /* Shadow stack: ambient + directional + glow */
+  background: linear-gradient(180deg, #090d14 0%, #06080d 100%);
+  border: 1px solid rgba(255 255 255 / 0.12);
   box-shadow:
-    0 8px 24px rgba(0 0 0 / 0.34),
-    0 26px 60px rgba(0 0 0 / 0.52),
-    0 0 0 0.5px rgba(255 255 255 / 0.06) inset;
-
+    0 10px 26px rgba(15 23 42 / 0.12),
+    0 2px 10px rgba(15 23 42 / 0.08);
   backface-visibility: hidden;
   transform: translateZ(0);
+  isolation: isolate;
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -817,44 +852,7 @@ const handleRootKeydown = (e) => {
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-
-/* ─────────────────────────────────────────────────────────────
-   CINEMATIC GLOWS  — purely decorative, no layout impact
-───────────────────────────────────────────────────────────── */
-.sc-glows {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 10;
-  mix-blend-mode: overlay;
-  opacity: 0.16;
-}
-.sc-glow {
-  position: absolute;
-  border-radius: 9999px;
-  filter: blur(60px);
-}
-.sc-glow--pink {
-  width: 200px;
-  height: 200px;
-  top: -60px;
-  left: -60px;
-  background: #ec489966;
-}
-.sc-glow--cyan {
-  width: 200px;
-  height: 200px;
-  bottom: -60px;
-  right: -60px;
-  background: #06b6d466;
-}
-.sc-glow--amber {
-  width: 150px;
-  height: 150px;
-  top: 40%;
-  left: 40%;
-  background: #f59e0b33;
+  filter: saturate(1.18) contrast(1.08) brightness(1.06);
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -864,23 +862,39 @@ const handleRootKeydown = (e) => {
   position: absolute;
   inset: 0;
   background:
+    radial-gradient(
+      circle at center 38%,
+      transparent 0%,
+      transparent 52%,
+      rgba(255, 252, 247, 0.04) 78%,
+      rgba(255, 252, 247, 0.1) 100%
+    ),
     linear-gradient(
       to top,
-      rgba(2, 6, 12, 0.97) 0%,
-      rgba(3, 10, 18, 0.82) 24%,
-      rgba(7, 14, 22, 0.42) 54%,
-      rgba(7, 10, 14, 0.12) 78%,
-      transparent 100%
-    ),
-    linear-gradient(
-      135deg,
-      rgba(0, 0, 0, 0.38) 0%,
-      rgba(0, 0, 0, 0.08) 38%,
-      rgba(0, 0, 0, 0.44) 100%
-    ),
-    radial-gradient(circle at top, rgba(255, 255, 255, 0.14), transparent 32%);
+      rgba(255, 251, 245, 0.28) 0%,
+      rgba(255, 251, 245, 0.14) 16%,
+      transparent 34%
+    );
   pointer-events: none;
   z-index: 10;
+}
+
+.sc-root--giant .sc-gradient {
+  background:
+    radial-gradient(
+      circle at center 30%,
+      transparent 0%,
+      transparent 36%,
+      rgba(0, 0, 0, 0.12) 64%,
+      rgba(0, 0, 0, 0.28) 100%
+    ),
+    linear-gradient(
+      to top,
+      rgba(8, 8, 10, 0.9) 0%,
+      rgba(8, 8, 10, 0.62) 24%,
+      rgba(8, 8, 10, 0.18) 44%,
+      transparent 68%
+    );
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -909,9 +923,10 @@ const handleRootKeydown = (e) => {
   border: 1px solid rgba(253 224 71 / 0.5);
 }
 .sc-badge--giant {
-  background: linear-gradient(90deg, #a855f7, #6366f1);
+  background: linear-gradient(90deg, #ff0033, #ff3b30);
   color: #fff;
-  border: 1px solid rgba(192 132 252 / 0.4);
+  border: 1px solid rgba(255 95 95 / 0.48);
+  box-shadow: 0 8px 18px rgba(255 0 51 / 0.24);
 }
 .sc-live-dot {
   width: 6px;
@@ -932,13 +947,11 @@ const handleRootKeydown = (e) => {
   align-items: center;
   justify-content: center;
   color: #fff;
-  background: rgba(7 10 16 / 0.58);
-  border: 1px solid rgba(255 255 255 / 0.14);
-  backdrop-filter: blur(14px) saturate(1.16);
+  background: rgba(7 10 16 / 0.82);
+  border: 1px solid rgba(255 255 255 / 0.18);
   transition:
     background 0.2s ease,
-    transform 0.15s ease,
-    box-shadow 0.2s ease;
+    transform 0.15s ease;
 }
 .sc-action-btn:active {
   transform: scale(0.88);
@@ -949,7 +962,16 @@ const handleRootKeydown = (e) => {
 .sc-action-btn--active {
   background: #8f174b;
   border-color: rgba(236 72 153 / 0.45);
-  box-shadow: 0 0 18px rgba(236 72 153 / 0.35);
+}
+
+.sc-root--giant .sc-action-btn {
+  background: rgba(9 9 11 / 0.64);
+  border-color: rgba(255 255 255 / 0.14);
+}
+
+.sc-root--giant .sc-action-btn--active {
+  background: #ff0033;
+  border-color: rgba(255 95 95 / 0.52);
 }
 /* Focus visible ring (keyboard nav) */
 .sc-action-btn:focus-visible {
@@ -998,24 +1020,24 @@ const handleRootKeydown = (e) => {
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 0.55rem 0.65rem 0.75rem;
+  padding: 2.5rem 0.65rem 0.75rem;
   z-index: 20;
   overflow: hidden;
+  background: none;
 }
 
 .sc-info-surface {
-  border-radius: 20px 20px 18px 18px;
   background: transparent;
   border: none;
   box-shadow: none;
-  backdrop-filter: none;
-  padding: 0.72rem 0.75rem 0.74rem;
+  padding: 0;
+  border-radius: 0;
 }
 
 .sc-venue-name {
   font-size: clamp(0.88rem, 0.72rem + 0.9cqi, 1.25rem);
   font-weight: 900;
-  color: #fff;
+  color: rgba(12 18 28 / 0.96);
   line-height: 1.12;
   letter-spacing: -0.02em;
   margin-bottom: 0.42rem;
@@ -1027,9 +1049,12 @@ const handleRootKeydown = (e) => {
   -webkit-box-orient: vertical;
   overflow: hidden;
   overflow-wrap: anywhere;
-  text-shadow:
-    0 2px 10px rgba(0 0 0 / 0.78),
-    0 0 18px rgba(0 0 0 / 0.46);
+  text-rendering: optimizeLegibility;
+}
+
+.sc-root--giant .sc-venue-name {
+  color: rgba(255 255 255 / 0.96);
+  text-shadow: 0 2px 12px rgba(0 0 0 / 0.48);
 }
 
 .sc-meta-row {
@@ -1049,17 +1074,24 @@ const handleRootKeydown = (e) => {
   max-width: 64%;
   padding: 0.32rem 0.55rem;
   border-radius: 999px;
-  background: rgba(255 255 255 / 0.16);
-  border: 1px solid rgba(255 255 255 / 0.22);
+  background: rgba(15 23 42 / 0.05);
+  border: 1px solid rgba(15 23 42 / 0.09);
   font-size: clamp(0.58rem, 0.5rem + 0.4cqi, 0.65rem);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: rgba(255 255 255 / 0.98);
+  color: rgba(15 23 42 / 0.82);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-shadow: 0 1px 6px rgba(0 0 0 / 0.55);
+}
+
+.sc-root--giant .sc-chip {
+  background: rgba(9 9 11 / 0.72);
+  border-color: rgba(255 255 255 / 0.08);
+  color: rgba(255 255 255 / 0.92);
+  box-shadow: inset 0 0 0 1px rgba(255 255 255 / 0.02);
+  backdrop-filter: blur(10px);
 }
 
 .sc-meta-item {
@@ -1067,22 +1099,31 @@ const handleRootKeydown = (e) => {
   align-items: center;
   gap: 4px;
   font-size: clamp(0.6rem, 0.55rem + 0.36cqi, 0.72rem);
-  color: rgba(241 245 249 / 0.98);
+  color: rgba(15 23 42 / 0.66);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-shadow: 0 1px 6px rgba(0 0 0 / 0.65);
+}
+
+.sc-root--giant .sc-meta-item {
+  color: rgba(255 255 255 / 0.76);
 }
 
 .sc-meta-item--distance {
   margin-left: auto;
   flex: 0 1 auto;
   max-width: 44%;
-  padding: 0.32rem 0.55rem;
+  padding: 0.34rem 0.58rem;
   border-radius: 999px;
-  background: rgba(8 145 178 / 0.24);
-  border: 1px solid rgba(103 232 249 / 0.28);
-  color: rgba(186 230 253 / 0.95);
+  background: rgba(14 165 233 / 0.1);
+  border: 1px solid rgba(14 165 233 / 0.22);
+  color: rgba(3 105 161 / 0.92);
+}
+
+.sc-root--giant .sc-meta-item--distance {
+  background: rgba(255 0 51 / 0.14);
+  border-color: rgba(255 95 95 / 0.34);
+  color: rgba(255 242 242 / 0.94);
 }
 
 .sc-sub-row {
@@ -1101,17 +1142,28 @@ const handleRootKeydown = (e) => {
   min-height: 24px;
   padding: 0.26rem 0.48rem;
   border-radius: 999px;
-  background: rgba(255 255 255 / 0.14);
-  border: 1px solid rgba(255 255 255 / 0.18);
-  color: rgba(255 255 255 / 0.96);
+  background: rgba(15 23 42 / 0.05);
+  border: 1px solid rgba(15 23 42 / 0.08);
+  color: rgba(15 23 42 / 0.64);
   flex-shrink: 0;
-  text-shadow: 0 1px 6px rgba(0 0 0 / 0.65);
 }
+
+.sc-root--giant .sc-stat-pill {
+  background: rgba(9 9 11 / 0.7);
+  border-color: rgba(255 255 255 / 0.08);
+  color: rgba(255 255 255 / 0.78);
+  backdrop-filter: blur(10px);
+}
+
 .sc-stat-pill--time {
-  color: rgba(226 232 240 / 0.82);
+  color: rgba(15 23 42 / 0.62);
   flex-shrink: 1;
   min-width: 0;
   overflow: hidden;
+}
+
+.sc-root--giant .sc-stat-pill--time {
+  color: rgba(255 255 255 / 0.72);
 }
 
 .sc-stat-pill--time span {
@@ -1142,22 +1194,34 @@ const handleRootKeydown = (e) => {
   font-weight: 800;
   color: #fff;
   border: 1px solid transparent;
-  box-shadow: 0 10px 22px rgba(2 6 23 / 0.26);
   transition:
     filter 0.18s ease,
     transform 0.14s ease;
 }
 .sc-cta--secondary {
   justify-content: flex-start;
-  background: rgba(255 255 255 / 0.14);
-  border-color: rgba(255 255 255 / 0.2);
-  color: rgba(255 255 255 / 0.92);
+  background: rgba(15 23 42 / 0.06);
+  border-color: rgba(15 23 42 / 0.1);
+  color: rgba(15 23 42 / 0.82);
+}
+
+.sc-root--giant .sc-cta--secondary {
+  background: rgba(9 9 11 / 0.72);
+  border-color: rgba(255 255 255 / 0.08);
+  color: rgba(255 255 255 / 0.88);
+  backdrop-filter: blur(10px);
 }
 
 .sc-cta--primary {
   justify-content: flex-start;
-  background: linear-gradient(100deg, #0f4c81 0%, #0891b2 100%);
-  border-color: rgba(103 232 249 / 0.22);
+  background: linear-gradient(100deg, #0e68a3 0%, #14b8ff 100%);
+  border-color: rgba(125 211 252 / 0.22);
+}
+
+.sc-root--giant .sc-cta--primary {
+  background: linear-gradient(120deg, #ff0033 0%, #ff3b30 100%);
+  border-color: rgba(255 255 255 / 0.12);
+  box-shadow: 0 10px 24px rgba(255 0 51 / 0.24);
 }
 
 .sc-cta--icon {
@@ -1171,6 +1235,11 @@ const handleRootKeydown = (e) => {
   font-weight: 700;
   color: rgba(255 255 255 / 0.72);
 }
+
+.sc-root--giant .sc-cta-distance {
+  color: rgba(255 255 255 / 0.84);
+}
+
 .sc-cta:active {
   transform: scale(0.97);
   filter: brightness(0.92);

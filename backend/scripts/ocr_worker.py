@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 import redis
 import requests
 from dotenv import load_dotenv
+from postgrest import APIError
 
 # Ensure backend dir is in path
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
@@ -25,6 +26,22 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger("vibecity-ocr-worker")
+
+OCR_PROCESS_ERRORS = (
+    APIError,
+    requests.RequestException,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+OCR_QUEUE_ERRORS = (
+    APIError,
+    json.JSONDecodeError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+    redis.RedisError,
+)
 
 
 def get_redis() -> redis.Redis:
@@ -144,7 +161,7 @@ def process_order(order_id: str) -> None:
     verification = None
     try:
         verification = verify_slip_with_gcv(slip_url, amount)
-    except Exception as e:
+    except OCR_PROCESS_ERRORS as e:
         verification = None
         logger.error(f"OCR failed for order {order_id}: {e}")
 
@@ -185,7 +202,7 @@ def process_order(order_id: str) -> None:
             try:
                 apply_entitlement(order, feature, starts_at, ends_at)
                 entitlement_applied = True
-            except Exception as e:
+            except OCR_PROCESS_ERRORS as e:
                 verification.status = "error"
                 verification.reason = f"entitlement_error: {e}"
         else:
@@ -270,7 +287,7 @@ def process_order(order_id: str) -> None:
                 ),
                 timeout=5,
             )
-        except Exception:
+        except (requests.RequestException, TypeError, ValueError):
             pass
 
 
@@ -301,7 +318,7 @@ def run_worker() -> None:
                             raise RuntimeError("Missing order_id in OCR payload")
                         process_order(order_id)
                         r.xack(settings.OCR_QUEUE_STREAM, settings.OCR_QUEUE_GROUP, msg_id)
-                    except Exception as ex:
+                    except OCR_QUEUE_ERRORS as ex:
                         logger.error(f"❌ OCR worker failed msg {msg_id}: {ex}")
                         try:
                             r.xadd(
@@ -309,9 +326,9 @@ def run_worker() -> None:
                                 {"error": str(ex), "event": json.dumps(fields)},
                             )
                             r.xack(settings.OCR_QUEUE_STREAM, settings.OCR_QUEUE_GROUP, msg_id)
-                        except Exception:
+                        except (TypeError, ValueError, redis.RedisError):
                             pass
-        except Exception as loop_ex:
+        except (redis.RedisError, OSError, RuntimeError) as loop_ex:
             logger.error(f"❌ OCR loop error: {loop_ex}")
             time.sleep(2)
 

@@ -147,7 +147,8 @@ onUnmounted(() => {
 		}"
 		:style="{
 			'--c': glowColor,
-			'--scale': isSelected ? 1.28 : isHovered ? 1.12 : 1,
+			'--scale': isSelected ? 1.04 : isHovered ? 1.1 : 1,
+			'--lift': isSelected ? '0px' : isHovered ? '-12px' : '-5px',
 		}"
 		role="button"
 		:aria-label="shop.name"
@@ -214,11 +215,11 @@ onUnmounted(() => {
 	align-items: center;
 	cursor: pointer;
 	user-select: none;
-	transform: scale(var(--scale)) translateZ(0);
+	transform: translateY(var(--lift)) scale(var(--scale)) translateZ(0);
 	transform-origin: bottom center;
 	transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 	will-change: transform;
-	filter: drop-shadow(0 6px 16px var(--glow-soft));
+	filter: drop-shadow(0 8px 24px var(--glow-soft)) brightness(var(--vc-ui-brightness, 1.0));
 }
 
 /* ── Board ───────────────────────────────────────────────────── */
@@ -226,34 +227,34 @@ onUnmounted(() => {
 	position: relative;
 	display: flex;
 	align-items: center;
-	gap: 10px;
-	padding: 8px 14px 8px 10px;
+	gap: 9px;
+	padding: 7px 13.5px 7px 9.5px;
 
 	/* Dark neon sign chassis */
 	background:
 		linear-gradient(
 			160deg,
-			rgba(255,255,255,0.05) 0%,
+			rgba(255,255,255,0.08) 0%,
 			transparent 50%,
-			rgba(0,0,0,0.4) 100%
+			rgba(0,0,0,0.5) 100%
 		),
 		#080c14;
 	border: 2px solid var(--c);
 	border-radius: 6px;
-	min-width: 162px;
-	max-width: 215px;
+	min-width: 148px;
+	max-width: 198px;
 	overflow: hidden;
 
 	/* Layered neon glow */
 	box-shadow:
-		0 0 0 1px color-mix(in srgb, var(--c) 20%, transparent),
-		0 0 8px var(--c),
-		0 0 20px var(--glow-soft),
-		0 0 40px var(--glow-soft),
-		inset 0 0 16px color-mix(in srgb, var(--c) 8%, transparent);
+		0 0 0 1px color-mix(in srgb, var(--c) 25%, transparent),
+		0 0 10px var(--c),
+		0 0 24px var(--glow-soft),
+		0 0 48px var(--glow-soft),
+		inset 0 0 18px color-mix(in srgb, var(--c) 10%, transparent);
 
 	z-index: 2;
-	transition: box-shadow 0.3s ease, border-color 0.3s ease;
+	transition: box-shadow 0.3s ease, border-color 0.3s ease, border-width 0.2s ease;
 }
 
 /* Scan line CRT effect */
@@ -289,9 +290,9 @@ onUnmounted(() => {
 /* Vertical divider */
 .ns__divider {
 	position: absolute;
-	left: 40px;
-	top: 6px;
-	bottom: 6px;
+	left: 36px;
+	top: 5px;
+	bottom: 5px;
 	width: 1px;
 	background: linear-gradient(
 		to bottom,
@@ -312,7 +313,7 @@ onUnmounted(() => {
 
 .ns__icon {
 	display: block;
-	font-size: 20px;
+	font-size: 18px;
 	line-height: 1;
 	filter: drop-shadow(0 0 6px var(--c)) drop-shadow(0 0 2px #fff8);
 	animation: icon-float 3s ease-in-out infinite;
@@ -330,15 +331,15 @@ onUnmounted(() => {
 .ns__text {
 	display: flex;
 	flex-direction: column;
-	gap: 3px;
+	gap: 2px;
 	min-width: 0;
 	z-index: 1;
 }
 
 .ns__name {
-	font-size: 12.5px;
+	font-size: 11.25px;
 	font-weight: 900;
-	letter-spacing: 0.7px;
+	letter-spacing: 0.6px;
 	color: #fff;
 	text-shadow:
 		0 0 4px #fff,
@@ -348,14 +349,14 @@ onUnmounted(() => {
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	max-width: 142px;
+	max-width: 128px;
 	line-height: 1.2;
 }
 
 .ns__cat {
-	font-size: 8.5px;
+	font-size: 7.7px;
 	font-weight: 700;
-	letter-spacing: 1.4px;
+	letter-spacing: 1.2px;
 	color: var(--c);
 	text-transform: uppercase;
 	line-height: 1;
@@ -375,9 +376,9 @@ onUnmounted(() => {
 .ns__tip {
 	width: 0;
 	height: 0;
-	border-left: 7px solid transparent;
-	border-right: 7px solid transparent;
-	border-top: 9px solid var(--c);
+	border-left: 9px solid transparent;
+	border-right: 9px solid transparent;
+	border-top: 16px solid var(--c);
 	position: relative;
 	z-index: 2;
 }
@@ -387,8 +388,8 @@ onUnmounted(() => {
 	top: 0;
 	left: 50%;
 	transform: translateX(-50%);
-	width: 14px;
-	height: 9px;
+	width: 22px;
+	height: 16px;
 	background: radial-gradient(ellipse at center top, var(--glow-mid) 0%, transparent 80%);
 	filter: blur(3px);
 }
@@ -427,18 +428,52 @@ onUnmounted(() => {
 .ns--selected .ns__board {
 	box-shadow:
 		0 0 0 1px color-mix(in srgb, var(--c) 40%, transparent),
-		0 0 12px var(--c),
-		0 0 28px var(--glow-mid),
-		0 0 60px var(--glow-soft),
-		inset 0 0 22px color-mix(in srgb, var(--c) 14%, transparent);
-	border-width: 2.5px;
+		0 0 16px var(--c),
+		0 0 32px var(--glow-mid),
+		0 0 70px var(--glow-soft),
+		inset 0 0 24px color-mix(in srgb, var(--c) 16%, transparent);
+	border-width: 3.5px;
+	filter: brightness(1.4) saturate(1.2);
+}
+
+.ns--selected .ns__board {
+	/* Glowing tinted background instead of solid black */
+	background:
+		linear-gradient(
+			160deg,
+			rgba(255, 255, 255, 0.22) 0%,
+			transparent 40%,
+			rgba(0, 0, 0, 0.4) 100%
+		),
+		color-mix(in srgb, var(--c) 25%, #080c14);
+
+	box-shadow:
+		0 0 0 2px color-mix(in srgb, var(--c) 60%, transparent),
+		0 0 16px var(--c),
+		0 0 32px var(--glow-mid),
+		inset 0 0 24px color-mix(in srgb, var(--c) 20%, transparent);
+
+	border-width: 3px;
+	filter: brightness(var(--vc-ui-selected-brightness, 1.1)) contrast(var(--vc-ui-contrast, 1.0));
+	backdrop-filter: blur(4px);
 }
 
 .ns--selected .ns__name {
 	text-shadow:
-		0 0 6px #fff,
-		0 0 12px var(--c),
-		0 0 28px var(--glow-mid);
+		0 0 8px #fff,
+		0 0 16px var(--c);
+	font-size: 11.25px;
+	letter-spacing: 0.6px;
+}
+
+.ns--selected .ns__icon {
+	filter: drop-shadow(0 0 8px var(--c));
+	transform: scale(1.08);
+}
+
+.ns--selected .ns__cat {
+	opacity: 1;
+	text-shadow: 0 0 10px var(--c), 0 0 4px #fff6;
 }
 
 /* selected bounce-in */
@@ -494,9 +529,9 @@ onUnmounted(() => {
 }
 
 @keyframes select-bounce {
-	0%   { transform: scale(0.88) translateZ(0); }
-	60%  { transform: scale(1.32) translateZ(0); }
-	100% { transform: scale(var(--scale)) translateZ(0); }
+	0%   { transform: translateY(var(--lift)) scale(0.88) translateZ(0); }
+	60%  { transform: translateY(var(--lift)) scale(1.38) translateZ(0); }
+	100% { transform: translateY(var(--lift)) scale(var(--scale)) translateZ(0); }
 }
 
 @keyframes neon-flicker {

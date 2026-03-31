@@ -3,15 +3,16 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 
+import redis
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from postgrest import APIError
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.routers import (
-    admin,
     analytics,
     emergency,
     map_core,
@@ -27,6 +28,11 @@ from app.api.routers import (
     ugc,
     vibes,
     visitor,
+    traffic,
+    export,
+    user,
+    notifications as notifications_router,
+    settings as settings_router,
 )
 from app.core.config import get_settings, validate_settings
 from app.core.logging import setup_logging
@@ -207,7 +213,7 @@ def _run_readiness_checks() -> tuple[str, dict[str, str]]:
         try:
             supabase_admin.table("orders").select("id").limit(1).execute()
             checks["supabase"] = "ok"
-        except Exception:
+        except APIError:
             checks["supabase"] = "degraded"
             if strict_health:
                 overall = "degraded"
@@ -218,7 +224,7 @@ def _run_readiness_checks() -> tuple[str, dict[str, str]]:
         redis_conn = get_redis()
         redis_conn.ping()
         checks["redis"] = "ok"
-    except Exception:
+    except (ImportError, redis.RedisError, OSError):
         checks["redis"] = "degraded"
         if strict_health:
             overall = "degraded"
@@ -227,7 +233,7 @@ def _run_readiness_checks() -> tuple[str, dict[str, str]]:
     try:
         from app.services.vector.places_vector_service import _is_circuit_open
         checks["qdrant"] = "circuit_open" if _is_circuit_open() else "ok"
-    except Exception:
+    except (ImportError, RuntimeError):
         checks["qdrant"] = "unknown"
 
     return overall, checks
@@ -261,13 +267,17 @@ app.include_router(shops.router, prefix=settings.API_V1_STR + "/shops", tags=["s
 app.include_router(owner.router, prefix=settings.API_V1_STR + "/owner", tags=["owner"])
 app.include_router(ugc.router, prefix=settings.API_V1_STR + "/ugc", tags=["ugc"])
 app.include_router(emergency.router, prefix=settings.API_V1_STR + "/emergency", tags=["emergency"])
-app.include_router(admin.router, prefix=settings.API_V1_STR + "/admin", tags=["admin"])
 app.include_router(redemption.router, prefix=settings.API_V1_STR + "/redemption", tags=["redemption"])
 app.include_router(analytics.router, prefix=settings.API_V1_STR + "/analytics", tags=["analytics"])
 app.include_router(seo.router, prefix=settings.API_V1_STR + "/seo", tags=["seo"])
 app.include_router(partner.router, prefix=settings.API_V1_STR + "/partner", tags=["partner"])
 app.include_router(visitor.router, prefix=settings.API_V1_STR + "/visitor", tags=["visitor"])
 app.include_router(places.router, prefix=settings.API_V1_STR + "/places", tags=["places"])
+app.include_router(traffic.router, prefix=settings.API_V1_STR + "/traffic", tags=["traffic"])
+app.include_router(export.router, prefix=settings.API_V1_STR + "/export", tags=["export"])
+app.include_router(user.router, prefix=settings.API_V1_STR + "/user", tags=["user"])
+app.include_router(notifications_router.router, prefix=settings.API_V1_STR + "/notifications", tags=["notifications"])
+app.include_router(settings_router.router, prefix=settings.API_V1_STR + "/settings", tags=["settings"])
 app.include_router(proxy.router, prefix=settings.API_V1_STR, tags=["proxy"])
 
 # Map core endpoints — dual-alias per roadmap lock decision

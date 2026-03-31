@@ -6,6 +6,12 @@ import { useRoute, useRouter } from "vue-router";
 import BottomFeed from "../components/feed/BottomFeed.vue";
 import SmartHeader from "../components/layout/SmartHeader.vue";
 import AppModals from "../components/system/AppModals.vue";
+import { preloadAssets } from "../utils/performance";
+
+const ASSETS_TO_PRELOAD = ["/map-style-dark.json", "/fonts/vibe-font.woff2"];
+
+preloadAssets(ASSETS_TO_PRELOAD);
+
 import EmptyState from "../components/ui/EmptyState.vue";
 import ErrorBoundary from "../components/ui/ErrorBoundary.vue"; // C4: prevents blank-screen on render crash
 import FilterMenuSync from "../components/ui/FilterMenu.vue";
@@ -202,11 +208,12 @@ const {
 	activeCategories,
 	activeZone,
 	activeProvince,
-	activeBuilding,
 	activeFloor,
 	activeMall,
+	activeDrawerContext,
 	activePopup,
 	userLocation,
+	isMockLocation,
 	userLevel,
 	totalCoins,
 	favorites,
@@ -228,10 +235,10 @@ const {
 
 	// Computed
 	shops,
+	mapShops,
 	filteredShops,
 	carouselShops,
 	carouselShopIds,
-	nearbyPins,
 	suggestedShops,
 	mallShops,
 	activeEvents,
@@ -246,6 +253,8 @@ const {
 	handleCardClick,
 	handleCardHover,
 	handleOpenDetail,
+	handleSelectionFlightComplete,
+	handleSentientAutoSelect,
 	mapSelectionIntent,
 	closeDetailSheet,
 	handlePanelScroll,
@@ -254,8 +263,11 @@ const {
 	handleEnterIndoor,
 	handleCloseFloorSelector,
 	handleBuildingOpen,
+	handleGiantPreviewShopChange,
+	handleGiantOpenDetail,
 	openRideModal,
 	closeRideModal,
+	closeMallDrawer,
 	openRideApp,
 	toggleFavorite,
 	requestGeolocation,
@@ -952,7 +964,6 @@ const hasFilteredResults = computed(() => {
 
         <ErrorBoundary>
           <FilterMenu
-            v-if="showFilterMenu"
             :is-open="showFilterMenu"
             :selected-categories="activeFilters"
             @close="showFilterMenu = false"
@@ -1011,9 +1022,7 @@ const hasFilteredResults = computed(() => {
           :split-width="splitHeaderWidth"
           :globalSearchQuery="globalSearchQuery"
           :showSearchResults="showSearchResults"
-          :globalSearchResults="
-            globalSearchResults?.length ? globalSearchResults : filteredShops
-          "
+          :globalSearchResults="globalSearchResults?.length ? globalSearchResults : shops"
           @open-sidebar="showSidebar = true"
           @open-filter="handleOpenFilterMenu"
           @update:globalSearchQuery="handleSearchQueryUpdate"
@@ -1067,8 +1076,9 @@ const hasFilteredResults = computed(() => {
                     ref="mapRef"
                     :uiTopOffset="mapUiTopOffset"
                     :uiBottomOffset="mapUiBottomOffset"
-                    :shops="filteredShops"
+                    :shops="mapShops"
                     :userLocation="userLocation"
+                    :is-mock-location="isMockLocation"
                     :highlightedShopId="activeShopId"
                     :is-low-power-mode="isLowPowerMode"
                     :priority-shop-ids="carouselShopIds"
@@ -1083,8 +1093,11 @@ const hasFilteredResults = computed(() => {
                     :isGiantPinView="isGiantPinView"
                     :isDashboardOpen="isDashboardOpen"
                     @select-shop="handleMarkerClick"
+                    @locate-me="handleLocateMe"
                     @map-ready-change="handleMapReadyChange"
                     @open-detail="handleOpenDetail"
+                    @sentient-select="handleSentientAutoSelect"
+                    @selection-flight-complete="handleSelectionFlightComplete"
                     @open-ride-modal="openRideModal"
                     @exit-indoor="handleCloseFloorSelector"
                     @open-building="handleBuildingOpen"
@@ -1158,7 +1171,7 @@ const hasFilteredResults = computed(() => {
             class="relative pt-[118px] h-full min-h-0 bg-gradient-to-b from-[#0b1020] via-zinc-950 to-zinc-900"
           >
             <div
-              v-if="!filteredShops?.length"
+              v-if="!shops?.length"
               class="pointer-events-none absolute inset-0 grid place-items-center px-6 text-center text-white/40 text-sm font-semibold tracking-wide"
             >
               {{ t("home.no_venues_found") || "ไม่พบร้านค้าที่ตรงเงื่อนไข" }}
@@ -1166,7 +1179,7 @@ const hasFilteredResults = computed(() => {
             <div data-testid="vibe-carousel" class="h-full min-h-0">
               <VideoPanel
                 ref="panelRef"
-                :shops="filteredShops"
+                :shops="shops"
                 :activeShopId="activeShopId"
                 :isDarkMode="isDarkMode"
                 :sticky-top="shouldUseSplitHeader ? 0 : 56"
@@ -1214,8 +1227,9 @@ const hasFilteredResults = computed(() => {
                 ref="mapRef"
                 :uiTopOffset="mapUiTopOffset"
                 :uiBottomOffset="0"
-                :shops="nearbyPins"
+                :shops="mapShops"
                 :userLocation="userLocation"
+                :is-mock-location="isMockLocation"
                 :highlightedShopId="activeShopId"
                 :is-low-power-mode="isLowPowerMode"
                 :priority-shop-ids="carouselShopIds"
@@ -1231,7 +1245,10 @@ const hasFilteredResults = computed(() => {
                 :isDashboardOpen="isDashboardOpen"
                 @map-ready-change="handleMapReadyChange"
                 @select-shop="handleMarkerClick"
+                @locate-me="handleLocateMe"
                 @open-detail="handleOpenDetail"
+                @sentient-select="handleSentientAutoSelect"
+                @selection-flight-complete="handleSelectionFlightComplete"
                 @open-ride-modal="openRideModal"
                 @exit-indoor="handleCloseFloorSelector"
                 @open-building="handleBuildingOpen"
@@ -1249,7 +1266,7 @@ const hasFilteredResults = computed(() => {
               class="grid grid-cols-1 gap-3 p-3 pt-14 md:gap-4 md:p-4 md:pt-16 xl:grid-cols-2"
             >
               <div
-                v-for="(shop, index) in filteredShops.slice(0, 10)"
+                v-for="(shop, index) in shops.slice(0, 10)"
                 :key="`land-${shop.id}`"
                 :data-shop-id="shop.id"
                 data-testid="landscape-shop-card"
@@ -1303,8 +1320,9 @@ const hasFilteredResults = computed(() => {
                 ref="mapRef"
                 :uiTopOffset="mapUiTopOffset"
                 :uiBottomOffset="mapUiBottomOffset"
-                :shops="filteredShops"
+                :shops="mapShops"
                 :userLocation="userLocation"
+                :is-mock-location="isMockLocation"
                 :highlightedShopId="activeShopId"
                 :is-low-power-mode="false"
                 :isDarkMode="isDarkMode"
@@ -1319,8 +1337,11 @@ const hasFilteredResults = computed(() => {
                 :isGiantPinView="isGiantPinView"
                 :isDashboardOpen="isDashboardOpen"
                 @select-shop="handleMarkerClick"
+                @locate-me="handleLocateMe"
                 @map-ready-change="handleMapReadyChange"
                 @open-detail="handleOpenDetail"
+                @sentient-select="handleSentientAutoSelect"
+                @selection-flight-complete="handleSelectionFlightComplete"
                 @open-ride-modal="openRideModal"
                 @exit-indoor="handleCloseFloorSelector"
                 @open-building="handleBuildingOpen"
@@ -1436,6 +1457,7 @@ const hasFilteredResults = computed(() => {
         :rideModalShop="rideModalShop"
         :showMallDrawer="showMallDrawer"
         :activeMall="activeMall"
+        :drawerContext="activeDrawerContext"
         :mallShops="mallShops"
         :activeShopId="activeShopId"
         :favorites="favorites"
@@ -1450,8 +1472,10 @@ const hasFilteredResults = computed(() => {
         @toggle-favorite="toggleFavorite"
         @close-ride-modal="closeRideModal"
         @open-ride-app="openRideApp"
-        @close-mall-drawer="showMallDrawer = false"
+        @close-mall-drawer="closeMallDrawer()"
         @select-mall-shop="handleMarkerClick"
+        @preview-shop-change="handleGiantPreviewShopChange"
+        @open-shop-detail="handleGiantOpenDetail"
         @open-ride-modal="openRideModal"
         @close-profile-drawer="showProfileDrawer = false"
         @toggle-language="toggleLanguage"

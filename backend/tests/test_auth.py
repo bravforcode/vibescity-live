@@ -47,9 +47,9 @@ async def test_verify_admin(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_verify_admin_allowlist_email(monkeypatch):
-    monkeypatch.setattr(auth.settings, "ADMIN_EMAIL_ALLOWLIST", "omchai.g44@gmail.com")
+    monkeypatch.setattr(auth.settings, "ADMIN_EMAIL_ALLOWLIST", "admin@example.com")
     allowlisted_user = SimpleNamespace(
         app_metadata={"role": "viewer"},
-        email="omchai.g44@gmail.com",
+        email="admin@example.com",
     )
     assert await auth.verify_admin(allowlisted_user) == allowlisted_user

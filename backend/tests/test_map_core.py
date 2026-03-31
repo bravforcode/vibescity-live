@@ -8,7 +8,6 @@ import pytest
 
 from app.api.routers import map_core as map_core_module
 
-
 # ── Supabase fake ─────────────────────────────────────────────────
 
 
@@ -25,8 +24,10 @@ class _FakeRPC:
 class FakeSupabase:
     def __init__(self, rpc_data=None):
         self._rpc_data = rpc_data if rpc_data is not None else []
+        self.calls = []
 
     def rpc(self, name, params):
+        self.calls.append((name, params))
         return _FakeRPC(self._rpc_data)
 
 
@@ -46,7 +47,7 @@ def fake_supabase(monkeypatch):
 
 
 def test_venues_happy_path(client, fake_supabase):
-    fake_supabase([
+    sb = fake_supabase([
         {"id": "1", "name": "Club A", "lat": 13.75, "lng": 100.5, "category": "club", "rating": 4.5, "is_live": True},
         {"id": "2", "name": "Bar B",  "lat": 13.76, "lng": 100.6, "category": "bar",  "rating": None, "is_live": False},
     ])
@@ -58,6 +59,16 @@ def test_venues_happy_path(client, fake_supabase):
     assert data["total"] == 2
     assert data["venues"][0]["id"] == "1"
     assert "timestamp" in data
+    assert sb.calls
+    rpc_name, rpc_params = sb.calls[-1]
+    assert rpc_name == "get_map_pins"
+    assert rpc_params == {
+        "p_min_lng": 100.0,
+        "p_min_lat": 13.0,
+        "p_max_lng": 101.0,
+        "p_max_lat": 14.0,
+        "p_zoom": 12,
+    }
 
 
 def test_venues_bbox_bad_format(client, fake_supabase):

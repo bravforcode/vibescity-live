@@ -4,6 +4,7 @@ import {
 	getFlagGovernanceViolations,
 	validateFlagDependencies,
 } from "@/config/featureFlagGovernance";
+import { isFrontendOnlyDevMode } from "../lib/runtimeConfig";
 import { isSupabaseSchemaCacheError, supabase } from "../lib/supabase";
 
 const DEFAULT_FLAGS = Object.freeze({
@@ -17,7 +18,7 @@ const DEFAULT_FLAGS = Object.freeze({
 	enable_header_layout_guard_v2: true,
 	enable_search_overlay_guard_v2: true,
 	enable_map_render_scheduler_v2: true,
-	enable_map_effects_pipeline_v2: false,
+	enable_map_effects_pipeline_v2: true,
 	enable_feed_virtualization_v2: true,
 	enable_perf_guardrails_v2: true,
 	enable_neon_sign_map_v1: true,
@@ -85,6 +86,13 @@ const buildDefaultFlagMeta = () => {
 	};
 	return entries;
 };
+
+const buildLocalDevFlags = () => ({
+	...DEFAULT_FLAGS,
+	use_v2_feed: false,
+	use_v2_search: false,
+	enable_map_effects_pipeline_v2: true,
+});
 
 const readPersistedFlagsForE2E = () => {
 	if (typeof localStorage === "undefined") return {};
@@ -186,6 +194,23 @@ export const useFeatureFlagStore = defineStore("feature-flags", () => {
 					};
 					continue;
 				}
+				nextMeta[key] = {
+					...nextMeta[key],
+					enabled: Boolean(enabled),
+					kill_switch: false,
+				};
+			}
+			flagMeta.value = nextMeta;
+			flags.value = nextFlags;
+			loadedAt.value = Date.now();
+			return;
+		}
+
+		if (isFrontendOnlyDevMode()) {
+			const nextFlags = buildLocalDevFlags();
+			const nextMeta = buildDefaultFlagMeta();
+			for (const [key, enabled] of Object.entries(nextFlags)) {
+				if (!nextMeta[key]) continue;
 				nextMeta[key] = {
 					...nextMeta[key],
 					enabled: Boolean(enabled),

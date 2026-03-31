@@ -1,13 +1,35 @@
 -- ==========================================
 -- VibeCity Master Data Recovery SQL
 -- ==========================================
+-- DANGER:
+-- This script drops live tables. It now requires an explicit confirmation
+-- value in the current SQL session before any destructive statement runs.
+--
+-- Required once per session before running the rest of this file:
+-- SELECT set_config(
+--   'app.vibecity_master_data_recovery_confirm',
+--   'I_UNDERSTAND_THIS_DROPS_TABLES',
+--   false
+-- );
+-- ==========================================
 -- INSTRUCTIONS:
 -- 1. Go to Supabase SQL Editor.
--- 2. Paste this entire script.
--- 3. Click "Run".
--- 4. Wait for "Success" message.
--- 5. Refresh your browser app.
+-- 2. Run the confirmation SELECT shown above.
+-- 3. Paste this entire script.
+-- 4. Click "Run".
+-- 5. Wait for "Success" message.
+-- 6. Refresh your browser app.
 -- ==========================================
+
+DO $$
+BEGIN
+  IF current_setting('app.vibecity_master_data_recovery_confirm', true)
+     IS DISTINCT FROM 'I_UNDERSTAND_THIS_DROPS_TABLES' THEN
+    RAISE EXCEPTION
+      'Refusing to run destructive recovery. Run SELECT set_config(''app.vibecity_master_data_recovery_confirm'', ''I_UNDERSTAND_THIS_DROPS_TABLES'', false) in this SQL session first.';
+  END IF;
+END
+$$;
 
 -- 1. NUKE & RECREATE SCHEMA
 -- Ensure extension is available

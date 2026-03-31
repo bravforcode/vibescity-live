@@ -1,6 +1,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { resolveVenueMedia } from "../domain/venue/viewModel";
 import { useFeatureFlagStore } from "../store/featureFlagStore";
+import { isAppDebugLoggingEnabled } from "../utils/debugFlags";
 
 /**
  * Bottom Feed Logic Composable
@@ -228,14 +229,14 @@ export function useBottomFeedLogic(props, emit) {
 
 	// ✅ Analytics (placeholder for future integration)
 	const trackView = (shopId) => {
-		if (import.meta.env.DEV) {
+		if (import.meta.env.DEV && isAppDebugLoggingEnabled()) {
 			console.log("📊 [Analytics] Track view:", shopId);
 		}
 		// Future: integrate with analytics service
 	};
 
 	const trackImpression = (shopId) => {
-		if (import.meta.env.DEV) {
+		if (import.meta.env.DEV && isAppDebugLoggingEnabled()) {
 			console.log("📊 [Analytics] Track impression:", shopId);
 		}
 		// Future: integrate with analytics service
@@ -244,7 +245,7 @@ export function useBottomFeedLogic(props, emit) {
 	// ✅ Lifecycle
 	onMounted(() => {
 		void featureFlagStore.refreshFlags().catch(() => {});
-		if (import.meta.env.DEV) {
+		if (import.meta.env.DEV && isAppDebugLoggingEnabled()) {
 			console.log("🔍 [BottomFeedLogic] MOUNTED");
 		}
 

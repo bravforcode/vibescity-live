@@ -53,8 +53,8 @@ def print_setup_instructions():
 ║    MEMORY_DATABASE_URL=postgres://user:pass@host:port/db     ║
 ║                                                              ║
 ║    And ONE of the following API keys:                        ║
-║    GOOGLE_API_KEY=AIzaSy... (For Gemini/Vertex AI)           ║
-║    OPENAI_API_KEY=sk-...    (For OpenAI)                     ║
+║    GOOGLE_API_KEY=<gemini-or-vertex-key>                     ║
+║    OPENAI_API_KEY=<openai-api-key>                           ║
 ║                                                              ║
 ║  Then run in Supabase SQL Editor:                            ║
 ║    CREATE EXTENSION IF NOT EXISTS vector;                    ║

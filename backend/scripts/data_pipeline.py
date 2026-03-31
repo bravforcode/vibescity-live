@@ -25,7 +25,12 @@ except ImportError:
     pass
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+# Prefer service role key (bypasses RLS for bulk import); fall back to anon key
+SUPABASE_KEY = (
+    os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    or os.getenv("SUPABASE_KEY")
+    or ""
+)
 
 # Category color mapping for UI
 CATEGORY_COLORS = {
@@ -67,21 +72,17 @@ def transform_venue(osm_venue: dict) -> dict:
 
     return {
         "name": osm_venue.get("name", ""),
-        "name_en": osm_venue.get("name_en", ""),
         "category": category,
         "latitude": osm_venue.get("latitude"),
         "longitude": osm_venue.get("longitude"),
         "province": osm_venue.get("province", ""),
         "region": osm_venue.get("region", ""),
         "district": osm_venue.get("address", ""),
-        "status": "OFF",  # Default, will be updated by real-time system
-        "category_color": CATEGORY_COLORS.get(category, "#6b7280"),
+        "status": "off",
         "social_links": social_links if social_links else None,
         "image_urls": [],
         "phone": osm_venue.get("phone"),
         "opening_hours": osm_venue.get("opening_hours"),
-        "verified": False,
-        "is_promoted": False,
         "source": "osm",
         "osm_id": osm_venue.get("osm_id", ""),
         "osm_type": osm_venue.get("osm_type", "node"),
@@ -124,7 +125,19 @@ def import_to_supabase(venues: list[dict], batch_size: int = 50):
 
     # Filter out invalid entries
     valid_venues = [v for v in transformed if v.get("latitude") and v.get("longitude")]
-    print(f"✅ {len(valid_venues)} valid venues to import")
+
+    # Deduplicate by osm_id (overlapping province bboxes produce duplicates)
+    seen_osm_ids: set[str] = set()
+    deduped: list[dict] = []
+    for v in valid_venues:
+        osm_id = v.get("osm_id") or ""
+        if osm_id and osm_id in seen_osm_ids:
+            continue
+        if osm_id:
+            seen_osm_ids.add(osm_id)
+        deduped.append(v)
+    valid_venues = deduped
+    print(f"✅ {len(valid_venues)} unique valid venues to import")
 
     # Batch upsert
     success_count = 0
@@ -138,10 +151,10 @@ def import_to_supabase(venues: list[dict], batch_size: int = 50):
         batch_num = i // batch_size + 1
 
         try:
-            # Upsert based on osm_id to avoid duplicates
+            # Insert new venues, skip duplicates (partial unique index on osm_id)
             supabase.table("venues").upsert(
                 batch,
-                on_conflict="osm_id"
+                ignore_duplicates=True,
             ).execute()
 
             success_count += len(batch)

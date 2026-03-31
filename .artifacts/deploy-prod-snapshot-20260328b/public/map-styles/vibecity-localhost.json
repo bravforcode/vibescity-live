@@ -1,0 +1,15 @@
+{
+	"version": 8,
+	"name": "VibeCity Localhost Quiet",
+	"id": "vibecity-localhost",
+	"sources": {},
+	"layers": [
+		{
+			"id": "background",
+			"type": "background",
+			"paint": {
+				"background-color": "#050816"
+			}
+		}
+	]
+}

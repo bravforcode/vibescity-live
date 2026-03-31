@@ -13,6 +13,7 @@ import {
 import {
 	computed,
 	defineAsyncComponent,
+	inject,
 	nextTick,
 	onUnmounted,
 	ref,
@@ -27,6 +28,7 @@ import { useSpatialFeedback } from "@/composables/useSpatialFeedback";
 import { useSwipeToDismiss } from "@/composables/useSwipeToDismiss";
 import { resolveVenueMedia } from "@/domain/venue/viewModel";
 import { Z } from "../../constants/zIndex";
+import MallDrawerGiantContent from "./MallDrawerGiantContent.vue";
 
 const ImageLoader = defineAsyncComponent(() => import("../ui/ImageLoader.vue"));
 
@@ -69,6 +71,10 @@ const props = defineProps({
 		type: Object,
 		default: null,
 	},
+	drawerContext: {
+		type: Object,
+		default: null,
+	},
 	shops: {
 		type: Array,
 		default: () => [],
@@ -95,10 +101,16 @@ const props = defineProps({
 const emit = defineEmits([
 	"close",
 	"select-shop",
+	"preview-shop-change",
+	"open-shop-detail",
 	"open-ride-modal",
 	"prefetch-ride",
 	"toggle-favorite",
 ]);
+
+const isGiantPinMode = computed(
+	() => props.drawerContext?.mode === "giant-pin",
+);
 
 const activeTab = ref("ALL"); // ALL, Food, Fashion, Beauty, Tech, Cinema
 const activeFloor = ref(null); // Selected floor for Mall mode
@@ -451,7 +463,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <transition name="drawer-slide">
+  <transition name="drawer-slide" appear>
     <div
       v-if="isOpen"
       ref="drawerRef"
@@ -468,6 +480,28 @@ onUnmounted(() => {
       :aria-labelledby="drawerTitleId"
       tabindex="-1"
     >
+      <button
+        ref="closeButtonRef"
+        @click="emit('close')"
+        aria-label="Close mall drawer"
+        class="absolute top-4 right-4 z-20 flex h-12 w-12 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:bg-black/60 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+      >
+        <X class="w-5 h-5" />
+      </button>
+
+      <MallDrawerGiantContent
+        v-if="isGiantPinMode"
+        :context="drawerContext"
+        :building="building"
+        :shops="shops"
+        :favorites="favorites"
+        @preview-shop-change="(shop) => emit('preview-shop-change', shop)"
+        @open-shop-detail="(shop) => emit('open-shop-detail', shop)"
+        @open-ride-modal="(shop) => emit('open-ride-modal', shop)"
+        @toggle-favorite="(id) => emit('toggle-favorite', id)"
+      />
+
+      <template v-else>
       <!-- Header Image Area -->
       <div class="relative h-40 sm:h-48 flex-shrink-0">
         <div class="absolute inset-0">
@@ -483,15 +517,6 @@ onUnmounted(() => {
             class="absolute inset-0 bg-gradient-to-t from-zinc-900 via-zinc-900/60 to-transparent"
           ></div>
         </div>
-        <!-- Close Button -->
-        <button
-          ref="closeButtonRef"
-          @click="emit('close')"
-          aria-label="Close mall drawer"
-          class="absolute top-4 right-4 w-12 h-12 rounded-full bg-black/40 text-white flex items-center justify-center backdrop-blur-md hover:bg-black/60 transition z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-        >
-          <X class="w-5 h-5" />
-        </button>
       </div>
 
       <!-- Title Info -->
@@ -510,7 +535,7 @@ onUnmounted(() => {
               {{ building?.name || "Shopping Mall" }}
             </h2>
             <p class="text-white/70 text-sm">
-              {{ building?.zone || "Chiang Mai" }}
+              {{ building?.zone || building?.province || building?.city || "Selected area" }}
             </p>
           </div>
         </div>
@@ -523,7 +548,7 @@ onUnmounted(() => {
             building && emit('toggle-favorite', building.id || building.key)
           "
           aria-label="Toggle mall favorite"
-          class="w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md transition active:scale-90 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70"
+          class="flex h-12 w-12 items-center justify-center rounded-full border backdrop-blur-md transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70"
           :class="[
             building && favorites.includes(Number(building.id || building.key))
               ? 'bg-pink-500 border-pink-400 text-white'
@@ -553,7 +578,7 @@ onUnmounted(() => {
         <button
           @click.stop="handleShare(building)"
           aria-label="Share mall"
-          class="w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md bg-white/10 border border-white/20 text-white hover:bg-white/20 transition active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+          class="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-md transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:bg-white/20 active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
         >
           <Share2 class="w-5 h-5 text-white" />
         </button>
@@ -606,7 +631,7 @@ onUnmounted(() => {
                 :key="cat.id"
                 @click="activeTab = cat.id"
                 :class="[
-                  'snap-center px-4 py-2 rounded-xl text-xs font-black transition whitespace-nowrap active:scale-95 border-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70',
+                  'snap-center px-4 py-2 rounded-xl border-2 text-xs font-black whitespace-nowrap transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70',
                   activeTab === cat.id
                     ? 'bg-blue-600 text-white border-blue-400 shadow-lg shadow-blue-500/20'
                     : isDarkMode
@@ -832,7 +857,7 @@ onUnmounted(() => {
               @click="emit('select-shop', shop)"
               @keydown.enter.prevent="emit('select-shop', shop)"
               @keydown.space.prevent="emit('select-shop', shop)"
-              class="flex items-center gap-3 p-3 rounded-2xl transition cursor-pointer group active:scale-[0.98] border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+              class="group flex cursor-pointer items-center gap-3 rounded-2xl border p-3 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
               role="button"
               tabindex="0"
               :aria-label="`Open ${shop.name || 'venue'} details`"
@@ -934,11 +959,12 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
+      </template>
     </div>
   </transition>
 
   <!-- Backdrop — opacity + blur tied to swipe gesture in real-time -->
-  <transition name="fade">
+  <transition name="fade" appear>
     <div
       v-if="isOpen"
       ref="backdropRef"
@@ -960,16 +986,22 @@ onUnmounted(() => {
 <style scoped>
 .drawer-slide-enter-active,
 .drawer-slide-leave-active {
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    opacity 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
 }
 .drawer-slide-enter-from,
 .drawer-slide-leave-to {
-  transform: translateY(100%);
+  opacity: 0;
+  transform: translateY(44px) scale(0.985);
 }
 
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.3s ease;
+  transition:
+    opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    backdrop-filter 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .fade-enter-from,
 .fade-leave-to {

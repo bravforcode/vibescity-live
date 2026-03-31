@@ -4,9 +4,10 @@ type AuthUser = {
 	user_metadata?: Record<string, unknown>;
 };
 
-const DEFAULT_ADMIN_EMAILS = ["omchai.g44@gmail.com", "nxme176@gmail.com"];
-
-const normalize = (value: unknown) => String(value || "").trim().toLowerCase();
+const normalize = (value: unknown) =>
+	String(value || "")
+		.trim()
+		.toLowerCase();
 
 const parseCsv = (raw: string | null | undefined) =>
 	String(raw || "")
@@ -41,9 +42,8 @@ const collectRoles = (user: AuthUser) => {
 
 const buildAllowlist = () => {
 	const envAllowlist = parseCsv(Deno.env.get("ADMIN_EMAIL_ALLOWLIST"));
-	const values = [...DEFAULT_ADMIN_EMAILS, ...envAllowlist];
 	const out = new Set<string>();
-	for (const email of values) out.add(normalize(email));
+	for (const email of envAllowlist) out.add(normalize(email));
 	return out;
 };
 

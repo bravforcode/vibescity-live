@@ -1,0 +1,5 @@
+# One-shot release migration delta allowlist
+# Only these migrations are allowed to be pending/applied during rollout.
+
+20260207110000_gamification_persistence.sql
+20260207120000_prod_uuid_unification_delta.sql

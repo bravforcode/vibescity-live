@@ -211,7 +211,7 @@
 		"place_name_placeholder": "e.g. The Rooftop Bar",
 		"category": "Category",
 		"province": "Province",
-		"province_placeholder": "e.g. Chiang Mai",
+		"province_placeholder": "e.g. Bangkok, Chiang Mai, Phuket",
 		"earn_rewards": "Earn Rewards!",
 		"earn_desc": "Get +{coins} Coins & +{xp} XP for every approved shop.",
 		"location": "Location",
@@ -341,6 +341,12 @@
 		"select": "Select",
 		"about": "About",
 		"current_vibe": "Current Vibe",
+		"featured_shop": "Featured Shop",
+		"now_showing": "Now Showing",
+		"preview_hint": "Tap a card to switch the featured shop",
+		"preview_action": "Tap to preview",
+		"photo_count": "{count} photos",
+		"video_count": "{count} videos",
 		"shops_inside": "{count} shops inside",
 		"shops_in_building": "Shops in Building",
 		"no_phone": "No Phone",
@@ -399,15 +405,6 @@
 		},
 		"mapless": {
 			"unavailable": "Map unavailable on this device."
-		},
-		"dev_preview": {
-			"badge": "Stable local preview",
-			"title": "Chromium local dev now skips WebGL by default",
-			"desc": "This preview keeps localhost fast and console-clean. Production, E2E, and explicit WebGL opt-in still use the full MapLibre renderer.",
-			"visible": "Visible pins",
-			"empty": "No venue coordinates are available yet, so the local preview stays in placeholder mode.",
-			"open_webgl": "Open full WebGL map",
-			"note": "Use this only when you need to inspect real WebGL behavior in this browser session."
 		},
 		"token_error": {
 			"title": "Map token error",

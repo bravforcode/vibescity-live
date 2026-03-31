@@ -1,5 +1,10 @@
 import { ref, watch } from "vue";
+import { isFrontendOnlyDevMode } from "../lib/runtimeConfig";
 import { supabase } from "../lib/supabase";
+import {
+	isExpectedAbortError,
+	isTransientNetworkError,
+} from "../utils/networkErrorUtils";
 import { useHardwareInfo } from "./useHardwareInfo";
 import { useIntentPredictor } from "./useIntentPredictor";
 
@@ -16,9 +21,18 @@ const TTL_MS = 60_000; // 60 seconds
 // Semaphore for concurrent tracking
 let activePrefetches = 0;
 const MAX_CONCURRENT = 3;
+const PREFETCH_TRANSIENT_BACKOFF_MS = 30_000;
 
 // Global AbortController for cancelation
 let globalAbort = new AbortController();
+let transientPrefetchBackoffUntil = 0;
+
+export const shouldSkipSpeculativeVenuePrefetch = ({
+	isFrontendOnlyDev = isFrontendOnlyDevMode(),
+	isOffline = typeof navigator !== "undefined" && navigator.onLine === false,
+	backoffUntil = transientPrefetchBackoffUntil,
+	now = Date.now(),
+} = {}) => isFrontendOnlyDev || isOffline || Number(backoffUntil || 0) > now;
 
 const prefetchImage = (url) => {
 	if (!url) return;
@@ -31,7 +45,7 @@ const prefetchImage = (url) => {
 };
 
 const prefetchVenueData = async (id, signal) => {
-	if (!id) return;
+	if (!id || shouldSkipSpeculativeVenuePrefetch()) return;
 	try {
 		await supabase
 			.from("shops")
@@ -42,12 +56,17 @@ const prefetchVenueData = async (id, signal) => {
 		// Note: Supabase JS client handles caching in some versions,
 		// but even just making the fetch Warms the browser's disk/network cache.
 		// For true local-first, you would insert into IndexedDB here if needed.
-	} catch {
-		// silently fail
+	} catch (error) {
+		if (isExpectedAbortError(error, { signal })) return;
+		if (isTransientNetworkError(error)) {
+			transientPrefetchBackoffUntil =
+				Date.now() + PREFETCH_TRANSIENT_BACKOFF_MS;
+		}
 	}
 };
 
 const executePrefetch = async (id) => {
+	if (shouldSkipSpeculativeVenuePrefetch()) return;
 	if (activePrefetches >= MAX_CONCURRENT) return; // Too busy
 	if (prefetchCache.has(id)) {
 		const age = Date.now() - prefetchCache.get(id);
@@ -98,6 +117,7 @@ export function usePrefetchEngine() {
 	const startEngine = () => {
 		// Respect user settings and hardware limits
 		if (isSlowNetwork.value || isLowPowerMode.value) return;
+		if (shouldSkipSpeculativeVenuePrefetch()) return;
 
 		// If browser supports navigator.connection.saveData, respect it!
 		if (navigator.connection?.saveData) {

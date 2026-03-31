@@ -1,0 +1,10 @@
+# Replace @menum if the repository owner uses a different GitHub handle.
+* @menum
+
+/.github/ @menum
+/api/ @menum
+/backend/ @menum
+/docs/ @menum
+/scripts/ @menum
+/src/ @menum
+/supabase/ @menum

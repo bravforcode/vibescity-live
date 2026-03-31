@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import redis
-import time
 import logging
+import time
+
+import redis
 
 from app.core.config import get_settings
 

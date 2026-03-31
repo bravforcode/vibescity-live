@@ -91,9 +91,13 @@ const setupIntersectionObserver = () => {
 	});
 };
 
-// Re-observe when shops change
+// Infinite DOM rendering limit
+const visibleCount = ref(30);
+const visibleShops = computed(() => props.shops.slice(0, visibleCount.value));
+
+// Re-observe when visible shops change
 watch(
-	() => props.shops,
+	() => visibleShops.value,
 	() => {
 		nextTick(() => {
 			if (observerInstance) {
@@ -106,13 +110,21 @@ watch(
 	},
 );
 
-// Handle scroll events
-const handleScroll = () => {
+// Handle scroll events & Infinite Scroll
+const handleScroll = (e) => {
 	isUserScrolling.value = true;
 	if (scrollTimeout) clearTimeout(scrollTimeout);
 	scrollTimeout = setTimeout(() => {
 		isUserScrolling.value = false;
 	}, 150);
+
+	// Infinite scroll logic
+	const { scrollTop, scrollHeight, clientHeight } = e.target;
+	if (scrollTop + clientHeight >= scrollHeight - 800) {
+		if (visibleCount.value < props.shops.length) {
+			visibleCount.value += 30;
+		}
+	}
 };
 
 // Exposed method to scroll to a specific shop
@@ -150,21 +162,22 @@ defineExpose({ scrollToShop });
 <template>
   <div
     ref="panelRef"
+    data-testid="desktop-feed-panel"
     :class="[
       'video-panel h-full overflow-y-auto border-l',
       isDarkMode
-        ? 'bg-zinc-950/95 backdrop-blur-xl border-white/10'
-        : 'bg-white/95 backdrop-blur-xl border-gray-200',
+        ? 'bg-[linear-gradient(180deg,#060814_0%,#09090b_100%)] border-white/10'
+        : 'bg-white border-gray-200',
     ]"
     @scroll="handleScroll"
   >
     <!-- Header -->
     <div
       :class="[
-        'sticky z-20 border-b p-4 backdrop-blur-xl',
+        'sticky z-20 border-b px-4 py-4',
         isDarkMode
-          ? 'bg-gradient-to-r from-zinc-950/95 to-zinc-900/95 border-white/10'
-          : 'bg-white/95 border-gray-200',
+          ? 'bg-[linear-gradient(135deg,rgba(6,8,20,0.98)_0%,rgba(9,9,11,0.98)_100%)] border-white/10'
+          : 'bg-white border-gray-200',
       ]"
       :style="{ top: `${Math.max(0, stickyTop)}px` }"
     >
@@ -187,14 +200,15 @@ defineExpose({ scrollToShop });
     </div>
 
     <!-- Shop Cards List -->
-    <div class="p-3 space-y-3">
+    <div class="space-y-4 p-4 xl:p-5">
       <div
-        v-for="shop in shops"
+        v-for="(shop, index) in visibleShops"
         :key="shop.id"
         :ref="(el) => setCardRef(el, shop.id)"
         :data-shop-id="shop.id"
+        data-testid="desktop-shop-card"
         :class="[
-          'transition duration-300',
+          'shop-card-wrapper transition duration-300',
           activeShopId === shop.id ? 'scale-[1.02]' : '',
         ]"
       >
@@ -203,6 +217,7 @@ defineExpose({ scrollToShop });
           :isActive="activeShopId === shop.id"
           :isDarkMode="isDarkMode"
           :favorites="favorites"
+          :isPriority="index === 0"
           @click="emit('select-shop', shop)"
           @open-detail="emit('open-detail', shop)"
           @hover="handleCardHover"
@@ -250,5 +265,10 @@ defineExpose({ scrollToShop });
 
 .video-panel::-webkit-scrollbar-thumb:hover {
   background-color: rgba(255, 255, 255, 0.25);
+}
+
+.shop-card-wrapper {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 320px;
 }
 </style>

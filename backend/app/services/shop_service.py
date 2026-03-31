@@ -13,7 +13,7 @@ class ShopService:
         "pin_type,rating,review_count,image_urls,Image_URL1,is_verified,"
         "slug,short_code,vibe_info,open_time,metadata,pin_metadata,"
         "boost_until,glow_until,giant_until,verified_until,video_url,"
-        "building_id,floor,ig_url,fb_url,tiktok_url"
+        "building_id,floor,ig_url,fb_url,tiktok_url,storefront_image_url"
     )
 
     def __init__(self):

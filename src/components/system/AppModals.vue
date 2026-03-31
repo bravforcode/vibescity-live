@@ -1,18 +1,31 @@
 <!-- src/components/system/AppModals.vue -->
 <script setup>
 import { AlertTriangle, X } from "lucide-vue-next";
-import { computed, defineAsyncComponent, ref } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { DEFAULT_CITY } from "@/config/cityConfig";
 import {
 	normalizeVenueCollection,
 	normalizeVenueViewModel,
 } from "@/domain/venue/viewModel";
-import InstallBanner from "../ui/InstallBanner.vue";
+import { defineResilientAsync } from "@/utils/asyncComponentFactory";
+import VibeModal from "../modal/VibeModal.vue";
 import PortalLayer from "./PortalLayer.vue";
 
 const { t } = useI18n();
 
 const rideModalRef = ref(null);
+const scheduleIdleChunkPreload = (loader, timeout = 2000) => {
+	if (typeof window === "undefined") return;
+	const run = () => {
+		void loader().catch(() => {});
+	};
+	if (typeof window.requestIdleCallback === "function") {
+		window.requestIdleCallback(run, { timeout });
+		return;
+	}
+	window.setTimeout(run, 32);
+};
 
 const handlePrefetchRide = (shop) => {
 	if (!shop || !props.userLocation) return;
@@ -22,25 +35,32 @@ const handlePrefetchRide = (shop) => {
 	rideModalRef.value?.prefetch?.(normalized, props.userLocation);
 };
 
-const MallDrawer = defineAsyncComponent(
+const MallDrawer = defineResilientAsync(
 	() => import("../modal/MallDrawer.vue"),
 );
-const ProfileDrawer = defineAsyncComponent(
+const ProfileDrawer = defineResilientAsync(
 	() => import("../modal/ProfileDrawer.vue"),
 );
-const VibeModal = defineAsyncComponent(() => import("../modal/VibeModal.vue"));
-const ConfettiEffect = defineAsyncComponent(
+const ConfettiEffect = defineResilientAsync(
 	() => import("../ui/ConfettiEffect.vue"),
 );
-const RideComparisonModal = defineAsyncComponent(
+const RideComparisonModal = defineResilientAsync(
 	() => import("../transport/RideComparisonModal.vue"),
 );
+
+scheduleIdleChunkPreload(() => import("../ui/VisitorCount.vue"));
+scheduleIdleChunkPreload(() => import("../ui/ReviewSystem.vue"));
+scheduleIdleChunkPreload(() => import("../ui/PhotoGallery.vue"));
 
 const props = defineProps({
 	selectedShop: Object,
 	rideModalShop: Object,
 	showMallDrawer: Boolean,
 	activeMall: Object,
+	drawerContext: {
+		type: Object,
+		default: null,
+	},
 	mallShops: {
 		type: Array,
 		default: () => [],
@@ -61,7 +81,7 @@ const props = defineProps({
 	showConfetti: Boolean,
 	userLocation: {
 		type: Array,
-		default: () => [18.7883, 98.9853],
+		default: () => [DEFAULT_CITY.lat, DEFAULT_CITY.lng],
 	},
 	activeUserCount: {
 		type: Number,
@@ -76,6 +96,8 @@ const emit = defineEmits([
 	"open-ride-app",
 	"close-mall-drawer",
 	"select-mall-shop",
+	"preview-shop-change",
+	"open-shop-detail",
 	"open-ride-modal",
 	"close-profile-drawer",
 	"toggle-language",
@@ -108,17 +130,15 @@ const normalizedMallShops = computed(() =>
 
 <template>
   <PortalLayer>
-    <transition name="modal">
-      <div v-if="normalizedSelectedShop">
-        <VibeModal
-          :shop="normalizedSelectedShop"
-          :userLocation="props.userLocation"
-          :userCount="props.activeUserCount"
-          @close="emit('close-vibe-modal')"
-          @toggle-favorite="(id) => emit('toggle-favorite', id)"
-        />
-      </div>
-    </transition>
+    <div v-if="normalizedSelectedShop">
+      <VibeModal
+        :shop="normalizedSelectedShop"
+        :userLocation="props.userLocation"
+        :userCount="props.activeUserCount"
+        @close="emit('close-vibe-modal')"
+        @toggle-favorite="(id) => emit('toggle-favorite', id)"
+      />
+    </div>
 
     <RideComparisonModal
       ref="rideModalRef"
@@ -130,14 +150,16 @@ const normalizedMallShops = computed(() =>
     />
 
     <MallDrawer
-      v-if="props.showMallDrawer"
       :is-open="props.showMallDrawer"
       :building="props.activeMall"
+      :drawer-context="props.drawerContext"
       :shops="normalizedMallShops"
       :is-dark-mode="props.isDarkMode"
       :selected-shop-id="props.activeShopId"
       @close="emit('close-mall-drawer')"
       @select-shop="(shop) => emit('select-mall-shop', shop)"
+      @preview-shop-change="(shop) => emit('preview-shop-change', shop)"
+      @open-shop-detail="(shop) => emit('open-shop-detail', shop)"
       @open-ride-modal="(shop) => emit('open-ride-modal', shop)"
       @prefetch-ride="handlePrefetchRide"
       @toggle-favorite="(id) => emit('toggle-favorite', id)"
@@ -145,7 +167,6 @@ const normalizedMallShops = computed(() =>
     />
 
     <ProfileDrawer
-      v-if="props.showProfileDrawer"
       :is-open="props.showProfileDrawer"
       :is-dark-mode="props.isDarkMode"
       @close="emit('close-profile-drawer')"
@@ -223,7 +244,6 @@ const normalizedMallShops = computed(() =>
     </transition>
 
     <ConfettiEffect v-if="props.showConfetti" />
-    <InstallBanner />
   </PortalLayer>
 </template>
 
@@ -250,34 +270,17 @@ const normalizedMallShops = computed(() =>
   opacity: 0;
 }
 
-.modal-fade-enter-active {
-  transition: opacity 0.25s ease-out;
+.modal-enter-active {
+  transition: opacity 0.1s ease-out;
+  will-change: opacity;
 }
-.modal-fade-leave-active {
-  transition: opacity 0.2s ease-in;
+.modal-leave-active {
+  transition: opacity 0.12s ease-in;
+  will-change: opacity;
 }
-.modal-fade-enter-from,
-.modal-fade-leave-to {
+.modal-enter-from,
+.modal-leave-to {
   opacity: 0;
-}
-
-.modal-scale-enter-active {
-  transition:
-    opacity 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
-    transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-.modal-scale-leave-active {
-  transition:
-    opacity 0.2s ease-in,
-    transform 0.2s ease-in;
-}
-.modal-scale-enter-from {
-  opacity: 0;
-  transform: scale(0.85) translateY(20px);
-}
-.modal-scale-leave-to {
-  opacity: 0;
-  transform: scale(0.9) translateY(10px);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -288,10 +291,8 @@ const normalizedMallShops = computed(() =>
 
   .fade-enter-active,
   .fade-leave-active,
-  .modal-fade-enter-active,
-  .modal-fade-leave-active,
-  .modal-scale-enter-active,
-  .modal-scale-leave-active {
+  .modal-enter-active,
+  .modal-leave-active {
     transition-duration: 0.01ms !important;
   }
 }

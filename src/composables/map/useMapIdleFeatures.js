@@ -54,15 +54,14 @@ export function useMapIdleFeatures() {
 
 		const tasks = idleTasksQueued.value;
 		if (!tasks.length) return;
+		const pendingTasks = tasks.filter((task) => !task.executed);
+		if (!pendingTasks.length) return;
 
-		const maxTimeout = tasks.reduce(
-			(acc, t) => Math.max(acc, t.timeout ?? 3000),
-			3000,
-		);
-
-		const runTasks = () => {
-			for (const task of tasks) {
-				if (task.executed) continue;
+		let taskIndex = 0;
+		const scheduleNextTask = () => {
+			if (taskIndex >= pendingTasks.length) return;
+			const task = pendingTasks[taskIndex];
+			const runTask = () => {
 				try {
 					task.fn();
 					task.executed = true;
@@ -73,16 +72,25 @@ export function useMapIdleFeatures() {
 							err,
 						);
 					}
+				} finally {
+					taskIndex += 1;
+					if (taskIndex < pendingTasks.length) {
+						scheduleNextTask();
+					}
 				}
+			};
+
+			if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+				window.requestIdleCallback(runTask, { timeout: task.timeout ?? 3000 });
+				return;
 			}
+
+			// Fallback: yield between tasks so older browsers do not collapse
+			// the whole deferred queue into a single long timer callback.
+			setTimeout(runTask, taskIndex === 0 ? 200 : 120);
 		};
 
-		if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-			window.requestIdleCallback(runTasks, { timeout: maxTimeout });
-		} else {
-			// Fallback: small delay so paint finishes before heavy work starts
-			setTimeout(runTasks, 200);
-		}
+		scheduleNextTask();
 	};
 
 	return {

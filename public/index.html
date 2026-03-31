@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/images/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" href="/images/apple-touch-icon.png" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
@@ -11,21 +11,21 @@
     <meta name="theme-color" content="#8B5CF6" />
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/images/apple-touch-icon.png" />
-    <title>VibeCity - Chiang Mai Entertainment</title>
+    <title>VibeCity - Thailand Entertainment Map</title>
     <link rel="canonical" href="https://vibecity.live/" />
     <!-- SEO & social media metadata -->
     <meta
       name="description"
-      content="VibeCity.live - Discover Chiang Mai's best nightlife, bars, and entertainment in real-time."
+      content="VibeCity.live - Discover nightlife, cafes, events, and local experiences across Thailand in real time."
     />
     <meta name="robots" content="index,follow" />
     <meta
       property="og:title"
-      content="VibeCity.live | Local Entertainment Map"
+      content="VibeCity.live | Thailand Entertainment Map"
     />
     <meta
       property="og:description"
-      content="Discover the hottest venues in Chiang Mai with real-time vibe updates and navigation."
+      content="Discover nightlife, cafes, events, and local experiences across Thailand with real-time vibe updates and navigation."
     />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="VibeCity" />
@@ -40,11 +40,11 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta
       name="twitter:title"
-      content="VibeCity.live | Local Entertainment Map"
+      content="VibeCity.live | Thailand Entertainment Map"
     />
     <meta
       name="twitter:description"
-      content="Discover the hottest venues in Chiang Mai with real-time vibe updates and navigation."
+      content="Discover nightlife, cafes, events, and local experiences across Thailand with real-time vibe updates and navigation."
     />
     <meta
       name="twitter:image"
@@ -89,32 +89,50 @@
       }
     </style>
 
-    <!-- Preload critical assets -->
-    <link rel="preconnect" href="https://api.mapbox.com" />
-    <link rel="preconnect" href="https://events.mapbox.com" importance="low" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Google APIs — for venue photos via Places Photos API -->
     <link rel="preconnect" href="https://maps.googleapis.com" />
     <link rel="dns-prefetch" href="https://maps.gstatic.com" />
-    <!-- Non-blocking font load: preload trick eliminates render-blocking -->
-    <link
-      rel="preload"
-      as="style"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap"
-    />
-    <link
-      rel="stylesheet"
-      media="print"
-      onload="this.media='all'"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap"
-    />
-    <noscript>
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap"
-      />
-    </noscript>
+    <script>
+      (() => {
+        const hostname = window.location.hostname;
+        const isLocalhost =
+          hostname === "localhost" ||
+          hostname === "127.0.0.1" ||
+          hostname === "[::1]";
+
+        if (isLocalhost) return;
+
+        const fontHref =
+          "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap";
+        const head = document.head;
+
+        const preconnectGoogle = document.createElement("link");
+        preconnectGoogle.rel = "preconnect";
+        preconnectGoogle.href = "https://fonts.googleapis.com";
+        head.appendChild(preconnectGoogle);
+
+        const preconnectGstatic = document.createElement("link");
+        preconnectGstatic.rel = "preconnect";
+        preconnectGstatic.href = "https://fonts.gstatic.com";
+        preconnectGstatic.crossOrigin = "anonymous";
+        head.appendChild(preconnectGstatic);
+
+        const preload = document.createElement("link");
+        preload.rel = "preload";
+        preload.as = "style";
+        preload.href = fontHref;
+        head.appendChild(preload);
+
+        const stylesheet = document.createElement("link");
+        stylesheet.rel = "stylesheet";
+        stylesheet.media = "print";
+        stylesheet.onload = function onFontStylesheetLoad() {
+          this.media = "all";
+        };
+        stylesheet.href = fontHref;
+        head.appendChild(stylesheet);
+      })();
+    </script>
 
     <style>
       :root {

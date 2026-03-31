@@ -1,8 +1,8 @@
 #!/usr/bin/env node
+import { execSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { execSync } from "node:child_process";
 import dotenv from "dotenv";
 
 const REQUIRED_SECRETS = [
@@ -119,11 +119,9 @@ const runCli = (cli, args, options = {}) => {
 };
 
 const listRemoteSecretNames = (cli, projectRef) => {
-	const res = runCli(
-		cli,
-		["secrets", "list", "--project-ref", projectRef],
-		{ capture: true },
-	);
+	const res = runCli(cli, ["secrets", "list", "--project-ref", projectRef], {
+		capture: true,
+	});
 	const names = new Set();
 	for (const line of res.stdout.split(/\r?\n/)) {
 		const match = line.match(/^\s*([A-Z0-9_]+)\s+\|/);
@@ -140,10 +138,7 @@ const loadEnvSources = (envFile) => {
 };
 
 const resolveSecretValue = (secretsSource, key) => {
-	let value = secretsSource[key];
-	if ((!value || !String(value).trim()) && key === "ADMIN_EMAIL_ALLOWLIST") {
-		value = "omchai.g44@gmail.com,nxme176@gmail.com";
-	}
+	const value = secretsSource[key];
 	if (!value || !String(value).trim()) return "";
 
 	const text = String(value).trim();

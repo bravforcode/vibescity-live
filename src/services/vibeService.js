@@ -1,5 +1,5 @@
 import i18n from "@/i18n.js";
-import { apiFetch } from "./apiClient";
+import { request, VibeClaimSchema } from "./apiService";
 
 class VibeService {
 	constructor() {
@@ -36,29 +36,22 @@ class VibeService {
 		}
 
 		try {
-			const response = await apiFetch(`${this.baseURL}/claim`, {
+			const data = await request({
+				url: `${this.baseURL}/claim`,
 				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
+				data: {
 					place_id: placeId,
 					zone_id: zoneId,
 					user_id: userId,
 					vibe_type: placeId ? "place" : "zone",
-				}),
+				},
+				schema: VibeClaimSchema,
 			});
 
-			const data = await response.json();
-
-			// Cache the response to respect cooldown
-			this.setCache(cacheKey, {
-				next_claim_time: new Date(data.next_claim_time).getTime(),
-			});
-
+			this.setCache(cacheKey, data);
 			return data;
 		} catch (error) {
-			console.error("[VibeService] Failed to claim vibe:", error);
+			console.error("Vibe claim error:", error);
 			throw error;
 		}
 	}

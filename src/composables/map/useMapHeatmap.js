@@ -15,7 +15,12 @@ const BREATH_COLORS = {
 	hype: "hsla(0, 90%, 45%, 1)",
 };
 
-export function useMapHeatmap(mapRef, allowHeatmapRef, shopsByIdRef) {
+export function useMapHeatmap(
+	mapRef,
+	allowHeatmapRef,
+	shopsByIdRef,
+	options = {},
+) {
 	const heatmapGeoJson = {
 		type: "FeatureCollection",
 		features: [],
@@ -26,6 +31,17 @@ export function useMapHeatmap(mapRef, allowHeatmapRef, shopsByIdRef) {
 	let _observer = null;
 	let _isVisible = true;
 	let _maxDensity = 1;
+	const canAnimateHeatmap = () => {
+		const candidate = options?.animateHeatmap;
+		if (candidate && typeof candidate === "object" && "value" in candidate) {
+			return Boolean(candidate.value);
+		}
+		if (typeof candidate === "function") {
+			return Boolean(candidate());
+		}
+		if (candidate === undefined) return true;
+		return Boolean(candidate);
+	};
 
 	const updateHeatmapData = (densityData) => {
 		if (!allowHeatmapRef.value) return;
@@ -157,13 +173,17 @@ export function useMapHeatmap(mapRef, allowHeatmapRef, shopsByIdRef) {
 			}
 		}
 
-		startBreathing();
-		setupVisibilityObserver();
+		if (canAnimateHeatmap()) {
+			startBreathing();
+			setupVisibilityObserver();
+			return;
+		}
+		stopBreathing();
 	};
 
 	// ─── Breathing Animation ─────────────────────────────────────
 	const startBreathing = () => {
-		if (_breathing || prefersReducedMotion) return;
+		if (_breathing || prefersReducedMotion || !canAnimateHeatmap()) return;
 		_breathing = true;
 
 		const startTime = performance.now();

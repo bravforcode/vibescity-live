@@ -6,6 +6,7 @@ Designed for cloud deployment with scheduled runs
 """
 import asyncio
 import json
+import logging
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -113,56 +114,154 @@ THAILAND_PROVINCES = {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ENTERTAINMENT VENUE TYPES (Comprehensive)
+# ALL VENUE TYPES — Maximum Thailand coverage
 # ═══════════════════════════════════════════════════════════════════════════════
 VENUE_TYPES = {
-    # Nightlife
     "amenity": [
+        # Food & Drink
         "bar", "pub", "nightclub", "biergarten", "brewery",
         "restaurant", "cafe", "fast_food", "food_court",
+        "ice_cream", "juice_bar", "bubble_tea",
+        # Entertainment
         "cinema", "theatre", "arts_centre", "community_centre",
         "casino", "gambling", "events_venue",
         "karaoke_box", "music_venue", "concert_hall",
+        # Wellness
         "spa", "sauna", "massage",
-        "ice_cream", "juice_bar", "bubble_tea",
+        # Health
+        "pharmacy", "clinic", "dentist", "veterinary", "hospital",
+        # Finance
+        "bank", "post_office",
+        # Market
+        "marketplace",
+        # Culture
+        "library", "place_of_worship",
+        # Automotive
+        "car_rental", "car_wash",
+        # Other
+        "fuel",
     ],
     "leisure": [
         "dance", "nightclub", "amusement_arcade", "bowling_alley",
-        "escape_game", "hackerspace", "beach_resort",
+        "escape_game", "beach_resort",
         "water_park", "theme_park", "miniature_golf",
         "sports_centre", "fitness_centre", "stadium",
+        "swimming_pool", "golf_course",
         "park", "garden", "nature_reserve",
+        "sauna", "turkish_bath",
     ],
     "tourism": [
         "attraction", "viewpoint", "museum", "gallery",
         "zoo", "aquarium", "theme_park",
         "hotel", "hostel", "guest_house", "motel",
+        "apartment", "chalet", "camp_site",
+        "information", "picnic_site",
     ],
     "shop": [
+        # Department & Grocery
         "mall", "department_store", "supermarket",
-        "convenience", "alcohol", "wine",
+        "convenience", "alcohol", "wine", "wholesale",
+        # Food specialty
+        "bakery", "butcher", "seafood", "greengrocer",
+        "deli", "confectionery", "tea", "coffee", "frozen_food",
+        # Fashion
+        "clothes", "shoes", "accessories", "jewelry",
+        "watches", "bag", "boutique", "second_hand", "tailor",
+        # Beauty & Health
+        "hairdresser", "beauty", "cosmetics", "perfumery",
+        "optician", "massage", "tattoo",
+        # Electronics
+        "electronics", "mobile_phone", "computer", "camera",
+        "video_games",
+        # Home
+        "furniture", "interior_decoration", "bed",
+        "carpet", "kitchen", "hardware", "paint", "garden",
+        "doityourself",
+        # Books & Stationery
+        "books", "stationery", "art", "music",
+        "musical_instrument",
+        # Sports & Outdoor
+        "sports", "outdoor", "bicycle",
+        # Auto
+        "car", "car_repair", "car_parts", "motorcycle", "tyres",
+        # Gifts & Leisure
+        "gift", "souvenir", "antiques", "toys",
+        "florist", "pet",
+        # Services
+        "laundry", "dry_cleaning", "travel_agency",
+        "pharmacy", "medical_supply",
+        "tobacco", "newsagent", "copyshop", "photo",
+    ],
+    "craft": [
+        "tailor", "shoemaker", "jeweller", "watchmaker",
+        "bakery", "brewery", "winery",
+        "pottery", "photographer", "florist",
     ],
 }
 
 # Category mapping for Thai names
 CATEGORY_MAP = {
+    # Food & Drink
     "bar": "บาร์", "pub": "ผับ", "nightclub": "ไนท์คลับ",
     "restaurant": "ร้านอาหาร", "cafe": "คาเฟ่", "fast_food": "ฟาสต์ฟู้ด",
+    "food_court": "ฟู้ดคอร์ท", "ice_cream": "ไอศกรีม", "bubble_tea": "ชานมไข่มุก",
+    "juice_bar": "น้ำผลไม้", "bakery": "เบเกอรี่", "seafood": "อาหารทะเล",
+    "butcher": "ร้านเนื้อ", "greengrocer": "ผักผลไม้", "confectionery": "ขนม",
+    "deli": "เดลิ", "tea": "ร้านชา", "coffee": "ร้านกาแฟ",
+    # Entertainment
     "cinema": "โรงหนัง", "theatre": "โรงละคร", "music_venue": "สถานที่แสดงดนตรี",
+    "karaoke_box": "คาราโอเกะ", "events_venue": "สถานที่จัดงาน",
+    "concert_hall": "คอนเสิร์ตฮอลล์", "casino": "คาสิโน",
+    "amusement_arcade": "เกมส์", "escape_game": "เกมหนีห้อง",
+    "bowling_alley": "โบว์ลิ่ง",
+    # Wellness
     "spa": "สปา", "massage": "นวด", "sauna": "ซาวน่า",
-    "hotel": "โรงแรม", "hostel": "โฮสเทล", "guest_house": "เกสต์เฮาส์",
-    "attraction": "สถานที่ท่องเที่ยว", "museum": "พิพิธภัณฑ์", "gallery": "แกลเลอรี่",
-    "mall": "ห้างสรรพสินค้า", "park": "สวนสาธารณะ",
-    "water_park": "สวนน้ำ", "theme_park": "สวนสนุก",
-    "bowling_alley": "โบว์ลิ่ง", "karaoke_box": "คาราโอเกะ",
-    "events_venue": "สถานที่จัดงาน", "concert_hall": "คอนเสิร์ตฮอลล์",
-    "ice_cream": "ไอศกรีม", "bubble_tea": "ชานมไข่มุก",
     "fitness_centre": "ฟิตเนส", "sports_centre": "ศูนย์กีฬา",
+    "swimming_pool": "สระว่ายน้ำ", "golf_course": "สนามกอล์ฟ",
+    # Hotels & Accommodation
+    "hotel": "โรงแรม", "hostel": "โฮสเทล", "guest_house": "เกสต์เฮาส์",
+    "motel": "โมเทล", "apartment": "อพาร์ทเมนต์", "camp_site": "แคมป์ปิ้ง",
+    # Tourism
+    "attraction": "สถานที่ท่องเที่ยว", "museum": "พิพิธภัณฑ์",
+    "gallery": "แกลเลอรี่", "zoo": "สวนสัตว์", "aquarium": "พิพิธภัณฑ์สัตว์น้ำ",
+    "viewpoint": "จุดชมวิว", "theme_park": "สวนสนุก",
+    "water_park": "สวนน้ำ", "beach_resort": "รีสอร์ทชายหาด",
+    # Health & Services
+    "pharmacy": "ร้านขายยา", "clinic": "คลินิก", "dentist": "ทันตแพทย์",
+    "veterinary": "สัตวแพทย์", "hospital": "โรงพยาบาล",
+    "optician": "ร้านแว่นตา",
+    # Shopping
+    "mall": "ห้างสรรพสินค้า", "department_store": "ห้างสรรพสินค้า",
+    "supermarket": "ซูเปอร์มาร์เก็ต", "convenience": "ร้านสะดวกซื้อ",
+    "marketplace": "ตลาด", "wholesale": "ค้าส่ง",
+    "clothes": "ร้านเสื้อผ้า", "shoes": "ร้านรองเท้า",
+    "accessories": "เครื่องประดับ", "jewelry": "ร้านทอง",
+    "bag": "กระเป๋า", "tailor": "ร้านตัดเสื้อ", "second_hand": "มือสอง",
+    "hairdresser": "ร้านตัดผม", "beauty": "ร้านเสริมสวย",
+    "cosmetics": "เครื่องสำอาง", "tattoo": "สักลาย",
+    "electronics": "อิเล็กทรอนิกส์", "mobile_phone": "มือถือ",
+    "computer": "คอมพิวเตอร์", "camera": "กล้อง",
+    "furniture": "เฟอร์นิเจอร์", "hardware": "วัสดุก่อสร้าง",
+    "sports": "อุปกรณ์กีฬา", "outdoor": "อุปกรณ์กลางแจ้ง",
+    "bicycle": "จักรยาน",
+    "books": "ร้านหนังสือ", "stationery": "เครื่องเขียน",
+    "music": "ดนตรี", "musical_instrument": "เครื่องดนตรี",
+    "gift": "ของขวัญ", "souvenir": "ของที่ระลึก",
+    "antiques": "ของเก่า", "toys": "ของเล่น",
+    "florist": "ร้านดอกไม้", "pet": "สัตว์เลี้ยง",
+    "laundry": "ร้านซักรีด", "travel_agency": "บริษัทนำเที่ยว",
+    "car": "รถยนต์", "car_repair": "ซ่อมรถ", "motorcycle": "มอเตอร์ไซค์",
+    "bank": "ธนาคาร", "post_office": "ไปรษณีย์",
+    "park": "สวนสาธารณะ", "garden": "สวน", "nature_reserve": "เขตอนุรักษ์",
+    "library": "ห้องสมุด", "place_of_worship": "ศาสนสถาน",
+    "fuel": "ปั๊มน้ำมัน",
 }
+
+logger = logging.getLogger("osm_scraper")
 
 
 def build_province_query(bbox: tuple) -> str:
-    """Build comprehensive Overpass query for entertainment venues"""
+    """Build comprehensive Overpass query for all venue types"""
     south, west, north, east = bbox
 
     queries = []
@@ -193,8 +292,13 @@ async def fetch_with_retry(query: str, max_retries: int = 3) -> list[dict]:
                 )
                 response.raise_for_status()
                 return response.json().get("elements", [])
-        except Exception as e:
-            print(f"   ⚠️ Attempt {attempt + 1} failed ({endpoint}): {e}")
+        except (httpx.HTTPError, ValueError) as exc:
+            logger.warning(
+                "Attempt %s failed for %s: %s",
+                attempt + 1,
+                endpoint,
+                exc,
+            )
             await asyncio.sleep(5 * (attempt + 1))
     return []
 
@@ -276,26 +380,31 @@ async def scrape_all_thailand(batch_size: int = 5) -> dict:
     provinces = list(THAILAND_PROVINCES.items())
     total = len(provinces)
 
-    print(f"🇹🇭 Starting Thailand-wide scrape: {total} provinces")
-    print(f"🏷️  Categories: {len([v for vl in VENUE_TYPES.values() for v in vl])}")
-    print("-" * 60)
+    logger.info("🇹🇭 Starting Thailand-wide scrape: %s provinces", total)
+    logger.info("🏷️  Categories: %s", len([v for vl in VENUE_TYPES.values() for v in vl]))
+    logger.info("%s", "-" * 60)
 
     for i in range(0, total, batch_size):
         batch = provinces[i:i + batch_size]
         batch_names = [p[0] for p in batch]
-        print(f"\n📍 Batch {i//batch_size + 1}/{(total + batch_size - 1)//batch_size}: {', '.join(batch_names)}")
+        logger.info(
+            "📍 Batch %s/%s: %s",
+            i // batch_size + 1,
+            (total + batch_size - 1) // batch_size,
+            ", ".join(batch_names),
+        )
 
         # Parallel fetch within batch
         tasks = [scrape_province(name, data) for name, data in batch]
         results = await asyncio.gather(*tasks)
 
         for name, venues in zip(batch_names, results, strict=False):
-            print(f"   ✅ {name}: {len(venues)} venues")
+            logger.info("   ✅ %s: %s venues", name, len(venues))
             all_venues.extend(venues)
 
         # Rate limit between batches
         if i + batch_size < total:
-            print("   ⏳ Waiting 10s before next batch...")
+            logger.info("   ⏳ Waiting 10s before next batch...")
             await asyncio.sleep(10)
 
     # Summary by region
@@ -304,11 +413,11 @@ async def scrape_all_thailand(batch_size: int = 5) -> dict:
         r = v.get("region", "unknown")
         region_counts[r] = region_counts.get(r, 0) + 1
 
-    print("\n" + "=" * 60)
-    print(f"📊 TOTAL: {len(all_venues)} venues across {total} provinces")
-    print("📊 By Region:")
+    logger.info("%s", "=" * 60)
+    logger.info("📊 TOTAL: %s venues across %s provinces", len(all_venues), total)
+    logger.info("📊 By Region:")
     for region, count in sorted(region_counts.items(), key=lambda x: -x[1]):
-        print(f"   {region}: {count}")
+        logger.info("   %s: %s", region, count)
 
     return {
         "meta": {
@@ -327,21 +436,22 @@ async def scrape_all_thailand(batch_size: int = 5) -> dict:
 def save_results(data: dict, filename: str = "thailand_venues.json"):
     """Save results to JSON file"""
     output_path = Path(__file__).parent / filename
-    with open(output_path, "w", encoding="utf-8") as f:
+    with output_path.open("w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-    print(f"\n💾 Saved to {output_path}")
+    logger.info("💾 Saved to %s", output_path)
     return output_path
 
 
 async def main():
     """Main entry point"""
-    print("🚀 OSM Thailand Entertainment Scraper")
-    print(f"📅 Started at: {datetime.now(UTC).isoformat()}")
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    logger.info("🚀 OSM Thailand Entertainment Scraper")
+    logger.info("📅 Started at: %s", datetime.now(UTC).isoformat())
 
     data = await scrape_all_thailand()
     save_results(data)
 
-    print("\n✅ Scraping complete!")
+    logger.info("✅ Scraping complete!")
     return data
 
 

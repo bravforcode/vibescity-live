@@ -1,0 +1,31 @@
+name: E2E (Manual)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install deps
+        run: npm install
+
+      - name: Install Playwright browsers
+        run: node scripts/run-playwright-cli.mjs install --with-deps
+
+      - name: Run E2E
+        run: npm run test:e2e
+
+      - name: Console Budget (manual e2e)
+        if: ${{ always() }}
+        run: node scripts/ci/ui-console-budget.mjs
+
+      - name: Step Summary (manual e2e)
+        if: ${{ always() }}
+        run: node scripts/ci/e2e-summary.mjs --lane manual-e2e --junit reports/e2e/junit.xml --console test-results/ui-console-events.ndjson

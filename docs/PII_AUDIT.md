@@ -43,7 +43,8 @@ Required Supabase Secrets (Edge)
   - `PII_AUDIT_ACCESS_EXPORT_MAX_ROWS=5000`
 
 Frontend
-- `VITE_PII_AUDIT_ENABLED=true` enables periodic client pings (throttled, fail-open).
+- `VITE_PII_AUDIT_CLIENT_ENABLED=true` enables periodic client pings (throttled, fail-open).
+- `VITE_PII_AUDIT_ENABLED=true` is kept only as a deprecated compatibility fallback.
 - Admin UI: `/admin` -> tab `PII Audit` (PIN is kept in memory only).
 - Admin PII access report shows who viewed/exported PII audit data and how often.
 

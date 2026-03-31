@@ -169,6 +169,15 @@ export function useMapPadding(mapRef, options = {}) {
 	const PIN_SOURCE_ID = "pins_source";
 	const activePinId = ref(null);
 	let lastPinProgress = -1;
+	let pendingPinProgress = null;
+	let pinProgressFrame = 0;
+	const hasPinSource = () => {
+		try {
+			return Boolean(mapRef.value?.getSource?.(PIN_SOURCE_ID));
+		} catch {
+			return false;
+		}
+	};
 
 	const toFeatureStateId = (id) => {
 		if (id === null || id === undefined) return null;
@@ -178,7 +187,7 @@ export function useMapPadding(mapRef, options = {}) {
 
 	const setActivePinId = (pinId) => {
 		// Reset old pin state
-		if (activePinId.value !== null && mapRef.value) {
+		if (activePinId.value !== null && mapRef.value && hasPinSource()) {
 			const oldFid = toFeatureStateId(activePinId.value);
 			if (oldFid !== null) {
 				try {
@@ -193,13 +202,18 @@ export function useMapPadding(mapRef, options = {}) {
 		}
 		activePinId.value = pinId;
 		lastPinProgress = -1;
+		pendingPinProgress = null;
 	};
 
-	const setPinDragProgress = (progress) => {
+	const flushPinDragProgress = () => {
+		pinProgressFrame = 0;
 		if (activePinId.value === null || !mapRef.value) return;
-		const clamped = Math.max(0, Math.min(1, progress));
-		// Hysteresis: skip if change < 0.02
-		if (Math.abs(clamped - lastPinProgress) < 0.02) return;
+		if (!hasPinSource()) return;
+		if (pendingPinProgress === null) return;
+		const clamped = pendingPinProgress;
+		pendingPinProgress = null;
+		// Hysteresis: skip if change < 0.035
+		if (Math.abs(clamped - lastPinProgress) < 0.035) return;
 		lastPinProgress = clamped;
 
 		const fid = toFeatureStateId(activePinId.value);
@@ -215,6 +229,17 @@ export function useMapPadding(mapRef, options = {}) {
 		}
 	};
 
+	const setPinDragProgress = (progress) => {
+		if (activePinId.value === null || !mapRef.value) return;
+		pendingPinProgress = Math.max(0, Math.min(1, progress));
+		if (!isSystemEnabled) {
+			flushPinDragProgress();
+			return;
+		}
+		if (pinProgressFrame) return;
+		pinProgressFrame = requestAnimationFrame(flushPinDragProgress);
+	};
+
 	// Init
 	if (typeof window !== "undefined") {
 		isMobile.value = isMobileDevice();
@@ -223,6 +248,7 @@ export function useMapPadding(mapRef, options = {}) {
 	onUnmounted(() => {
 		if (resizeObserver) resizeObserver.disconnect();
 		if (updateTimeout) clearTimeout(updateTimeout);
+		if (pinProgressFrame) cancelAnimationFrame(pinProgressFrame);
 	});
 
 	return {

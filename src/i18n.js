@@ -25,7 +25,7 @@ const inlineMessages = {
 			music: "ดนตรีสด",
 			club: "คลับ",
 			cafe_desc: "☕ ดื่มด่ำกับกาแฟพรีเมียมในบรรยากาศสุดชิลล์ เหมาะสำหรับนั่งทำงานหรือพักผ่อน",
-			bar_desc: "🍸 บาร์ลับใจกลางเชียงใหม่ พร้อมเครื่องดื่มคราฟต์และดนตรีสุดคลาสสิก",
+			bar_desc: "🍸 บาร์คัดสรรบรรยากาศโดดเด่น พร้อมเครื่องดื่มคราฟต์และดนตรีสุดคลาสสิก",
 			club_desc: "🪩 ปลดปล่อยความมันส์กับ DJ ชั้นนำและระบบแสงสีเสียงเต็มรูปแบบ",
 			food_desc: "🍽️ สัมผัสรสชาติอาหารเลิศรสที่รังสรรค์จากวัตถุดิบชั้นดีในท้องถิ่น",
 			music_desc: "🎸 ฟังดนตรีสดจากวงชื่อดังในบรรยากาศเป็นกันเอง พร้อมเครื่องดื่มเย็นฉ่ำ",
@@ -85,7 +85,7 @@ const inlineMessages = {
 			cafe_desc:
 				"☕ Enjoy premium coffee in a chill atmosphere, perfect for work or relaxation.",
 			bar_desc:
-				"🍸 Hidden bar in the heart of Chiang Mai with craft drinks and classic music.",
+				"🍸 A standout bar experience with craft drinks and timeless music.",
 			club_desc:
 				"🪩 Unleash the fun with top DJs and full light and sound systems.",
 			food_desc:
@@ -153,11 +153,115 @@ function deepMerge(target, source) {
 	return output;
 }
 
-// ✅ Merge JSON locale files with inline messages
-// JSON files are the base, inline messages add/override specific keys
+const messageFormatterCache = new Map();
+const MESSAGE_TOKEN_RE = /\$\{([^}]+)\}|\{([^}]+)\}/g;
+
+const readNamedPath = (namedValues, token) => {
+	if (!namedValues || !token) return undefined;
+	if (token in namedValues) return namedValues[token];
+	if (!token.includes(".")) return undefined;
+	return token
+		.split(".")
+		.reduce(
+			(current, segment) =>
+				current && typeof current === "object" ? current[segment] : undefined,
+			namedValues,
+		);
+};
+
+const readMessageParam = (ctx, token) => {
+	if (!ctx || !token) return undefined;
+
+	if (/^\d+$/.test(token)) {
+		const index = Number(token);
+		if (typeof ctx.list === "function") {
+			const value = ctx.list(index);
+			if (value !== undefined) return value;
+		}
+		const listValues = Array.isArray(ctx.list)
+			? ctx.list
+			: Array.isArray(ctx.values)
+				? ctx.values
+				: Array.isArray(ctx.listValues)
+					? ctx.listValues
+					: null;
+		return listValues?.[index];
+	}
+
+	if (typeof ctx.named === "function") {
+		const value = ctx.named(token);
+		if (value !== undefined) return value;
+	}
+
+	const namedValues =
+		ctx.namedValues ||
+		(typeof ctx.named === "object" && ctx.named ? ctx.named : null) ||
+		(typeof ctx.values === "object" && !Array.isArray(ctx.values)
+			? ctx.values
+			: null) ||
+		null;
+
+	const nestedNamedValue = readNamedPath(namedValues, token);
+	if (nestedNamedValue !== undefined) {
+		return nestedNamedValue;
+	}
+
+	return undefined;
+};
+
+const createSafeMessageFormatter = (message, cacheKey) => {
+	const normalizedMessage = String(message ?? "");
+	const existing = messageFormatterCache.get(cacheKey);
+	if (existing) return existing;
+
+	const formatter = (ctx = {}) =>
+		normalizedMessage.replace(
+			MESSAGE_TOKEN_RE,
+			(match, templateToken, rawToken) => {
+				const token = String(templateToken || rawToken || "").trim();
+				if (!token) return "";
+				const value = readMessageParam(ctx, token);
+				return value === undefined || value === null ? match : String(value);
+			},
+		);
+
+	messageFormatterCache.set(cacheKey, formatter);
+	return formatter;
+};
+
+const compileLocaleMessageTree = (localeCode, value, keyPath = "") => {
+	if (typeof value === "string") {
+		return createSafeMessageFormatter(
+			value,
+			`${localeCode}:${keyPath || String(value ?? "")}`,
+		);
+	}
+	if (Array.isArray(value)) {
+		return value.map((entry, index) =>
+			compileLocaleMessageTree(localeCode, entry, `${keyPath}[${index}]`),
+		);
+	}
+	if (!value || typeof value !== "object") {
+		return value;
+	}
+
+	return Object.fromEntries(
+		Object.entries(value).map(([key, entry]) => [
+			key,
+			compileLocaleMessageTree(
+				localeCode,
+				entry,
+				keyPath ? `${keyPath}.${key}` : key,
+			),
+		]),
+	);
+};
+
+// ✅ Merge JSON locale files with inline messages, then precompile leaf strings
+// into CSP-safe formatter functions so the runtime-only vue-i18n build is enough.
 const messages = {
-	en: deepMerge(enJson, inlineMessages.en),
-	th: deepMerge(thJson, inlineMessages.th),
+	en: compileLocaleMessageTree("en", deepMerge(enJson, inlineMessages.en)),
+	th: compileLocaleMessageTree("th", deepMerge(thJson, inlineMessages.th)),
 };
 
 // ✅ Locale persistence (remember selected language)

@@ -9,11 +9,15 @@
  * - Eventbrite
  */
 
+import { isAppDebugLoggingEnabled } from "../utils/debugFlags";
+
 const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
 let eventCache = {
 	data: [],
 	lastFetched: null,
 };
+
+const shouldLogEventDebug = () => isAppDebugLoggingEnabled();
 
 /**
  * Event categories mapping
@@ -341,7 +345,7 @@ async function fetchTicketmelonEvents() {
 	try {
 		// Note: This would need actual API access
 		// For now, return mock data structure
-		if (import.meta.env.DEV)
+		if (shouldLogEventDebug())
 			console.log("[EventService] Fetching from Ticketmelon...");
 
 		// In production, use:
@@ -350,7 +354,9 @@ async function fetchTicketmelonEvents() {
 
 		return [];
 	} catch (error) {
-		console.error("[EventService] Ticketmelon fetch error:", error);
+		if (shouldLogEventDebug()) {
+			console.error("[EventService] Ticketmelon fetch error:", error);
+		}
 		return [];
 	}
 }
@@ -361,7 +367,7 @@ async function fetchTicketmelonEvents() {
 async function fetchFacebookEvents(accessToken, _locationIds = []) {
 	try {
 		if (!accessToken) {
-			if (import.meta.env.DEV)
+			if (shouldLogEventDebug())
 				console.log("[EventService] No Facebook access token provided");
 			return [];
 		}
@@ -373,7 +379,9 @@ async function fetchFacebookEvents(accessToken, _locationIds = []) {
 
 		return [];
 	} catch (error) {
-		console.error("[EventService] Facebook fetch error:", error);
+		if (shouldLogEventDebug()) {
+			console.error("[EventService] Facebook fetch error:", error);
+		}
 		return [];
 	}
 }
@@ -383,7 +391,7 @@ async function fetchFacebookEvents(accessToken, _locationIds = []) {
  */
 async function fetchThaiTicketMajorEvents() {
 	try {
-		if (import.meta.env.DEV)
+		if (shouldLogEventDebug())
 			console.log("[EventService] Fetching from ThaiTicketMajor...");
 
 		// This would need web scraping or API access
@@ -402,7 +410,9 @@ async function fetchThaiTicketMajorEvents() {
 			},
 		];
 	} catch (error) {
-		console.error("[EventService] ThaiTicketMajor fetch error:", error);
+		if (shouldLogEventDebug()) {
+			console.error("[EventService] ThaiTicketMajor fetch error:", error);
+		}
 		return [];
 	}
 }
@@ -430,12 +440,12 @@ export async function getAllEvents(options = {}) {
 		eventCache.lastFetched &&
 		Date.now() - eventCache.lastFetched < CACHE_DURATION
 	) {
-		if (import.meta.env.DEV)
+		if (shouldLogEventDebug())
 			console.log("[EventService] Returning cached events");
 		return filterEvents(eventCache.data, province, category);
 	}
 
-	if (import.meta.env.DEV)
+	if (shouldLogEventDebug())
 		console.log("[EventService] Fetching fresh events...");
 
 	// Fetch from all sources

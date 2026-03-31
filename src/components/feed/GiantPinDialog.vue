@@ -4,8 +4,8 @@ import {
 	MapPin,
 	Navigation,
 	Phone,
+	Play,
 	Sparkles,
-	Star,
 	Store,
 	Users,
 	X,
@@ -244,6 +244,10 @@ useDialogA11y({
 
           <!-- Title overlay on media -->
           <div class="media-title-bar">
+            <div class="media-kicker">
+              <Play class="w-3.5 h-3.5 fill-current" />
+              <span>{{ t("shop.giant_pin") }}</span>
+            </div>
             <div class="venue-chip">
               <MapPin class="w-3 h-3" />
               <span>{{ selectedTitle }}</span>
@@ -266,8 +270,12 @@ useDialogA11y({
         <!-- Venue header -->
         <div class="panel-header">
           <div class="panel-header-text">
+            <p class="panel-kicker">
+              <Play class="w-3.5 h-3.5 fill-current" />
+              <span>{{ selectedGiantShop?.name || selectedTitle }}</span>
+            </p>
             <p class="shops-count">
-              <Sparkles class="w-3 h-3 inline mr-1 text-violet-400" />
+              <Sparkles class="w-3 h-3 inline mr-1 text-rose-400" />
               {{ t("giant_pin.shops_inside", { count: giantPinShops.length }) }}
             </p>
           </div>
@@ -312,7 +320,7 @@ useDialogA11y({
             <!-- Vibe / visitor count -->
             <div class="vibe-card">
               <div class="vibe-label">
-                <Users class="w-3 h-3 text-violet-400" />
+                <Users class="w-3 h-3 text-rose-400" />
                 <span>{{ t("giant_pin.current_vibe") }}</span>
               </div>
               <Suspense>
@@ -405,13 +413,13 @@ useDialogA11y({
 ══════════════════════════════════════════════════════════ */
 :root {
   --modal-radius: 20px;
-  --panel-bg: #0e0e12;
-  --surface: rgba(255,255,255,0.05);
-  --border: rgba(255,255,255,0.08);
+  --panel-bg: #0f0f0f;
+  --surface: rgba(255,255,255,0.07);
+  --border: rgba(255,255,255,0.1);
   --text-primary: #f0f0f5;
   --text-muted: rgba(255,255,255,0.5);
-  --accent: #7c3aed;
-  --accent-glow: rgba(124,58,237,0.4);
+  --accent: #ff0033;
+  --accent-glow: rgba(255,0,51,0.32);
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -444,7 +452,7 @@ useDialogA11y({
   box-shadow:
     0 0 0 1px rgba(255,255,255,0.07),
     0 30px 80px -10px rgba(0,0,0,0.7),
-    0 0 60px -20px var(--accent-glow);
+    0 0 60px -24px var(--accent-glow);
   transform-origin: center center;
   animation: modalIn 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards;
 }
@@ -488,7 +496,7 @@ useDialogA11y({
   height: 100%;
   display: grid;
   grid-template-columns: 7fr 3fr;
-  background: #0e0e12;
+  background: #0f0f0f;
   border-radius: var(--modal-radius);
   overflow: hidden;
 }
@@ -556,7 +564,7 @@ useDialogA11y({
   position: absolute;
   top: 0; bottom: 0; right: 0;
   width: 80px;
-  background: linear-gradient(to right, transparent, rgba(14,14,18,0.9));
+  background: linear-gradient(to right, transparent, rgba(15,15,15,0.96));
   pointer-events: none;
 }
 
@@ -577,6 +585,22 @@ useDialogA11y({
   animation: slideUpFade 0.5s 0.2s ease both;
 }
 
+.media-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 0, 51, 0.92);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 10px 22px rgba(255, 0, 51, 0.28);
+  margin-bottom: 10px;
+}
+
 @keyframes slideUpFade {
   from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -588,14 +612,15 @@ useDialogA11y({
   gap: 5px;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(124,58,237,0.25);
-  border: 1px solid rgba(124,58,237,0.4);
-  color: #c4b5fd;
+  background: rgba(15,15,15,0.78);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.88);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   margin-bottom: 8px;
+  backdrop-filter: blur(10px);
 }
 
 .media-shop-name {
@@ -611,7 +636,7 @@ useDialogA11y({
 .media-shop-category {
   font-size: 13px;
   font-weight: 600;
-  color: #a78bfa;
+  color: rgba(255,255,255,0.72);
   letter-spacing: 0.02em;
 }
 
@@ -624,7 +649,7 @@ useDialogA11y({
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: rgba(0,0,0,0.5);
+  background: rgba(15,15,15,0.7);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255,255,255,0.12);
@@ -644,7 +669,7 @@ useDialogA11y({
 .info-panel {
   display: flex;
   flex-direction: column;
-  background: #111117;
+  background: #121212;
   border-left: 1px solid rgba(255,255,255,0.06);
   overflow: hidden;
 }
@@ -653,7 +678,35 @@ useDialogA11y({
   padding: 18px 16px 14px;
   border-bottom: 1px solid rgba(255,255,255,0.06);
   flex-shrink: 0;
-  background: rgba(0,0,0,0.2);
+  background: linear-gradient(180deg, rgba(24,24,24,0.98) 0%, rgba(18,18,18,0.98) 100%);
+}
+
+.panel-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.panel-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 0, 51, 0.14);
+  border: 1px solid rgba(255, 0, 51, 0.28);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.panel-kicker span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .shops-count {
@@ -661,7 +714,7 @@ useDialogA11y({
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.5);
+  color: rgba(255,255,255,0.58);
 }
 
 .panel-body {
@@ -676,14 +729,14 @@ useDialogA11y({
 /* Scrollbar styling */
 .panel-body::-webkit-scrollbar       { width: 3px; }
 .panel-body::-webkit-scrollbar-track { background: transparent; }
-.panel-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 99px; }
+.panel-body::-webkit-scrollbar-thumb { background: rgba(255,0,51,0.28); border-radius: 99px; }
 
 /* ── Shop detail ── */
 .shop-detail-section {
   padding: 14px 14px 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   animation: fadeSlideIn 0.4s ease both;
 }
 
@@ -701,46 +754,49 @@ useDialogA11y({
 
 .action-btn {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   gap: 6px;
   padding: 12px 8px;
-  border-radius: 14px;
+  border-radius: 12px;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.02em;
   cursor: pointer;
   transition: transform 0.15s, opacity 0.15s;
-  border: none;
+  border: 1px solid transparent;
   text-decoration: none;
+  justify-content: center;
 }
 
 .action-btn:active { transform: scale(0.95); }
 
 .action-btn--primary {
-  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  background: linear-gradient(135deg, #ff0033, #ff3b30);
   color: #fff;
-  box-shadow: 0 4px 20px rgba(124,58,237,0.35);
+  box-shadow: 0 8px 24px rgba(255,0,51,0.3);
 }
 .action-btn--primary:hover { opacity: 0.9; }
 
 .action-btn--green {
-  background: linear-gradient(135deg, #059669, #047857);
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.08);
   color: #fff;
-  box-shadow: 0 4px 20px rgba(5,150,105,0.3);
+  box-shadow: none;
 }
 .action-btn--green:hover { opacity: 0.9; }
 
 .action-btn--disabled {
   background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.06);
   color: rgba(255,255,255,0.25);
   cursor: not-allowed;
 }
 
 /* Vibe card */
 .vibe-card {
-  background: rgba(124,58,237,0.08);
-  border: 1px solid rgba(124,58,237,0.2);
+  background: linear-gradient(180deg, rgba(28,28,28,0.98) 0%, rgba(20,20,20,0.98) 100%);
+  border: 1px solid rgba(255,255,255,0.08);
   border-radius: 14px;
   padding: 12px 14px;
 }
@@ -753,7 +809,7 @@ useDialogA11y({
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(255,255,255,0.4);
+  color: rgba(255,255,255,0.46);
   margin-bottom: 8px;
 }
 
@@ -787,7 +843,7 @@ useDialogA11y({
 
 /* About card */
 .about-card {
-  background: rgba(255,255,255,0.03);
+  background: linear-gradient(180deg, rgba(28,28,28,0.98) 0%, rgba(20,20,20,0.98) 100%);
   border: 1px solid rgba(255,255,255,0.07);
   border-radius: 14px;
   padding: 12px 14px;
@@ -798,7 +854,7 @@ useDialogA11y({
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(255,255,255,0.35);
+  color: rgba(255,255,255,0.42);
   margin-bottom: 8px;
 }
 
@@ -819,22 +875,22 @@ useDialogA11y({
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(255,255,255,0.3);
+  color: rgba(255,255,255,0.42);
 }
 
 .shops-divider::after {
   content: '';
   flex: 1;
   height: 1px;
-  background: rgba(255,255,255,0.07);
+  background: linear-gradient(90deg, rgba(255,0,51,0.35), rgba(255,255,255,0.04));
 }
 
 /* ── Shop list ── */
 .shop-list {
-  padding: 0 10px 14px;
+  padding: 0 12px 18px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 /* Skeleton cards */
@@ -848,20 +904,20 @@ useDialogA11y({
 /* Shop card */
 .shop-card {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
-  padding: 8px 10px 8px 8px;
+  padding: 10px;
   border-radius: 14px;
   cursor: pointer;
   transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
-  border: 1px solid transparent;
-  background: transparent;
+  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(24,24,24,0.9);
   text-align: left;
   width: 100%;
 }
 
 .shop-card:hover {
-  background: rgba(255,255,255,0.05);
+  background: rgba(34,34,34,0.98);
 }
 
 .shop-card:active {
@@ -869,16 +925,16 @@ useDialogA11y({
 }
 
 .shop-card--active {
-  background: rgba(124,58,237,0.12) !important;
-  border-color: rgba(124,58,237,0.35) !important;
-  box-shadow: 0 0 20px rgba(124,58,237,0.15);
+  background: rgba(42,18,24,0.98) !important;
+  border-color: rgba(255,0,51,0.34) !important;
+  box-shadow: 0 0 24px rgba(255,0,51,0.14);
 }
 
 /* Thumbnail */
 .shop-thumb {
-  width: 52px;
-  height: 52px;
-  border-radius: 10px;
+  width: 96px;
+  height: 54px;
+  border-radius: 12px;
   overflow: hidden;
   flex-shrink: 0;
   background: rgba(255,255,255,0.05);
@@ -910,20 +966,21 @@ useDialogA11y({
 }
 
 .shop-card-name {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 13.5px;
+  font-weight: 800;
   color: #f0f0f5;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
   line-height: 1.3;
 }
 
 .shop-card-cat {
   font-size: 11px;
   font-weight: 500;
-  color: #a78bfa;
-  margin-top: 2px;
+  color: rgba(255,255,255,0.56);
+  margin-top: 4px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -939,7 +996,7 @@ useDialogA11y({
 
 .shop-card:hover .shop-card-arrow,
 .shop-card--active .shop-card-arrow {
-  color: #a78bfa;
+  color: #ff4f67;
   transform: translateX(2px);
 }
 
@@ -977,6 +1034,11 @@ useDialogA11y({
 
   .action-row {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .shop-thumb {
+    width: 84px;
+    height: 48px;
   }
 
   .shop-card-skeleton {

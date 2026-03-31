@@ -35,7 +35,7 @@ class MemoryService:
 
         try:
             from app.core.config import settings
-        except Exception as e:
+        except (ImportError, RuntimeError, ValueError) as e:
             logger.warning("Memory service: cannot import settings — disabled. %s", e)
             return
 
@@ -117,7 +117,7 @@ class MemoryService:
 
         except ImportError:
             logger.warning("Memory service: mem0 package not installed — auto-disabled.")
-        except Exception as e:
+        except (AttributeError, RuntimeError, TypeError, ValueError) as e:
             logger.warning("Memory service: initialization failed — auto-disabled. %s", e)
 
     def add_memory(
@@ -142,7 +142,7 @@ class MemoryService:
             if isinstance(result, list) and len(result) > 0:
                 return result[0].get("id") if isinstance(result[0], dict) else str(result[0])
             return str(result) if result else None
-        except Exception as e:
+        except (AttributeError, RuntimeError, TypeError, ValueError) as e:
             logger.error("Memory add failed: %s", e)
             return None
 
@@ -167,7 +167,7 @@ class MemoryService:
             if isinstance(results, list):
                 return results
             return []
-        except Exception as e:
+        except (AttributeError, RuntimeError, TypeError, ValueError) as e:
             logger.error("Memory search failed: %s", e)
             return []
 

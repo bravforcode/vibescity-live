@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import re
+import sys
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import asyncpg
@@ -86,6 +88,7 @@ FORBIDDEN_STATUSES = ("LIVE", "OFF")
 
 REMOVED_QUERY_PARAMS = {"sslmode", "sslrootcert", "sslcert", "sslkey", "channel_binding"}
 SSL_REQUIRE_MODES = {"require", "verify-full"}
+logger = logging.getLogger("validate_triad_contract")
 
 
 def _sanitize_dsn(url: str) -> tuple[str, dict]:
@@ -132,7 +135,7 @@ async def _validate() -> dict:
     clean_dsn, connect_args = _sanitize_dsn(database_url)
     try:
         conn = await asyncpg.connect(clean_dsn, **connect_args)
-    except Exception as exc:
+    except (asyncpg.PostgresError, OSError) as exc:
         return {
             "ok": False,
             "errors": [f"Database connection failed: {exc}"],
@@ -296,34 +299,40 @@ async def _validate() -> dict:
 
 
 def _print_plain(report: dict) -> None:
-    print("PASS: TRIAD contract validation succeeded" if report.get("ok") else "FAIL: TRIAD contract validation failed")
+    logger.info(
+        "%s",
+        "PASS: TRIAD contract validation succeeded"
+        if report.get("ok")
+        else "FAIL: TRIAD contract validation failed",
+    )
     checks = report.get("checks") or {}
     for key in sorted(checks):
-        print(f"- {key}: {checks[key]}")
-    print(f"- has_status_constraint: {report.get('has_status_constraint')}")
-    print(f"- duplicate_identity_groups: {report.get('duplicate_identity_groups')}")
-    print(f"- duplicate_osm_id_groups: {report.get('duplicate_osm_id_groups')}")
+        logger.info("- %s: %s", key, checks[key])
+    logger.info("- has_status_constraint: %s", report.get("has_status_constraint"))
+    logger.info("- duplicate_identity_groups: %s", report.get("duplicate_identity_groups"))
+    logger.info("- duplicate_osm_id_groups: %s", report.get("duplicate_osm_id_groups"))
     if report.get("missing_tables"):
-        print("- missing_tables:", ", ".join(report["missing_tables"]))
+        logger.info("- missing_tables: %s", ", ".join(report["missing_tables"]))
     if report.get("missing_views"):
-        print("- missing_views:", ", ".join(report["missing_views"]))
+        logger.info("- missing_views: %s", ", ".join(report["missing_views"]))
     if report.get("missing_materialized_views"):
-        print("- missing_materialized_views:", ", ".join(report["missing_materialized_views"]))
+        logger.info("- missing_materialized_views: %s", ", ".join(report["missing_materialized_views"]))
     if report.get("missing_functions"):
-        print("- missing_functions:", ", ".join(report["missing_functions"]))
+        logger.info("- missing_functions: %s", ", ".join(report["missing_functions"]))
     if report.get("missing_venues_columns"):
-        print("- missing_venues_columns:", ", ".join(report["missing_venues_columns"]))
+        logger.info("- missing_venues_columns: %s", ", ".join(report["missing_venues_columns"]))
     if report.get("forbidden_status_counts"):
         counts = ", ".join(f"{k}={v}" for k, v in report["forbidden_status_counts"].items())
-        print("- forbidden_status_counts:", counts)
+        logger.info("- forbidden_status_counts: %s", counts)
     for error in report.get("errors", []):
-        print(f"- error: {error}")
+        logger.info("- error: %s", error)
 
 
 def main() -> int:
+    logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
     report = asyncio.run(_validate())
     _print_plain(report)
-    print(json.dumps(report, ensure_ascii=False, sort_keys=True))
+    logger.info("%s", json.dumps(report, ensure_ascii=False, sort_keys=True))
     return 0 if report.get("ok") else 1
 
 

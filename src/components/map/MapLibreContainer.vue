@@ -48,8 +48,17 @@ import { useNeonSignTheme } from "../../composables/map/useNeonSignTheme";
 import { useAudioSystem } from "../../composables/useAudioSystem";
 import { useHaptics } from "../../composables/useHaptics";
 import {
+	getDetailSelectionModalGapPx,
+	getDetailSelectionTargetRatio,
+	getDetailSelectionVisualLiftPx,
+	getPreviewPopupClearancePx,
+	isNarrowDetailViewport,
+} from "../../constants/mapSelectionLayout";
+import { Z } from "../../constants/zIndex";
+import {
 	getApiV1BaseUrl,
 	isFrontendOnlyDevMode,
+	isLocalBrowserHostname,
 } from "../../lib/runtimeConfig";
 import {
 	clearRuntimeLaneUnavailable,
@@ -81,10 +90,9 @@ import LiveActivityChips from "./LiveActivityChips.vue";
 import MapLoadingSkeleton from "./MapLoadingSkeleton.vue";
 
 // MapLibre GL does not use mapbox:// style URLs — always use the production neon style by default.
-const LOCAL_DEV_HOST_PATTERN = /^(localhost|127\.0\.0\.1)$/i;
 const isLocalBrowserHost = () =>
 	typeof window !== "undefined" &&
-	LOCAL_DEV_HOST_PATTERN.test(window.location.hostname);
+	isLocalBrowserHostname(window.location.hostname);
 const IS_LOCALHOST_BROWSER = isLocalBrowserHost();
 const LOCALHOST_STYLE_URL = "/map-styles/vibecity-localhost.json";
 const NEON_STYLE_URL = "/map-styles/vibecity-neon.json";
@@ -94,13 +102,16 @@ const LOCALHOST_STYLE_MODE =
 		.toLowerCase() === "quiet"
 		? "quiet"
 		: "prod";
+const EXTERNAL_STYLE_OVERRIDE_ALLOWED =
+	import.meta.env.DEV &&
+	import.meta.env.VITE_ALLOW_EXTERNAL_MAP_STYLE === "true";
 const ENV_PRIMARY_STYLE_URL =
 	import.meta.env.VITE_MAP_STYLE_URL ||
 	import.meta.env.VITE_MAP_STYLE_FALLBACK_URL ||
-	NEON_STYLE_URL;
-const PROD_STYLE_URL = IS_LOCALHOST_BROWSER
-	? NEON_STYLE_URL
-	: ENV_PRIMARY_STYLE_URL || NEON_STYLE_URL;
+	"";
+const PROD_STYLE_URL = EXTERNAL_STYLE_OVERRIDE_ALLOWED
+	? ENV_PRIMARY_STYLE_URL || NEON_STYLE_URL
+	: NEON_STYLE_URL;
 const STRICT_E2E_STYLE = NEON_STYLE_URL;
 const RESOLVED_STYLE_MODE = resolveRuntimeMapStyleMode({
 	isLocalhostBrowser: IS_LOCALHOST_BROWSER,
@@ -119,6 +130,10 @@ const PIN_LAYER_ID = "unclustered-pins";
 const PIN_HITBOX_LAYER_ID = "unclustered-pins-hitbox";
 const SELECTED_PIN_LAYER_ID = "selected-pin-marker";
 const DISTANCE_LINE_SOURCE_ID = "distance-line";
+const USER_LOCATION_SOURCE_ID = "user-location";
+const USER_LOCATION_PULSE_LAYER_ID = "user-location-pulse";
+const USER_LOCATION_RING_LAYER_ID = "user-location-ring";
+const USER_LOCATION_DOT_LAYER_ID = "user-location-dot";
 const THAILAND_AGGREGATE_LEVEL = "country";
 const COUNTRY_AGGREGATE_MAX_ZOOM = 6.2;
 const PROVINCE_AGGREGATE_MAX_ZOOM = 7.8;
@@ -137,12 +152,17 @@ const IS_STRICT_MAP_E2E = import.meta.env.VITE_E2E_MAP_REQUIRED === "true";
 const ENABLE_DOM_OVERLAY_MARKERS = IS_E2E || IS_STRICT_MAP_E2E;
 const ENABLE_DOM_COIN_MARKERS = false;
 const SHOULD_EXPOSE_MAP_DEBUG =
-	import.meta.env.DEV || IS_E2E || IS_STRICT_MAP_E2E;
+	import.meta.env.DEV || IS_LOCALHOST_BROWSER || IS_E2E || IS_STRICT_MAP_E2E;
 const TRAFFIC_RADIUS_KM = 1;
 const TRAFFIC_REFRESH_INTERVAL_MS = 30000;
 const TRAFFIC_RECOMPUTE_DISTANCE_KM = 0.12;
-const TRAFFIC_CENTER_FALLBACK_DISTANCE_KM = 35;
+const TRAFFIC_FLOW_MIN_VISIBLE_ZOOM = Number(
+	MAP_CONFIG?.cars?.minVisibleZoom ?? 12,
+);
+const TRAFFIC_LOCAL_SOURCE_ID = "traffic-roads-local";
 const TRAFFIC_NEON_SOURCE_ID = "neon-roads";
+const TRAFFIC_BOOTSTRAP_RETRY_DELAY_MS = 800;
+const TRAFFIC_BOOTSTRAP_MAX_ATTEMPTS = 24;
 const HOT_ROADS_BASE_INTERVAL_MS = 30000;
 const HOT_ROADS_LOW_POWER_INTERVAL_MS = 60000;
 const HOT_ROADS_MAX_INTERVAL_MS = 120000;
@@ -317,6 +337,7 @@ onMounted(() => {
 const props = defineProps({
 	shops: Array,
 	userLocation: Array,
+	isMockLocation: { type: Boolean, default: false },
 	highlightedShopId: [Number, String],
 	selectionIntent: { type: Object, default: null },
 	isDarkMode: { type: Boolean, default: true },
@@ -343,6 +364,12 @@ const mapWrapperStyle = computed(() => ({
 	pointerEvents: props.isDashboardOpen ? "none" : "auto",
 	willChange: props.isDashboardOpen ? "auto" : "transform",
 }));
+const shouldShowLocateMeControl = computed(
+	() => !maplessMode.value && !props.isDashboardOpen,
+);
+const locateMeControlStyle = computed(() => ({
+	top: `${Math.max(12, Number(props.uiTopOffset || 0) + 8)}px`,
+}));
 
 const getMapLifecycleMode = () => {
 	if (maplessMode.value) return "mapless";
@@ -365,7 +392,7 @@ const runtimeAnimationGuard = computed(
 );
 const mapEffectsEnabled = computed(
 	() =>
-		enableMapEffectsPipelineV2.value &&
+		(enableMapEffectsPipelineV2.value || import.meta.env.DEV) &&
 		(!enableMapShaderSafeModeV1.value || !mapRuntimeSafeModeLatched.value) &&
 		!IS_E2E &&
 		!IS_STRICT_MAP_E2E,
@@ -409,6 +436,14 @@ const allowViewportGlow = computed(
 		!runtimeAnimationGuard.value,
 );
 const viewportGlowOpacity = ref(0);
+const trafficFlowQuality = computed(() => {
+	if (!mapEffectsEnabled.value) return "off";
+	if (prefs.isReducedMotion || prefersReducedMotion.value) return "off";
+	if (isPerfRestricted.value) return "off";
+	if (shouldPreferSmoothMobileRuntime.value) return "lite";
+	return effectiveMotionBudget.value === "micro" ? "lite" : "full";
+});
+const allowTrafficFlowFx = computed(() => trafficFlowQuality.value !== "off");
 const allowWeatherFx = computed(
 	() =>
 		mapEffectsEnabled.value &&
@@ -419,7 +454,7 @@ const allowWeatherFx = computed(
 const soundEnabled = computed(() => Boolean(prefs.isSoundEnabled));
 const effectiveMotionBudget = computed(() => {
 	if (isPerfRestricted.value) return "micro";
-	return prefs.motionBudget || "micro";
+	return prefs.motionBudget || "full";
 });
 const mapLayerEffectsMode = computed(() => {
 	if (IS_E2E || IS_STRICT_MAP_E2E) return "off";
@@ -488,18 +523,89 @@ const latchMapRuntimeSafeMode = (reason = "runtime_failure", error = null) => {
 const emit = defineEmits([
 	"select-shop",
 	"open-detail",
+	"sentient-select",
 	"open-building",
 	"exit-indoor",
 	"open-ride-modal",
+	"locate-me",
 	"map-ready-change",
+	"selection-flight-complete",
 ]);
 
 const mapContainer = ref(null);
+const hasActiveDetailSelection = computed(
+	() =>
+		Array.isArray(props.selectedShopCoords) &&
+		props.selectedShopCoords.length >= 2,
+);
 const mapContextRecovering = ref(false);
 const webglRecoveryAttempts = ref(0);
 const MAX_WEBGL_RECOVERY_ATTEMPTS = 2;
 let webglRecoveryTimer = null;
 let webglRestoreGraceTimer = null;
+let detailModalGestureState = null;
+const getMapGestureEnabled = (handler) =>
+	Boolean(
+		handler && typeof handler.isEnabled === "function" && handler.isEnabled(),
+	);
+const setMapGestureEnabled = (handler, enabled) => {
+	if (!handler) return;
+	try {
+		if (enabled) {
+			handler.enable?.();
+			return;
+		}
+		handler.disable?.();
+	} catch {
+		// Ignore gesture toggles that are unavailable in the current renderer mode.
+	}
+};
+const syncDetailModalMapGestures = (locked) => {
+	const mapInstance = map.value;
+	if (!mapInstance) return;
+	if (locked) {
+		if (!detailModalGestureState) {
+			detailModalGestureState = {
+				scrollZoom: getMapGestureEnabled(mapInstance.scrollZoom),
+				boxZoom: getMapGestureEnabled(mapInstance.boxZoom),
+				dragRotate: getMapGestureEnabled(mapInstance.dragRotate),
+				dragPan: getMapGestureEnabled(mapInstance.dragPan),
+				doubleClickZoom: getMapGestureEnabled(mapInstance.doubleClickZoom),
+				keyboard: getMapGestureEnabled(mapInstance.keyboard),
+				touchZoomRotate: getMapGestureEnabled(mapInstance.touchZoomRotate),
+			};
+		}
+		setMapGestureEnabled(mapInstance.scrollZoom, false);
+		setMapGestureEnabled(mapInstance.boxZoom, false);
+		setMapGestureEnabled(mapInstance.dragRotate, false);
+		setMapGestureEnabled(mapInstance.dragPan, false);
+		setMapGestureEnabled(mapInstance.doubleClickZoom, false);
+		setMapGestureEnabled(mapInstance.keyboard, false);
+		setMapGestureEnabled(mapInstance.touchZoomRotate, false);
+		return;
+	}
+	if (!detailModalGestureState) return;
+	setMapGestureEnabled(
+		mapInstance.scrollZoom,
+		detailModalGestureState.scrollZoom,
+	);
+	setMapGestureEnabled(mapInstance.boxZoom, detailModalGestureState.boxZoom);
+	setMapGestureEnabled(
+		mapInstance.dragRotate,
+		detailModalGestureState.dragRotate,
+	);
+	setMapGestureEnabled(mapInstance.dragPan, detailModalGestureState.dragPan);
+	setMapGestureEnabled(
+		mapInstance.doubleClickZoom,
+		detailModalGestureState.doubleClickZoom,
+	);
+	setMapGestureEnabled(mapInstance.keyboard, detailModalGestureState.keyboard);
+	setMapGestureEnabled(
+		mapInstance.touchZoomRotate,
+		detailModalGestureState.touchZoomRotate,
+	);
+	detailModalGestureState = null;
+};
 const isMapOperational = () => {
 	const mapInstance = map.value;
 	if (!mapInstance || !isMapReady.value || mapContextRecovering.value) {
@@ -682,6 +788,125 @@ const applySourceData = (sourceId, data) => {
 	const source = map.value.getSource(sourceId);
 	source?.setData?.(data);
 };
+const buildUserLocationFeatureCollection = () => {
+	const lat = Number(props.userLocation?.[0]);
+	const lng = Number(props.userLocation?.[1]);
+	if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+		return { type: "FeatureCollection", features: [] };
+	}
+	return {
+		type: "FeatureCollection",
+		features: [
+			{
+				type: "Feature",
+				properties: {
+					isMockLocation: Boolean(props.isMockLocation),
+				},
+				geometry: {
+					type: "Point",
+					coordinates: [lng, lat],
+				},
+			},
+		],
+	};
+};
+const buildUserLocationFeatureCollectionFromLngLat = (lngLat) => {
+	const lng = Number(lngLat?.[0]);
+	const lat = Number(lngLat?.[1]);
+	if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+		return { type: "FeatureCollection", features: [] };
+	}
+	return {
+		type: "FeatureCollection",
+		features: [
+			{
+				type: "Feature",
+				properties: {
+					isMockLocation: Boolean(props.isMockLocation),
+				},
+				geometry: {
+					type: "Point",
+					coordinates: [lng, lat],
+				},
+			},
+		],
+	};
+};
+const ensureUserLocationLayers = () => {
+	if (!isMapOperational()) return false;
+	const mapInstance = map.value;
+	if (!mapInstance?.isStyleLoaded?.()) return false;
+
+	try {
+		if (!mapInstance.getSource(USER_LOCATION_SOURCE_ID)) {
+			mapInstance.addSource(USER_LOCATION_SOURCE_ID, {
+				type: "geojson",
+				data: { type: "FeatureCollection", features: [] },
+			});
+		}
+	} catch (error) {
+		mapDebugWarn("User location source setup failed:", error);
+		return false;
+	}
+
+	const safeAddUserLocationLayer = (layerConfig) => {
+		if (mapInstance.getLayer(layerConfig.id)) return;
+		try {
+			mapInstance.addLayer(layerConfig);
+		} catch (error) {
+			mapDebugWarn(
+				`User location layer setup failed: ${layerConfig.id}`,
+				error,
+			);
+		}
+	};
+
+	safeAddUserLocationLayer({
+		id: USER_LOCATION_PULSE_LAYER_ID,
+		type: "circle",
+		source: USER_LOCATION_SOURCE_ID,
+		paint: {
+			"circle-radius": 24,
+			"circle-color": "#60A5FA",
+			"circle-opacity": 0.16,
+			"circle-blur": 0.35,
+			"circle-pitch-scale": "viewport",
+			"circle-pitch-alignment": "viewport",
+		},
+	});
+	safeAddUserLocationLayer({
+		id: USER_LOCATION_RING_LAYER_ID,
+		type: "circle",
+		source: USER_LOCATION_SOURCE_ID,
+		paint: {
+			"circle-radius": 10,
+			"circle-color": "#3B82F6",
+			"circle-opacity": 0.12,
+			"circle-stroke-width": 2.5,
+			"circle-stroke-color": "#BFDBFE",
+			"circle-stroke-opacity": 0.92,
+			"circle-pitch-scale": "viewport",
+			"circle-pitch-alignment": "viewport",
+		},
+	});
+	safeAddUserLocationLayer({
+		id: USER_LOCATION_DOT_LAYER_ID,
+		type: "circle",
+		source: USER_LOCATION_SOURCE_ID,
+		paint: {
+			"circle-radius": 6.5,
+			"circle-color": "#2563EB",
+			"circle-opacity": 1,
+			"circle-stroke-width": 3,
+			"circle-stroke-color": "#FFFFFF",
+			"circle-stroke-opacity": 0.98,
+			"circle-pitch-scale": "viewport",
+			"circle-pitch-alignment": "viewport",
+		},
+	});
+
+	return Boolean(mapInstance.getSource(USER_LOCATION_SOURCE_ID));
+};
 const mapReadyFallbackArmed = ref(false);
 const currentStyleUrl = ref(null);
 const selectionSourceLabel = ref("none");
@@ -720,16 +945,22 @@ const initMapOnce = (styleOverride = null) => {
 
 	const initialStyleUrl =
 		styleOverride ?? styleUrlForTheme(Boolean(props.isDarkMode));
-	const initialCenter =
-		normalizeUserLocationToCenter(props.userLocation) || center.value;
+	const startupUserCenter = props.isMockLocation
+		? null
+		: normalizeUserLocationToCenter(props.userLocation);
+	const initialCenter = startupUserCenter || center.value;
+	const initialZoom = startupUserCenter
+		? Math.max(Number(zoom.value) || 0, USER_LOCATION_STARTUP_ZOOM)
+		: zoom.value;
 	center.value = initialCenter;
+	zoom.value = initialZoom;
 	mapUserInteracted.value = false;
 	hasAutoCenteredOnUser.value = false;
 	mapContextRecovering.value = false;
 	currentStyleUrl.value = initialStyleUrl;
 	mapTeardownDone = false;
 	sentientDisposed = false;
-	initMap(initialCenter, zoom.value, initialStyleUrl);
+	initMap(initialCenter, initialZoom, initialStyleUrl);
 	armStrictStyleGate();
 };
 
@@ -942,6 +1173,8 @@ const {
 	addNeonSignLayers,
 } = useMapLayers(map, {
 	effectsMode: () => mapLayerEffectsMode.value,
+	trafficFlowQuality: () => trafficFlowQuality.value,
+	trafficMinVisibleZoom: Number(MAP_CONFIG?.cars?.minVisibleZoom ?? 12),
 	scheduler: (sourceId, data) => applySourceData(sourceId, data),
 	coinMinZoom: 0,
 	renderTextLabels: MAP_TEXT_LABELS_ENABLED,
@@ -1011,6 +1244,7 @@ const zoom = ref(
 		: 17.5,
 );
 const center = ref([DEFAULT_CITY.lng, DEFAULT_CITY.lat]);
+const USER_LOCATION_STARTUP_ZOOM = 16.2;
 
 const mapInitRequested = ref(false);
 const mapUserInteracted = ref(false);
@@ -1029,9 +1263,17 @@ watch(
 	(newLoc) => {
 		const newCenter = normalizeUserLocationToCenter(newLoc);
 		if (!newCenter) return;
+		if (props.isMockLocation) {
+			center.value = newCenter;
+			return;
+		}
 
 		if (!mapInitRequested.value || !isMapReady.value) {
 			center.value = newCenter;
+			zoom.value = Math.max(
+				Number(zoom.value) || 0,
+				USER_LOCATION_STARTUP_ZOOM,
+			);
 			return;
 		}
 		if (!map.value || mapUserInteracted.value || hasAutoCenteredOnUser.value) {
@@ -1055,7 +1297,10 @@ watch(
 		try {
 			map.value.flyTo({
 				center: newCenter,
-				zoom: Math.max(map.value.getZoom?.() || 16, 16),
+				zoom: Math.max(
+					Number(map.value.getZoom?.() || 0),
+					USER_LOCATION_STARTUP_ZOOM,
+				),
 				pitch: 60,
 				bearing: bearing.value,
 				speed: 0.5,
@@ -1312,7 +1557,9 @@ let routeTrailFrame = 0;
 const hasActiveRoute = ref(false);
 const lastTrafficCenter = ref(null);
 const lastTrafficRefreshAt = ref(0);
+const lastTrafficZoom = ref(null);
 let trafficRefreshInterval = null;
+let trafficBootstrapTimer = null;
 let hotRoadPollTimer = null;
 const hotRoadSnapshotId = ref("");
 const hotRoadPollFailures = ref(0);
@@ -1323,32 +1570,40 @@ const ROUTE_TRAIL_DASH_FRAMES = [
 	[0.8, 2.6],
 ];
 
+const normalizeTrafficAnchor = (locationLike) => {
+	const lat = Number(locationLike?.lat ?? locationLike?.[0]);
+	const lng = Number(locationLike?.lng ?? locationLike?.[1]);
+	if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+	return { lat, lng };
+};
+
+const hasTrafficAnchorShifted = (
+	nextAnchor,
+	prevAnchor,
+	thresholdKm = TRAFFIC_RECOMPUTE_DISTANCE_KM,
+) => {
+	if (!nextAnchor && !prevAnchor) return false;
+	if (!nextAnchor || !prevAnchor) return true;
+	return (
+		calculateDistance(
+			prevAnchor.lat,
+			prevAnchor.lng,
+			nextAnchor.lat,
+			nextAnchor.lng,
+		) >= thresholdKm
+	);
+};
+
 const resolveTrafficAnchor = () => {
-	const userLoc = Array.isArray(props.userLocation) ? props.userLocation : null;
-	const userLat = Number(userLoc?.[0]);
-	const userLng = Number(userLoc?.[1]);
-	const hasUserLocation = Number.isFinite(userLat) && Number.isFinite(userLng);
+	const userAnchor = normalizeTrafficAnchor(props.userLocation);
+	if (userAnchor) return userAnchor;
 
 	const mapCenter = map.value?.getCenter?.();
 	const centerLat = Number(mapCenter?.lat);
 	const centerLng = Number(mapCenter?.lng);
-	const hasMapCenter = Number.isFinite(centerLat) && Number.isFinite(centerLng);
-
-	if (hasUserLocation && hasMapCenter) {
-		const userToCenterKm = calculateDistance(
-			userLat,
-			userLng,
-			centerLat,
-			centerLng,
-		);
-		if (userToCenterKm <= TRAFFIC_CENTER_FALLBACK_DISTANCE_KM) {
-			return { lat: userLat, lng: userLng };
-		}
+	if (Number.isFinite(centerLat) && Number.isFinite(centerLng)) {
 		return { lat: centerLat, lng: centerLng };
 	}
-
-	if (hasUserLocation) return { lat: userLat, lng: userLng };
-	if (hasMapCenter) return { lat: centerLat, lng: centerLng };
 	return null;
 };
 
@@ -1358,10 +1613,11 @@ const resolveTrafficAnchor = () => {
 
 const refreshTrafficSubset = async ({ force = false } = {}) => {
 	if (!map.value || !isMapReady.value) return;
-	if (mapLayerEffectsMode.value === "off") {
+	if (!allowTrafficFlowFx.value) {
 		stopCarAnimation();
 		lastTrafficCenter.value = null;
 		lastTrafficRefreshAt.value = Date.now();
+		lastTrafficZoom.value = null;
 		return;
 	}
 	const anchor = resolveTrafficAnchor();
@@ -1369,6 +1625,7 @@ const refreshTrafficSubset = async ({ force = false } = {}) => {
 	if (!anchor) {
 		lastTrafficCenter.value = null;
 		lastTrafficRefreshAt.value = Date.now();
+		lastTrafficZoom.value = null;
 		await upsertTrafficRoads({
 			userLocation: null,
 			radiusKm: TRAFFIC_RADIUS_KM,
@@ -1384,15 +1641,37 @@ const refreshTrafficSubset = async ({ force = false } = {}) => {
 			? calculateDistance(previous.lat, previous.lng, anchor.lat, anchor.lng)
 			: Number.POSITIVE_INFINITY;
 	const stale = now - lastTrafficRefreshAt.value >= TRAFFIC_REFRESH_INTERVAL_MS;
+	const currentZoom = Number(map.value?.getZoom?.() ?? 0);
+	const previousZoom = Number(lastTrafficZoom.value);
+	const crossedTrafficZoomThreshold =
+		Number.isFinite(currentZoom) &&
+		currentZoom >= TRAFFIC_FLOW_MIN_VISIBLE_ZOOM &&
+		(!Number.isFinite(previousZoom) ||
+			previousZoom < TRAFFIC_FLOW_MIN_VISIBLE_ZOOM);
+	const missingTrafficLayers =
+		Number.isFinite(currentZoom) &&
+		currentZoom >= TRAFFIC_FLOW_MIN_VISIBLE_ZOOM &&
+		!(
+			map.value?.getLayer?.("road-flow-core") &&
+			map.value?.getSource?.("road-flow-cars")
+		);
+	const shouldForceTrafficRefresh =
+		force || crossedTrafficZoomThreshold || missingTrafficLayers;
 
-	if (!force && movedKm < TRAFFIC_RECOMPUTE_DISTANCE_KM && !stale) return;
+	if (
+		!shouldForceTrafficRefresh &&
+		movedKm < TRAFFIC_RECOMPUTE_DISTANCE_KM &&
+		!stale
+	)
+		return;
 
 	lastTrafficCenter.value = { lat: anchor.lat, lng: anchor.lng };
 	lastTrafficRefreshAt.value = now;
+	lastTrafficZoom.value = Number.isFinite(currentZoom) ? currentZoom : null;
 	await upsertTrafficRoads({
 		userLocation: { lat: anchor.lat, lng: anchor.lng },
 		radiusKm: TRAFFIC_RADIUS_KM,
-		force,
+		force: shouldForceTrafficRefresh,
 	});
 };
 
@@ -1622,9 +1901,26 @@ const clearProgressiveEffectsTimer = () => {
 	}
 };
 
+const shouldDeferHeavyEffectsUntilInteraction = () =>
+	!mapUserInteracted.value &&
+	(IS_LOCALHOST_BROWSER || shouldPreferSmoothMobileRuntime.value);
+
 const runProgressiveHeavyEffects = (seq) => {
 	if (!map.value || !isMapReady.value) return;
 	if (seq !== progressiveEffectsSeq) return;
+	if (shouldDeferHeavyEffectsUntilInteraction()) {
+		removeHeatmapLayer();
+		stopAtmosphereLoop();
+		removeFirefliesLayer();
+		resetTrafficDashState();
+		stopRouteTrailAnimation();
+		applyRouteTrailVisibility();
+		applyFogSettings();
+		if (allowWeatherFx.value) {
+			updateWeatherVisuals();
+		}
+		return;
+	}
 	addNeonRoads();
 	if (allowHeatmap.value) addHeatmapLayer();
 	else removeHeatmapLayer();
@@ -1657,16 +1953,19 @@ const runProgressiveHeavyEffects = (seq) => {
 	}
 };
 
-const scheduleProgressiveHeavyEffects = () => {
+const scheduleProgressiveHeavyEffects = ({ immediate = false } = {}) => {
 	if (!map.value || !isMapReady.value) return;
 	const mapInstance = map.value;
 	const seq = ++progressiveEffectsSeq;
+	const deferUntilInteraction = shouldDeferHeavyEffectsUntilInteraction();
+	const primaryDelayMs = immediate ? 60 : deferUntilInteraction ? 2600 : 1200;
+	const idleDelayMs = immediate ? 40 : deferUntilInteraction ? 900 : 140;
 
 	clearProgressiveEffectsTimer();
 	progressiveEffectsTimer = window.setTimeout(() => {
 		progressiveEffectsTimer = null;
 		runProgressiveHeavyEffects(seq);
-	}, 1200);
+	}, primaryDelayMs);
 
 	mapInstance.once("idle", () => {
 		if (
@@ -1680,7 +1979,7 @@ const scheduleProgressiveHeavyEffects = () => {
 		progressiveEffectsTimer = window.setTimeout(() => {
 			progressiveEffectsTimer = null;
 			runProgressiveHeavyEffects(seq);
-		}, 140);
+		}, idleDelayMs);
 	});
 };
 
@@ -2538,9 +2837,9 @@ const refreshPins = async ({ localOnly = false } = {}) => {
 		currentZoom,
 		shops,
 		features:
-			lastGoodPinFeatures.length > 0
-				? lastGoodPinFeatures
-				: localFallbackFeatures,
+			localFallbackFeatures.length > 0
+				? localFallbackFeatures
+				: lastGoodPinFeatures,
 	});
 	if (immediateFallback.length > 0) {
 		applyFeaturesForRefresh({ seq, features: immediateFallback });
@@ -2611,64 +2910,74 @@ const refreshPins = async ({ localOnly = false } = {}) => {
 };
 
 const markMapUserInteraction = () => {
+	const wasInteracted = mapUserInteracted.value;
 	mapUserInteracted.value = true;
+	if (!wasInteracted && map.value && isMapReady.value) {
+		scheduleProgressiveHeavyEffects({ immediate: true });
+	}
 };
 
 // Bind events
-watch(isMapReady, (ready) => {
-	if (ready && map.value && isMapOperational()) {
-		if (SHOULD_EXPOSE_MAP_DEBUG && typeof window !== "undefined") {
-			window.__vibecityMapDebug = map.value;
+watch(
+	isMapReady,
+	(ready) => {
+		if (ready && map.value && isMapOperational()) {
+			if (SHOULD_EXPOSE_MAP_DEBUG && typeof window !== "undefined") {
+				window.__vibecityMapDebug = map.value;
+			}
+			map.value.off("moveend", scheduleMapRefresh);
+			map.value.off("zoomend", scheduleMapRefresh);
+			map.value.off("move", handleMapMoveForEnhancements);
+			map.value.off("zoom", handleMapMoveForEnhancements);
+			map.value.off("moveend", handleMapMoveEndForWeather);
+			map.value.off("movestart", handleMoveStart3d);
+			map.value.off("moveend", handleMoveEnd3d);
+			map.value.off("style.load", handleMapStyleLoad);
+			map.value.off("dragstart", markMapUserInteraction);
+			map.value.off("zoomstart", markMapUserInteraction);
+			map.value.off("rotatestart", markMapUserInteraction);
+			map.value.off("pitchstart", markMapUserInteraction);
+
+			map.value.on("moveend", scheduleMapRefresh);
+			map.value.on("zoomend", scheduleMapRefresh);
+			map.value.on("move", handleMapMoveForEnhancements);
+			map.value.on("zoom", handleMapMoveForEnhancements);
+			map.value.on("moveend", handleMapMoveEndForWeather);
+			map.value.on("movestart", handleMoveStart3d);
+			map.value.on("moveend", handleMoveEnd3d);
+			map.value.on("style.load", handleMapStyleLoad);
+			map.value.on("dragstart", markMapUserInteraction);
+			map.value.on("zoomstart", markMapUserInteraction);
+			map.value.on("rotatestart", markMapUserInteraction);
+			map.value.on("pitchstart", markMapUserInteraction);
+			currentMapZoom.value = map.value.getZoom();
+			scheduleMapRefresh({ allowSameViewport: true });
+			map.value.once("idle", () => {
+				void ensureBaseMapLayersReady();
+				scheduleMapRefresh({ force: true });
+			});
+			void ensureBaseMapLayersReady();
+			syncBuildingInfoPopupFromSelection();
+
+			// Run initial marker update
+			requestUpdateMarkers();
+
+			// Atmosphere updates now handled by composable watcher
+			if (allowWeatherFx.value) {
+				refreshWeather();
+				// applyFogSettings(); // Handled by composable
+				// updateWeatherVisuals(); // Handled by composable
+			}
+
+			if (soundEnabled.value && !IS_E2E) {
+				attachSoundGestureListener();
+				syncSoundZoneFromSelection();
+				updateSoundVolumeFromZoom(true);
+			}
 		}
-		map.value.off("moveend", scheduleMapRefresh);
-		map.value.off("zoomend", scheduleMapRefresh);
-		map.value.off("move", handleMapMoveForEnhancements);
-		map.value.off("zoom", handleMapMoveForEnhancements);
-		map.value.off("moveend", handleMapMoveEndForWeather);
-		map.value.off("movestart", handleMoveStart3d);
-		map.value.off("moveend", handleMoveEnd3d);
-		map.value.off("style.load", handleMapStyleLoad);
-		map.value.off("dragstart", markMapUserInteraction);
-		map.value.off("zoomstart", markMapUserInteraction);
-		map.value.off("rotatestart", markMapUserInteraction);
-		map.value.off("pitchstart", markMapUserInteraction);
-
-		map.value.on("moveend", scheduleMapRefresh);
-		map.value.on("zoomend", scheduleMapRefresh);
-		map.value.on("move", handleMapMoveForEnhancements);
-		map.value.on("zoom", handleMapMoveForEnhancements);
-		map.value.on("moveend", handleMapMoveEndForWeather);
-		map.value.on("movestart", handleMoveStart3d);
-		map.value.on("moveend", handleMoveEnd3d);
-		map.value.on("style.load", handleMapStyleLoad);
-		map.value.on("dragstart", markMapUserInteraction);
-		map.value.on("zoomstart", markMapUserInteraction);
-		map.value.on("rotatestart", markMapUserInteraction);
-		map.value.on("pitchstart", markMapUserInteraction);
-		currentMapZoom.value = map.value.getZoom();
-		scheduleMapRefresh({ allowSameViewport: true });
-		map.value.once("idle", () => {
-			scheduleMapRefresh({ force: true });
-		});
-		syncBuildingInfoPopupFromSelection();
-
-		// Run initial marker update
-		requestUpdateMarkers();
-
-		// Atmosphere updates now handled by composable watcher
-		if (allowWeatherFx.value) {
-			refreshWeather();
-			// applyFogSettings(); // Handled by composable
-			// updateWeatherVisuals(); // Handled by composable
-		}
-
-		if (soundEnabled.value && !IS_E2E) {
-			attachSoundGestureListener();
-			syncSoundZoneFromSelection();
-			updateSoundVolumeFromZoom(true);
-		}
-	}
-});
+	},
+	{ immediate: true },
+);
 
 watch(
 	[isMapReady, mapInitRequested],
@@ -3028,6 +3337,12 @@ const attachCoinLayerWithFallback = ({ allowRetry = true } = {}) => {
  */
 const setupMapLayers = async () => {
 	if (!map.value) return;
+	if (!map.value.isStyleLoaded?.()) {
+		map.value.once("style.load", () => {
+			void setupMapLayers();
+		});
+		return;
+	}
 	await loadMapImages(map.value);
 	try {
 		map.value.setTerrain?.(null);
@@ -3042,7 +3357,11 @@ const setupMapLayers = async () => {
 	applyRouteTrailVisibility();
 	applyFogSettings();
 	addNeonRoads();
-	addCarAnimation({ sourceId: TRAFFIC_NEON_SOURCE_ID });
+	if (allowTrafficFlowFx.value) {
+		addCarAnimation({ sourceId: TRAFFIC_NEON_SOURCE_ID });
+	} else {
+		stopCarAnimation();
+	}
 	if (allowHeatmap.value) {
 		addHeatmapLayer();
 	}
@@ -3304,33 +3623,7 @@ const setupMapLayers = async () => {
 	updateSelectedPinLayerFilter(props.highlightedShopId);
 
 	// 6. User Location
-	if (!map.value.getSource("user-location")) {
-		map.value.addSource("user-location", {
-			type: "geojson",
-			data: { type: "FeatureCollection", features: [] },
-		});
-		map.value.addLayer({
-			id: "user-location-outer",
-			type: "circle",
-			source: "user-location",
-			paint: {
-				"circle-radius": 15,
-				"circle-color": "#3B82F6",
-				"circle-opacity": 0.2,
-			},
-		});
-		map.value.addLayer({
-			id: "user-location-inner",
-			type: "circle",
-			source: "user-location",
-			paint: {
-				"circle-radius": 6,
-				"circle-color": "#3B82F6",
-				"circle-stroke-width": 2,
-				"circle-stroke-color": "#fff",
-			},
-		});
-	}
+	ensureUserLocationLayers();
 
 	// 7. Register neon sign layers once per style after the pin source exists.
 	if (map.value.isStyleLoaded?.()) {
@@ -3338,19 +3631,26 @@ const setupMapLayers = async () => {
 	}
 };
 
+const ensureBaseMapLayersReady = async () => {
+	if (!map.value || !isMapReady.value) return;
+	if (map.value.getSource(PIN_SOURCE_ID)) return;
+	await setupMapLayers();
+	updateMapSources();
+	requestUpdateMarkers();
+	updateEventMarkers();
+	scheduleTrafficFlowBootstrap();
+};
+
 // Update GeoJSON sources
 const updateMapSources = () => {
 	if (!isMapOperational()) return;
 
 	// 1. Update user location
-	if (map.value.getSource("user-location") && props.userLocation) {
-		applySourceData("user-location", {
-			type: "Feature",
-			geometry: {
-				type: "Point",
-				coordinates: [props.userLocation[1], props.userLocation[0]],
-			},
-		});
+	if (ensureUserLocationLayers()) {
+		applySourceData(
+			USER_LOCATION_SOURCE_ID,
+			buildUserLocationFeatureCollection(),
+		);
 	}
 
 	void refreshTrafficSubset();
@@ -3508,6 +3808,7 @@ watch(isMapReady, async (ready) => {
 		mapDebugLog("✅ Map Core Ready - Setting up Layers");
 		await setupMapLayers();
 		updateMapSources();
+		scheduleTrafficFlowBootstrap();
 		refreshSmartPulseTargets();
 		requestUpdateMarkers();
 		updateEventMarkers();
@@ -3566,25 +3867,30 @@ const clearPopupRepairTimer = () => {
 		popupRepairTimer = null;
 	}
 };
-const getPopupLiftOffset = (item) => {
+const getPopupLiftOffset = (item, surface = "preview") => {
 	const pinType = String(item?.pin_type || "")
 		.trim()
 		.toLowerCase();
-	if (
-		pinType === "giant" ||
-		item?.is_giant_active === true ||
-		item?.isGiantPin === true
-	) {
-		return 64;
-	}
-	if (pinType === "event") return 56;
-	if (String(item?.status || "").toUpperCase() === "LIVE" || item?.isLive) {
-		return 42;
-	}
-	if (item?.isPromoted === true || item?.boostActive === true) {
-		return 40;
-	}
-	return 36;
+	const baseLift = (() => {
+		if (
+			pinType === "giant" ||
+			item?.is_giant_active === true ||
+			item?.isGiantPin === true
+		) {
+			return 112;
+		}
+		if (pinType === "event") return 96;
+		if (String(item?.status || "").toUpperCase() === "LIVE" || item?.isLive) {
+			return 82;
+		}
+		if (item?.isPromoted === true || item?.boostActive === true) {
+			return 76;
+		}
+		return 72;
+	})();
+	return surface === "preview"
+		? baseLift + getPreviewPopupClearancePx()
+		: baseLift;
 };
 const getSelectionChromeBounds = (surface = "preview") => {
 	const mapInstance = map.value;
@@ -3601,7 +3907,7 @@ const getSelectionChromeBounds = (surface = "preview") => {
 		.querySelector('[data-testid="bottom-feed"]')
 		?.getBoundingClientRect?.();
 	const modalRect = document
-		.querySelector('[data-testid="vibe-modal"]')
+		.querySelector('[data-testid="vibe-modal-surface"]')
 		?.getBoundingClientRect?.();
 
 	const chromeBottom = Math.max(
@@ -3613,9 +3919,20 @@ const getSelectionChromeBounds = (surface = "preview") => {
 		Math.round(mapRect.bottom - Number(props.uiBottomOffset || 0)),
 		Math.round(bottomFeedRect?.top || mapRect.bottom),
 	);
+
+	// Fallback for modal top if it hasn't rendered yet (70% height on mobile, 40% on desktop)
+	const isNarrow = isNarrowDetailViewport();
+	const fallbackModalTop = isNarrow
+		? mapRect.top + mapRect.height * 0.3
+		: mapRect.top + mapRect.height * 0.1;
+
+	const modalTop =
+		modalRect?.top ?? (surface === "detail" ? fallbackModalTop : previewBottom);
+
+	const detailModalGapPx = getDetailSelectionModalGapPx();
 	const detailBottom = Math.min(
 		previewBottom,
-		Math.round(modalRect?.top || previewBottom),
+		Math.round(modalTop) - (surface === "detail" ? detailModalGapPx : 0),
 	);
 	const safeTop = Math.max(
 		Math.round(mapRect.top + POPUP_SAFE_BUFFER_PX),
@@ -3643,8 +3960,13 @@ const getSelectionFlightGeometry = (surface = "preview") => {
 	const topPad = Math.max(0, Math.round(safeTop - mapRect.top));
 	const bottomPad = Math.max(0, Math.round(mapRect.bottom - safeBottom));
 	const usableHeight = Math.max(180, safeBottom - safeTop);
+	const detailTargetRatio = getDetailSelectionTargetRatio();
+	const detailVisualLiftPx =
+		surface === "detail" ? getDetailSelectionVisualLiftPx() : 0;
 	const targetPinViewportY =
-		safeTop + usableHeight * (surface === "detail" ? 0.5 : 0.7);
+		safeTop +
+		usableHeight * (surface === "detail" ? detailTargetRatio : 0.7) -
+		detailVisualLiftPx;
 	const targetPinContainerY = targetPinViewportY - mapRect.top;
 	const offsetY = Math.round(containerHeight / 2 - targetPinContainerY);
 	return {
@@ -3683,9 +4005,9 @@ const keepPopupAbovePin = (popup, item, { surface = "preview" } = {}) => {
 	const mapHost = mapContainer.value || mapInstance?.getContainer?.();
 	if (!popupEl || !mapInstance || !mapHost) return null;
 
-	popupEl.style.zIndex = "6050";
+	popupEl.style.zIndex = String(Z.MAPBOX_POPUP);
 	popupEl.dataset.anchorPolicy = "above-pin";
-	popupEl.dataset.popupLift = String(getPopupLiftOffset(item));
+	popupEl.dataset.popupLift = String(getPopupLiftOffset(item, surface));
 
 	const overflowState = measurePopupOverflow(popupEl, surface);
 	if (!overflowState) return null;
@@ -3766,7 +4088,7 @@ const showPopup = (
 		closeOnClick: false,
 		className: "vibe-maplibre-popup",
 		maxWidth: "384px",
-		offset: [0, -getPopupLiftOffset(item)],
+		offset: [0, -getPopupLiftOffset(item, surface)],
 		anchor: "bottom",
 	})
 		.setLngLat([lng, lat])
@@ -3989,6 +4311,8 @@ const runSelectionIntent = async (intent) => {
 		Number.isFinite(lat) &&
 		Number.isFinite(lng)
 	) {
+		const previewSelectionZoom = 16.8;
+		const detailSelectionZoom = 16.95;
 		const geometry = getSelectionFlightGeometry(surface);
 		popupSettleState.value = "camera-pending";
 		try {
@@ -3996,12 +4320,12 @@ const runSelectionIntent = async (intent) => {
 				center: [lng, lat],
 				zoom: Math.max(
 					map.value.getZoom?.() || 16.1,
-					surface === "detail" ? 16.2 : 16.05,
+					surface === "detail" ? detailSelectionZoom : previewSelectionZoom,
 				),
 				pitch: 60,
 				bearing: bearing.value,
 				essential: true,
-				duration: 850,
+				duration: isNarrowDetailViewport() ? 680 : 850,
 				curve: 1,
 				easing: (t) => t * (2 - t),
 				offset: [0, geometry?.offsetY || 0],
@@ -4022,11 +4346,15 @@ const runSelectionIntent = async (intent) => {
 	}
 
 	if (activeSelectionFlightSeq !== requestId) return;
-	if (props.isGiantPinView || intent.popupMode === "none") {
+	if (
+		surface === "detail" ||
+		props.isGiantPinView ||
+		intent.popupMode === "none"
+	) {
+		closeActivePopup();
 		popupSettleState.value = "idle";
 		return;
 	}
-
 	popupSettleState.value = "popup-mounting";
 	const popup = showPopup(shop, {
 		force: true,
@@ -4038,6 +4366,14 @@ const runSelectionIntent = async (intent) => {
 		return;
 	}
 	await settlePopupAfterMount(popup, shop, { requestId, surface });
+	if (activeSelectionFlightSeq !== requestId) return;
+	emit("selection-flight-complete", {
+		requestId,
+		shop,
+		shopId: String(shop?.id ?? intent.shopId ?? "").trim(),
+		source: String(intent.source || "unknown"),
+		surface,
+	});
 };
 
 const updateMarkers = () => {
@@ -4118,7 +4454,7 @@ const handleAggregatePinTap = ({ aggregateLevel, feature }) => {
 			break;
 	}
 
-	mapUserInteracted.value = true;
+	markMapUserInteraction();
 	map.value.easeTo({
 		center: coordinates,
 		zoom: Math.max(Number(map.value.getZoom?.() ?? 0), targetZoom),
@@ -4362,6 +4698,8 @@ useNeonPinsLayer(
 			handleMarkerClick(shop);
 		},
 		highlightedShopId: computed(() => props.highlightedShopId),
+		activePopupShopId: computed(() => activePopupShopId.value),
+		maxVisiblePins: isPerfRestricted.value ? 12 : 30,
 	},
 );
 
@@ -4501,6 +4839,8 @@ watch(isMapReady, (ready) => {
 	if (!ready || !map.value || !isMapOperational()) return;
 	queueMapResize(true);
 	setupMapInteractions();
+	ensureUserLocationLayers();
+	updateUserLocation();
 	refreshSmartPulseTargets();
 	// Task 1.6: Measure map interactive time on first idle
 	map.value.once("idle", () => {
@@ -4577,28 +4917,12 @@ watch(publicMapReady, (ready) => {
 // ✅ Update User Location
 const updateUserLocation = () => {
 	if (!isMapOperational()) return;
-	if (!map.value.getSource("user-location")) return;
-
-	if (props.userLocation && props.userLocation.length >= 2) {
-		const [lat, lng] = props.userLocation;
-		applySourceData("user-location", {
-			type: "FeatureCollection",
-			features: [
-				{
-					type: "Feature",
-					geometry: {
-						type: "Point",
-						coordinates: [lng, lat],
-					},
-				},
-			],
-		});
-	} else {
-		applySourceData("user-location", {
-			type: "FeatureCollection",
-			features: [],
-		});
-	}
+	syncUserLocationDomMarker();
+	if (!ensureUserLocationLayers()) return;
+	applySourceData(
+		USER_LOCATION_SOURCE_ID,
+		buildUserLocationFeatureCollection(),
+	);
 };
 
 let lastMoveEnhanceAt = 0;
@@ -4631,8 +4955,119 @@ const set3dBuildingsVisible = (visible) => {
 const handleMoveStart3d = () => set3dBuildingsVisible(false);
 const handleMoveEnd3d = () => set3dBuildingsVisible(true);
 
+const getTrafficFlowRenderState = () => {
+	const mapInstance = map.value;
+	const hasFlowLayer = Boolean(mapInstance?.getLayer?.("road-flow-core"));
+	const hasCarSource = Boolean(mapInstance?.getSource?.("road-flow-cars"));
+	const hasLocalSource = Boolean(
+		mapInstance?.getSource?.(TRAFFIC_LOCAL_SOURCE_ID),
+	);
+	const hasNeonSource = Boolean(
+		mapInstance?.getSource?.(TRAFFIC_NEON_SOURCE_ID),
+	);
+	let renderedRoadFlow = 0;
+	let renderedCarCore = 0;
+	let renderedCarSymbol = 0;
+
+	if (
+		mapInstance &&
+		typeof mapInstance.queryRenderedFeatures === "function" &&
+		hasFlowLayer
+	) {
+		try {
+			renderedRoadFlow = mapInstance.queryRenderedFeatures(undefined, {
+				layers: ["road-flow-core"],
+			}).length;
+			renderedCarCore = mapInstance.getLayer?.("road-flow-car-core")
+				? mapInstance.queryRenderedFeatures(undefined, {
+						layers: ["road-flow-car-core"],
+					}).length
+				: 0;
+			renderedCarSymbol = mapInstance.getLayer?.("road-flow-car-symbol")
+				? mapInstance.queryRenderedFeatures(undefined, {
+						layers: ["road-flow-car-symbol"],
+					}).length
+				: 0;
+		} catch {
+			// Ignore render-query races during map style transitions.
+		}
+	}
+
+	return {
+		hasFlowLayer,
+		hasCarSource,
+		hasLocalSource,
+		hasNeonSource,
+		renderedRoadFlow,
+		renderedCarCore,
+		renderedCarSymbol,
+	};
+};
+
+const hasTrafficFlowLayersMounted = () => {
+	const state = getTrafficFlowRenderState();
+	return state.hasFlowLayer && state.hasCarSource;
+};
+
+const hasTrafficFlowCarsVisible = () => {
+	const currentZoom = Number(map.value?.getZoom?.() ?? 0);
+	if (
+		!Number.isFinite(currentZoom) ||
+		currentZoom < TRAFFIC_FLOW_MIN_VISIBLE_ZOOM
+	) {
+		return true;
+	}
+	const state = getTrafficFlowRenderState();
+	if (!state.hasFlowLayer || !state.hasCarSource) return false;
+	if (state.renderedRoadFlow <= 0) return false;
+	return Math.max(state.renderedCarCore, state.renderedCarSymbol) > 0;
+};
+
+const resolveTrafficFlowBootstrapSourceId = () => {
+	const state = getTrafficFlowRenderState();
+	if (state.hasLocalSource) return TRAFFIC_LOCAL_SOURCE_ID;
+	if (state.hasNeonSource) return TRAFFIC_NEON_SOURCE_ID;
+	return TRAFFIC_NEON_SOURCE_ID;
+};
+
+const ensureTrafficFlowBootstrap = () => {
+	if (!map.value || !isMapReady.value || !allowTrafficFlowFx.value) return;
+	const currentZoom = Number(map.value.getZoom?.() ?? 0);
+	if (
+		!Number.isFinite(currentZoom) ||
+		currentZoom < TRAFFIC_FLOW_MIN_VISIBLE_ZOOM
+	) {
+		return;
+	}
+	if (hasTrafficFlowCarsVisible()) return;
+	const sourceId = resolveTrafficFlowBootstrapSourceId();
+	void refreshTrafficSubset({ force: true });
+	addCarAnimation({ sourceId });
+};
+
+const scheduleTrafficFlowBootstrap = (
+	delayMs = 180,
+	remainingAttempts = TRAFFIC_BOOTSTRAP_MAX_ATTEMPTS,
+) => {
+	if (typeof window === "undefined") return;
+	if (trafficBootstrapTimer) {
+		clearTimeout(trafficBootstrapTimer);
+	}
+	trafficBootstrapTimer = window.setTimeout(() => {
+		trafficBootstrapTimer = null;
+		ensureTrafficFlowBootstrap();
+		if (!hasTrafficFlowCarsVisible() && remainingAttempts > 1) {
+			scheduleTrafficFlowBootstrap(
+				TRAFFIC_BOOTSTRAP_RETRY_DELAY_MS,
+				remainingAttempts - 1,
+			);
+		}
+	}, delayMs);
+};
+
 const handleMapMoveEndForWeather = () => {
 	void refreshTrafficSubset();
+	scheduleTrafficFlowBootstrap();
 	if (!allowWeatherFx.value) return;
 	refreshWeather();
 	applyFogSettings();
@@ -4664,26 +5099,122 @@ const handleTerrainSourceOnStyleLoad = () => {
 };
 
 const handleMapStyleLoad = () => {
+	void ensureBaseMapLayersReady();
 	setCyberpunkAtmosphere();
 	handleTerrainSourceOnStyleLoad();
 	resetTrafficDashState();
 	applyFogSettings();
 	syncBuildingInfoPopupFromSelection();
 	updateSoundVolumeFromZoom(true);
-	addCarAnimation({ sourceId: TRAFFIC_NEON_SOURCE_ID });
-	void refreshTrafficSubset({ force: true });
+	if (allowTrafficFlowFx.value) {
+		addCarAnimation({ sourceId: TRAFFIC_NEON_SOURCE_ID });
+		scheduleTrafficFlowBootstrap();
+	} else {
+		stopCarAnimation();
+	}
 	scheduleProgressiveHeavyEffects();
 };
 
 // ✅ Focus Location (Fly To) - Smooth & Precise Centering
 // Focus Location moved to composable
-const focusLocation = (coords, targetZoom, pitch, extraBottomOffset) => {
-	focusLocationCore(coords, targetZoom, pitch ?? 60, extraBottomOffset);
+const focusLocation = (
+	coords,
+	targetZoom,
+	pitch,
+	extraBottomOffset,
+	cameraOptions,
+) => {
+	if (cameraOptions?.cameraMode === "locate") {
+		hasAutoCenteredOnUser.value = true;
+	}
+	focusLocationCore(
+		coords,
+		targetZoom,
+		pitch ?? 60,
+		extraBottomOffset,
+		cameraOptions,
+	);
+};
+
+const locateUser = (
+	coords,
+	targetZoom = 17,
+	extraBottomOffset = 0,
+	options = {},
+) => {
+	hasAutoCenteredOnUser.value = true;
+	const { refine = false, ...cameraOptions } = options || {};
+	syncUserLocationDomMarker(coords);
+	if (ensureUserLocationLayers()) {
+		applySourceData(
+			USER_LOCATION_SOURCE_ID,
+			buildUserLocationFeatureCollectionFromLngLat(coords),
+		);
+	}
+	focusLocationCore(coords, targetZoom, 60, extraBottomOffset, {
+		cameraMode: "locate",
+		duration: refine ? 900 : 1200,
+		interrupt: true,
+		...cameraOptions,
+	});
 };
 
 // Center on User moved to composable
 const centerOnUser = () => {
 	centerOnUserCore();
+};
+
+let userLocationMarker = null;
+const removeUserLocationMarker = () => {
+	if (!userLocationMarker) return;
+	userLocationMarker.remove();
+	userLocationMarker = null;
+};
+const createUserLocationMarkerElement = () => {
+	if (typeof document === "undefined") return null;
+	const root = document.createElement("div");
+	root.className = "vibe-user-location-marker";
+	root.innerHTML = `
+		<span class="vibe-user-location-marker__pulse"></span>
+		<span class="vibe-user-location-marker__ring"></span>
+		<span class="vibe-user-location-marker__dot"></span>
+	`;
+	return root;
+};
+const ensureUserLocationDomMarker = () => {
+	if (!map.value || userLocationMarker) return userLocationMarker;
+	const element = createUserLocationMarkerElement();
+	if (!element) return null;
+	userLocationMarker = new maplibregl.Marker({
+		element,
+		anchor: "center",
+		pitchAlignment: "viewport",
+		rotationAlignment: "viewport",
+	});
+	return userLocationMarker;
+};
+const syncUserLocationDomMarker = (coords = null) => {
+	if (!map.value) return;
+	const lngLat = Array.isArray(coords)
+		? [Number(coords[0]), Number(coords[1])]
+		: normalizeUserLocationToCenter(props.userLocation);
+	if (
+		!Array.isArray(lngLat) ||
+		lngLat.length < 2 ||
+		!Number.isFinite(lngLat[0]) ||
+		!Number.isFinite(lngLat[1])
+	) {
+		removeUserLocationMarker();
+		return;
+	}
+	const marker = ensureUserLocationDomMarker();
+	if (!marker) return;
+	marker.setLngLat(lngLat);
+	try {
+		marker.addTo(map.value);
+	} catch {
+		// Ignore duplicate add attempts during style churn.
+	}
 };
 
 const applyStyleIfNeeded = (isDarkMode) => {
@@ -4764,10 +5295,18 @@ watch(
 	},
 );
 
-watch([effectiveMotionBudget, isPerfRestricted], () => {
+watch([trafficFlowQuality, effectiveMotionBudget, isPerfRestricted], () => {
 	refreshSmartPulseTargets();
+	if (!allowTrafficFlowFx.value) {
+		stopCarAnimation();
+	}
 	if (isPerfRestricted.value) {
 		resetTrafficDashState();
+		return;
+	}
+	if (map.value && isMapReady.value && allowTrafficFlowFx.value) {
+		void refreshTrafficSubset({ force: true });
+		scheduleTrafficFlowBootstrap();
 	}
 });
 
@@ -4925,7 +5464,18 @@ watch(
 				const trans = { duration: 400, delay: 0 };
 				const transFast = { duration: 200, delay: 0 };
 				if (id) {
-					const dimExpr = ["case", ["==", ["get", "id"], String(id)], 1.0, 0.3];
+					const dimExpr = [
+						"case",
+						["==", ["get", "id"], String(id)],
+						1.0,
+						0.72,
+					];
+					const hitboxExpr = [
+						"case",
+						["==", ["get", "id"], String(id)],
+						0.01,
+						0.005,
+					];
 					if (map.value.getLayer(PIN_LAYER_ID)) {
 						map.value.setPaintProperty(
 							PIN_LAYER_ID,
@@ -4949,7 +5499,7 @@ watch(
 						map.value.setPaintProperty(
 							PIN_HITBOX_LAYER_ID,
 							"circle-opacity",
-							dimExpr,
+							hitboxExpr,
 						);
 					}
 				} else {
@@ -5019,6 +5569,39 @@ watch(
 );
 
 watch(
+	[() => props.userLocation, () => props.activeProvince],
+	([nextUserLocation, nextProvince], [prevUserLocation, prevProvince]) => {
+		if (!map.value || !isMapReady.value || !allowTrafficFlowFx.value) return;
+		const nextAnchor = normalizeTrafficAnchor(nextUserLocation);
+		const prevAnchor = normalizeTrafficAnchor(prevUserLocation);
+		const provinceChanged =
+			String(nextProvince || "") !== String(prevProvince || "");
+		const anchorShifted = hasTrafficAnchorShifted(nextAnchor, prevAnchor);
+		const trafficFlowNeedsBootstrap = !hasTrafficFlowCarsVisible();
+		if (!provinceChanged && !anchorShifted && !trafficFlowNeedsBootstrap)
+			return;
+		const shouldForceRefresh =
+			provinceChanged ||
+			anchorShifted ||
+			trafficFlowNeedsBootstrap ||
+			!nextAnchor ||
+			!prevAnchor;
+		void refreshTrafficSubset({ force: shouldForceRefresh });
+		scheduleTrafficFlowBootstrap(shouldForceRefresh ? 90 : 180);
+	},
+	{ deep: false },
+);
+
+watch(
+	[hasActiveDetailSelection, publicMapReady],
+	([hasDetailSelection, ready]) => {
+		if (!ready) return;
+		syncDetailModalMapGestures(hasDetailSelection);
+	},
+	{ immediate: true },
+);
+
+watch(
 	[() => props.buildings, activeEvents],
 	() => {
 		updateEventMarkers();
@@ -5040,6 +5623,8 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+	syncDetailModalMapGestures(false);
+	removeUserLocationMarker();
 	deferredFeaturesDisposed = true;
 	stopDeferredFeatureWatches();
 	if (mapInitRequested.value && !isMapReady.value) {
@@ -5143,6 +5728,10 @@ onUnmounted(() => {
 		clearInterval(trafficRefreshInterval);
 		trafficRefreshInterval = null;
 	}
+	if (trafficBootstrapTimer) {
+		clearTimeout(trafficBootstrapTimer);
+		trafficBootstrapTimer = null;
+	}
 	clearHotRoadPollTimer();
 
 	teardownMap();
@@ -5171,6 +5760,7 @@ defineExpose({
 	map,
 	isMapReady,
 	focusLocation,
+	locateUser,
 	centerOnUser,
 	webGLSupported,
 	maplessMode,
@@ -5223,6 +5813,18 @@ defineExpose({
       v-if="shouldShowMapLoadingSkeleton"
       class="absolute inset-0 z-[1100] pointer-events-none"
     />
+
+    <button
+      v-if="shouldShowLocateMeControl"
+      type="button"
+      data-testid="map-locate-me"
+      class="absolute right-4 z-[2300] rounded-full border border-white/15 bg-black/55 px-3 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-white shadow-[0_12px_32px_rgba(2,6,23,0.34)] backdrop-blur-md transition hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+      :style="locateMeControlStyle"
+      :aria-label="$t('auto.k_1ccc1cf2') || 'My Location'"
+      @click="emit('locate-me')"
+    >
+      {{ $t("auto.k_1ccc1cf2") || "My Location" }}
+    </button>
 
     <div
       v-if="IS_DEV_BUILD && RESOLVED_STYLE_MODE === 'quiet'"
@@ -5435,7 +6037,7 @@ defineExpose({
     <!-- Hidden keyboard-accessible venue list for screen readers / keyboard users -->
     <ul
       role="list"
-      :aria-label="$t('map.venues_list') || 'Venues'"
+      :aria-label="tt('map.venues_list', 'Venues')"
       class="sr-only"
     >
       <li
@@ -5455,7 +6057,7 @@ defineExpose({
 <style>
 /* MapLibre Popup Overrides */
 .maplibregl-popup {
-  z-index: 3000 !important;
+  z-index: 4300 !important;
 }
 
 .maplibregl-popup-content {
@@ -5531,7 +6133,59 @@ defineExpose({
 }
 
 .vibe-maplibre-popup {
-  z-index: 10000 !important;
+  z-index: 4300 !important;
+}
+
+.vibe-user-location-marker {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  pointer-events: none;
+}
+
+.vibe-user-location-marker__pulse,
+.vibe-user-location-marker__ring,
+.vibe-user-location-marker__dot {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+}
+
+.vibe-user-location-marker__pulse {
+  width: 34px;
+  height: 34px;
+  background: rgba(96, 165, 250, 0.22);
+  animation: vibe-user-location-pulse 1.8s ease-out infinite;
+}
+
+.vibe-user-location-marker__ring {
+  width: 18px;
+  height: 18px;
+  background: rgba(59, 130, 246, 0.14);
+  border: 2px solid rgba(191, 219, 254, 0.95);
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.18);
+}
+
+.vibe-user-location-marker__dot {
+  width: 12px;
+  height: 12px;
+  background: #2563eb;
+  border: 3px solid #fff;
+  box-shadow:
+    0 0 0 2px rgba(37, 99, 235, 0.28),
+    0 6px 18px rgba(37, 99, 235, 0.3);
+}
+
+@keyframes vibe-user-location-pulse {
+  0% {
+    opacity: 0.85;
+    transform: translate(-50%, -50%) scale(0.72);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.28);
+  }
 }
 
 .vibe-popup button {

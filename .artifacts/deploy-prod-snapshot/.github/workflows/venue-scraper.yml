@@ -1,0 +1,74 @@
+name: 🇹🇭 Thailand Venue Scraper
+
+on:
+  # Run every 15 minutes for fast data refresh
+  schedule:
+    - cron: '*/15 * * * *'
+
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      batch_size:
+        description: 'Provinces per batch (5-10)'
+        required: false
+        default: '5'
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+
+jobs:
+  scrape-and-import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📚 Install dependencies
+        run: |
+          pip install httpx supabase python-dotenv
+
+      - name: 🕷️ Run OSM Scraper
+        working-directory: backend/scripts
+        run: |
+          echo "🚀 Starting Thailand-wide venue scrape..."
+          python osm_scraper.py
+          echo "✅ Scraping complete!"
+
+      - name: 📤 Import to Supabase
+        working-directory: backend/scripts
+        run: |
+          echo "📥 Importing venues to Supabase..."
+          python data_pipeline.py
+          echo "✅ Import complete!"
+
+      - name: 📊 Generate Report
+        working-directory: backend/scripts
+        run: |
+          echo "## 📊 Scrape Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f thailand_venues.json ]; then
+            TOTAL=$(python -c "import json; print(json.load(open('thailand_venues.json'))['meta']['total_venues'])")
+            PROVINCES=$(python -c "import json; print(json.load(open('thailand_venues.json'))['meta']['provinces_scraped'])")
+            echo "- **Total Venues**: $TOTAL" >> $GITHUB_STEP_SUMMARY
+            echo "- **Provinces Scraped**: $PROVINCES" >> $GITHUB_STEP_SUMMARY
+            echo "- **Timestamp**: $(date -u)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ No data file found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: 📁 Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: venue-data-${{ github.run_number }}
+          path: backend/scripts/thailand_venues.json
+          retention-days: 7

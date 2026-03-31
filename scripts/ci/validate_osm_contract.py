@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import re
+import sys
 from typing import Iterable
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -39,6 +41,7 @@ REQUIRED_COLUMNS = (
 FORBIDDEN_STATUSES = ("LIVE", "OFF")
 REMOVED_QUERY_PARAMS = {"sslmode", "sslrootcert", "sslcert", "sslkey", "channel_binding"}
 SSL_REQUIRE_MODES = {"require", "verify-full"}
+logger = logging.getLogger("validate_osm_contract")
 
 
 def _sanitize_dsn(url: str) -> tuple[str, dict]:
@@ -100,7 +103,7 @@ async def _validate() -> dict:
     clean_dsn, connect_args = _sanitize_dsn(database_url)
     try:
         conn = await asyncpg.connect(clean_dsn, **connect_args)
-    except Exception as exc:
+    except (asyncpg.PostgresError, OSError) as exc:
         return {
             "ok": False,
             "errors": [f"Database connection failed: {exc}"],
@@ -196,29 +199,30 @@ async def _validate() -> dict:
 
 def _print_plain(report: dict) -> None:
     if report.get("ok"):
-        print("PASS: OSM contract validation succeeded")
+        logger.info("PASS: OSM contract validation succeeded")
     else:
-        print("FAIL: OSM contract validation failed")
+        logger.info("FAIL: OSM contract validation failed")
     if "table_exists" in report:
-        print(f"- table_exists: {report.get('table_exists')}")
+        logger.info("- table_exists: %s", report.get("table_exists"))
     if report.get("missing_columns"):
-        print("- missing_columns:", ", ".join(report["missing_columns"]))
+        logger.info("- missing_columns: %s", ", ".join(report["missing_columns"]))
     checks = report.get("checks") or {}
     for key in sorted(checks.keys()):
-        print(f"- {key}: {checks[key]}")
+        logger.info("- %s: %s", key, checks[key])
     if report.get("forbidden_status_counts"):
         counts = ", ".join(
             f"{k}={v}" for k, v in report["forbidden_status_counts"].items()
         )
-        print("- forbidden_status_counts:", counts)
+        logger.info("- forbidden_status_counts: %s", counts)
     for error in report.get("errors", []):
-        print(f"- error: {error}")
+        logger.info("- error: %s", error)
 
 
 def main() -> int:
+    logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
     report = asyncio.run(_validate())
     _print_plain(report)
-    print(json.dumps(report, ensure_ascii=False, sort_keys=True))
+    logger.info("%s", json.dumps(report, ensure_ascii=False, sort_keys=True))
     return 0 if report.get("ok") else 1
 
 

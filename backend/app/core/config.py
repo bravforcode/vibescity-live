@@ -72,9 +72,17 @@ class Settings(BaseSettings):
     SHEETS_WEBHOOK_PAYMENTS_URL: str = ""
     SHEETS_WEBHOOK_SECRET: str = ""
     SHEETS_STRATEGY: str = "db_sync"  # db_sync | legacy_webhook
+    GOOGLE_SHEETS_CREDENTIALS_PATH: str = ""
+    GOOGLE_SHEETS_SPREADSHEET_ID: str = ""
+    GOOGLE_SHEETS_SHEET_NAME: str = "Anonymous Analytics"
+    GOOGLE_SHEETS_AUTO_SYNC: bool = False
+    GOOGLE_SHEETS_SYNC_INTERVAL: int = 15
+    GOOGLE_SHEETS_DATA_RETENTION_DAYS: int = 30
+    GOOGLE_SHEETS_ENABLE_ANONYMIZATION: bool = True
 
-    # Admin access fallback (email allowlist, comma-separated)
-    ADMIN_EMAIL_ALLOWLIST: str = "omchai.g44@gmail.com"
+    # Admin access fallback (email allowlist, comma-separated).
+    # Keep empty by default and set explicitly per environment.
+    ADMIN_EMAIL_ALLOWLIST: str = ""
 
     # Slip Verification (OCR)
     SLIP_EXPECT_RECEIVER_NAME: str = ""
@@ -90,6 +98,10 @@ class Settings(BaseSettings):
 
     # PayPal
     PAYPAL_CLIENT_ID: str | None = None
+
+    # Google Maps / Street View
+    GOOGLE_API_KEY: str = ""
+    GOOGLE_MAPS_API_KEY: str = ""
     PAYPAL_SECRET: str | None = None
     PAYPAL_MODE: str = "sandbox"  # sandbox or live
 

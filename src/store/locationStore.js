@@ -5,9 +5,18 @@
  */
 import { defineStore } from "pinia";
 import { computed, ref, shallowRef } from "vue";
+import { DEFAULT_CITY } from "../config/cityConfig";
+import {
+	shouldPreferRealLocalDevLocation,
+	shouldUseDeterministicLocalDevLocation,
+} from "../lib/runtimeConfig";
+import { isAppDebugLoggingEnabled } from "../utils/debugFlags";
 
-// Chiang Mai default coordinates
-const DEFAULT_LOCATION = { lat: 18.7883, lng: 98.9853 };
+const DEFAULT_LOCATION = { lat: DEFAULT_CITY.lat, lng: DEFAULT_CITY.lng };
+const LOCALHOST_DEV_REFERENCE_LOCATION = {
+	lat: DEFAULT_CITY.lat,
+	lng: DEFAULT_CITY.lng,
+};
 const LOCATION_OPTIONS = {
 	enableHighAccuracy: true,
 	timeout: 15000,
@@ -48,6 +57,11 @@ export const useLocationStore = defineStore(
 		const error = shallowRef(null);
 
 		let watchId = null;
+		let permissionStatusHandle = null;
+		let permissionStatusListener = null;
+		const useDeterministicLocalDevLocation =
+			shouldUseDeterministicLocalDevLocation();
+		const preferRealLocalDevLocation = shouldPreferRealLocalDevLocation();
 
 		// ═══════════════════════════════════════════
 		// 📊 Computed
@@ -106,12 +120,74 @@ export const useLocationStore = defineStore(
 			return true;
 		};
 
+		const applyDeterministicLocalDevLocation = () => {
+			setUserLocation(LOCALHOST_DEV_REFERENCE_LOCATION, true);
+			isTracking.value = false;
+			isLoading.value = false;
+			error.value = null;
+			return userLocation.value;
+		};
+
+		const maybeApplyDeterministicLocalDevFallback = () => {
+			if (!preferRealLocalDevLocation || userLocation.value) return false;
+			applyDeterministicLocalDevLocation();
+			return true;
+		};
+
+		const attachPermissionStatusListener = (result) => {
+			if (!result || permissionStatusHandle === result) return;
+			if (permissionStatusHandle && permissionStatusListener) {
+				permissionStatusHandle.removeEventListener?.(
+					"change",
+					permissionStatusListener,
+				);
+			}
+			permissionStatusHandle = result;
+			permissionStatusListener = () => {
+				permissionStatus.value = result.state;
+			};
+			result.addEventListener?.("change", permissionStatusListener);
+		};
+
+		const syncPermissionStatus = async () => {
+			if (!navigator?.permissions?.query) return permissionStatus.value;
+			try {
+				const result = await navigator.permissions.query({
+					name: "geolocation",
+				});
+				permissionStatus.value = result.state;
+				attachPermissionStatusListener(result);
+				return result.state;
+			} catch {
+				return permissionStatus.value;
+			}
+		};
+
 		/**
 		 * Request current position once
 		 */
-		const getCurrentPosition = () => {
+		const getCurrentPosition = async () => {
+			if (useDeterministicLocalDevLocation) {
+				return applyDeterministicLocalDevLocation();
+			}
+			const permissionState = await syncPermissionStatus();
+			if (permissionState === "denied") {
+				const deniedError = {
+					code: 1,
+					message: "Geolocation permission denied",
+				};
+				handlePositionError(deniedError);
+				if (maybeApplyDeterministicLocalDevFallback()) {
+					return userLocation.value;
+				}
+				throw deniedError;
+			}
 			return new Promise((resolve, reject) => {
 				if (!navigator.geolocation) {
+					if (maybeApplyDeterministicLocalDevFallback()) {
+						resolve(userLocation.value);
+						return;
+					}
 					const err = new Error("Geolocation not supported");
 					error.value = err;
 					reject(err);
@@ -128,6 +204,10 @@ export const useLocationStore = defineStore(
 					(err) => {
 						handlePositionError(err);
 						isLoading.value = false;
+						if (maybeApplyDeterministicLocalDevFallback()) {
+							resolve(userLocation.value);
+							return;
+						}
 						reject(err);
 					},
 					LOCATION_OPTIONS,
@@ -139,19 +219,27 @@ export const useLocationStore = defineStore(
 		 * Start watching position continuously
 		 */
 		const startWatching = async () => {
-			if (isTracking.value || !navigator.geolocation) return;
+			if (useDeterministicLocalDevLocation) {
+				applyDeterministicLocalDevLocation();
+				return;
+			}
+			if (isTracking.value) return;
+			if (!navigator.geolocation) {
+				maybeApplyDeterministicLocalDevFallback();
+				return;
+			}
 
 			// Check permission first
-			if (navigator.permissions) {
-				try {
-					const result = await navigator.permissions.query({
-						name: "geolocation",
-					});
-					permissionStatus.value = result.state;
-					result.addEventListener("change", () => {
-						permissionStatus.value = result.state;
-					});
-				} catch {} // Some browsers don't support this
+			const permissionState = await syncPermissionStatus();
+			if (permissionState === "denied") {
+				isTracking.value = false;
+				isLoading.value = false;
+				if (!userLocation.value) {
+					if (!maybeApplyDeterministicLocalDevFallback()) {
+						setUserLocation(DEFAULT_LOCATION, true);
+					}
+				}
+				return;
 			}
 
 			isTracking.value = true;
@@ -210,7 +298,7 @@ export const useLocationStore = defineStore(
 			error.value = null;
 			isLoading.value = false;
 
-			if (import.meta.env.DEV) {
+			if (isAppDebugLoggingEnabled()) {
 				console.log(
 					`📍 Location updated: [${latitude.toFixed(5)}, ${longitude.toFixed(5)}] ±${acc?.toFixed(0)}m`,
 				);
@@ -236,11 +324,14 @@ export const useLocationStore = defineStore(
 			};
 
 			if (err.code === 1) permissionStatus.value = "denied";
-			if (import.meta.env.DEV)
+			if (isAppDebugLoggingEnabled())
 				console.warn("📍 Geolocation error:", error.value);
 
 			// Use default if no location set
 			if (!userLocation.value) {
+				if (maybeApplyDeterministicLocalDevFallback()) {
+					return;
+				}
 				setUserLocation(DEFAULT_LOCATION, true);
 			}
 		};
@@ -267,7 +358,7 @@ export const useLocationStore = defineStore(
 		};
 
 		/**
-		 * Use default location (Chiang Mai)
+		 * Use default Thailand-wide fallback location.
 		 */
 		const useDefaultLocation = () => {
 			setUserLocation(DEFAULT_LOCATION, true);
@@ -309,6 +400,18 @@ export const useLocationStore = defineStore(
 		persist: {
 			paths: ["userLocation", "isMockLocation"],
 			key: "vibe-location",
+			afterHydrate: ({ store }) => {
+				if (shouldUseDeterministicLocalDevLocation()) {
+					store.setUserLocation(LOCALHOST_DEV_REFERENCE_LOCATION, true);
+					return;
+				}
+				if (shouldPreferRealLocalDevLocation() && store.isMockLocation) {
+					store.$patch({
+						userLocation: null,
+						isMockLocation: false,
+					});
+				}
+			},
 		},
 	},
 );

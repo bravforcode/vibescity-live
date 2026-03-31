@@ -1,0 +1,42 @@
+name: Load Test (k6)
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  k6:
+    runs-on: ubuntu-latest
+    env:
+      K6_BASE_URL: ${{ secrets.K6_BASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Skip if no K6_BASE_URL
+        if: ${{ env.K6_BASE_URL == '' }}
+        run: echo "K6_BASE_URL not set; skipping."
+
+      - name: Setup k6
+        if: ${{ env.K6_BASE_URL != '' }}
+        uses: grafana/setup-k6@v0.3.1
+
+      - name: Prepare report directory
+        if: ${{ env.K6_BASE_URL != '' }}
+        run: node scripts/k6/report.mjs --prepare
+
+      - name: Run k6 load test
+        if: ${{ env.K6_BASE_URL != '' }}
+        run: k6 run k6-tests/realistic-load.js
+
+      - name: Build HTML report
+        if: ${{ env.K6_BASE_URL != '' }}
+        run: node scripts/k6/report.mjs --build
+
+      - name: Upload k6 report
+        if: ${{ env.K6_BASE_URL != '' && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-report
+          path: reports/k6/
+          retention-days: 14

@@ -14,12 +14,13 @@ import {
 	Shield,
 	X,
 } from "lucide-vue-next";
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { useHaptics } from "../../composables/useHaptics";
 import {
 	EMERGENCY_CONTACTS,
 	getCallLink,
 	getDirectionsLink,
+	getEmergencyFallbackState,
 	getNearbyEmergency,
 } from "../../services/emergencyService";
 import { useUserPreferencesStore } from "../../store/userPreferencesStore";
@@ -41,15 +42,40 @@ const emit = defineEmits(["close", "navigate-home"]);
 const { successFeedback, selectFeedback } = useHaptics();
 const prefsStore = useUserPreferencesStore();
 
-// Computed
-const nearbyEmergency = computed(() => {
-	if (!props.userLocation) return { hospitals: [], police: [], nearest: [] };
-	const [lat, lng] = props.userLocation;
-	return getNearbyEmergency(lat, lng, 3);
-});
+const nearbyEmergency = ref(getEmergencyFallbackState(null, null));
+const isEmergencyLoading = ref(false);
 
 const hasHome = computed(() => prefsStore.hasHomeSet);
 const homeName = computed(() => prefsStore.homeName);
+
+const loadNearbyEmergencyState = async () => {
+	const [lat, lng] = props.userLocation || [];
+	nearbyEmergency.value = getEmergencyFallbackState(lat, lng);
+
+	if (!props.isOpen) {
+		isEmergencyLoading.value = false;
+		return;
+	}
+
+	isEmergencyLoading.value = true;
+	try {
+		nearbyEmergency.value = await getNearbyEmergency(lat, lng, 3);
+	} finally {
+		isEmergencyLoading.value = false;
+	}
+};
+
+watch(
+	() => [
+		props.isOpen,
+		props.userLocation?.[0] ?? null,
+		props.userLocation?.[1] ?? null,
+	],
+	() => {
+		void loadNearbyEmergencyState();
+	},
+	{ immediate: true },
+);
 
 // Actions
 const callEmergency = (number) => {
@@ -60,6 +86,12 @@ const callEmergency = (number) => {
 const navigateToLocation = (lat, lng) => {
 	selectFeedback();
 	openExternal(getDirectionsLink(lat, lng));
+};
+
+const navigateToSearch = (url) => {
+	if (!url) return;
+	selectFeedback();
+	openExternal(url);
 };
 
 const goHome = () => {
@@ -87,7 +119,7 @@ const iconMap = {
 </script>
 
 <template>
-  <Transition name="slide-up">
+  <Transition name="slide-up" appear>
     <div
       v-if="isOpen"
       class="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm"
@@ -115,7 +147,7 @@ const iconMap = {
           </div>
           <button
             @click="close"
-            class="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors active:scale-95 focus-ring"
+            class="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:bg-white/20 active:scale-95 focus-ring"
             aria-label="Close safety panel"
           >
             <X class="w-5 h-5 text-white" />
@@ -127,7 +159,7 @@ const iconMap = {
           <button
             v-if="hasHome"
             @click="goHome"
-            class="w-full p-4 rounded-2xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-bold flex items-center gap-4 shadow-lg shadow-blue-500/30 active:scale-[0.98] transition-transform"
+            class="flex w-full items-center gap-4 rounded-2xl bg-gradient-to-r from-blue-500 to-cyan-500 p-4 font-bold text-white shadow-lg shadow-blue-500/30 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 active:scale-[0.98]"
           >
             <div
               class="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center"
@@ -161,7 +193,7 @@ const iconMap = {
               v-for="(contact, key) in EMERGENCY_CONTACTS"
               :key="key"
               @click="callEmergency(contact.number)"
-              class="p-3 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center gap-3 active:scale-95 transition-transform hover:bg-red-500/20"
+              class="flex items-center gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:bg-red-500/20 active:scale-95"
             >
               <component
                 :is="iconMap[contact.icon] || Phone"
@@ -185,22 +217,46 @@ const iconMap = {
             Nearby Hospitals
           </h3>
           <div class="space-y-2">
+            <div
+              v-if="isEmergencyLoading && !nearbyEmergency.hospitals.length"
+              class="w-full p-3 rounded-xl bg-white/5 text-sm text-white/60"
+            >
+              Looking up nearby hospitals...
+            </div>
+            <template v-if="nearbyEmergency.hospitals.length">
+              <button
+                v-for="hospital in nearbyEmergency.hospitals"
+                :key="hospital.id"
+                @click="navigateToLocation(hospital.lat, hospital.lng)"
+                class="flex w-full items-center gap-3 rounded-xl bg-white/5 p-3 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:bg-white/10 active:scale-[0.98]"
+              >
+                <Building2 class="w-5 h-5 text-green-400" />
+                <div class="text-left flex-1">
+                  <div class="text-white text-sm font-medium truncate">
+                    {{ hospital.name }}
+                  </div>
+                  <div class="text-white/50 text-xs">
+                    {{ hospital.distance.toFixed(1) }} km away
+                  </div>
+                </div>
+                <MapPin class="w-4 h-4 text-white/40" />
+              </button>
+            </template>
             <button
-              v-for="hospital in nearbyEmergency.hospitals"
-              :key="hospital.id"
-              @click="navigateToLocation(hospital.lat, hospital.lng)"
-              class="w-full p-3 rounded-xl bg-white/5 flex items-center gap-3 active:scale-[0.98] transition-transform hover:bg-white/10"
+              v-else
+              @click="navigateToSearch(nearbyEmergency.searchLinks?.hospitals)"
+              class="flex w-full items-center gap-3 rounded-xl bg-white/5 p-3 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:bg-white/10 active:scale-[0.98]"
             >
               <Building2 class="w-5 h-5 text-green-400" />
               <div class="text-left flex-1">
-                <div class="text-white text-sm font-medium truncate">
-                  {{ hospital.name }}
+                <div class="text-white text-sm font-medium">
+                  Find hospitals near me
                 </div>
                 <div class="text-white/50 text-xs">
-                  {{ hospital.distance.toFixed(1) }} km away
+                  Open nearby hospital search in Google Maps
                 </div>
               </div>
-              <MapPin class="w-4 h-4 text-white/40" />
+              <Navigation class="w-4 h-4 text-white/40" />
             </button>
           </div>
         </div>
@@ -213,22 +269,46 @@ const iconMap = {
             Nearby Police
           </h3>
           <div class="space-y-2">
+            <div
+              v-if="isEmergencyLoading && !nearbyEmergency.police.length"
+              class="w-full p-3 rounded-xl bg-white/5 text-sm text-white/60"
+            >
+              Looking up nearby police...
+            </div>
+            <template v-if="nearbyEmergency.police.length">
+              <button
+                v-for="station in nearbyEmergency.police"
+                :key="station.id"
+                @click="navigateToLocation(station.lat, station.lng)"
+                class="flex w-full items-center gap-3 rounded-xl bg-white/5 p-3 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:bg-white/10 active:scale-[0.98]"
+              >
+                <Shield class="w-5 h-5 text-blue-400" />
+                <div class="text-left flex-1">
+                  <div class="text-white text-sm font-medium truncate">
+                    {{ station.name }}
+                  </div>
+                  <div class="text-white/50 text-xs">
+                    {{ station.distance.toFixed(1) }} km away
+                  </div>
+                </div>
+                <MapPin class="w-4 h-4 text-white/40" />
+              </button>
+            </template>
             <button
-              v-for="station in nearbyEmergency.police"
-              :key="station.id"
-              @click="navigateToLocation(station.lat, station.lng)"
-              class="w-full p-3 rounded-xl bg-white/5 flex items-center gap-3 active:scale-[0.98] transition-transform hover:bg-white/10"
+              v-else
+              @click="navigateToSearch(nearbyEmergency.searchLinks?.police)"
+              class="flex w-full items-center gap-3 rounded-xl bg-white/5 p-3 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:bg-white/10 active:scale-[0.98]"
             >
               <Shield class="w-5 h-5 text-blue-400" />
               <div class="text-left flex-1">
-                <div class="text-white text-sm font-medium truncate">
-                  {{ station.name }}
+                <div class="text-white text-sm font-medium">
+                  Find police near me
                 </div>
                 <div class="text-white/50 text-xs">
-                  {{ station.distance.toFixed(1) }} km away
+                  Open nearby police search in Google Maps
                 </div>
               </div>
-              <MapPin class="w-4 h-4 text-white/40" />
+              <Navigation class="w-4 h-4 text-white/40" />
             </button>
           </div>
         </div>
@@ -241,17 +321,25 @@ const iconMap = {
 .slide-up-enter-active,
 .slide-up-leave-active {
   transition:
-    opacity 0.3s cubic-bezier(0.19, 1, 0.22, 1),
-    transform 0.3s cubic-bezier(0.19, 1, 0.22, 1);
+    opacity 0.34s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.34s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
 }
 
 .slide-up-enter-from,
 .slide-up-leave-to {
-  transform: translateY(100%);
+  transform: translateY(36px) scale(0.985);
   opacity: 0;
 }
 
 .safe-area-bottom {
   padding-bottom: env(safe-area-inset-bottom, 20px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide-up-enter-active,
+  .slide-up-leave-active {
+    transition-duration: 0.01ms !important;
+  }
 }
 </style>

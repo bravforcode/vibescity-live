@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/lib/runtimeConfig", () => ({
 	getApiV1BaseUrl: () => "https://api.test",
+	isLocalBrowserHostname: (hostname) =>
+		/^(localhost|127\.0\.0\.1)$/i.test(String(hostname || "")),
 }));
 
 vi.mock("../../src/services/visitorIdentity", () => ({

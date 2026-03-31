@@ -27,6 +27,7 @@ except:
 
 DEFAULT_PYTHON_EXCLUDES = [
     ".git",
+    ".artifacts",
     ".venv",
     ".vercel_python_packages",
     "__pycache__",
@@ -36,6 +37,8 @@ DEFAULT_PYTHON_EXCLUDES = [
     "coverage",
     "dist",
     "node_modules",
+    "reports",
+    "tmp",
     "venv",
 ]
 FALLBACK_RESULT_CACHE = {}

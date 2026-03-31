@@ -1,0 +1,114 @@
+/* 🟣 Vibe Float Animation (Ultimate Cyberpunk) */
+
+/* ตัวลอยหลัก */
+.vibe-float-marker {
+	font-size: 42px; /* ใหญ่สะใจ */
+	font-weight: 900;
+	pointer-events: none;
+	position: absolute;
+	z-index: 9999;
+
+	/* Animation: เด้งขึ้นแบบ Elastic */
+	animation: floatUpFade 2.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+
+	/* 🎨 Neon Glow Effect: ไล่เฉด 4 ชั้น (ขาว -> ชมพู -> ม่วง -> ฟ้า) */
+	color: #fff;
+	text-shadow:
+		0 0 5px rgba(255, 255, 255, 1), /* Core สว่างสุด */
+		0 0 15px rgba(255, 126, 182, 0.9), /* Inner Glow (Pink) */
+		0 0 30px rgba(189, 147, 249, 0.7), /* Mid Glow (Purple) */
+		0 0 50px rgba(139, 233, 253, 0.5); /* Outer Aura (Cyan) */
+
+	/* Filter ช่วยให้แสงดูฟุ้งเหมือนถ่ายรูป */
+	filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));
+	will-change: transform, opacity;
+}
+
+/* Keyframes: ลอยขึ้น + หมุนนิดๆ + ขยายตัว */
+@keyframes floatUpFade {
+	0% {
+		transform: translateY(0) scale(0.2) rotate(-15deg);
+		opacity: 0;
+		filter: blur(4px);
+	}
+	15% {
+		/* จังหวะ Pop ขึ้นมา */
+		transform: translateY(-20px) scale(1.4) rotate(5deg);
+		opacity: 1;
+		filter: blur(0px);
+	}
+	40% {
+		/* ลอยนิ่งๆ โชว์ตัว */
+		transform: translateY(-50px) scale(1.1) rotate(-3deg);
+		opacity: 1;
+	}
+	100% {
+		/* ลอยหายไปในอวกาศ */
+		transform: translateY(-120px) scale(0.8) rotate(0deg);
+		opacity: 0;
+		filter: blur(8px); /* เบลอตอนจบ */
+	}
+}
+
+/* ---------------------------------------------------- */
+/* ✨ Extra Effects: ของแถมเพื่อความสวยงาม */
+/* ---------------------------------------------------- */
+
+/* 1. Class เสริมสำหรับเปลี่ยนสีตามอารมณ์ */
+.vibe-float-love {
+	text-shadow:
+		0 0 10px #fff,
+		0 0 30px #ff7eb6,
+		0 0 60px #ff7eb6;
+} /* ชมพูหวาน */
+.vibe-float-chill {
+	text-shadow:
+		0 0 10px #fff,
+		0 0 30px #8be9fd,
+		0 0 60px #8be9fd;
+} /* ฟ้าสดใส */
+.vibe-float-fire {
+	text-shadow:
+		0 0 10px #fff,
+		0 0 30px #ff5555,
+		0 0 60px #ffb86c;
+} /* ส้มเดือด */
+.vibe-float-magic {
+	text-shadow:
+		0 0 10px #fff,
+		0 0 30px #bd93f9,
+		0 0 60px #bd93f9;
+} /* ม่วงลึกลับ */
+
+/* 2. Pulse Effect (ใส่ที่ Marker บนแผนที่) */
+/* วิธีใช้: <div class="marker vibe-marker-pulse">…</div> */
+.vibe-marker-pulse::before {
+	content: "";
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: 100%;
+	height: 100%;
+	transform: translate(-50%, -50%);
+	border-radius: 50%;
+	background: transparent;
+	border: 2px solid rgba(139, 233, 253, 0.8);
+	box-shadow: 0 0 15px rgba(139, 233, 253, 0.5);
+	animation: ripple 2s infinite ease-out;
+	z-index: -1;
+}
+
+@keyframes ripple {
+	0% {
+		width: 100%;
+		height: 100%;
+		opacity: 0.8;
+		border-width: 3px;
+	}
+	100% {
+		width: 300%;
+		height: 300%;
+		opacity: 0;
+		border-width: 0px;
+	}
+}

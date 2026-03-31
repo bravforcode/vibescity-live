@@ -2,21 +2,13 @@
 import { Heart, MapPin, Navigation, Share2, Sparkles } from "lucide-vue-next";
 import { computed, defineAsyncComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { DynamicScroller, DynamicScrollerItem } from "vue-virtual-scroller";
-import "vue-virtual-scroller/dist/vue-virtual-scroller.css";
 import { useBottomFeedLogic } from "../../composables/useBottomFeedLogic";
 import { useDragScroll } from "../../composables/useDragScroll";
-import { useHaptics } from "../../composables/useHaptics";
 import ShopCard from "../panel/ShopCard.vue";
 import PullToRefresh from "../ui/PullToRefresh.vue";
 import SwipeCard from "../ui/SwipeCard.vue";
 
 const { t } = useI18n();
-
-// ✅ Lazy load heavy components
-const VisitorCount = defineAsyncComponent(
-	() => import("../ui/VisitorCount.vue"),
-);
 
 const SkeletonCard = defineAsyncComponent(
 	() => import("../ui/SkeletonCard.vue"),
@@ -81,26 +73,20 @@ const emit = defineEmits([
 
 // Cap DOM nodes for performance — slice in computed keeps v-memo cache stable
 const CAROUSEL_CAP = 30;
+const ACTIVE_CARD_WIDTH = 220;
+const INACTIVE_CARD_WIDTH = 176;
+const CARD_HEIGHT = 264;
 const cappedShops = computed(() => props.carouselShops.slice(0, CAROUSEL_CAP));
-
-// ✅ Haptic Feedback
-const { tapFeedback, selectFeedback, impactFeedback } = useHaptics();
+const edgeSpacerWidth = computed(() =>
+	props.isImmersive ? "0px" : `calc(50vw - ${ACTIVE_CARD_WIDTH / 2}px)`,
+);
 
 // ✅ Bottom Feed Logic (extracted to composable)
 const {
-	isGiantPinView,
-	activeGiantPin,
-	giantPinShops,
-	selectedGiantShop,
-	selectedGiantVideoUrl,
-	selectedGiantImage,
 	isVideoExpanded,
 	expandedShop,
 	videoRef,
 	normalizeId,
-	getShopPreviewImage,
-	exitGiantView,
-	selectGiantShop,
 	closeExpandedVideo,
 	selectShop,
 	handleScroll,
@@ -123,16 +109,15 @@ const isFavorited = (shopId) => {
 };
 
 const isGridView = ref(false);
-const toggleView = () => {
-	isGridView.value = !isGridView.value;
-	selectFeedback();
-};
-
-// ✅ Virtual scroller item size (dynamic)
-const getItemSize = (index) => {
-	// Active card is larger due to scale effect
-	const isActive = props.carouselShops[index]?.id === props.activeShopId;
-	return props.isImmersive ? window.innerHeight : isActive ? 120 : 110;
+const getCardItemStyle = (shopId) => {
+	if (props.isImmersive) return null;
+	const isActive = props.activeShopId === shopId;
+	return {
+		width: `${isActive ? ACTIVE_CARD_WIDTH : INACTIVE_CARD_WIDTH}px`,
+		height: `${CARD_HEIGHT}px`,
+		transition:
+			"width 0.38s cubic-bezier(0.16, 1, 0.3, 1), transform 0.38s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.24s ease-out, box-shadow 0.24s ease-out",
+	};
 };
 </script>
 
@@ -175,21 +160,21 @@ const getItemSize = (index) => {
     </div>
 
     <!-- Grid View -->
-      <div
-        v-if="isGridView"
-        @scroll="handleScroll"
-        class="px-4 py-2 pb-24 h-[55vh] overflow-y-auto no-scrollbar grid grid-cols-2 md:grid-cols-3 gap-3 animate-fade-in pointer-events-auto"
+    <div
+      v-if="isGridView"
+      @scroll="handleScroll"
+      class="px-4 py-2 pb-24 h-[55vh] overflow-y-auto no-scrollbar grid grid-cols-2 md:grid-cols-3 gap-3 animate-fade-in pointer-events-auto"
+    >
+      <button
+        v-for="shop in cappedShops"
+        :key="shop.id"
+        v-memo="[shop.id, shop.status, shop.isPromoted]"
+        @click="emit('open-detail', shop)"
+        :aria-label="`Open details for ${shop.name}`"
+        type="button"
+        class="relative aspect-[3/4] rounded-2xl overflow-hidden bg-zinc-900 border border-white/10 shadow-xl active:scale-95 transition-[transform,opacity,box-shadow,border-color,background-color] hover:shadow-2xl hover:shadow-purple-500/20 text-left"
+        style="contain: layout style"
       >
-        <button
-          v-for="shop in cappedShops"
-          :key="shop.id"
-          v-memo="[shop.id, shop.status, shop.isPromoted]"
-          @click="emit('open-detail', shop)"
-          :aria-label="`Open details for ${shop.name}`"
-          type="button"
-          class="relative aspect-[3/4] rounded-2xl overflow-hidden bg-zinc-900 border border-white/10 shadow-xl active:scale-95 transition-[transform,opacity,box-shadow,border-color,background-color] hover:shadow-2xl hover:shadow-purple-500/20 text-left"
-          style="contain: layout style;"
-        >
         <img
           v-if="shop.Image_URL1"
           :src="shop.Image_URL1"
@@ -263,7 +248,7 @@ const getItemSize = (index) => {
       <!-- Loading State -->
       <div
         v-if="isDataLoading"
-        class="flex items-end px-[calc(50vw-100px)] py-3 gap-3 no-scrollbar mb-0 h-[220px] overflow-x-hidden"
+        class="flex items-end px-[calc(50vw-110px)] py-3 gap-3 no-scrollbar mb-0 h-[220px] overflow-x-hidden"
       >
         <SkeletonCard
           v-for="i in 5"
@@ -271,7 +256,7 @@ const getItemSize = (index) => {
           variant="carousel"
           :isDarkMode="isDarkMode"
           class="pointer-events-auto"
-          style="width: 190px; height: 200px"
+          style="width: 220px; height: 200px"
         />
       </div>
 
@@ -355,7 +340,7 @@ const getItemSize = (index) => {
               'flex gap-2 no-scrollbar transition-[transform,opacity] duration-300 snap-x snap-mandatory scroll-smooth',
               isImmersive
                 ? 'flex-col h-full overflow-y-auto overflow-x-hidden pt-0 pb-0 gap-0'
-                : 'flex-row overflow-x-auto overflow-y-visible px-3 pt-1 pb-2 h-[220px] items-end',
+                : 'flex-row overflow-x-auto overflow-y-visible px-3 pt-1 pb-2 h-[276px] items-end',
               'opacity-100',
               isDragging ? 'cursor-grabbing' : 'cursor-grab',
             ]"
@@ -374,7 +359,8 @@ const getItemSize = (index) => {
           >
             <div
               v-if="!isImmersive"
-              class="flex-shrink-0 w-[calc(50vw-100px)]"
+              class="flex-shrink-0"
+              :style="{ width: edgeSpacerWidth }"
             ></div>
 
             <template v-if="isIndoorView">
@@ -409,18 +395,19 @@ const getItemSize = (index) => {
                 :data-shop-id="shop.id"
                 data-testid="shop-card"
                 :is-immersive="isImmersive"
-                class="vibe-card-item flex-shrink-0 rounded-2xl overflow-hidden transition-[transform,opacity,box-shadow] duration-300 ease-out snap-center"
+                class="vibe-card-item flex-shrink-0 rounded-2xl overflow-visible snap-center"
                 :class="[
                   isImmersive
                     ? 'w-full h-[100dvh] rounded-none scale-100 opacity-100'
-                    : 'w-[190px] h-[210px]',
+                    : '',
                   !isImmersive && activeShopId === shop.id
                     ? 'scale-100 z-20 shadow-[0_0_24px_4px_rgba(139,92,246,0.55),0_0_8px_2px_rgba(236,72,153,0.35)]'
                     : '',
                   !isImmersive && activeShopId !== shop.id
-                    ? 'scale-[0.88] opacity-70'
+                    ? 'scale-[0.96] opacity-70'
                     : '',
                 ]"
+                :style="getCardItemStyle(shop.id)"
               >
                 <!-- ✅ IMMERSIVE MODE: Shop Info Overlay - MOVED UP & MORE VISIBLE -->
                 <div
@@ -505,7 +492,8 @@ const getItemSize = (index) => {
 
             <div
               v-if="!isImmersive"
-              class="flex-shrink-0 w-[calc(50vw-100px)]"
+              class="flex-shrink-0"
+              :style="{ width: edgeSpacerWidth }"
             ></div>
           </div>
         </PullToRefresh>
@@ -546,22 +534,9 @@ const getItemSize = (index) => {
 .vibe-card-item {
   scroll-snap-align: center;
   scroll-snap-stop: normal;
-  will-change: transform, opacity;
   transform: translateZ(0);
   backface-visibility: hidden;
   touch-action: manipulation;
-  transition:
-    transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
-    opacity 0.3s ease-out,
-    box-shadow 0.3s ease-out;
-}
-
-.vibe-card-item:hover {
-  transform: translateZ(0) scale(1.02);
-}
-
-.vibe-card-item:active {
-  transform: translateZ(0) scale(0.98);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -664,61 +639,6 @@ const getItemSize = (index) => {
     0 0 0 2px rgb(59 130 246),
     0 10px 15px -3px rgba(0, 0, 0, 0.1),
     0 4px 6px -4px rgba(0, 0, 0, 0.1);
-}
-
-.glass-header {
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-}
-
-/* ✅ Focus Visible for Accessibility */
-*:focus-visible {
-  outline: 2px solid #60a5fa;
-  outline-offset: 2px;
-  border-radius: 0.5rem;
-}
-
-/* ✅ Safe area utilities */
-.pb-safe {
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
-.pb-safe-offset-8 {
-  padding-bottom: calc(2rem + env(safe-area-inset-bottom));
-}
-
-.top-safe-offset-20 {
-  top: calc(5rem + env(safe-area-inset-top));
-}
-
-/* ✅ Custom Scrollbar */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 10px;
-}
-
-.shop-list-item:hover {
-  transform: scale(1.02);
-}
-
-.shop-list-item.active {
-  /* Use box-shadow to simulate ring instead of invalid ring-width property */
-  box-shadow:
-    0 0 0 2px rgb(59 130 246),
-    /* Ring color */ 0 10px 15px -3px rgb(0 0 0 / 0.1),
-    0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --tw-shadow-color: #3b82f6;
-  --tw-shadow: var(--tw-shadow-colored);
 }
 
 .glass-button:hover {
@@ -974,10 +894,6 @@ const getItemSize = (index) => {
 
   .vibe-card-item {
     touch-action: manipulation;
-  }
-
-  .vibe-card-item:hover {
-    transform: none;
   }
 
   .action-button:hover {

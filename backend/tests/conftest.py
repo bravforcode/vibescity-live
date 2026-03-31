@@ -33,11 +33,30 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-os.environ.setdefault("ENV", "testing")
-os.environ.setdefault("METRICS_ENABLED", "true")
-os.environ.setdefault("OTEL_ENABLED", "false")
-os.environ.setdefault("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+TEST_ENV_OVERRIDES = {
+    "ENV": "testing",
+    "METRICS_ENABLED": "true",
+    "OTEL_ENABLED": "false",
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "",
+    "VISITOR_SIGNING_SECRET": "test-secret-vibecity-ci-only",
+    "SUPABASE_URL": "https://example.supabase.co",
+    "SUPABASE_KEY": "test-anon-key",
+    "SUPABASE_SERVICE_ROLE_KEY": "",
+    "DATABASE_URL": "postgresql://test:test@localhost:5432/vibecity_test",
+    "NEON_DATABASE_URL": "postgresql://test:test@localhost:5432/vibecity_history_test",
+    "REDIS_URL": "",
+    "MEMORY_ENABLED": "false",
+    "MEMORY_DATABASE_URL": "",
+}
 
+if os.environ.get("VIBECITY_TEST_USE_REAL_SERVICES") != "1":
+    # Keep pytest isolated from whatever runtime-only credentials exist in the shell.
+    os.environ.update(TEST_ENV_OVERRIDES)
+else:
+    for key, value in TEST_ENV_OVERRIDES.items():
+        os.environ.setdefault(key, value)
+
+import app.core.auth as _auth_module  # noqa: E402  # used by clear_auth_cache fixture
 from app.core.auth import verify_user  # noqa: E402
 from app.main import app  # noqa: E402
 
@@ -53,7 +72,7 @@ def force_utf8_stdio():
             continue
         try:
             reconfigure(encoding="utf-8", errors="replace")
-        except Exception:
+        except (AttributeError, OSError, ValueError):
             # Keep tests fail-open if host stream does not support reconfiguration.
             pass
 
@@ -68,6 +87,14 @@ def clear_dependency_overrides():
     app.dependency_overrides = {}
     yield
     app.dependency_overrides = {}
+
+
+@pytest.fixture(autouse=True)
+def clear_auth_cache():
+    """Clear JWT token cache between tests to prevent cross-test cache hits."""
+    _auth_module._TOKEN_CACHE.clear()
+    yield
+    _auth_module._TOKEN_CACHE.clear()
 
 
 @pytest.fixture()

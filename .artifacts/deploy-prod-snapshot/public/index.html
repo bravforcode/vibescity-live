@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/images/apple-touch-icon.png" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <!-- PWA & Theme Color -->
+    <meta name="theme-color" content="#8B5CF6" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/images/apple-touch-icon.png" />
+    <title>VibeCity - Thailand Entertainment Map</title>
+    <link rel="canonical" href="https://vibecity.live/" />
+    <!-- SEO & social media metadata -->
+    <meta
+      name="description"
+      content="VibeCity.live - Discover nightlife, cafes, events, and local experiences across Thailand in real time."
+    />
+    <meta name="robots" content="index,follow" />
+    <meta
+      property="og:title"
+      content="VibeCity.live | Thailand Entertainment Map"
+    />
+    <meta
+      property="og:description"
+      content="Discover nightlife, cafes, events, and local experiences across Thailand with real-time vibe updates and navigation."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="VibeCity" />
+    <meta property="og:locale" content="th_TH" />
+    <meta
+      property="og:image"
+      content="https://vibecity.live/api/v1/seo/og/site.png"
+    />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:url" content="https://vibecity.live" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="VibeCity.live | Thailand Entertainment Map"
+    />
+    <meta
+      name="twitter:description"
+      content="Discover nightlife, cafes, events, and local experiences across Thailand with real-time vibe updates and navigation."
+    />
+    <meta
+      name="twitter:image"
+      content="https://vibecity.live/api/v1/seo/og/site.png"
+    />
+
+    <!-- Structured Data (Website) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "VibeCity",
+        "url": "https://vibecity.live",
+        "inLanguage": ["th", "en"]
+      }
+    </script>
+
+    <!-- Mobile Web App Capable -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="VibeCity" />
+    <link rel="apple-touch-icon" href="/images/apple-touch-icon.png" />
+
+    <!-- Accessibility Skip Link (for keyboard users) -->
+    <style>
+      .skip-link {
+        position: absolute;
+        top: -40px;
+        left: 0;
+        background: #8b5cf6;
+        color: white;
+        padding: 8px;
+        z-index: 10000;
+        transition: top 0.3s;
+      }
+      .skip-link:focus {
+        top: 0;
+      }
+    </style>
+
+    <!-- Preload critical assets -->
+    <link rel="preconnect" href="https://api.mapbox.com" />
+    <link rel="preconnect" href="https://events.mapbox.com" importance="low" />
+    <!-- Google APIs — for venue photos via Places Photos API -->
+    <link rel="preconnect" href="https://maps.googleapis.com" />
+    <link rel="dns-prefetch" href="https://maps.gstatic.com" />
+    <script>
+      (() => {
+        const hostname = window.location.hostname;
+        const isLocalhost =
+          hostname === "localhost" ||
+          hostname === "127.0.0.1" ||
+          hostname === "[::1]";
+
+        if (isLocalhost) return;
+
+        const fontHref =
+          "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap";
+        const head = document.head;
+
+        const preconnectGoogle = document.createElement("link");
+        preconnectGoogle.rel = "preconnect";
+        preconnectGoogle.href = "https://fonts.googleapis.com";
+        head.appendChild(preconnectGoogle);
+
+        const preconnectGstatic = document.createElement("link");
+        preconnectGstatic.rel = "preconnect";
+        preconnectGstatic.href = "https://fonts.gstatic.com";
+        preconnectGstatic.crossOrigin = "anonymous";
+        head.appendChild(preconnectGstatic);
+
+        const preload = document.createElement("link");
+        preload.rel = "preload";
+        preload.as = "style";
+        preload.href = fontHref;
+        head.appendChild(preload);
+
+        const stylesheet = document.createElement("link");
+        stylesheet.rel = "stylesheet";
+        stylesheet.media = "print";
+        stylesheet.onload = function onFontStylesheetLoad() {
+          this.media = "all";
+        };
+        stylesheet.href = fontHref;
+        head.appendChild(stylesheet);
+      })();
+    </script>
+
+    <style>
+      :root {
+        --font-display: "Inter", "Sarabun", system-ui, sans-serif;
+        --font-body: "Inter", "Sarabun", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", "Fira Code", "IBM Plex Mono", monospace;
+      }
+      /* Prevent FOUC — paint dark shell immediately before Vue mounts */
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: #0f0f1a;
+        font-family: var(--font-body);
+        height: 100%;
+        overflow: hidden;
+      }
+      #app {
+        height: 100%;
+        width: 100%;
+      }
+      /* Critical app-shell skeleton shown before JS hydrates */
+      #app:empty::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background: #0f0f1a;
+        z-index: 9999;
+      }
+    </style>
+  </head>
+  <body>
+    <a href="#main-content" class="skip-link">Skip to Map Content</a>
+    <div id="app"></div>
+  </body>
+</html>

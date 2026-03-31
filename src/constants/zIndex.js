@@ -21,8 +21,8 @@ export const Z = Object.freeze({
 	// Full-screen loading overlay
 	LOADING: 9999,
 
-	// Mapbox popup should be above the map but below app overlays
-	MAPBOX_POPUP: 10000,
+	// Map popups/sign overlays should stay above the map but below app drawers
+	MAPBOX_POPUP: 4300,
 
 	// Drawers (Mall/Profile)
 	DRAWER: 11000,

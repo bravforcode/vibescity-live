@@ -1,0 +1,265 @@
+# ----------------------------------------
+# 1. Logs & Diagnostics
+# ----------------------------------------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.tgz
+
+# ----------------------------------------
+# 2. Dependencies
+# ----------------------------------------
+node_modules/
+.pnpm-store/
+
+# ----------------------------------------
+# 3. Build Output
+# ----------------------------------------
+dist/
+dist-ssr/
+coverage/
+*.tsbuildinfo
+*.d.ts
+
+# ----------------------------------------
+# 4. Environment Variables (CRITICAL SECURITY)
+# ----------------------------------------
+# Block all .env files to prevent token leaks
+.env
+.env.local
+.env.*
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+# Allow example env files
+!.env.example
+
+# Sentry Config Auth Token
+.env.sentry-build-plugin
+
+# Local MCP config files
+.mcp.json
+mcp_config_ready_to_copy.json
+mcp_config*.local.json
+
+# ----------------------------------------
+# 5. Editor & OS Files
+# ----------------------------------------
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ----------------------------------------
+# 6. Platform Specific (Vercel/Cloud)
+# ----------------------------------------
+.vercel/
+*.local
+*.vercel
+
+# ----------------------------------------
+# 7. Project Specific (Large Assets)
+# ----------------------------------------
+# Prevent large GeoJSON files from being uploaded to Git
+public/data/chiangmai-main-roads-lanes.geojson
+public/data/chiangmai-main-roads.geojson
+
+# Prevent accidental large extension bundles/assets from landing in public/
+*.vsix
+public/images/animation/*.vsix
+
+# ----------------------------------------
+# 8. Testing
+# ----------------------------------------
+# End-to-end testing reports and screenshots
+/test/e2e/reports/
+tests/e2e/reports/
+test/e2e/screenshots/
+tests/e2e/screenshots/
+
+# ----------------------------------------
+# 9. Temporary & Cache Files
+# ----------------------------------------
+# Temporary and system files that are not needed in version control
+.worktrees/
+.venv/
+*.bak
+*.swp
+*.swo
+*.tmp
+*.temp
+*.pid
+*.seed
+*.orig
+
+# ----------------------------------------
+# 10. Build tools & IDE generated files
+# ----------------------------------------
+# Ignore IDE generated files
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# Ignore build artifacts from common build tools
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Ignore additional generated files
+*.log*
+*.csv
+
+# ----------------------------------------
+# 11. Docker and container files
+# ----------------------------------------
+# Ignore Docker-related files
+.docker/
+docker-compose.override.yml
+*.dockerfile
+docker-compose.yml
+
+*storybook.log
+storybook-static
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+
+# ----------------------------------------
+# 12. Test Reports (Generated Artifacts)
+# ----------------------------------------
+# JUnit and other test reports should not be committed
+reports/
+junit.xml
+**/junit.xml
+sonar-report.xml
+
+# Python caches
+__pycache__/
+*.pyc
+
+# Virtual envs
+.venv*/
+venv*/
+
+# Playwright reports
+playwright-report*/
+
+# Temporary files
+.tmp*
+nul
+
+# Playwright reports (all variants)
+playwright-report*/
+
+# Claude / Agent config (local only)
+AGENTS.md
+CLAUDE.md
+.claude/
+
+# Local notes / artifacts
+findings.md
+progress.md
+task_plan.md
+observability/
+
+# ----------------------------------------
+# 13. Dev Tooling & Worktrees (auto-generated)
+# ----------------------------------------
+# Old Codex / Vercel agent worktrees
+.codex-*/
+.vercel-main-*/
+.vercel-prod-*/
+
+# Visual regression snapshots
+.loki/
+
+# Python lint cache
+.ruff_cache/
+
+# Build / lint report txt files
+build_output.txt
+build_report.txt
+bundle_size_report.txt
+knip_report.txt
+lint_report.txt
+unit_test_report*.txt
+*_unit_full.log
+vibecity_zero_loss_patch.diff
+
+# UI / UX agent skills (local dev tool, not source code)
+ux-ui-agent-skills/
+
+# Storybook build
+storybook-static/
+.storybook/
+
+# k6 performance tests output
+k6-tests/
+
+# Demo / check scripts
+demo/
+check_db/
+
+# Coverage report file
+.coverage
+
+# ----------------------------------------
+# 14. Debug / Error Output Files (never commit these)
+# ----------------------------------------
+# Push/migration error logs
+push_err*.txt
+supabase_push_error*.txt
+supabase_db_push_error*.txt
+
+# Ruff / lint / TSC debug outputs
+*-ruff-errors*.txt
+ruff-errors*.txt
+lint-errors*.txt
+lint_output*.txt
+tsc-errors*.txt
+tsc-output*.txt
+*_output.txt
+*_errors.txt
+
+# Doctor / diagnostics
+doctor_output*.txt
+
+# One-off debug scripts that should never be committed
+fix_ruff*.py
+upgrade_settings.py
+db_check.cjs
+test-rpc.cjs
+
+# Temporary test/schema files in root
+test.js
+test.sql
+test_enums.sql
+test_out*.txt
+test_output*.txt
+tmp_*.json
+tmp_*.sql
+
+# Stale/leftover files
+oldest_header.vue
+*_commit.txt
+*_diff.txt
+review-decisions.auto.json
+mig_list.txt

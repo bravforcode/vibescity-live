@@ -1,0 +1,143 @@
+name: SonarCloud
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: sonar-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sonarcloud:
+    name: SonarCloud Scan (Unit + E2E + Quality Gate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # =========================
+      # 📦 CHECKOUT
+      # =========================
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # =========================
+      # 🟢 NODE
+      # =========================
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install
+
+      # =========================
+      # 🧪 UNIT TESTS + COVERAGE
+      # =========================
+      - name: Unit tests + coverage (Vitest)
+        run: npm run test:unit:coverage
+
+      - name: Upload Unit Coverage Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-coverage
+          path: coverage/**
+          retention-days: 14
+
+      # =========================
+      # 🎭 PLAYWRIGHT E2E
+      # =========================
+      - name: Cache Playwright Browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('bun.lock') }}
+
+      - name: Install Playwright Browsers
+        run: node scripts/run-playwright-cli.mjs install --with-deps
+
+      - name: Run Playwright E2E
+        env:
+          VITE_E2E: "true"
+          VITE_MAPBOX_TOKEN: ${{ secrets.VITE_MAPBOX_TOKEN }}
+        run: npm run test:e2e
+
+      - name: Console Budget (sonar e2e)
+        if: ${{ always() }}
+        run: node scripts/ci/ui-console-budget.mjs
+
+      - name: Step Summary (sonar e2e)
+        if: ${{ always() }}
+        run: node scripts/ci/e2e-summary.mjs --lane sonar-e2e --junit reports/e2e/junit.xml --console test-results/ui-console-events.ndjson
+
+      - name: Upload Playwright Report Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/**
+            test-results/**
+            reports/e2e/**
+          retention-days: 14
+
+      # =========================
+      # 🔄 JUNIT → SONAR GENERIC
+      # =========================
+      - name: Convert Playwright JUnit → Sonar Generic
+        run: |
+          node ./scripts/junit-to-sonar-generic.js \
+            reports/e2e/junit.xml \
+            reports/e2e/sonar-generic.xml
+
+      - name: Detect Sonar token
+        id: sonar_token
+        run: |
+          if [ -n "${{ secrets.SONAR_TOKEN }}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::SONAR_TOKEN is not configured. Skipping SonarCloud quality gate step."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # =========================
+      # 🔒 SONARCLOUD
+      # =========================
+      - name: SonarCloud Scan (Quality Gate)
+        if: ${{ steps.sonar_token.outputs.enabled == 'true' }}
+        uses: SonarSource/sonarcloud-github-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+            -Dsonar.testExecutionReportPaths=reports/e2e/sonar-generic.xml
+
+      # =========================
+      # 📝 PR SUMMARY (NO SPAM)
+      # =========================
+      - name: PR Summary (Artifacts)
+        if: always()
+        run: |
+          echo "## ✅ CI Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- 🧪 **Unit Coverage (Vitest)**" >> $GITHUB_STEP_SUMMARY
+          echo "  - 📦 Artifact: unit-coverage" >> $GITHUB_STEP_SUMMARY
+          echo "- 🎭 **E2E Report (Playwright)**" >> $GITHUB_STEP_SUMMARY
+          echo "  - 📦 Artifact: playwright-report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔒 **Quality Gate:** enforced by SonarCloud" >> $GITHUB_STEP_SUMMARY

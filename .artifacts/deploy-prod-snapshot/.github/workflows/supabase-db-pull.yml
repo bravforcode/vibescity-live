@@ -1,0 +1,79 @@
+name: Supabase DB Pull
+
+on:
+  schedule:
+    - cron: "0 19 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: supabase-db-pull
+  cancel-in-progress: false
+
+jobs:
+  pull-schema:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Authenticate and link project
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then
+            echo "Missing secret: SUPABASE_ACCESS_TOKEN"
+            exit 1
+          fi
+          if [ -z "${SUPABASE_DB_PASSWORD:-}" ]; then
+            echo "Missing secret: SUPABASE_DB_PASSWORD"
+            exit 1
+          fi
+          PROJECT_REF="${SUPABASE_PROJECT_REF:-rukyitpjfmzhqjlfmbie}"
+          supabase login --token "${SUPABASE_ACCESS_TOKEN}"
+          supabase link --project-ref "${PROJECT_REF}" --password "${SUPABASE_DB_PASSWORD}"
+
+      - name: Pull remote schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          PULL_LOG="$(mktemp)"
+          if supabase db pull --linked 2>&1 | tee "${PULL_LOG}"; then
+            echo "Supabase schema pull completed."
+            exit 0
+          fi
+
+          if grep -qi "migration history does not match local files" "${PULL_LOG}"; then
+            echo "::warning::Supabase migration history mismatch detected. Skipping automated db pull for this run."
+            echo "::warning::Please reconcile migration history manually, then re-run this workflow."
+            exit 0
+          fi
+
+          echo "Supabase db pull failed with non-recoverable error."
+          cat "${PULL_LOG}"
+          exit 1
+
+      - name: Commit and push migration changes
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- supabase/migrations; then
+            echo "No migration changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add supabase/migrations
+          git commit -m "chore(db): automated supabase db pull"
+          git push

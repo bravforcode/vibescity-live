@@ -1,4 +1,5 @@
 import { getApiV1BaseUrl } from "../lib/runtimeConfig";
+import { request, VisitorBootstrapSchema } from "./apiService";
 import {
 	clearRuntimeLaneUnavailable,
 	isKnownMissingRuntimeLane,
@@ -173,20 +174,14 @@ export const bootstrapVisitor = async ({ forceRefresh = false } = {}) => {
 
 	for (const base of baseCandidates) {
 		try {
-			const response = await fetch(`${base}/visitor/bootstrap`, {
+			payload = await request({
+				url: `${base}/visitor/bootstrap`,
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ visitor_id: visitorId }),
+				data: { visitor_id: visitorId },
+				schema: VisitorBootstrapSchema,
 			});
-			if (response.ok) {
-				payload = await response.json();
+			if (payload?.visitor_token) {
 				clearRuntimeLaneUnavailable(RUNTIME_LANES.visitorBootstrap);
-				break;
-			}
-			const errorPayload = await response.json().catch(() => ({}));
-			const detail = errorPayload?.detail || `HTTP ${response.status}`;
-			lastError = new Error(detail);
-			if (![404, 405].includes(response.status)) {
 				break;
 			}
 		} catch (error) {

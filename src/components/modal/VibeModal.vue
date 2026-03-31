@@ -10,7 +10,6 @@ import {
 	watch,
 	watchEffect,
 } from "vue";
-import { useChromaticGlass } from "../../composables/engine/useChromaticGlass.js";
 import { useGranularAudio } from "../../composables/engine/useGranularAudio.js";
 import { useHaptics } from "../../composables/useHaptics";
 import { usePerformance } from "../../composables/usePerformance";
@@ -90,10 +89,13 @@ const FALLBACK_IMAGE =
 const DOUBLE_TAP_DELAY = 300;
 const MAX_FLASH_WINDOW = 1200000; // 20 minutes
 const DISMISS_THRESHOLD = {
-	DISTANCE: 150,
-	VELOCITY: 0.5,
-	QUICK_FLICK: 60,
+	DISTANCE: 140,
+	VELOCITY: 0.48,
+	QUICK_FLICK: 56,
 };
+const MODAL_ENTER_DURATION_MS = 280;
+const MODAL_LEAVE_DURATION_MS = 220;
+const DEFERRED_MODAL_SETUP_MS = 220;
 
 // ==========================================
 // ✅ COMPOSABLES & PROPS
@@ -140,13 +142,6 @@ const prefersCoarsePointer =
 const preferLiteModalEffects = ref(
 	prefersCoarsePointer || isLowPowerMode.value,
 );
-// Refractive glass panel — placed after modalCard so ref is captured
-const { enabled: glassEnabled, fallbackClass } = useChromaticGlass({
-	panelId: "vibe-modal",
-	panelRef: modalCard,
-	enabled: () => !preferLiteModalEffects.value,
-	aberration: 0.006,
-});
 const scrollContentRef = ref(null);
 const imageCarouselRef = ref(null);
 const videoPlayer = ref(null);
@@ -157,6 +152,9 @@ const dragProgress = ref(0);
 const showHeartAnim = ref(false);
 const touchStart = ref({ y: 0, t: 0 });
 const initialScrollTop = ref(0);
+let touchSessionActive = false;
+let touchStartedFromDragZone = false;
+const DRAG_START_SLOP_PX = 10;
 
 // Gallery State
 const currentImageIndex = ref(0);
@@ -173,15 +171,36 @@ const modalTitleId = "vibe-modal-title";
 
 // --- Cinematic Spatial Physics: Dynamic Map Padding ---
 const mapPaddingApi = inject("mapPaddingApi", null);
+const syncMapPinFocusForModal = (isOpen = true) => {
+	if (!mapPaddingApi) return;
+	if (!isOpen) {
+		mapPaddingApi.setPinDragProgress(0);
+		mapPaddingApi.setActivePin(null);
+		mapPaddingApi.setActivePinId(null);
+		return;
+	}
+	const lat = toFiniteCoord(props.shop?.lat ?? props.shop?.latitude);
+	const lng = toFiniteCoord(props.shop?.lng ?? props.shop?.longitude);
+	if (lat === null || lng === null) {
+		mapPaddingApi.setActivePin(null);
+		mapPaddingApi.setActivePinId(null);
+		return;
+	}
+	mapPaddingApi.setActivePin([lng, lat]);
+	mapPaddingApi.setActivePinId(props.shop?.id ?? null);
+	mapPaddingApi.setPinDragProgress(1);
+};
 
 // Promotion State
 const timeLeft = ref("");
 const isPromoActive = ref(false);
 let timerInterval = null;
+let deferredSetupTimer = null;
 
 // Lazy Loading State
 const isMediaVisible = ref(false);
 const isReviewsVisible = ref(false);
+const isDeferredContentReady = ref(false);
 const mediaObserver = ref(null);
 const reviewsObserver = ref(null);
 const mediaLoadFailed = ref(false);
@@ -252,19 +271,48 @@ const safeTopOffset = computed(
 );
 const modalBackdropClass = computed(() =>
 	preferLiteModalEffects.value
-		? "absolute inset-0 bg-black/78 transition-opacity duration-200"
-		: "absolute inset-0 bg-black/70 backdrop-blur-xl transition-opacity duration-300",
+		? "absolute inset-0 bg-[rgba(0,0,0,0.5)] transition-opacity duration-200 ease-out"
+		: "absolute inset-0 bg-[rgba(0,0,0,0.4)] backdrop-blur-sm transition-opacity duration-300 ease-out",
 );
 const modalSurfaceClass = computed(() =>
 	preferLiteModalEffects.value
-		? "relative w-full md:max-w-5xl bg-white dark:bg-[#0a0a12] md:rounded-[2rem] rounded-t-[2rem] flex flex-col shadow-[0_-6px_24px_rgba(0,0,0,0.32)] max-h-[72vh] md:max-h-[76vh] pointer-events-auto overflow-hidden"
-		: "relative w-full md:max-w-5xl bg-white dark:bg-[#0a0a12] md:rounded-[2rem] rounded-t-[2rem] flex flex-col shadow-[0_-8px_48px_rgba(0,0,0,0.5)] max-h-[72vh] md:max-h-[76vh] pointer-events-auto overflow-hidden",
+		? "dark relative w-full md:max-w-5xl border border-white/8 bg-[#05070b] md:rounded-[2rem] rounded-t-[2rem] flex flex-col shadow-[0_-10px_42px_rgba(0,0,0,0.72)] max-h-[72vh] md:max-h-[76vh] pointer-events-auto overflow-hidden"
+		: "dark relative w-full md:max-w-5xl border border-white/10 bg-[#06090f] md:rounded-[2rem] rounded-t-[2rem] flex flex-col shadow-[0_-14px_64px_rgba(0,0,0,0.78)] max-h-[72vh] md:max-h-[76vh] pointer-events-auto overflow-hidden",
 );
 const closeButtonClass = computed(() =>
 	preferLiteModalEffects.value
-		? "absolute right-4 z-50 flex h-8 w-8 items-center justify-center rounded-full border border-white/12 bg-black/35 transition active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 dark:bg-white/12"
-		: "absolute right-4 z-50 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/10 backdrop-blur-xl transition active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 dark:bg-white/10",
+		? "absolute right-4 z-50 flex h-8 w-8 items-center justify-center rounded-full border border-white/12 bg-black/35 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-[1.04] hover:bg-black/45 active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 dark:bg-white/12 dark:hover:bg-white/18"
+		: "absolute right-4 z-50 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/10 backdrop-blur-xl transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-[1.04] hover:bg-black/20 active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 dark:bg-white/10 dark:hover:bg-white/18",
 );
+const modalSurfaceStyle = computed(() => {
+	return {
+		zIndex: Z.MODAL,
+		"--safe-area-top": "env(safe-area-inset-top)",
+		"--safe-area-bottom": "env(safe-area-inset-bottom)",
+		overscrollBehaviorY: "contain",
+		background: preferLiteModalEffects.value
+			? "rgba(5,7,11,0.98)"
+			: "rgba(6,9,15,0.96)",
+		borderColor: preferLiteModalEffects.value
+			? "rgba(255,255,255,0.08)"
+			: "rgba(255,255,255,0.1)",
+		boxShadow: preferLiteModalEffects.value
+			? "0 -10px 42px rgba(0,0,0,0.7)"
+			: "0 -14px 64px rgba(0,0,0,0.78)",
+		willChange: "transform, opacity",
+		transform: "translateZ(0)",
+		backfaceVisibility: "hidden",
+	};
+});
+const modalContentStyle = computed(() => ({
+	willChange: "auto",
+}));
+const modalHandleStyle = computed(() => ({
+	transform: `translate3d(0, ${Math.round(dragProgress.value * 2)}px, 0) scaleX(${1 + dragProgress.value * 0.06})`,
+	opacity: 0.9 + dragProgress.value * 0.1,
+	willChange: "transform, opacity",
+}));
+const particleCount = computed(() => (preferLiteModalEffects.value ? 4 : 12));
 
 const processedImages = computed(() => {
 	try {
@@ -295,6 +343,21 @@ const processedImages = computed(() => {
 	}
 });
 
+const galleryItems = computed(() => {
+	const items = Array.isArray(processedImages.value)
+		? processedImages.value.filter(Boolean)
+		: [];
+	if (!items.length) return [];
+	const heroUrl = String(
+		media.value?.url || resolvedMediaUrl.value || "",
+	).trim();
+	if (!heroUrl) return items;
+	const remaining = items.filter(
+		(item) => String(item || "").trim() !== heroUrl,
+	);
+	return remaining.length > 0 ? remaining : items;
+});
+
 const isVideo = (url) => {
 	if (!url || typeof url !== "string") return false;
 	return (
@@ -304,7 +367,7 @@ const isVideo = (url) => {
 	);
 };
 
-const hasGallery = computed(() => processedImages.value.length > 0);
+const hasGallery = computed(() => galleryItems.value.length > 0);
 
 const hasSocialLinks = computed(
 	() =>
@@ -333,6 +396,21 @@ watch(
 	{ immediate: true },
 );
 
+watch(galleryItems, (items) => {
+	if (!Array.isArray(items) || items.length === 0) {
+		currentImageIndex.value = 0;
+		galleryInitialIndex.value = 0;
+		isGalleryOpen.value = false;
+		return;
+	}
+	if (currentImageIndex.value >= items.length) {
+		currentImageIndex.value = Math.max(0, items.length - 1);
+	}
+	if (galleryInitialIndex.value >= items.length) {
+		galleryInitialIndex.value = Math.max(0, items.length - 1);
+	}
+});
+
 const handlePrimaryVideoError = (event) => {
 	if (Number(event?.target?.error?.code || 0) === 1) return;
 	markMediaElementFailed(event, resolvedMediaUrl.value);
@@ -358,28 +436,23 @@ const getGalleryThumbnailUrl = (url) => {
 
 const { apply } = useMotion(modalCard, {
 	initial: {
-		y: "100%",
+		y: 72,
 		opacity: 0,
-		scale: 0.95,
 	},
 	enter: {
 		y: 0,
 		opacity: 1,
-		scale: 1,
 		transition: {
-			type: "spring",
-			stiffness: 260,
-			damping: 30,
-			mass: 0.8,
+			duration: MODAL_ENTER_DURATION_MS,
+			ease: [0.22, 1, 0.36, 1],
 		},
 	},
 	leave: {
-		y: "100%",
+		y: 72,
 		opacity: 0,
-		scale: 0.95,
 		transition: {
-			duration: 350,
-			ease: [0.25, 0.1, 0.25, 1],
+			duration: MODAL_LEAVE_DURATION_MS,
+			ease: [0.4, 0, 1, 1],
 		},
 	},
 });
@@ -393,49 +466,69 @@ const handleTouchStart = (e) => {
 
 	initialScrollTop.value = scrollContentRef.value.scrollTop;
 	touchStart.value = { y: e.touches[0].clientY, t: Date.now() };
-	isDragging.value = true;
+	touchSessionActive = true;
+	touchStartedFromDragZone = Boolean(
+		e.target?.closest?.(
+			"[data-testid='vibe-modal-handle-zone'], [data-testid='vibe-modal-drag-zone']",
+		),
+	);
+	isDragging.value = false;
+	dragProgress.value = 0;
 };
 
 const handleTouchMove = (e) => {
-	if (!isDragging.value) return;
+	if (!touchSessionActive) return;
 
 	const currentY = e.touches[0].clientY;
 	const deltaY = currentY - touchStart.value.y;
+	const canPullFromTop =
+		touchStartedFromDragZone ||
+		(initialScrollTop.value <= 0 &&
+			(!scrollContentRef.value || scrollContentRef.value.scrollTop <= 0));
 
 	// Block dragging if scrolled down or scrolling up
-	if (
-		initialScrollTop.value > 0 ||
-		(scrollContentRef.value && scrollContentRef.value.scrollTop > 0) ||
-		deltaY < 0
-	) {
+	if (!canPullFromTop || deltaY < 0) {
 		return;
 	}
+	if (deltaY <= DRAG_START_SLOP_PX) return;
 
-	// Active drag (pulling down from top)
-	if (e.cancelable && deltaY > 0) {
+	// Some mobile browsers mark touchmove as non-cancelable once scroll starts.
+	// Keep driving the sheet drag anyway when the gesture began from the top.
+	if (e.cancelable) {
 		e.preventDefault();
+	}
+	if (!isDragging.value) {
+		isDragging.value = true;
+	}
 
-		// Logarithmic resistance for iOS feel
-		const limit = 200;
-		const resistance = limit * Math.log10(1 + deltaY / (limit * 0.5)) * 2.5;
+	// Offset by slop so resistance starts from 0 at drag initiation (no jump)
+	const effectiveDelta = deltaY - DRAG_START_SLOP_PX;
+	const limit = preferLiteModalEffects.value ? 210 : 230;
+	const resistance =
+		limit * Math.log10(1 + effectiveDelta / (limit * 0.46)) * 2.65;
 
-		dragProgress.value = Math.min(deltaY / 600, 1);
+	dragProgress.value = Math.min(effectiveDelta / 360, 1);
 
-		apply({
-			y: resistance,
-			scale: 1 - deltaY / 3000,
-			opacity: 1,
-		});
+	apply({
+		y: resistance,
+		opacity: 1,
+	});
+	mapPaddingApi?.setPinDragProgress?.(1 - Math.min(1, effectiveDelta / 280));
 
-		const _dt = Date.now() - touchStart.value.t;
-		if (_dt > 0) {
-			audioSwipe(Math.abs(deltaY) / _dt);
-		}
+	const _dt = Date.now() - touchStart.value.t;
+	if (_dt > 0) {
+		audioSwipe(Math.abs(deltaY) / _dt);
 	}
 };
 
 const handleTouchEnd = (e) => {
-	if (!isDragging.value) return;
+	if (!touchSessionActive) return;
+	touchSessionActive = false;
+	if (!isDragging.value) {
+		touchStartedFromDragZone = false;
+		dragProgress.value = 0;
+		return;
+	}
 	isDragging.value = false;
 
 	const currentY = e.changedTouches[0].clientY;
@@ -444,7 +537,9 @@ const handleTouchEnd = (e) => {
 	const velocity = deltaY / time;
 
 	const isScrolledToTop =
-		!scrollContentRef.value || scrollContentRef.value.scrollTop <= 0;
+		touchStartedFromDragZone ||
+		!scrollContentRef.value ||
+		scrollContentRef.value.scrollTop <= 0;
 
 	// Dismiss conditions
 	if (isScrolledToTop && deltaY > 0) {
@@ -461,10 +556,12 @@ const handleTouchEnd = (e) => {
 	// Snap back
 	if (deltaY > 0) {
 		apply("enter");
+		mapPaddingApi?.setPinDragProgress?.(1);
 		audioSnap();
 	}
 
 	dragProgress.value = 0;
+	touchStartedFromDragZone = false;
 };
 
 // ==========================================
@@ -476,7 +573,7 @@ const handleClose = () => {
 		impactFeedback("medium");
 		audioDismiss();
 		apply("leave");
-		setTimeout(() => emit("close"), 300);
+		setTimeout(() => emit("close"), MODAL_LEAVE_DURATION_MS + 40);
 	} catch (error) {
 		console.error("Error closing modal:", error);
 		emit("close");
@@ -526,10 +623,10 @@ const fireSnapHaptic = (idx) => {
 };
 
 const openGalleryAt = (index) => {
-	if (!processedImages.value.length) return;
+	if (!galleryItems.value.length) return;
 	const safeIndex = Math.max(
 		0,
-		Math.min(Number(index) || 0, processedImages.value.length - 1),
+		Math.min(Number(index) || 0, galleryItems.value.length - 1),
 	);
 	galleryInitialIndex.value = safeIndex;
 	currentImageIndex.value = safeIndex;
@@ -544,7 +641,7 @@ const closeGallery = () => {
 const jumpToImage = (index) => {
 	const safeIndex = Math.max(
 		0,
-		Math.min(Number(index) || 0, processedImages.value.length - 1),
+		Math.min(Number(index) || 0, galleryItems.value.length - 1),
 	);
 	currentImageIndex.value = safeIndex;
 	scrollToImage(safeIndex);
@@ -552,7 +649,7 @@ const jumpToImage = (index) => {
 };
 
 const nextImage = () => {
-	if (currentImageIndex.value < processedImages.value.length - 1) {
+	if (currentImageIndex.value < galleryItems.value.length - 1) {
 		currentImageIndex.value++;
 		scrollToImage(currentImageIndex.value);
 		impactFeedback("light");
@@ -588,7 +685,7 @@ const handleCarouselScroll = () => {
 	if (
 		newIndex !== currentImageIndex.value &&
 		newIndex >= 0 &&
-		newIndex < processedImages.value.length
+		newIndex < galleryItems.value.length
 	) {
 		currentImageIndex.value = newIndex;
 		fireSnapHaptic(newIndex);
@@ -917,15 +1014,12 @@ const getParticleStyle = (index) => {
 
 onMounted(() => {
 	try {
+		syncMapPinFocusForModal(true);
 		isMobile.value = isMobileDevice();
 		preferLiteModalEffects.value =
 			isLowPowerMode.value || isMobile.value || prefersCoarsePointer;
 		initialVisitorCount.value = Math.floor(Math.random() * 50) + 10;
-
-		updateCountdown();
-		timerInterval = setInterval(updateCountdown, 1000);
-
-		setupIntersectionObservers();
+		isDeferredContentReady.value = false;
 
 		// ✅ Add carousel scroll listener (Passive + Throttled)
 		if (imageCarouselRef.value) {
@@ -940,13 +1034,20 @@ onMounted(() => {
 		document.addEventListener("keydown", handleKeydown);
 		lockBodyScroll(true);
 
-		// ✅ Focus close button for accessibility
-		nextTick(() => {
-			const closeBtn = modalCard.value?.querySelector(
-				'button[aria-label="Close details"]',
-			);
-			closeBtn?.focus?.();
-		});
+		deferredSetupTimer = setTimeout(() => {
+			isDeferredContentReady.value = true;
+			updateCountdown();
+			timerInterval = setInterval(updateCountdown, 1000);
+			setupIntersectionObservers();
+
+			// ✅ Focus close button after the enter animation settles
+			nextTick(() => {
+				const closeBtn = modalCard.value?.querySelector(
+					'button[aria-label="Close details"]',
+				);
+				closeBtn?.focus?.();
+			});
+		}, DEFERRED_MODAL_SETUP_MS);
 	} catch (error) {
 		console.error("Error in onMounted:", error);
 	}
@@ -955,6 +1056,7 @@ onMounted(() => {
 onUnmounted(() => {
 	try {
 		if (timerInterval) clearInterval(timerInterval);
+		if (deferredSetupTimer) clearTimeout(deferredSetupTimer);
 		if (singleTapTimer) clearTimeout(singleTapTimer);
 
 		if (mediaObserver.value) mediaObserver.value.disconnect();
@@ -972,21 +1074,36 @@ onUnmounted(() => {
 		// ✅ Clean up desktop listeners
 		document.removeEventListener("keydown", handleKeydown);
 		lockBodyScroll(false);
+		syncMapPinFocusForModal(false);
 	} catch (error) {
 		console.error("Error in onUnmounted:", error);
 	}
 });
+
+watch(
+	() => [
+		props.shop?.id,
+		props.shop?.lat,
+		props.shop?.lng,
+		props.shop?.latitude,
+		props.shop?.longitude,
+	],
+	() => {
+		syncMapPinFocusForModal(true);
+	},
+	{ immediate: true },
+);
 </script>
 
 <template>
   <div
     data-testid="vibe-modal"
-    class="fixed inset-0 flex items-end md:items-center justify-center pointer-events-auto font-sans overflow-hidden"
+    class="fixed inset-0 flex items-end md:items-center justify-center pointer-events-none font-sans overflow-hidden"
     :style="{ zIndex: Z.MODAL }"
   >
     <!-- iOS-Style Backdrop with Blur -->
     <div
-      :class="modalBackdropClass"
+      :class="[modalBackdropClass, 'pointer-events-none md:pointer-events-auto']"
       :style="{ opacity: 1 - dragProgress * 0.5 }"
       @click="handleClose"
     />
@@ -994,16 +1111,12 @@ onUnmounted(() => {
     <!-- Main Modal Container -->
     <div
       ref="modalCard"
+      data-testid="vibe-modal-surface"
       @touchstart.stop="handleTouchStart"
       @touchmove.stop="handleTouchMove"
       @touchend.stop="handleTouchEnd"
-      :class="[modalSurfaceClass, fallbackClass]"
-      :style="{
-        zIndex: Z.MODAL,
-        '--safe-area-top': 'env(safe-area-inset-top)',
-        '--safe-area-bottom': 'env(safe-area-inset-bottom)',
-        background: glassEnabled ? 'rgba(8,8,16,0.88)' : undefined,
-      }"
+      :class="modalSurfaceClass"
+      :style="modalSurfaceStyle"
       role="dialog"
       aria-modal="true"
       :aria-labelledby="modalTitleId"
@@ -1011,14 +1124,13 @@ onUnmounted(() => {
     >
       <!-- iOS-Style Drag Handle -->
       <div
+        data-testid="vibe-modal-handle-zone"
         class="flex justify-center pt-3 pb-1 cursor-grab active:cursor-grabbing"
+        style="touch-action: none;"
       >
         <div
           class="w-10 h-1 bg-gray-300 dark:bg-gray-500 rounded-full transition-[width,background-color] duration-200"
-          :style="{
-            width: dragProgress > 0 ? `${10 + dragProgress * 20}px` : '40px',
-            backgroundColor: dragProgress > 0.3 ? '#10b981' : undefined,
-          }"
+          :style="modalHandleStyle"
         />
       </div>
 
@@ -1035,10 +1147,15 @@ onUnmounted(() => {
       <!-- Scrollable Content -->
       <div
         ref="scrollContentRef"
-        class="flex-1 overflow-y-auto overflow-x-hidden -webkit-overflow-scrolling-touch"
+        class="flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain"
+        :style="modalContentStyle"
       >
         <!-- Header Section -->
-        <div class="px-4 py-3 space-y-2">
+          <div
+            data-testid="vibe-modal-drag-zone"
+            class="px-4 py-3 space-y-2"
+            style="touch-action: none;"
+          >
           <!-- Title Row -->
           <div class="flex items-start justify-between gap-3">
             <div class="flex-1 min-w-0">
@@ -1190,7 +1307,7 @@ onUnmounted(() => {
             class="absolute inset-0 overflow-hidden pointer-events-none z-10"
           >
             <div
-              v-for="i in 12"
+              v-for="i in particleCount"
               :key="`particle-${i}`"
               class="particle"
               :style="getParticleStyle(i)"
@@ -1304,6 +1421,7 @@ onUnmounted(() => {
           </template>
         </div>
 
+        <template v-if="isDeferredContentReady">
         <!-- Image Gallery Carousel -->
         <div v-if="hasGallery" class="relative px-5 py-4">
           <h4
@@ -1311,7 +1429,7 @@ onUnmounted(() => {
           >
             {{
               t("vibe.gallery")
-            }} ({{ resolvedMediaCounts.total || processedImages.length }})
+            }} ({{ galleryItems.length }})
           </h4>
 
           <div class="relative">
@@ -1321,7 +1439,7 @@ onUnmounted(() => {
               class="flex gap-3 overflow-x-auto snap-x snap-mandatory no-scrollbar scroll-smooth"
             >
               <button
-                v-for="(img, idx) in processedImages"
+                v-for="(img, idx) in galleryItems"
                 :key="`gallery-${idx}`"
                 type="button"
                 :aria-label="`Open gallery image ${idx + 1}`"
@@ -1347,7 +1465,7 @@ onUnmounted(() => {
             <!-- ✅ Dots Indicator -->
             <div class="mt-3 flex items-center justify-center gap-1.5">
               <button
-                v-for="(_, i) in processedImages"
+                v-for="(_, i) in galleryItems"
                 :key="`dot-${i}`"
                 class="h-1.5 rounded-full transition-[width,background-color] duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
                 :class="
@@ -1371,7 +1489,7 @@ onUnmounted(() => {
             </button>
 
             <button
-              v-if="currentImageIndex < processedImages.length - 1"
+              v-if="currentImageIndex < galleryItems.length - 1"
               @click="nextImage"
               aria-label="Next image"
               class="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 dark:bg-black/50 backdrop-blur-md shadow-lg active:scale-90 transition z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
@@ -1507,6 +1625,7 @@ onUnmounted(() => {
             :shop-name="shop.name"
           />
         </div>
+        </template>
 
         <!-- Bottom Safe Area -->
         <div class="h-[calc(var(--safe-area-bottom)+20px)]" />
@@ -1520,7 +1639,7 @@ onUnmounted(() => {
           <!-- Share -->
           <button
             @click="handleShare"
-            class="h-14 rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+            class="flex h-14 flex-col items-center justify-center gap-1 rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 shadow-lg transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
           >
             <Share2 class="w-5 h-5 text-white" />
             <span
@@ -1533,7 +1652,7 @@ onUnmounted(() => {
           <!-- Navigate -->
           <button
             @click="openGoogleMaps"
-            class="h-14 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50"
+            class="flex h-14 flex-col items-center justify-center gap-1 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 shadow-lg transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50"
           >
             <Navigation class="w-5 h-5 text-white" />
             <span
@@ -1549,7 +1668,7 @@ onUnmounted(() => {
               showRidePopup = true;
               impactFeedback('medium');
             "
-            class="h-14 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/50"
+            class="flex h-14 flex-col items-center justify-center gap-1 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 shadow-lg transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/50"
           >
             <Car class="w-5 h-5 text-white" />
             <span
@@ -1566,7 +1685,7 @@ onUnmounted(() => {
     </div>
 
     <!-- Ride Selection Bottom Sheet -->
-    <transition name="sheet">
+    <transition name="sheet" appear>
       <div
         v-if="showRidePopup"
         class="fixed inset-0 flex items-end justify-center bg-black/70 backdrop-blur-xl"
@@ -1604,7 +1723,7 @@ onUnmounted(() => {
                 @click="openRide('grab')"
                 :disabled="rideLoading === 'grab'"
                 :aria-label="t('vibe.open_grab')"
-                class="w-full h-16 bg-gradient-to-r from-[#00B14F] to-[#00A84D] rounded-2xl flex items-center px-4 gap-3 active:scale-98 transition-transform shadow-lg disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300/80"
+                class="flex h-16 w-full items-center gap-3 rounded-2xl bg-gradient-to-r from-[#00B14F] to-[#00A84D] px-4 shadow-lg transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 active:scale-98 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300/80"
               >
                 <div
                   class="w-10 h-10 bg-white rounded-full flex items-center justify-center"
@@ -1624,7 +1743,7 @@ onUnmounted(() => {
                 @click="openRide('bolt')"
                 :disabled="rideLoading === 'bolt'"
                 :aria-label="t('vibe.open_bolt')"
-                class="w-full h-16 bg-gradient-to-r from-[#34D186] to-[#2EC477] rounded-2xl flex items-center px-4 gap-3 active:scale-98 transition-transform shadow-lg disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300/80"
+                class="flex h-16 w-full items-center gap-3 rounded-2xl bg-gradient-to-r from-[#34D186] to-[#2EC477] px-4 shadow-lg transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 active:scale-98 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300/80"
               >
                 <div
                   class="w-10 h-10 bg-white rounded-full flex items-center justify-center"
@@ -1644,7 +1763,7 @@ onUnmounted(() => {
                 @click="openRide('lineman')"
                 :disabled="rideLoading === 'lineman'"
                 :aria-label="t('vibe.open_lineman')"
-                class="w-full h-16 bg-gradient-to-r from-[#00B14F] to-[#009440] rounded-2xl flex items-center px-4 gap-3 active:scale-98 transition-transform shadow-lg disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300/80"
+                class="flex h-16 w-full items-center gap-3 rounded-2xl bg-gradient-to-r from-[#00B14F] to-[#009440] px-4 shadow-lg transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 active:scale-98 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300/80"
               >
                 <div
                   class="w-10 h-10 bg-white rounded-full flex items-center justify-center"
@@ -1692,7 +1811,7 @@ onUnmounted(() => {
     </transition>
 
     <PhotoGallery
-      :images="processedImages"
+      :images="galleryItems"
       :initial-index="galleryInitialIndex"
       :is-open="isGalleryOpen"
       @close="closeGallery"
@@ -1723,48 +1842,58 @@ onUnmounted(() => {
 /* Transitions */
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.25s cubic-bezier(0.25, 0.1, 0.25, 1);
+  transition:
+    opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, filter;
 }
 
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+  filter: blur(2px);
 }
 
 .scale-enter-active,
 .scale-leave-active {
   transition:
-    opacity 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
-    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    opacity 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
 }
 
 .scale-enter-from,
 .scale-leave-to {
   opacity: 0;
-  transform: scale(0.8);
+  transform: scale(0.88) translateY(10px);
 }
 
 .sheet-enter-active,
 .sheet-leave-active {
-  transition: transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
+  transition:
+    opacity 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
 }
 
 .sheet-enter-from,
 .sheet-leave-to {
-  transform: translateY(100%);
+  opacity: 0;
+  transform: translateY(42px) scale(0.985);
 }
 
 .slide-up-enter-active,
 .slide-up-leave-active {
   transition:
-    opacity 0.3s cubic-bezier(0.25, 0.1, 0.25, 1),
-    transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+    opacity 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
 }
 
 .slide-up-enter-from,
 .slide-up-leave-to {
   opacity: 0;
-  transform: translateY(20px);
+  transform: translateY(24px) scale(0.96);
 }
 
 .heart-enter-active {

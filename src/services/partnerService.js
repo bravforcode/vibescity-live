@@ -7,9 +7,16 @@ import { bootstrapVisitor, getOrCreateVisitorId } from "./visitorIdentity";
 const API_SOURCE = "api";
 const FALLBACK_SOURCE = "supabase_fallback";
 const LOCAL_FALLBACK_SOURCE = "local_fallback";
+const LOCAL_DEV_HOST_PATTERN = /^(localhost|127\.0\.0\.1)$/i;
 const VERIFIED_ORDER_STATUSES = new Set(["verified", "paid"]);
 const PARTNER_READ_TTL_MS = 60_000;
 const partnerReadCache = new Map();
+
+const shouldShortCircuitPartnerReadsInLocalDev = () =>
+	import.meta.env.DEV &&
+	typeof window !== "undefined" &&
+	LOCAL_DEV_HOST_PATTERN.test(window.location.hostname) &&
+	import.meta.env.VITE_API_PROXY_DEV !== "true";
 
 const sanitizeCode = (value) =>
 	String(value || "")
@@ -473,7 +480,7 @@ export const partnerService = {
 			const cached = readCachedPayload("status", visitorId);
 			if (cached) return cached;
 		}
-		if (isFrontendOnlyDevMode()) {
+		if (isFrontendOnlyDevMode() || shouldShortCircuitPartnerReadsInLocalDev()) {
 			return writeCachedPayload(
 				"status",
 				visitorId,
@@ -516,7 +523,7 @@ export const partnerService = {
 			const cached = readCachedPayload("dashboard", visitorId);
 			if (cached) return cached;
 		}
-		if (isFrontendOnlyDevMode()) {
+		if (isFrontendOnlyDevMode() || shouldShortCircuitPartnerReadsInLocalDev()) {
 			return writeCachedPayload(
 				"dashboard",
 				visitorId,

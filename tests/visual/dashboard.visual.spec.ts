@@ -1,4 +1,8 @@
-import { expect, test, type Page } from "@playwright/test";
+// Dedicated dashboard visual lane only.
+// Ownership: owner + partner dashboard shells and panels. Keep map/feed and
+// legacy critical surfaces out of this spec so dashboard regressions stay reviewable.
+
+import { expect, type Page, test } from "@playwright/test";
 
 const seedStableVisitor = async (page: Page, id: string) => {
 	await page.addInitScript((visitorId) => {
@@ -242,7 +246,10 @@ test("@visual Partner dashboard unified shell", async ({ page }) => {
 	try {
 		await expect(root).toBeVisible({ timeout: 12_000 });
 	} catch {
-		test.skip(true, "Partner dashboard route is not accessible in this environment.");
+		test.skip(
+			true,
+			"Partner dashboard route is not accessible in this environment.",
+		);
 	}
 
 	await expect(page.getByTestId("partner-stat-strip")).toHaveScreenshot(

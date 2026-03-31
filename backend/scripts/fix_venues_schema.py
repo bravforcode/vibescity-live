@@ -1,20 +1,33 @@
+import logging
 import os
+from pathlib import Path
 
 import psycopg2
 from dotenv import load_dotenv
 
-load_dotenv(os.path.join(os.path.dirname(__file__), "../.env"))
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 DB_URL = os.getenv("SUPABASE_DIRECT_URL")
+logger = logging.getLogger("fix_venues_schema")
 
-if not DB_URL:
-    print("Error: SUPABASE_DIRECT_URL not set in backened/.env")
-    exit(1)
 
-print("Connecting to DB using DIRECT_URL...")
+def _configure_logging() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-try:
-    conn = psycopg2.connect(DB_URL)
+
+def main() -> int:
+    if not DB_URL:
+        logger.error("Error: SUPABASE_DIRECT_URL not set in backend/.env")
+        return 1
+
+    logger.info("Connecting to DB using DIRECT_URL...")
+
+    try:
+        conn = psycopg2.connect(DB_URL)
+    except psycopg2.Error as exc:
+        logger.error("Database connection failed: %s", exc)
+        return 1
+
     conn.autocommit = True
     cur = conn.cursor()
 
@@ -40,19 +53,24 @@ try:
         "CREATE INDEX IF NOT EXISTS idx_venues_h3_cell ON venues (h3_cell);",
         "CREATE INDEX IF NOT EXISTS idx_venues_category ON venues (category);",
         "CREATE INDEX IF NOT EXISTS idx_venues_osm_id ON venues (osm_id);",
-        "CREATE INDEX IF NOT EXISTS idx_venues_lat_lon ON venues (latitude, longitude);"
+        "CREATE INDEX IF NOT EXISTS idx_venues_lat_lon ON venues (latitude, longitude);",
     ]
 
-    for cmd in commands:
-        print(f"Executing: {cmd}")
-        try:
-            cur.execute(cmd)
-        except Exception as e:
-            print(f"Error executing {cmd}: {e}")
+    try:
+        for cmd in commands:
+            logger.info("Executing: %s", cmd)
+            try:
+                cur.execute(cmd)
+            except psycopg2.Error as exc:
+                logger.error("Error executing %s: %s", cmd, exc)
 
-    print("Schema updated successfully!")
-    cur.close()
-    conn.close()
+        logger.info("Schema updated successfully!")
+        return 0
+    finally:
+        cur.close()
+        conn.close()
 
-except Exception as e:
-    print(f"Database connection failed: {e}")
+
+if __name__ == "__main__":
+    _configure_logging()
+    raise SystemExit(main())

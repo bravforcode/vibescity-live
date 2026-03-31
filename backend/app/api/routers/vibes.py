@@ -8,6 +8,7 @@ import time
 from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from postgrest import APIError
 from pydantic import ValidationError
 
 from app.core.config import settings
@@ -71,7 +72,7 @@ class ConnectionManager:
 		try:
 			await websocket.send_text(json.dumps(payload))
 			return True
-		except Exception:
+		except (RuntimeError, ValueError, WebSocketDisconnect):
 			return False
 
 	async def broadcast_payload(self, payload: dict[str, Any]):
@@ -130,23 +131,20 @@ class ConnectionManager:
 		return affected_shops
 
 	async def handle_disconnect(self, websocket: WebSocket):
-		try:
-			affected_shops = self.remove_connection(websocket)
-			for shop_id in affected_shops:
-				connections = self.room_connections.get(shop_id, [])
-				if not connections:
-					continue
-				msg = {
-					"type": "presence",
-					"shopId": int(shop_id) if shop_id.isdigit() else shop_id,
-					"count": len(connections),
-				}
-				for conn in connections:
-					await self._safe_send(conn, msg)
+		affected_shops = self.remove_connection(websocket)
+		for shop_id in affected_shops:
+			connections = self.room_connections.get(shop_id, [])
+			if not connections:
+				continue
+			msg = {
+				"type": "presence",
+				"shopId": int(shop_id) if shop_id.isdigit() else shop_id,
+				"count": len(connections),
+			}
+			for conn in connections:
+				await self._safe_send(conn, msg)
 
-			await self.broadcast_heatmap()
-		except Exception as exc:
-			logger.warning("disconnect handling failed: %s", exc)
+		await self.broadcast_heatmap()
 
 	async def broadcast_heatmap(self):
 		if not self.global_connections:
@@ -219,7 +217,7 @@ async def _dispatch_map_effects_loop():
 				)
 		except asyncio.CancelledError:
 			break
-		except Exception as exc:
+		except (APIError, RuntimeError, TypeError, ValueError) as exc:
 			logger.warning("map effect dispatcher error: %s", exc)
 		finally:
 			await asyncio.sleep(poll_seconds)
@@ -243,7 +241,7 @@ async def _dispatch_hotspot_loop():
 				# Refresh aggregate every ~5 minutes
 				try:
 					await asyncio.to_thread(_rpc, "rollup_hotspot_5m", {})
-				except Exception as exc:
+				except (APIError, RuntimeError, TypeError, ValueError) as exc:
 					logger.debug("hotspot rollup skipped: %s", exc)
 				_last_hotspot_rollup = now
 
@@ -254,7 +252,7 @@ async def _dispatch_hotspot_loop():
 					{"p_limit": 20},
 				)
 				snapshot = list(rows or [])
-			except Exception:
+			except (APIError, RuntimeError, TypeError, ValueError):
 				snapshot = await asyncio.to_thread(_hotspot_snapshot, 20)
 
 			payload_data = snapshot[:20]
@@ -277,7 +275,7 @@ async def _dispatch_hotspot_loop():
 			)
 		except asyncio.CancelledError:
 			break
-		except Exception as exc:
+		except (APIError, RuntimeError, TypeError, ValueError) as exc:
 			logger.warning("hotspot broadcaster error: %s", exc)
 		finally:
 			await asyncio.sleep(interval_seconds)
@@ -341,7 +339,7 @@ async def vibe_stream(websocket: WebSocket):
 					await manager.broadcast_payload(result)
 		except WebSocketDisconnect:
 			await manager.handle_disconnect(websocket)
-		except Exception as exc:
+		except (RuntimeError, ValueError) as exc:
 			logger.warning("vibe websocket error: %s", exc)
 			await manager.handle_disconnect(websocket)
 	finally:

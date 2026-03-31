@@ -1,0 +1,11 @@
+*.css
+src/**/*.css
+package-lock.json
+bun.lock
+node_modules
+dist
+public
+.vercel
+
+# vendor snippets (do not lint/format)
+src/clarity_snippet.html

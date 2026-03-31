@@ -308,6 +308,8 @@ const collectLegacyMediaCandidates = (venue) => {
 		arrayCandidates.push(...venue.media.images);
 
 	const scalarCandidates = [
+		venue?.storefront_image_url,
+		venue?.storefrontImageUrl,
 		venue?.Image_URL1,
 		venue?.Image_URL2,
 		venue?.Image_URL3,
@@ -521,6 +523,26 @@ export const normalizeVenueViewModel = (
 		closeTime,
 		Province: province,
 		Zone: district,
+		buildingId:
+			source.buildingId ??
+			source.building_id ??
+			source.buildingKey ??
+			source.building_key ??
+			null,
+		building_id: source.building_id ?? source.buildingId ?? null,
+		buildingKey:
+			source.buildingKey ??
+			source.building_key ??
+			source.Building ??
+			source.building ??
+			null,
+		building_key: source.building_key ?? source.buildingKey ?? null,
+		building_name:
+			source.building_name ??
+			source.buildingName ??
+			source.Building ??
+			source.building ??
+			null,
 		Building:
 			source.Building ?? source.building ?? source.building_name ?? null,
 		Floor: source.Floor ?? source.floor ?? null,

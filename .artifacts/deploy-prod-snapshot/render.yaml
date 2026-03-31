@@ -1,0 +1,56 @@
+services:
+  # ── FastAPI Backend ─────────────────────────────────────────
+  - type: web
+    name: vibecity-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    region: singapore  # Closest to Thailand
+    plan: free
+    healthCheckPath: /health
+
+    envVars:
+      # Core
+      - key: ENV
+        value: production
+      - key: PROJECT_NAME
+        value: VibeCity API
+      - key: FRONTEND_URL
+        value: https://vibecity.live
+      - key: PORT
+        value: "8000"
+
+      # Supabase (REQUIRED) — กรอกใน Render Dashboard
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
+      # Auth
+      - key: VISITOR_SIGNING_SECRET
+        sync: false
+
+      # Stripe
+      - key: STRIPE_SECRET_KEY
+        sync: false
+
+      # Redis
+      - key: REDIS_URL
+        sync: false
+
+      # Database
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_DIRECT_URL
+        sync: false
+
+      # Optional
+      - key: METRICS_ENABLED
+        value: "true"
+      - key: SAFE_MODE
+        value: "false"
+      - key: OTEL_ENABLED
+        value: "false"
+      - key: MEMORY_ENABLED
+        value: "false"

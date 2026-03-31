@@ -1,5 +1,13 @@
 /* Global Mapbox Marker Styles & Animations */
 
+/* Fix: prevent browser passive-listener intervention on MapLibre canvas touch events */
+.maplibregl-canvas,
+.maplibregl-canvas-container,
+.maplibregl-interactive,
+.maplibregl-map {
+	touch-action: none;
+}
+
 /* Fireflies */
 .firefly-container {
 	position: absolute;
@@ -44,18 +52,6 @@
 		transform: translateY(-15px) translateX(15px) scale(1.1);
 		opacity: 0.7;
 	}
-}
-
-/* Custom Popup Styles */
-.vibe-maplibre-popup .maplibregl-popup-content {
-	padding: 0;
-	background: transparent;
-	box-shadow: none;
-	border-radius: 20px;
-}
-
-.vibe-maplibre-popup .maplibregl-popup-tip {
-	display: none; /* Tip can cause gaps, custom SVG pin tip is better */
 }
 
 /* Entry animation for popup */
@@ -110,8 +106,10 @@
 .giant-pin-wrapper {
 	position: relative;
 	display: flex;
-	flex-direction: column;
 	align-items: center;
+	justify-content: center;
+	width: 72px;
+	height: 92px;
 	filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4));
 	animation: giant-pin-float 3s ease-in-out infinite;
 	will-change: transform;
@@ -140,38 +138,8 @@
 	z-index: 1;
 }
 
-.giant-pin-purple-img {
-	transition: transform 0.2s ease;
-}
-.giant-pin-wrapper:hover .giant-pin-purple-img {
-	transform: scale(1.12) translateY(-2px);
-}
-
-.giant-pin-label-new {
-	position: absolute;
-	bottom: -15px;
-	left: 50%;
-	transform: translateX(-50%);
-	padding: 4px 12px;
-	background: linear-gradient(
-		135deg,
-		rgba(15, 15, 25, 0.95),
-		rgba(30, 30, 50, 0.95)
-	);
-	color: white;
-	font-size: 10px;
-	font-weight: 800;
-	letter-spacing: 0.5px;
-	border-radius: 20px;
-	white-space: nowrap;
-	backdrop-filter: blur(10px);
-	border: 1px solid rgba(139, 92, 246, 0.5);
-	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-	text-transform: uppercase;
-}
-
 .pulse-ring {
-	transform-origin: 40px 35px;
+	transform-origin: 36px 31px;
 	animation: ring-pulse 2s ease-out infinite;
 }
 

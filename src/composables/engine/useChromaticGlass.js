@@ -10,7 +10,7 @@
  *   background: rgba(15,15,20,0.75)
  */
 
-import { onMounted, onUnmounted } from "vue";
+import { onMounted, onUnmounted, unref } from "vue";
 import { caps } from "@/engine/capabilities.js";
 import { ChromaticGlass } from "@/engine/rendering/ChromaticGlass.js";
 
@@ -18,6 +18,17 @@ import { ChromaticGlass } from "@/engine/rendering/ChromaticGlass.js";
 let _glass = null;
 let _overlayCanvas = null;
 let _refCount = 0;
+
+const resolveMapCanvas = (mapCanvas) =>
+	mapCanvas ?? document.querySelector("canvas.maplibregl-canvas");
+
+const shouldUseCssFallback = (mapCanvas) => {
+	const canvas = resolveMapCanvas(mapCanvas);
+	if (!canvas) return false;
+	// Copying a live MapLibre WebGL canvas into a second WebGL pipeline causes
+	// repeated MapLibre/WebGL errors on venue/map drawers. Prefer CSS glass here.
+	return canvas.classList?.contains("maplibregl-canvas") === true;
+};
 
 const initSingleton = (mapCanvas) => {
 	if (_glass) return;
@@ -69,15 +80,19 @@ export function useChromaticGlass({
 	panelRef,
 	mapCanvas,
 	aberration,
+	enabled = true,
 }) {
-	const enabled = caps.webgl2;
+	const isEffectEnabled = () => {
+		const resolved = typeof enabled === "function" ? enabled() : unref(enabled);
+		return Boolean(resolved) && caps.webgl2 && !shouldUseCssFallback(mapCanvas);
+	};
+	const effectEnabled = isEffectEnabled();
 
 	onMounted(() => {
-		if (!enabled) return;
+		if (!isEffectEnabled()) return;
 
 		// Init singleton once we have a mapCanvas reference
-		const canvas =
-			mapCanvas ?? document.querySelector("canvas.maplibregl-canvas");
+		const canvas = resolveMapCanvas(mapCanvas);
 		if (canvas) initSingleton(canvas);
 		if (!_glass) return;
 
@@ -116,9 +131,9 @@ export function useChromaticGlass({
 
 	return {
 		/** True when WebGL refractive glass is active */
-		enabled,
+		enabled: effectEnabled,
 
 		/** CSS fallback class (applied when !enabled) */
-		fallbackClass: enabled ? "" : "glass-css-fallback",
+		fallbackClass: effectEnabled ? "" : "glass-css-fallback",
 	};
 }

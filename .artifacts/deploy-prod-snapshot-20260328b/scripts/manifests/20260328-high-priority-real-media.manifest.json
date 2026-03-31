@@ -1,0 +1,124 @@
+{
+  "batch": "20260328-high-priority-real-media",
+  "rows": [
+    {
+      "venue_id": "02363acb-cf7f-489c-a81e-cfc9badb5108",
+      "name": "Dusita coffee & bakery",
+      "decision": "apply",
+      "notes": [
+        "Verified against Suan Dusit University Lampang activity page that explicitly references SDU Library : Dusita Coffee&Bakery.",
+        "Facebook page id was present on the venue authority listing."
+      ],
+      "website": "https://www.dusit.ac.th/home/2024/1231492.html",
+      "fb_url": "https://www.facebook.com/209788272943838",
+      "official_sources": [
+        {
+          "platform": "facebook",
+          "source_url": "https://www.facebook.com/209788272943838",
+          "source_kind": "profile",
+          "verification_status": "manual_verified",
+          "verification_method": "worldplaces_linked_page_plus_official_article_review",
+          "confidence": 92,
+          "priority": 95,
+          "metadata": {
+            "evidence_url": "https://thailand.worldplaces.me/th/view-place/61234378-sdu-library.html",
+            "authority_url": "https://www.dusit.ac.th/home/2024/1231492.html"
+          }
+        }
+      ],
+      "image_urls": [
+        "https://www.dusit.ac.th/home/wp-content/gallery/6-1-106/LINE_ALBUM_%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B9%80%E0%B8%8A%E0%B8%B7%E0%B9%88%E0%B8%AD%E0%B8%A1%E0%B9%82%E0%B8%A2%E0%B8%87%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%94%E0%B8%B3%E0%B9%80%E0%B8%99%E0%B8%B4%E0%B8%99%E0%B8%87%E0%B8%B2%E0%B8%99-%E0%B8%AA%E0%B8%B3%E0%B8%99%E0%B8%B1%E0%B8%81%E0%B8%81%E0%B8%B4%E0%B8%88%E0%B8%81%E0%B8%B2%E0%B8%A3_%E0%B9%92%E0%B9%94%E0%B9%90%E0%B9%93%E0%B9%90%E0%B9%94_28.jpg",
+        "https://www.dusit.ac.th/home/wp-content/gallery/6-1-106/LINE_ALBUM_%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B9%80%E0%B8%8A%E0%B8%B7%E0%B9%88%E0%B8%AD%E0%B8%A1%E0%B9%82%E0%B8%A2%E0%B8%87%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%94%E0%B8%B3%E0%B9%80%E0%B8%99%E0%B8%B4%E0%B8%99%E0%B8%87%E0%B8%B2%E0%B8%99-%E0%B8%AA%E0%B8%B3%E0%B8%99%E0%B8%B1%E0%B8%81%E0%B8%81%E0%B8%B4%E0%B8%88%E0%B8%81%E0%B8%B2%E0%B8%A3_%E0%B9%92%E0%B9%94%E0%B9%90%E0%B9%93%E0%B9%90%E0%B9%94_41.jpg"
+      ]
+    },
+    {
+      "venue_id": "01e3a560-6867-41a1-949f-30ebfd43fc0e",
+      "name": "Cool Camping",
+      "decision": "apply",
+      "notes": [
+        "Verified against the venue's own website and linked Facebook page.",
+        "No verified direct video file was found during this pass, so only images are applied."
+      ],
+      "website": "https://coolcampingresort.com/",
+      "fb_url": "https://www.facebook.com/coolcampingresort",
+      "official_sources": [
+        {
+          "platform": "website",
+          "source_url": "https://coolcampingresort.com/",
+          "source_kind": "website",
+          "verification_status": "manual_verified",
+          "verification_method": "owned_domain_review",
+          "confidence": 100,
+          "priority": 100
+        },
+        {
+          "platform": "facebook",
+          "source_url": "https://www.facebook.com/coolcampingresort",
+          "source_kind": "profile",
+          "verification_status": "manual_verified",
+          "verification_method": "official_site_link_review",
+          "confidence": 98,
+          "priority": 95
+        }
+      ],
+      "image_urls": [
+        "https://coolcampingresort.com/hotel_pic/slide1.jpg",
+        "https://coolcampingresort.com/hotel_pic/slide2.jpg",
+        "https://coolcampingresort.com/hotel_pic/slide3.jpg",
+        "https://coolcampingresort.com/hotel_pic/slide4.jpg"
+      ]
+    },
+    {
+      "venue_id": "014e5b26-29ea-4b81-ae62-7df61cbba732",
+      "name": "ชมดาวรีสอร์ท",
+      "decision": "apply",
+      "notes": [
+        "Verified against the TATSTAR business page and owner-linked Facebook page.",
+        "This pass applies authoritative images only; no verified video source was exposed publicly."
+      ],
+      "fb_url": "https://www.facebook.com/profile.php?id=100065150034979",
+      "official_sources": [
+        {
+          "platform": "facebook",
+          "source_url": "https://www.facebook.com/profile.php?id=100065150034979",
+          "source_kind": "profile",
+          "verification_status": "manual_verified",
+          "verification_method": "tatstar_business_profile_review",
+          "confidence": 97,
+          "priority": 95,
+          "metadata": {
+            "authority_url": "https://www.tatstar.org/company/STAR-B01327"
+          }
+        }
+      ],
+      "image_urls": [
+        "https://storage.googleapis.com/tatstar-org-prod-assets-public/users/5244/company/cover/1763525111520.jpg",
+        "https://storage.googleapis.com/tatstar-org-prod-assets-public/users/5244/company/logo/1763525111367.jpg"
+      ]
+    },
+    {
+      "venue_id": "0252d260-e7bb-4072-8653-7448f221fe02",
+      "name": "ผาแดงสปอร์ตคลับ",
+      "decision": "defer_keep_hidden",
+      "reason": "No verifiable owned website or social profile was confirmed in the current review sweep."
+    },
+    {
+      "venue_id": "011690e8-62c4-47ec-9271-91ec64f7a1d5",
+      "name": "Cobra Stone Viewpoint",
+      "decision": "defer_keep_hidden",
+      "reason": "Landmark identity remains ambiguous and no venue-owned source was confirmed."
+    },
+    {
+      "venue_id": "00853ca7-7d14-49e1-8466-c5b15780977a",
+      "name": "Abacus",
+      "decision": "defer_keep_hidden",
+      "reason": "The current identity is ambiguous and the coordinates resolve outside the expected Thailand footprint."
+    },
+    {
+      "venue_id": "00ec1a4f-dbc4-4eb4-a7ce-444ffe5879a6",
+      "name": "Krua Than Khun",
+      "decision": "defer_keep_hidden",
+      "reason": "Only a phone number was present in source data; no owned website or social profile was confirmed."
+    }
+  ]
+}

@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const runtimeConfigMocks = vi.hoisted(() => ({
+	getWebSocketUrl: vi.fn(() => "wss://vibes.test/ws"),
+}));
+
 const runtimeLaneMocks = vi.hoisted(() => ({
 	isRuntimeLaneUnavailable: vi.fn(() => false),
 	markRuntimeLaneUnavailable: vi.fn(),
@@ -7,7 +11,7 @@ const runtimeLaneMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../src/lib/runtimeConfig", () => ({
-	getWebSocketUrl: () => "wss://vibes.test/ws",
+	getWebSocketUrl: runtimeConfigMocks.getWebSocketUrl,
 }));
 
 vi.mock("../../src/lib/runtimeLaneAvailability", () => ({
@@ -26,6 +30,7 @@ import { socketService } from "../../src/services/socketService";
 describe("socketService", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		runtimeConfigMocks.getWebSocketUrl.mockReturnValue("wss://vibes.test/ws");
 		socketService.disconnect();
 		socketService.listeners.clear();
 		socketService.pendingRoomIds.clear();
@@ -34,6 +39,9 @@ describe("socketService", () => {
 		socketService.shouldReconnect = true;
 		socketService.hasConnectedOnce = false;
 		socketService.connectedAt = 0;
+		socketService.sessionDisabled = false;
+		socketService.disabledReason = "";
+		socketService._reportedDisabledReason = "";
 		socketService.wsUrl = "";
 	});
 
@@ -78,5 +86,26 @@ describe("socketService", () => {
 		expect(socketService.shouldReconnect).toBe(false);
 		expect(socketService.circuitBreakerTripped).toBe(true);
 		expect(socketService.isConnected.value).toBe(false);
+	});
+
+	it("silently disables optional realtime when no websocket URL is configured", () => {
+		runtimeConfigMocks.getWebSocketUrl.mockReturnValue("");
+		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+		const WebSocketMock = vi.fn();
+		WebSocketMock.OPEN = 1;
+		WebSocketMock.CONNECTING = 0;
+		WebSocketMock.CLOSED = 3;
+		vi.stubGlobal("WebSocket", WebSocketMock);
+
+		expect(socketService.connect()).toBe(false);
+		socketService.joinRoom("shop-42");
+		expect(socketService.connect()).toBe(false);
+
+		expect(runtimeConfigMocks.getWebSocketUrl).toHaveBeenCalledTimes(1);
+		expect(WebSocketMock).not.toHaveBeenCalled();
+		expect(socketService.pendingRoomIds.size).toBe(0);
+		expect(socketService.getStatus().disabledForSession).toBe(true);
+		expect(socketService.getStatus().disabledReason).toBe("missing_url");
+		expect(warnSpy).not.toHaveBeenCalled();
 	});
 });

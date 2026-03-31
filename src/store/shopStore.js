@@ -5,14 +5,25 @@
  */
 import { defineStore } from "pinia";
 import { computed, ref, shallowRef, watch } from "vue";
+import { z } from "zod";
+import { DEFAULT_CITY } from "../config/cityConfig";
 import { normalizeId, normalizeSlug } from "../domain/venue/normalize";
 import {
 	normalizeVenueCollection,
 	normalizeVenueViewModel,
 } from "../domain/venue/viewModel";
-import { isFrontendOnlyDevMode } from "../lib/runtimeConfig";
+import {
+	getLocalVenueSnapshotRowById,
+	loadLocalVenueSnapshotRows,
+	shouldUseLocalVenueSnapshot,
+} from "../lib/localVenueSnapshot";
+import {
+	isFrontendOnlyDevMode,
+	isLocalBrowserHostname,
+} from "../lib/runtimeConfig";
 import { isSupabaseSchemaCacheError, supabase } from "../lib/supabase";
-import { apiFetch, parseApiError } from "../services/apiClient";
+import { request, DensitySchema, ReviewSchema } from "../services/apiService";
+import { parseApiError } from "../services/apiClient";
 import {
 	enrichVenueRowsWithRealMedia,
 	getRealVenueMedia,
@@ -21,6 +32,11 @@ import {
 import { isAppDebugLoggingEnabled } from "../utils/debugFlags";
 import { useFeatureFlagStore } from "./featureFlagStore";
 import { useLocationStore } from "./locationStore";
+
+const DEFAULT_NEARBY_VIEW_LIMIT = 30;
+const DEFAULT_NEARBY_RADIUS_KM = 20;
+const LOCATION_SCOPED_REFETCH_THRESHOLD_KM = 2;
+const LOCATION_SCOPED_REFETCH_COOLDOWN_MS = 15_000;
 
 // ═══════════════════════════════════════════
 // 🛠️ Utilities
@@ -139,6 +155,226 @@ const calculateDistance = (lat1, lng1, lat2, lng2) => {
 	return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
+const calculateTravelTimeMin = (distanceKm) => {
+	if (!Number.isFinite(distanceKm)) return 0;
+	// Estimated city driving: 30 km/h average (2 min/km) + 2 min buffer
+	return Math.round(distanceKm * 2 + 2);
+};
+
+const normalizeUserCoords = (coords) => {
+	if (!Array.isArray(coords) || coords.length < 2) return null;
+	const lat = Number(coords[0]);
+	const lng = Number(coords[1]);
+	if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+	return [lat, lng];
+};
+
+const resolveVenueDistanceKm = (shop, coords) => {
+	const normalizedCoords = normalizeUserCoords(coords);
+	if (!normalizedCoords) return Number.POSITIVE_INFINITY;
+
+	const distanceMeters = Number(shop?.distance_meters);
+	if (Number.isFinite(distanceMeters)) {
+		return distanceMeters / 1000;
+	}
+
+	const existingDistance = Number(
+		shop?.distance ?? shop?.distanceKm ?? shop?.distance_km,
+	);
+	if (Number.isFinite(existingDistance)) {
+		return existingDistance;
+	}
+
+	const shopCoords = normalizeCoords(shop);
+	if (!shopCoords) return Number.POSITIVE_INFINITY;
+
+	return calculateDistance(
+		normalizedCoords[0],
+		normalizedCoords[1],
+		shopCoords.lat,
+		shopCoords.lng,
+	);
+};
+
+const countVenuesWithinRadius = (
+	shops,
+	coords,
+	{ radiusKm = DEFAULT_NEARBY_RADIUS_KM } = {},
+) => {
+	if (!Array.isArray(shops) || shops.length === 0) return 0;
+	return shops.reduce((count, shop) => {
+		const distanceKm = resolveVenueDistanceKm(shop, coords);
+		return distanceKm <= radiusKm ? count + 1 : count;
+	}, 0);
+};
+
+const buildNearbyVenueSlice = (
+	shops,
+	{
+		limit = DEFAULT_NEARBY_VIEW_LIMIT,
+		radiusKm = DEFAULT_NEARBY_RADIUS_KM,
+	} = {},
+) => {
+	const sortedShops = Array.isArray(shops)
+		? [...shops].sort(
+				(a, b) => Number(a.distance || 0) - Number(b.distance || 0),
+			)
+		: [];
+	const finiteDistanceShops = sortedShops.filter((shop) =>
+		Number.isFinite(Number(shop?.distance)),
+	);
+	if (!finiteDistanceShops.length) {
+		return sortedShops.slice(0, limit);
+	}
+
+	const nearby = [];
+	const overflow = [];
+	for (const shop of finiteDistanceShops) {
+		if (Number(shop.distance) <= radiusKm) {
+			nearby.push(shop);
+			continue;
+		}
+		overflow.push(shop);
+	}
+
+	if (nearby.length >= limit) {
+		return nearby.slice(0, limit);
+	}
+
+	return [...nearby, ...overflow].slice(0, limit);
+};
+
+const normalizeMediaUrl = (value) => {
+	const raw = String(value || "").trim();
+	return raw.length > 0 ? raw : "";
+};
+
+const collectDirectImageUrls = (shop) => {
+	const seen = new Set();
+	const images = [];
+	const push = (value) => {
+		const normalized = normalizeMediaUrl(value);
+		if (!normalized || seen.has(normalized)) return;
+		seen.add(normalized);
+		images.push(normalized);
+	};
+
+	if (Array.isArray(shop?.image_urls)) {
+		shop.image_urls.forEach(push);
+	}
+	if (Array.isArray(shop?.images)) {
+		shop.images.forEach(push);
+	}
+
+	push(shop?.Image_URL1);
+	push(shop?.image_url_1);
+	push(shop?.Image_URL2);
+	push(shop?.image_url_2);
+	push(shop?.image_url);
+	push(shop?.cover_image);
+	push(shop?.coverImage);
+
+	return images;
+};
+
+const getDirectVideoUrl = (shop) =>
+	normalizeMediaUrl(shop?.video_url || shop?.Video_URL || shop?.videoUrl);
+
+const buildDirectCompleteMediaFallback = (shop) => {
+	const images = collectDirectImageUrls(shop);
+	const videoUrl = getDirectVideoUrl(shop);
+	if (images.length === 0 || !videoUrl) {
+		return null;
+	}
+
+	return {
+		image_urls: images,
+		images,
+		Image_URL1: images[0] || "",
+		Image_URL2: images[1] || "",
+		image_url_1: images[0] || "",
+		image_url_2: images[1] || "",
+		video_url: videoUrl,
+		Video_URL: videoUrl,
+		videoUrl,
+		cover_image: images[0] || "",
+		coverImage: images[0] || "",
+		has_real_image: true,
+		has_real_video: true,
+		media_counts: {
+			images: images.length,
+			videos: 1,
+			total: images.length + 1,
+		},
+		coverage: {
+			has_images: true,
+			has_videos: true,
+			has_media: true,
+			has_complete_media: true,
+		},
+		real_media: [
+			...images.map((url) => ({
+				type: "image",
+				url,
+				source: "direct_row",
+			})),
+			{
+				type: "video",
+				url: videoUrl,
+				source: "direct_row",
+			},
+		],
+	};
+};
+
+const applyDirectCompleteMediaFallback = (shop) => {
+	const fallback = buildDirectCompleteMediaFallback(shop);
+	if (!fallback) return shop;
+
+	const existingCounts = shop?.media_counts;
+	const existingCoverage = shop?.coverage;
+	const existingMediaCoverage = shop?.media_coverage;
+	const hasExistingCounts =
+		Number(existingCounts?.images || 0) > 0 ||
+		Number(existingCounts?.videos || 0) > 0;
+	const hasExistingCoverage = existingCoverage?.has_complete_media === true;
+	const hasExistingMediaCoverage =
+		existingMediaCoverage?.has_complete_media === true;
+	const existingRealMedia =
+		Array.isArray(shop?.real_media) && shop.real_media.length > 0
+			? shop.real_media
+			: null;
+
+	return {
+		...shop,
+		image_urls:
+			Array.isArray(shop?.image_urls) && shop.image_urls.length > 0
+				? shop.image_urls
+				: fallback.image_urls,
+		images:
+			Array.isArray(shop?.images) && shop.images.length > 0
+				? shop.images
+				: fallback.images,
+		Image_URL1: shop?.Image_URL1 || shop?.image_url_1 || fallback.Image_URL1,
+		Image_URL2: shop?.Image_URL2 || shop?.image_url_2 || fallback.Image_URL2,
+		image_url_1: shop?.image_url_1 || shop?.Image_URL1 || fallback.image_url_1,
+		image_url_2: shop?.image_url_2 || shop?.Image_URL2 || fallback.image_url_2,
+		video_url: shop?.video_url || shop?.Video_URL || fallback.video_url,
+		Video_URL: shop?.Video_URL || shop?.video_url || fallback.Video_URL,
+		videoUrl: shop?.videoUrl || shop?.video_url || fallback.videoUrl,
+		cover_image: shop?.cover_image || shop?.coverImage || fallback.cover_image,
+		coverImage: shop?.coverImage || shop?.cover_image || fallback.coverImage,
+		has_real_image: shop?.has_real_image === true || fallback.has_real_image,
+		has_real_video: shop?.has_real_video === true || fallback.has_real_video,
+		media_counts: hasExistingCounts ? existingCounts : fallback.media_counts,
+		coverage: hasExistingCoverage ? existingCoverage : fallback.coverage,
+		media_coverage: hasExistingMediaCoverage
+			? existingMediaCoverage
+			: fallback.coverage,
+		real_media: existingRealMedia || fallback.real_media,
+	};
+};
+
 // Stable int hash for UUID/string ids (used for deterministic rotation ordering)
 const hashStringToInt = (value) => {
 	const str = normalizeId(value);
@@ -147,12 +383,6 @@ const hashStringToInt = (value) => {
 		hash = ((hash << 5) + hash) ^ str.charCodeAt(i);
 	}
 	return Math.abs(hash) >>> 0;
-};
-
-const idToSeed = (id) => {
-	const n = Number(id);
-	if (Number.isFinite(n)) return n;
-	return hashStringToInt(id);
 };
 
 // Module-level distance cache — keyed by shopId + rounded GPS grid (~1.1 km cells).
@@ -174,14 +404,16 @@ const isRpcMissingError = (error) => {
 
 const buildE2eShops = () => {
 	const now = new Date().toISOString();
+	const baseLat = Number(DEFAULT_CITY.lat);
+	const baseLng = Number(DEFAULT_CITY.lng);
 	return [
 		{
 			id: 101,
 			name: "Vibe Cafe",
 			category: "Cafe",
 			description: "E2E mock cafe for reliable search results.",
-			lat: 18.7883,
-			lng: 98.9853,
+			lat: baseLat,
+			lng: baseLng,
 			status: "LIVE",
 			is_glowing: true,
 			rating: 4.7,
@@ -193,8 +425,8 @@ const buildE2eShops = () => {
 			name: "Cafe Noir",
 			category: "Cafe",
 			description: "E2E mock cafe near center.",
-			lat: 18.7892,
-			lng: 98.9861,
+			lat: baseLat + 0.0009,
+			lng: baseLng + 0.0008,
 			status: "LIVE",
 			rating: 4.4,
 			total_views: 90,
@@ -205,8 +437,8 @@ const buildE2eShops = () => {
 			name: "Vibe Bar",
 			category: "Nightlife",
 			description: "E2E mock nightlife spot.",
-			lat: 18.7901,
-			lng: 98.9844,
+			lat: baseLat + 0.0018,
+			lng: baseLng - 0.0009,
 			status: "LIVE",
 			rating: 4.5,
 			total_views: 150,
@@ -222,7 +454,7 @@ const OPTIONAL_VENUE_COLUMNS =
 	"id,description,province,district,phone,building:building_id,floor,video_url,open_time:opening_hours";
 const V2_FEED_COOLDOWN_MS = 3 * 60 * 1000;
 const SCHEMA_CACHE_FETCH_COOLDOWN_MS = 15_000;
-const LOCAL_DEV_HOST_PATTERN = /^(localhost|127\.0\.0\.1)$/i;
+const DEFAULT_USER_LOCATION = [DEFAULT_CITY.lat, DEFAULT_CITY.lng];
 
 // ═══════════════════════════════════════════
 // 🏪 Store Definition
@@ -239,9 +471,9 @@ export const useShopStore = defineStore(
 		const rawShops = shallowRef([]); // shallowRef for performance
 		const shopMap = shallowRef(new Map()); // shallowRef: no proxy traversal
 		const slugMap = shallowRef(new Map()); // shallowRef: no proxy traversal
-		const reviews = ref({});
-		const reviewsUnavailable = ref(false);
 		const reviewsApiDisabled = ref(false);
+		const reviewsUnavailable = ref(false);
+		const reviews = ref({});
 		const collectedCoins = shallowRef(new Set());
 		const currentTime = ref(new Date()); // ✅ Current time for status calculations
 
@@ -253,8 +485,12 @@ export const useShopStore = defineStore(
 		let _locationDebounceTimer = null;
 		watch(
 			() => locationStore.userLocation,
-			(newLoc) => {
+			(newLoc, oldLoc) => {
 				clearTimeout(_locationDebounceTimer);
+				if (Array.isArray(newLoc) && !Array.isArray(oldLoc)) {
+					debouncedUserLocation.value = newLoc;
+					return;
+				}
 				_locationDebounceTimer = setTimeout(() => {
 					debouncedUserLocation.value = newLoc;
 				}, 400);
@@ -274,13 +510,16 @@ export const useShopStore = defineStore(
 		const lastFetchTime = ref(null);
 		const v2FeedCircuitUntil = ref(0);
 		const schemaCacheRetryAfter = ref(0);
+		const lastLocationScopedFetch = shallowRef(null);
+		const lastLocationScopedRefreshAt = ref(0);
+		let locationScopedRefreshPromise = null;
 
 		// Rotation for randomization
 		const rotationSeed = ref(Math.floor(Date.now() / 1800000));
 		let rotationInterval = null;
 
 		const getUserLocationForNormalize = () =>
-			locationStore.userLocation || [18.7883, 98.9853];
+			locationStore.userLocation || DEFAULT_USER_LOCATION;
 
 		const normalizeVenueRows = (rows) =>
 			normalizeVenueCollection(rows, {
@@ -288,14 +527,41 @@ export const useShopStore = defineStore(
 				collectedCoinIds: collectedCoins.value,
 			});
 
-		const hasDisplayableRealMedia = (shop) =>
-			Number(shop?.media_counts?.total || shop?.media?.counts?.total || 0) > 0;
+		const hasCompleteRealMedia = (shop) => {
+			if (shop?.has_real_image === true && shop?.has_real_video === true) {
+				return true;
+			}
+			if (
+				shop?.coverage?.has_complete_media === true ||
+				shop?.media_coverage?.has_complete_media === true
+			) {
+				return true;
+			}
+			const imageCount = Number(
+				shop?.media_counts?.images ||
+					shop?.media?.counts?.images ||
+					shop?.counts?.images ||
+					0,
+			);
+			const videoCount = Number(
+				shop?.media_counts?.videos ||
+					shop?.media?.counts?.videos ||
+					shop?.counts?.videos ||
+					0,
+			);
+			if (imageCount > 0 && videoCount > 0) {
+				return true;
+			}
+			return buildDirectCompleteMediaFallback(shop) !== null;
+		};
 
 		const applyVenueRows = (rows) => {
-			const normalized = normalizeVenueRows(rows || []);
-			const filtered = normalized.filter((shop) =>
-				hasDisplayableRealMedia(shop),
+			const normalized = normalizeVenueRows(
+				(rows || []).map((row) => applyDirectCompleteMediaFallback(row)),
 			);
+			const filtered = shouldUseLocalVenueSnapshot()
+				? normalized
+				: normalized.filter((shop) => hasCompleteRealMedia(shop));
 
 			rawShops.value = filtered;
 			shopMap.value = new Map(
@@ -318,7 +584,8 @@ export const useShopStore = defineStore(
 		);
 
 		const processedShops = computed(() => {
-			const userLoc = debouncedUserLocation.value || [18.7883, 98.9853];
+			const userLoc = debouncedUserLocation.value || DEFAULT_USER_LOCATION;
+			const rotationMix = hashStringToInt(String(rotationSeed.value));
 			const seen = new Set();
 
 			return rawShops.value
@@ -365,9 +632,16 @@ export const useShopStore = defineStore(
 							}
 							return d;
 						})(),
+						travelTimeMin: (() => {
+							if (!hasCoords) return null;
+							const k = _distKey(normalizedShop.id, userLoc[0], userLoc[1]);
+							const d = _distCache.get(k);
+							return calculateTravelTimeMin(d);
+						})(),
 						randomKey:
-							(idToSeed(normalizedShop.id) + rotationSeed.value * 1103515245) %
-							12345,
+							(hashStringToInt(normalizeId(normalizedShop.id)) ^
+								rotationMix) >>>
+							0,
 					};
 				})
 				.filter(Boolean);
@@ -407,8 +681,6 @@ export const useShopStore = defineStore(
 			const feedVirtualizationEnabled = featureFlagStore.isEnabled(
 				"enable_feed_virtualization_v2",
 			);
-			// Carousel shows 30 nearby shops (rotated every 30 min via rotationSeed)
-			const defaultViewLimit = 30;
 			const filteredViewLimit = feedVirtualizationEnabled ? 100 : 60;
 			const isDefaultView =
 				activeCategories.value.length === 0 &&
@@ -432,16 +704,9 @@ export const useShopStore = defineStore(
 					shops.sort((a, b) => a.distance - b.distance);
 			}
 
-			// Default view: prioritize LIVE shops + random rotation
+			// Default view: keep the first slice anchored to the user's nearest venues.
 			if (isDefaultView) {
-				const live = shops.filter((s) => s.status === "LIVE" || s.is_glowing);
-				const normal = shops.filter(
-					(s) => s.status !== "LIVE" && !s.is_glowing,
-				);
-				const top50 = normal
-					.slice(0, 50)
-					.sort((a, b) => a.randomKey - b.randomKey);
-				return [...live, ...top50].slice(0, defaultViewLimit);
+				return buildNearbyVenueSlice(shops);
 			}
 
 			return shops.slice(0, filteredViewLimit); // Limit for performance
@@ -458,9 +723,7 @@ export const useShopStore = defineStore(
 		});
 
 		const nearbyShops = computed(() =>
-			processedShops.value
-				.filter((s) => Number.isFinite(s.distance) && s.distance < 5)
-				.slice(0, 20),
+			buildNearbyVenueSlice(processedShops.value),
 		);
 		const liveShops = computed(() =>
 			processedShops.value.filter((s) => s.status === "LIVE"),
@@ -523,6 +786,91 @@ export const useShopStore = defineStore(
 			}
 		};
 
+		const clearLocationScopedFetch = () => {
+			lastLocationScopedFetch.value = null;
+		};
+
+		const recordLocationScopedFetch = (source, coords, isMock) => {
+			const normalizedCoords = normalizeUserCoords(coords);
+			if (!normalizedCoords) {
+				clearLocationScopedFetch();
+				return;
+			}
+			lastLocationScopedFetch.value = {
+				source,
+				coords: normalizedCoords,
+				isMock: Boolean(isMock),
+				at: Date.now(),
+			};
+		};
+
+		const refreshLocationScopedFeed = async () => {
+			if (shouldUseLocalVenueSnapshot()) return false;
+			if (searchQuery.value.trim()) return false;
+			const currentCoords = normalizeUserCoords(locationStore.userLocation);
+			if (!currentCoords || locationStore.isMockLocation) return false;
+			const lastScopedFetch = lastLocationScopedFetch.value;
+			if (!lastScopedFetch || lastScopedFetch.source !== "v2-feed")
+				return false;
+
+			const shouldRefresh =
+				lastScopedFetch.isMock ||
+				calculateDistance(
+					lastScopedFetch.coords[0],
+					lastScopedFetch.coords[1],
+					currentCoords[0],
+					currentCoords[1],
+				) >= LOCATION_SCOPED_REFETCH_THRESHOLD_KM;
+			if (!shouldRefresh) return false;
+
+			const now = Date.now();
+			if (
+				now - Number(lastLocationScopedRefreshAt.value || 0) <
+				LOCATION_SCOPED_REFETCH_COOLDOWN_MS
+			) {
+				return false;
+			}
+
+			if (locationScopedRefreshPromise) {
+				return locationScopedRefreshPromise;
+			}
+
+			lastLocationScopedRefreshAt.value = now;
+			locationScopedRefreshPromise = fetchShops(true)
+				.then(() => true)
+				.catch(() => false)
+				.finally(() => {
+					locationScopedRefreshPromise = null;
+				});
+			return locationScopedRefreshPromise;
+		};
+
+		const fetchStandardVenueRows = async () => {
+			const fetchWithSelect = async (select) =>
+				supabase.from("venues").select(select).order("created_at", {
+					ascending: false,
+				});
+
+			let data = null;
+			let err = null;
+
+			({ data, error: err } = await fetchWithSelect(BASE_VENUE_COLUMNS));
+			if (err) {
+				if (import.meta.env.DEV) {
+					console.warn(
+						"🏪 Base venues select failed; falling back to select('*'):",
+						err?.message || err,
+					);
+				}
+				({ data, error: err } = await fetchWithSelect("*"));
+			}
+
+			if (err) throw err;
+			data = await enrichVenueRows(data || []);
+			data = await enrichVenueRowsWithRealMedia(data || []);
+			return data || [];
+		};
+
 		const fetchShops = async (force = false) => {
 			if (import.meta.env.VITE_E2E === "true") {
 				const data = buildE2eShops();
@@ -530,6 +878,21 @@ export const useShopStore = defineStore(
 				lastFetchTime.value = Date.now();
 				isLoading.value = false;
 				error.value = null;
+				return;
+			}
+
+			if (shouldUseLocalVenueSnapshot()) {
+				isLoading.value = true;
+				error.value = null;
+				try {
+					const rows = await loadLocalVenueSnapshotRows();
+					applyVenueRows(rows);
+					lastFetchTime.value = Date.now();
+				} catch (e) {
+					error.value = { message: e?.message || String(e), code: e?.code };
+				} finally {
+					isLoading.value = false;
+				}
 				return;
 			}
 
@@ -579,30 +942,10 @@ export const useShopStore = defineStore(
 					}
 				}
 
-				const fetchWithSelect = async (select) =>
-					supabase.from("venues").select(select).order("created_at", {
-						ascending: false,
-					});
-
-				let data = null;
-				let err = null;
-
-				({ data, error: err } = await fetchWithSelect(BASE_VENUE_COLUMNS));
-				if (err) {
-					if (import.meta.env.DEV) {
-						console.warn(
-							"🏪 Base venues select failed; falling back to select('*'):",
-							err?.message || err,
-						);
-					}
-					({ data, error: err } = await fetchWithSelect("*"));
-				}
-
-				if (err) throw err;
-				data = await enrichVenueRows(data || []);
-				data = await enrichVenueRowsWithRealMedia(data || []);
+				const data = await fetchStandardVenueRows();
 
 				applyVenueRows(data || []);
+				clearLocationScopedFetch();
 				lastFetchTime.value = Date.now();
 
 				if (shouldLogVenueStoreInfo())
@@ -637,7 +980,7 @@ export const useShopStore = defineStore(
 				return;
 			}
 
-			const userLoc = locationStore.userLocation || [18.7883, 98.9853];
+			const userLoc = locationStore.userLocation || DEFAULT_USER_LOCATION;
 			const { data, error: err } = await supabase.rpc("get_feed_cards", {
 				p_lat: userLoc[0],
 				p_lng: userLoc[1],
@@ -678,6 +1021,21 @@ export const useShopStore = defineStore(
 
 			const enriched = await enrichVenueRowsWithRealMedia(mapped);
 			applyVenueRows(enriched);
+			const needsBroaderNearbyCoverage =
+				!locationStore.isMockLocation &&
+				countVenuesWithinRadius(rawShops.value, userLoc) === 0;
+			if (needsBroaderNearbyCoverage) {
+				const broaderRows = await fetchStandardVenueRows();
+				applyVenueRows(broaderRows);
+				clearLocationScopedFetch();
+				lastFetchTime.value = Date.now();
+				return;
+			}
+			recordLocationScopedFetch(
+				"v2-feed",
+				userLoc,
+				locationStore.isMockLocation,
+			);
 			lastFetchTime.value = Date.now();
 		};
 
@@ -688,6 +1046,14 @@ export const useShopStore = defineStore(
 				return fetchShops(true);
 			}
 
+			if (shouldUseLocalVenueSnapshot()) {
+				if (rawShops.value.length === 0) {
+					await fetchShops(true);
+				}
+				searchQuery.value = q;
+				return;
+			}
+
 			await featureFlagStore.refreshFlags();
 			if (!featureFlagStore.isEnabled("use_v2_search")) {
 				searchQuery.value = q;
@@ -696,7 +1062,7 @@ export const useShopStore = defineStore(
 
 			isLoading.value = true;
 			error.value = null;
-			const userLoc = locationStore.userLocation || [18.7883, 98.9853];
+			const userLoc = locationStore.userLocation || DEFAULT_USER_LOCATION;
 
 			try {
 				const { data, error: err } = await supabase.rpc("search_venues_v2", {
@@ -748,6 +1114,43 @@ export const useShopStore = defineStore(
 			if (!key) return null;
 
 			const existing = shopMap.value.get(key) || null;
+			if (shouldUseLocalVenueSnapshot()) {
+				const snapshotRow = await getLocalVenueSnapshotRowById(key);
+				if (!snapshotRow) {
+					return hasCompleteRealMedia(existing) ? existing : null;
+				}
+
+				const merged = normalizeVenueViewModel(
+					{ ...(existing || {}), ...snapshotRow },
+					{
+						userLocation: getUserLocationForNormalize(),
+						collectedCoinIds: collectedCoins.value,
+					},
+				);
+				if (!hasCompleteRealMedia(merged)) {
+					return null;
+				}
+				venueDetailLoaded.add(key);
+				shopMap.value = new Map(shopMap.value);
+				shopMap.value.set(key, merged);
+
+				const slugKey = normalizeSlug(merged.slug);
+				if (slugKey) {
+					slugMap.value = new Map(slugMap.value);
+					slugMap.value.set(slugKey, merged);
+				}
+
+				if (syncCollection) {
+					const next = Array.isArray(rawShops.value) ? [...rawShops.value] : [];
+					const idx = next.findIndex((shop) => normalizeId(shop?.id) === key);
+					if (idx >= 0) {
+						next[idx] = merged;
+						rawShops.value = next;
+					}
+				}
+
+				return merged;
+			}
 			if (existing && Date.now() < schemaCacheRetryAfter.value) {
 				return existing;
 			}
@@ -768,13 +1171,19 @@ export const useShopStore = defineStore(
 					if (err) throw err;
 					if (!data) return null;
 
-					let mergedRow = { ...(existing || {}), ...data };
-					const realMedia = await getRealVenueMedia(key);
-					if (realMedia) {
-						if (Number(realMedia?.counts?.total || 0) <= 0) {
-							return null;
+					let mergedRow = applyDirectCompleteMediaFallback({
+						...(existing || {}),
+						...data,
+					});
+					if (!hasCompleteRealMedia(mergedRow)) {
+						const realMedia = await getRealVenueMedia(key);
+						if (realMedia && hasCompleteRealMedia(realMedia)) {
+							mergedRow = mergeVenueRowWithRealMedia(mergedRow, realMedia);
 						}
-						mergedRow = mergeVenueRowWithRealMedia(mergedRow, realMedia);
+					}
+					mergedRow = applyDirectCompleteMediaFallback(mergedRow);
+					if (!hasCompleteRealMedia(mergedRow)) {
+						return null;
 					}
 
 					const merged = normalizeVenueViewModel(mergedRow, {
@@ -892,7 +1301,7 @@ export const useShopStore = defineStore(
 		const shouldShortCircuitReviewsApiInLocalDev = () =>
 			import.meta.env.DEV &&
 			typeof window !== "undefined" &&
-			LOCAL_DEV_HOST_PATTERN.test(window.location.hostname) &&
+			isLocalBrowserHostname(window.location.hostname) &&
 			import.meta.env.VITE_API_PROXY_DEV !== "true";
 		const shouldSkipReviewsApi = () =>
 			isFrontendOnlyDevMode() || shouldShortCircuitReviewsApiInLocalDev();
@@ -931,37 +1340,25 @@ export const useShopStore = defineStore(
 
 			if (shouldUseReviewsApi) {
 				try {
-					const response = await apiFetch(
-						`/shops/${encodeURIComponent(shopId)}/reviews?limit=50`,
-						{
-							method: "GET",
-							includeVisitor: true,
-							refreshVisitorTokenIfNeeded: true,
-						},
-					);
+					const payload = await request({
+						url: `/shops/${encodeURIComponent(shopId)}/reviews?limit=50`,
+						method: "GET",
+						schema: z.array(ReviewSchema),
+					});
 
-					if (response.ok) {
-						reviews.value[key] = await parseReviewListResponse(response);
-						return;
-					}
-
-					if (shouldFallbackReviewsApi(response.status)) {
-						// Older/strict backend contract - fall back to direct Supabase query.
-						reviewsApiDisabled.value = true;
-					} else if (response.status === 401 || response.status === 403) {
-						reviewsUnavailable.value = true;
-						reviews.value[key] = [];
-						return;
-					} else if (import.meta.env.DEV) {
-						const detail = await parseApiError(
-							response,
-							"reviews_api_unavailable",
-						);
-						console.warn("🏪 Reviews API warning:", detail);
-					}
+					reviews.value[key] = payload || [];
+					return;
 				} catch (apiError) {
 					if (import.meta.env.DEV) {
 						console.warn("🏪 Reviews API fetch failed:", apiError);
+					}
+					// If it's an API error that should trigger fallback
+					if (apiError.response && shouldFallbackReviewsApi(apiError.response.status)) {
+						reviewsApiDisabled.value = true;
+					} else if (apiError.response && (apiError.response.status === 401 || apiError.response.status === 403)) {
+						reviewsUnavailable.value = true;
+						reviews.value[key] = [];
+						return;
 					}
 				}
 			}
@@ -1003,37 +1400,32 @@ export const useShopStore = defineStore(
 
 			if (shouldUseReviewsApi) {
 				try {
-					const response = await apiFetch(
-						`/shops/${encodeURIComponent(shopId)}/reviews`,
-						{
-							method: "POST",
-							includeVisitor: true,
-							refreshVisitorTokenIfNeeded: true,
-							body: {
-								rating: review?.rating ?? null,
-								comment: String(review?.comment || ""),
-								userName: String(review?.userName || "Vibe Explorer"),
-							},
+					const data = await request({
+						url: `/shops/${encodeURIComponent(shopId)}/reviews`,
+						method: "POST",
+						data: {
+							rating: review?.rating ?? null,
+							comment: String(review?.comment || ""),
+							userName: String(review?.userName || "Vibe Explorer"),
 						},
-					);
+						schema: ReviewSchema,
+					});
 
-					if (response.ok) {
-						const data = await parseReviewCreateResponse(response);
-						if (!reviews.value[String(shopId)])
-							reviews.value[String(shopId)] = [];
-						if (data) reviews.value[String(shopId)].unshift(data);
-						return { success: true, data };
-					}
-
-					if (shouldFallbackReviewsApi(response.status)) {
-						reviewsApiDisabled.value = true;
-					} else if (response.status === 401 || response.status === 403) {
-						reviewsUnavailable.value = true;
-						return { success: false, error: "reviews_unavailable" };
-					}
+					if (!reviews.value[String(shopId)])
+						reviews.value[String(shopId)] = [];
+					if (data) reviews.value[String(shopId)].unshift(data);
+					return { success: true, data };
 				} catch (apiError) {
 					if (import.meta.env.DEV) {
 						console.warn("🏪 Reviews API insert failed:", apiError);
+					}
+					if (apiError.response) {
+						if (shouldFallbackReviewsApi(apiError.response.status)) {
+							reviewsApiDisabled.value = true;
+						} else if (apiError.response.status === 401 || apiError.response.status === 403) {
+							reviewsUnavailable.value = true;
+							return { success: false, error: "reviews_unavailable" };
+						}
 					}
 				}
 			}
@@ -1073,6 +1465,7 @@ export const useShopStore = defineStore(
 			if (!shopId) return;
 			const shop = shopMap.value.get(shopId);
 			if (shop) shop.total_views = (shop.total_views || 0) + 1;
+			if (isFrontendOnlyDevMode()) return;
 			if (unavailableRpcNames.has("increment_venue_views")) return;
 
 			// Fire and forget with proper error handling
@@ -1181,10 +1574,56 @@ export const useShopStore = defineStore(
 			collectedCoins.value = next;
 		};
 
+		const venueDensity = ref({});
+		const densityLoading = ref({});
+		const densityError = ref({});
+		const densityCache = new Map();
+		const DENSITY_CACHE_TTL = 60 * 1000; // 1 minute
+
+		const fetchVenueDensity = async (shopId) => {
+			const key = String(shopId);
+			const now = Date.now();
+			
+			if (densityCache.has(key)) {
+				const cached = densityCache.get(key);
+				if (now - cached.at < DENSITY_CACHE_TTL) {
+					venueDensity.value[key] = cached.data;
+					return;
+				}
+			}
+
+			densityLoading.value[key] = true;
+			densityError.value[key] = null;
+
+			try {
+				const payload = await request({
+					url: `/shops/${encodeURIComponent(shopId)}/density`,
+					method: "GET",
+					schema: DensitySchema,
+				});
+
+				const data = payload?.data || payload || { level: 1, label: "Quiet" };
+				venueDensity.value[key] = data;
+				densityCache.set(key, { data, at: now });
+			} catch (err) {
+				if (import.meta.env.DEV) {
+					console.warn(`🏪 Failed to fetch density for ${shopId}:`, err);
+				}
+				densityError.value[key] = err.message;
+				// Fallback to quiet if real API fails
+				venueDensity.value[key] = { level: 1, label: "Quiet" };
+			} finally {
+				densityLoading.value[key] = false;
+			}
+		};
+
 		return {
 			// State
 			rawShops,
 			reviews,
+			venueDensity,
+			densityLoading,
+			densityError,
 			collectedCoins,
 			currentTime,
 			activeShopId,
@@ -1208,8 +1647,11 @@ export const useShopStore = defineStore(
 			liveShops,
 			// Actions
 			fetchShops,
+			fetchShopsV2,
 			searchV2,
+			refreshLocationScopedFeed,
 			fetchVenueDetail,
+			fetchVenueDensity,
 			getShopById,
 			getShopBySlug,
 			setActiveShop,
@@ -1241,8 +1683,5 @@ export const useShopStore = defineStore(
 			setUserLocation: (l) => locationStore.setUserLocation(l),
 			userLocation: computed(() => locationStore.userLocation),
 		};
-	},
-	{
-		persist: { paths: ["reviews"], key: "vibe-shops" },
 	},
 );

@@ -1,4 +1,4 @@
-import { getApiV1BaseUrl } from "../lib/runtimeConfig";
+import { getApiV1BaseUrl, isLocalBrowserHostname } from "../lib/runtimeConfig";
 import { isAbortLikeError } from "../utils/networkErrorUtils";
 import { unwrapApiEnvelope } from "./api/dashboardApiAdapter";
 import {
@@ -7,8 +7,6 @@ import {
 	getVisitorToken,
 	isVisitorTokenExpired,
 } from "./visitorIdentity";
-
-const LOCAL_DEV_HOST_PATTERN = /^(localhost|127\.0\.0\.1)$/i;
 
 export class ApiClientError extends Error {
 	constructor(message, options = {}) {
@@ -64,7 +62,7 @@ const buildBody = (headers, body) => {
 const isLocalDevBrowser = () =>
 	import.meta.env.DEV &&
 	typeof window !== "undefined" &&
-	LOCAL_DEV_HOST_PATTERN.test(window.location.hostname);
+	isLocalBrowserHostname(window.location.hostname);
 
 const isLocalDevProxyMode = () =>
 	isLocalDevBrowser() && import.meta.env.VITE_API_PROXY_DEV === "true";

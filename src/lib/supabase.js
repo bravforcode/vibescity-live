@@ -182,6 +182,30 @@ const createSupabaseFetch = () => {
 
 	return async (input, init = {}) => {
 		const meta = getRequestMeta(input, init);
+		
+		// Defensive fix: Ensure apikey is present if missing from init.headers
+		// Some supabase-js versions might not inject it correctly into custom fetch
+		if (isSupabaseRequest(meta.url)) {
+			const headers = init.headers || {};
+			const hasApiKey = 
+				headers.apikey || 
+				(headers instanceof Headers && headers.has("apikey")) ||
+				(typeof headers.get === "function" && headers.get("apikey"));
+				
+			if (!hasApiKey) {
+				if (init.headers instanceof Headers) {
+					init.headers.set("apikey", supabaseAnonKey);
+					init.headers.set("Authorization", `Bearer ${supabaseAnonKey}`);
+				} else {
+					init.headers = {
+						...headers,
+						apikey: supabaseAnonKey,
+						Authorization: `Bearer ${supabaseAnonKey}`,
+					};
+				}
+			}
+		}
+
 		const canRetry = isSchemaCacheRetryableRequest(meta);
 		const maxAttempts = canRetry ? SCHEMA_CACHE_RETRY_MAX_ATTEMPTS : 1;
 		let attempt = 0;

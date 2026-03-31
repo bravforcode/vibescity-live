@@ -1,0 +1,86 @@
+name: Auto Populate Venue Images & Videos
+
+on:
+  # Run every hour automatically
+  schedule:
+    - cron: '0 * * * *'
+  # Also allow manual trigger with custom batch size
+  workflow_dispatch:
+    inputs:
+      batches:
+        description: 'Number of batches to run (8 venues per batch)'
+        required: false
+        default: '20'
+      limit:
+        description: 'Venues per batch'
+        required: false
+        default: '8'
+
+jobs:
+  populate-venue-media:
+    name: Fetch images & videos for venues
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Run fetch-venue-images batches
+        env:
+          SUPABASE_URL: https://rukyitpjfmzhqjlfmbie.supabase.co
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          BATCHES: ${{ github.event.inputs.batches || '20' }}
+          LIMIT: ${{ github.event.inputs.limit || '8' }}
+        run: |
+          echo "🚀 Starting venue media population..."
+          echo "Batches: $BATCHES | Venues per batch: $LIMIT"
+
+          TOTAL_PHOTOS=0
+          TOTAL_VIDEOS=0
+          TOTAL_PROCESSED=0
+
+          for i in $(seq 1 $BATCHES); do
+            echo ""
+            echo "📦 Batch $i / $BATCHES..."
+
+            RESPONSE=$(curl -s -X POST \
+              "$SUPABASE_URL/functions/v1/fetch-venue-images" \
+              -H "apikey: $SUPABASE_ANON_KEY" \
+              -H "Content-Type: application/json" \
+              -d "{\"limit\": $LIMIT}")
+
+            # Check for errors
+            if echo "$RESPONSE" | grep -q '"error"'; then
+              echo "❌ Error in batch $i: $RESPONSE"
+              break
+            fi
+
+            PHOTOS=$(echo "$RESPONSE" | jq -r '.photos_updated // 0')
+            VIDEOS=$(echo "$RESPONSE" | jq -r '.videos_updated // 0')
+            PROCESSED=$(echo "$RESPONSE" | jq -r '.processed // 0')
+
+            TOTAL_PHOTOS=$((TOTAL_PHOTOS + PHOTOS))
+            TOTAL_VIDEOS=$((TOTAL_VIDEOS + VIDEOS))
+            TOTAL_PROCESSED=$((TOTAL_PROCESSED + PROCESSED))
+
+            echo "  ✅ Photos: $PHOTOS | Videos: $VIDEOS | Processed: $PROCESSED"
+
+            # If no venues processed, all done
+            if [ "$PROCESSED" -eq "0" ]; then
+              echo ""
+              echo "🎉 All venues already have media! Stopping early."
+              break
+            fi
+
+            # Rate limit: wait 2 seconds between batches
+            if [ "$i" -lt "$BATCHES" ]; then
+              sleep 2
+            fi
+          done
+
+          echo ""
+          echo "══════════════════════════════════"
+          echo "📊 FINAL SUMMARY"
+          echo "══════════════════════════════════"
+          echo "  Total venues processed : $TOTAL_PROCESSED"
+          echo "  Photos updated         : $TOTAL_PHOTOS"
+          echo "  Videos updated         : $TOTAL_VIDEOS"
+          echo "══════════════════════════════════"

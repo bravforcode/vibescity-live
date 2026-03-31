@@ -68,6 +68,44 @@ export const waitForBackoff = (delayMs) =>
 		setTimeout(resolve, ms);
 	});
 
+/**
+ * Enterprise Retry Policy with Exponential Backoff and Jitter
+ */
+export const withRetry = async (
+	fn,
+	{
+		maxRetries = 3,
+		baseDelayMs = 1000,
+		maxDelayMs = 10000,
+		shouldRetry = (err) => !err.status || err.status >= 500,
+	} = {},
+) => {
+	let lastError;
+	for (let attempt = 0; attempt <= maxRetries; attempt++) {
+		try {
+			return await fn();
+		} catch (error) {
+			lastError = error;
+			if (attempt === maxRetries || !shouldRetry(error)) {
+				throw error;
+			}
+
+			// Exponential backoff: base * 2^attempt
+			const delay = Math.min(maxDelayMs, baseDelayMs * 2 ** attempt);
+			// Add jitter: ±20%
+			const jitter = delay * 0.2 * (Math.random() * 2 - 1);
+			const finalDelay = Math.max(0, delay + jitter);
+
+			console.warn(
+				`[Retry] Attempt ${attempt + 1} failed. Retrying in ${Math.round(finalDelay)}ms...`,
+				error,
+			);
+			await new Promise((resolve) => setTimeout(resolve, finalDelay));
+		}
+	}
+	throw lastError;
+};
+
 // ✅ CIRCUIT BREAKER IMPLEMENTATION
 // Simple circuit breaker for resources with circuitBreaker=true flag
 // Opens after 3 consecutive failures, half-opens after 60s to retry

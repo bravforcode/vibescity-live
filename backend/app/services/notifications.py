@@ -1,9 +1,11 @@
+import logging
 
 import httpx
 
 from app.core.config import get_settings
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 async def send_push_notification(
     user_ids: list[str],
@@ -15,7 +17,7 @@ async def send_push_notification(
     Send push notification via OneSignal to specific users.
     """
     if not settings.ONESIGNAL_APP_ID or not settings.ONESIGNAL_API_KEY:
-        print("⚠️ OneSignal not configured. Skipping notification.")
+        logger.warning("OneSignal is not configured. Skipping notification send.")
         return False
 
     url = "https://onesignal.com/api/v1/notifications"
@@ -38,11 +40,14 @@ async def send_push_notification(
             response = await client.post(url, json=payload, headers=headers)
             if response.status_code == 200:
                 return True
-            else:
-                print(f"OneSignal Error: {response.text}")
-                return False
-        except Exception as e:
-            print(f"Notification Exception: {e}")
+            logger.warning(
+                "OneSignal returned a non-success response: status=%s body=%s",
+                response.status_code,
+                response.text,
+            )
+            return False
+        except httpx.HTTPError:
+            logger.exception("Failed to send OneSignal notification.")
             return False
 
 async def notify_shop_approved(user_id: str, shop_name: str, coins: int):

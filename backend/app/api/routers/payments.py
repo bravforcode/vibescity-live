@@ -18,6 +18,7 @@ from app.core.auth import verify_user
 from app.core.concurrency import core_db_sem
 from app.core.config import get_settings
 from app.core.rate_limit import limiter
+from app.core.resilience import retry_external_api
 from app.core.supabase import supabase_admin
 from app.services.ocr_queue import enqueue_ocr_job
 from app.services.sheets_logger import sheets_logger
@@ -248,15 +249,19 @@ async def create_checkout_session(
         metadata["sku"] = f"{body.itemType}_feature"
 
     try:
-        session = stripe.checkout.Session.create(
-            payment_method_types=["card", "promptpay"],
-            line_items=line_items,
-            mode=mode,
-            success_url=validate_redirect_url(body.successUrl),
-            cancel_url=validate_redirect_url(body.cancelUrl),
-            metadata=metadata,
-            idempotency_key=idempotency_key,
-        )
+        @retry_external_api
+        def create_stripe_session():
+            return stripe.checkout.Session.create(
+                payment_method_types=["card", "promptpay"],
+                line_items=line_items,
+                mode=mode,
+                success_url=validate_redirect_url(body.successUrl),
+                cancel_url=validate_redirect_url(body.cancelUrl),
+                metadata=metadata,
+                idempotency_key=idempotency_key,
+            )
+        
+        session = create_stripe_session()
         _schedule_payment_sheet_log(
             "checkout_session_created",
             {

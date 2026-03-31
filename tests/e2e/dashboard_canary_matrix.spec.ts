@@ -164,7 +164,7 @@ test.describe("Dashboard UI canary matrix", { tag: "@smoke" }, () => {
 			});
 			await openOwnerDashboard(page);
 			await expect(page.getByTestId("owner-dashboard-hero")).toBeVisible();
-			await expect(page.getByText(/Map Entertainment Dashboard/i)).toBeVisible();
+			await expect(page.getByText(/Merchant Portal/i)).toBeVisible();
 			await expect(page.getByTestId("owner-kpi-strip")).toBeVisible();
 			await expect(page.getByTestId("owner-venue-panel")).toBeVisible();
 		}

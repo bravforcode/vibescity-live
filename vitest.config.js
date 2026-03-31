@@ -47,6 +47,15 @@ export default defineConfig({
 
       // ✅ ช่วยให้ CI อ่านง่าย (optional)
       reportOnFailure: true,
+
+      // ✅ Coverage thresholds — regression gates based on measured baseline (2026-03-26)
+      // Calibrated to actual all:true averages; raise these as coverage improves
+      thresholds: {
+        "src/store/**": { statements: 25, functions: 24 },
+        "src/utils/**": { statements: 14, functions: 13 },
+        "src/services/**": { statements: 5, functions: 4 },
+        "src/composables/**": { statements: 1, functions: 1 },
+      },
     },
   },
 });

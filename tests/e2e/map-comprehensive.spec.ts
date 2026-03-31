@@ -1,182 +1,88 @@
 /**
- * Preview-first compatible map E2E suite.
+ * WebGL-first map E2E suite.
  *
- * This file intentionally supports both lanes:
- * - local dev-safe preview lane (default on Chromium localhost)
- * - full MapLibre WebGL lane (after explicit opt-in)
+ * The app should boot directly into the real MapLibre renderer without any
+ * localhost preview or manual opt-in lane.
  */
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
 const TEST_CONFIG = {
-	baseUrl:
-		process.env.E2E_BASE_URL || process.env.PLAYWRIGHT_BASE_URL || "/",
+	baseUrl: process.env.E2E_BASE_URL || process.env.PLAYWRIGHT_BASE_URL || "/",
 };
 
-type MapLane = "preview" | "webgl";
+const selectors = {
+	mapShell: '[data-testid="map-shell"]',
+	webglMap: ".maplibregl-map",
+	webglControls: ".maplibregl-ctrl",
+	webglPins: '[data-testid="venue-marker"]',
+	drawer: '[data-testid="venue-drawer"]',
+};
 
-class MapTestHelpers {
-	static readonly selectors = {
-		mapShell: '[data-testid="map-shell"]',
-		webglMap: ".maplibregl-map",
-		webglControls: ".maplibregl-ctrl",
-		webglPins: '[data-testid="venue-marker"]',
-		previewPins: '[data-testid="dev-preview-pin"]',
-		previewOpenWebgl: '[data-testid="dev-preview-open-webgl"]',
-		drawer: '[data-testid="venue-drawer"]',
-	};
+const waitForMapShellReady = async (page: Page) => {
+	await page.waitForSelector(selectors.mapShell, { timeout: 20_000 });
+	await page.waitForSelector(selectors.webglMap, {
+		timeout: 30_000,
+	});
+	await page.waitForSelector(`${selectors.mapShell}[data-map-ready="true"]`, {
+		timeout: 30_000,
+	});
+};
 
-	static async waitForMapShellReady(page: Page) {
-		await page.waitForSelector(this.selectors.mapShell, { timeout: 20_000 });
-		await page.waitForSelector(
-			`${this.selectors.mapShell}[data-map-ready="true"]`,
-			{ timeout: 30_000 },
-		);
-	}
+const getMetrics = async (page: Page) =>
+	page.evaluate(() => {
+		const mapShell = document.querySelector('[data-testid="map-shell"]');
+		return {
+			mapReady: mapShell?.getAttribute("data-map-ready") === "true",
+			mapInitRequested:
+				mapShell?.getAttribute("data-map-init-requested") === "true",
+			mapMetrics: (window as any).__mapMetrics || null,
+		};
+	});
 
-	static async detectLane(page: Page): Promise<MapLane> {
-		const previewButtonVisible = await page
-			.locator(this.selectors.previewOpenWebgl)
-			.first()
-			.isVisible()
-			.catch(() => false);
-		if (previewButtonVisible) return "preview";
+const waitForPins = async (page: Page, minCount = 1) => {
+	const pins = page.locator(selectors.webglPins);
+	let count = await pins.count().catch(() => 0);
 
-		const previewPinsCount = await page
-			.locator(this.selectors.previewPins)
-			.count()
-			.catch(() => 0);
-		if (previewPinsCount > 0) return "preview";
-
-		const webglVisible = await page
-			.locator(this.selectors.webglMap)
-			.first()
-			.isVisible()
-			.catch(() => false);
-		return webglVisible ? "webgl" : "preview";
-	}
-
-	static async ensureWebglLane(page: Page): Promise<MapLane> {
-		await this.waitForMapShellReady(page);
-		const lane = await this.detectLane(page);
-
-		if (lane === "preview") {
-			const openWebglBtn = page.locator(this.selectors.previewOpenWebgl).first();
-			if (await openWebglBtn.isVisible().catch(() => false)) {
-				await openWebglBtn.click();
-			}
-		}
-
-		await page.waitForSelector(this.selectors.webglMap, { timeout: 20_000 });
-		return "webgl";
-	}
-
-	static async prepareMapLane(
-		page: Page,
-		opts: { requireWebgl?: boolean } = {},
-	): Promise<MapLane> {
-		await this.waitForMapShellReady(page);
-		if (opts.requireWebgl) {
-			return this.ensureWebglLane(page);
-		}
-		return this.detectLane(page);
-	}
-
-	static async waitForPins(
-		page: Page,
-		lane: MapLane,
-		minCount = 1,
-	): Promise<{ pins: ReturnType<Page["locator"]>; count: number; selector: string }> {
-		const selectors =
-			lane === "preview"
-				? [this.selectors.previewPins, this.selectors.webglPins]
-				: [this.selectors.webglPins, this.selectors.previewPins];
-
-		for (const selector of selectors) {
-			const count = await page.locator(selector).count().catch(() => 0);
-			if (count >= minCount) {
-				return { pins: page.locator(selector), count, selector };
-			}
-		}
-
+	if (count < minCount) {
 		await page.waitForTimeout(1_500);
-		for (const selector of selectors) {
-			const count = await page.locator(selector).count().catch(() => 0);
-			if (count >= minCount) {
-				return { pins: page.locator(selector), count, selector };
-			}
-		}
-
-		const metrics = await this.getMetrics(page);
-		expect(metrics.mapReady).toBe(true);
-		const selector = selectors[0];
-		const count = await page.locator(selector).count().catch(() => 0);
-		return { pins: page.locator(selector), count, selector };
+		count = await pins.count().catch(() => 0);
 	}
 
-	static async getMetrics(page: Page) {
-		return page.evaluate(() => {
-			const mapShell = document.querySelector('[data-testid="map-shell"]');
-			return {
-				mapReady: mapShell?.getAttribute("data-map-ready") === "true",
-				mapInitRequested:
-					mapShell?.getAttribute("data-map-init-requested") === "true",
-				mapMetrics: (window as any).__mapMetrics || null,
-			};
-		});
-	}
-}
+	const metrics = await getMetrics(page);
+	expect(metrics.mapReady).toBe(true);
+	return { pins, count };
+};
 
 test.beforeEach(async ({ page }) => {
 	await page.goto(TEST_CONFIG.baseUrl);
 	await page.setViewportSize({ width: 1280, height: 800 });
-	await MapTestHelpers.waitForMapShellReady(page);
+	await waitForMapShellReady(page);
 });
 
 test.describe("Map Core Functionality", () => {
-	test("should render map shell and report ready state", async ({ page }) => {
-		const lane = await MapTestHelpers.prepareMapLane(page);
-		const metrics = await MapTestHelpers.getMetrics(page);
+	test("should render the WebGL map shell and report ready state", async ({
+		page,
+	}) => {
+		const metrics = await getMetrics(page);
 
-		expect(["preview", "webgl"]).toContain(lane);
+		await expect(page.locator(selectors.webglMap)).toBeVisible();
 		expect(metrics.mapReady).toBe(true);
 		expect(metrics.mapInitRequested).toBe(true);
 		expect(metrics.mapMetrics).not.toBeNull();
 	});
 
-	test("should render pins in current lane", async ({ page }) => {
-		const lane = await MapTestHelpers.prepareMapLane(page);
-		const { pins, count } = await MapTestHelpers.waitForPins(page, lane, 1);
+	test("should render venue pins in the WebGL map", async ({ page }) => {
+		const { pins, count } = await waitForPins(page, 1);
 		if (count > 0) {
 			await expect(pins.first()).toBeVisible();
 		}
 	});
 
-	test("should support explicit preview to webgl opt-in", async ({ page }) => {
-		await MapTestHelpers.waitForMapShellReady(page);
-
-		const previewButton = page.locator(
-			MapTestHelpers.selectors.previewOpenWebgl,
-		);
-		if (await previewButton.first().isVisible().catch(() => false)) {
-			await previewButton.first().click();
-		}
-
-		await page.waitForSelector(MapTestHelpers.selectors.webglMap, {
-			timeout: 20_000,
-		});
-		await expect(page.locator(MapTestHelpers.selectors.webglMap)).toBeVisible();
-	});
-
-	test("should expose webgl controls after webgl lane is active", async ({
-		page,
-	}) => {
-		await MapTestHelpers.prepareMapLane(page, { requireWebgl: true });
-		const controlCount = await page
-			.locator(MapTestHelpers.selectors.webglControls)
-			.count();
+	test("should expose map controls after WebGL boot", async ({ page }) => {
+		const controlCount = await page.locator(selectors.webglControls).count();
 		if (controlCount === 0) {
-			await expect(page.locator(MapTestHelpers.selectors.webglMap)).toBeVisible();
+			await expect(page.locator(selectors.webglMap)).toBeVisible();
 		} else {
 			expect(controlCount).toBeGreaterThan(0);
 		}
@@ -185,19 +91,18 @@ test.describe("Map Core Functionality", () => {
 
 test.describe("Map Interaction And Responsiveness", () => {
 	test("should handle pin click flow without crashing", async ({ page }) => {
-		const lane = await MapTestHelpers.prepareMapLane(page);
-		const { pins, count } = await MapTestHelpers.waitForPins(page, lane, 1);
+		const { pins, count } = await waitForPins(page, 1);
 		if (count > 0) {
 			await pins.first().click({ force: true });
 		}
 
-		const drawer = page.locator(MapTestHelpers.selectors.drawer);
+		const drawer = page.locator(selectors.drawer);
 		const opened = await drawer.isVisible().catch(() => false);
 		if (opened) {
 			await expect(drawer).toBeVisible();
 		}
 
-		const metrics = await MapTestHelpers.getMetrics(page);
+		const metrics = await getMetrics(page);
 		expect(metrics.mapReady).toBe(true);
 	});
 
@@ -210,8 +115,8 @@ test.describe("Map Interaction And Responsiveness", () => {
 			{ width: 1920, height: 1080 },
 		]) {
 			await page.setViewportSize(viewport);
-			await MapTestHelpers.waitForMapShellReady(page);
-			await expect(page.locator(MapTestHelpers.selectors.mapShell)).toBeVisible();
+			await waitForMapShellReady(page);
+			await expect(page.locator(selectors.mapShell)).toBeVisible();
 		}
 	});
 });

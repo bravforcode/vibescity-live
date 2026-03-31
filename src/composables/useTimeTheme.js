@@ -11,9 +11,9 @@ export function useTimeTheme() {
 	const currentHour = ref(new Date().getHours());
 	const intervalId = ref(null);
 
-	// Source-of-truth: Night Neon default (custom style), day falls back to Mapbox light.
-	const NIGHT_STYLE = "mapbox://styles/phirrr/cmlktq68u002601se295iazmm";
-	const DAY_STYLE = "mapbox://styles/phirrr/cmlktq68u002601se295iazmm";
+	// Keep both lanes on the same-origin neon theme until a real day style exists.
+	const NIGHT_STYLE = "/map-styles/vibecity-neon.json";
+	const DAY_STYLE = "/map-styles/vibecity-neon.json";
 
 	const updateTime = () => {
 		currentHour.value = new Date().getHours();

@@ -29,6 +29,7 @@ import {
 	watch,
 } from "vue";
 import { useI18n } from "vue-i18n";
+import { APP_NAME, DEFAULT_REFERRAL_SHARE_TEXT } from "@/config/appMeta";
 import { useHaptics } from "../../composables/useHaptics";
 import { usePerformance } from "../../composables/usePerformance";
 import { useSpatialFeedback } from "../../composables/useSpatialFeedback";
@@ -182,8 +183,8 @@ const handleLogout = async () => {
 const handleInviteFriend = async () => {
 	selectFeedback();
 	const shareData = {
-		title: "VibeCity - Your Nightlife Guide",
-		text: "Check out VibeCity for the best nightlife spots! 🌃",
+		title: `${APP_NAME} - Thailand Entertainment Map`,
+		text: DEFAULT_REFERRAL_SHARE_TEXT,
 		url: window.location.origin,
 	};
 
@@ -390,7 +391,7 @@ const menuSections = computed(() => {
 </script>
 
 <template>
-  <transition name="drawer-slide">
+  <transition name="drawer-slide" appear>
     <div
       v-if="isOpen"
       ref="drawerRef"
@@ -410,7 +411,7 @@ const menuSections = computed(() => {
         <button
           ref="closeButtonRef"
           type="button"
-          class="absolute top-4 left-4 z-30 w-9 h-9 rounded-xl bg-white/10 border border-white/20 text-white flex items-center justify-center transition hover:bg-white/20 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+          class="absolute top-4 left-4 z-30 flex h-9 w-9 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:bg-white/20 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
           aria-label="Close profile drawer"
           @click="handleClose"
         >
@@ -518,7 +519,7 @@ const menuSections = computed(() => {
           <div class="flex items-center gap-2 mb-4">
             <button
               @click="activeView = 'menu'"
-              class="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+              class="rounded-full bg-white/10 p-2 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-x-0.5 hover:bg-white/20 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
               aria-label="Back to menu"
             >
               <ChevronLeft class="w-5 h-5 text-white" />
@@ -697,7 +698,7 @@ const menuSections = computed(() => {
           <button
             v-if="userStore.isAuthenticated"
             @click="handleLogout"
-            class="w-full py-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-black uppercase tracking-widest active:scale-95 transition mb-4 flex items-center justify-center gap-2 hover:bg-red-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/70"
+            class="mb-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 py-3 text-xs font-black uppercase tracking-widest text-red-500 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:bg-red-500/20 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/70"
           >
             <LogOut class="w-4 h-4" />
             {{ t("profile.sign_out") }}
@@ -724,7 +725,7 @@ const menuSections = computed(() => {
   </transition>
 
   <!-- Coming Soon Toast -->
-  <transition name="fade">
+  <transition name="fade" appear>
     <div
       v-if="comingSoonToast"
       class="fixed top-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl bg-purple-600/90 text-white text-xs font-bold shadow-lg backdrop-blur-sm"
@@ -737,7 +738,7 @@ const menuSections = computed(() => {
   </transition>
 
   <!-- Backdrop — opacity + blur tied to swipe gesture in real-time -->
-  <transition name="fade">
+  <transition name="fade" appear>
     <div
       v-if="isOpen"
       ref="backdropRef"
@@ -757,16 +758,22 @@ const menuSections = computed(() => {
 <style scoped>
 .drawer-slide-enter-active,
 .drawer-slide-leave-active {
-  transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+  transition:
+    opacity 0.44s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.44s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
 }
 .drawer-slide-enter-from,
 .drawer-slide-leave-to {
-  transform: translateX(100%);
+  opacity: 0;
+  transform: translateX(48px) scale(0.985);
 }
 
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.4s ease;
+  transition:
+    opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    backdrop-filter 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .fade-enter-from,
 .fade-leave-to {

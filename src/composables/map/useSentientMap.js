@@ -647,14 +647,13 @@ export function useSentientMap(
 			// Mark as seen
 			seenDb.markSeen(candidate.id, candidate.isLive ? "live" : "standard");
 
-			// Emit to parent
+			// Emit to parent — sentient-select triggers the guarded once-per-shop detail flow
 			const shop = candidate.shop ?? {
 				id: candidate.id,
 				lat: candidate.lat,
 				lng: candidate.lng,
 			};
-			emitFn("select-shop", shop);
-			emitFn("open-detail", shop);
+			emitFn("sentient-select", shop);
 		}, 150);
 	};
 

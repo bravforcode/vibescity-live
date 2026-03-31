@@ -1,13 +1,13 @@
+import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
-import path from "path";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const targetEmail = String(
-	process.argv[2] || process.env.ADMIN_GRANT_EMAIL || "omchai.g44@gmail.com",
+	process.argv[2] || process.env.ADMIN_GRANT_EMAIL || "",
 )
 	.trim()
 	.toLowerCase();
@@ -18,7 +18,9 @@ if (!supabaseUrl || !supabaseServiceKey) {
 }
 
 if (!targetEmail) {
-	console.error("Missing target email. Usage: node scripts/grant_admin.js <email>");
+	console.error(
+		"Missing target email. Usage: node scripts/grant_admin.js <email>",
+	);
 	process.exit(1);
 }
 
@@ -42,7 +44,10 @@ const findUserByEmail = async (email) => {
 		});
 		if (error) throw error;
 		const match = (users || []).find(
-			(user) => String(user.email || "").trim().toLowerCase() === email,
+			(user) =>
+				String(user.email || "")
+					.trim()
+					.toLowerCase() === email,
 		);
 		if (match) return match;
 		if (!users || users.length < perPage) return null;

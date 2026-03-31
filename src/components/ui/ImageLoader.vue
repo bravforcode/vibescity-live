@@ -1,7 +1,12 @@
 <script setup>
 import { useIntersectionObserver } from "@vueuse/core";
 import { Store } from "lucide-vue-next";
-import { onUnmounted, ref, watch } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
+import {
+	getUsableMediaUrl,
+	markMediaUrlFailed,
+	mediaFailureVersion,
+} from "../../utils/mediaSourceGuard.js";
 
 const props = defineProps({
 	src: {
@@ -37,9 +42,14 @@ const isLoaded = ref(false);
 const hasError = ref(false);
 const isVisible = ref(false);
 const currentSrc = ref("");
+const normalizedSrc = computed(() => {
+	void mediaFailureVersion.value;
+	return getUsableMediaUrl(props.src);
+});
 
 const load = () => {
-	if (!props.src || hasError.value || isLoaded.value) return;
+	const source = normalizedSrc.value;
+	if (!source || hasError.value || isLoaded.value) return;
 
 	const img = new Image();
 	img.crossOrigin = "anonymous";
@@ -48,15 +58,16 @@ const load = () => {
 		img.fetchPriority = props.fetchpriority;
 	}
 	img.onload = () => {
-		currentSrc.value = props.src;
+		currentSrc.value = source;
 		isLoaded.value = true;
 		emit("load");
 	};
 	img.onerror = () => {
+		markMediaUrlFailed(source);
 		hasError.value = true;
-		emit("error");
+		emit("error", source);
 	};
-	img.src = props.src;
+	img.src = source;
 };
 
 const { stop } = useIntersectionObserver(
@@ -73,17 +84,14 @@ const { stop } = useIntersectionObserver(
 	},
 );
 
-watch(
-	() => props.src,
-	() => {
-		isLoaded.value = false;
-		hasError.value = false;
-		currentSrc.value = "";
-		if (isVisible.value) {
-			load();
-		}
-	},
-);
+watch([() => props.src, normalizedSrc], ([rawSrc, nextSrc]) => {
+	isLoaded.value = false;
+	currentSrc.value = "";
+	hasError.value = Boolean(rawSrc) && !nextSrc;
+	if (isVisible.value) {
+		load();
+	}
+});
 
 onUnmounted(() => {
 	stop();
@@ -106,7 +114,7 @@ onUnmounted(() => {
     <!-- Error Fallback -->
     <transition name="fade-fast">
       <div
-        v-if="hasError || (!src && !isLoaded)"
+        v-if="hasError || (!normalizedSrc && !isLoaded)"
         class="absolute inset-0 z-0 flex items-center justify-center bg-zinc-900/50 fallback-bg"
       >
         <Store :class="fallbackIconClass" />
@@ -115,15 +123,16 @@ onUnmounted(() => {
 
     <!-- Completed Image -->
     <transition name="fade">
-      <img
-        v-show="isLoaded && !hasError"
-        :src="currentSrc"
-        :alt="alt"
-        :class="['absolute inset-0 w-full h-full object-cover z-10', imgClass]"
-        loading="lazy"
-        draggable="false"
-        crossorigin="anonymous"
-      />
+      <picture v-show="isLoaded && !hasError">
+        <img
+          :src="currentSrc"
+          :alt="alt"
+          :class="['absolute inset-0 w-full h-full object-cover z-10', imgClass]"
+          loading="lazy"
+          draggable="false"
+          crossorigin="anonymous"
+        />
+      </picture>
     </transition>
   </div>
 </template>

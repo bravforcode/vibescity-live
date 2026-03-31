@@ -46,6 +46,8 @@ const successTimer = ref(null);
 const resetTimer = ref(null);
 
 const shopReviews = computed(() => shopStore.getShopReviews(props.shopId));
+const venueDensity = computed(() => shopStore.venueDensity[String(props.shopId)]);
+const densityLoading = computed(() => shopStore.densityLoading[String(props.shopId)]);
 
 const REACTION_KEYS = new Set(["love", "heart", "haha", "wow", "sad", "angry"]);
 const REACTION_REGEX =
@@ -94,6 +96,7 @@ const topReaction = computed(() => {
 
 onMounted(() => {
 	shopStore.fetchShopReviews(props.shopId);
+	shopStore.fetchVenueDensity(props.shopId);
 });
 
 const runSelectReaction = async (reaction) => {
@@ -172,12 +175,30 @@ onUnmounted(() => {
           <MessageSquare class="w-5 h-5 text-blue-400" />
           {{ t("reviews.title") || "Community Vibes" }}
         </h3>
-        <p
-          class="text-xs text-zinc-500 font-bold uppercase tracking-widest mt-1"
-        >
-          {{ totalReactions }}
-          {{ t("reviews.reactions_count") || "reactions" }}
-        </p>
+        <div class="flex items-center gap-2 mt-1">
+          <p
+            class="text-xs text-zinc-500 font-bold uppercase tracking-widest"
+          >
+            {{ totalReactions }}
+            {{ t("reviews.reactions_count") || "reactions" }}
+          </p>
+          <span class="w-1 h-1 rounded-full bg-zinc-700"></span>
+          <!-- Density Status -->
+          <div v-if="venueDensity" class="flex items-center gap-1.5">
+            <div 
+              class="w-2 h-2 rounded-full animate-pulse"
+              :class="{
+                'bg-green-500': venueDensity.level <= 2,
+                'bg-yellow-500': venueDensity.level === 3,
+                'bg-red-500': venueDensity.level >= 4
+              }"
+            ></div>
+            <span class="text-[10px] font-black text-zinc-400 uppercase tracking-wider">
+              {{ venueDensity.label }}
+            </span>
+          </div>
+          <div v-else-if="densityLoading" class="w-12 h-3 bg-white/5 animate-pulse rounded"></div>
+        </div>
       </div>
 
       <!-- Top Reaction Badge -->

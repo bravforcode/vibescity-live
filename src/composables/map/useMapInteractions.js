@@ -11,18 +11,69 @@ export function useMapInteractions(
 ) {
 	const { impactFeedback } = useHaptics();
 	const { spawnTapRipple } = options;
+	const AGGREGATE_LEVELS = new Set(["country", "province", "zone"]);
+	const normalizeText = (value) =>
+		String(value ?? "")
+			.trim()
+			.toLowerCase();
+	const asBool = (value) => {
+		if (typeof value === "boolean") return value;
+		if (typeof value === "number") return value !== 0;
+		const normalized = normalizeText(value);
+		return (
+			normalized === "true" ||
+			normalized === "1" ||
+			normalized === "yes" ||
+			normalized === "y"
+		);
+	};
 	const resolveFeatureItem =
 		typeof options.resolveFeatureItem === "function"
 			? options.resolveFeatureItem
 			: null;
 	const enableTapRipple = options.enableTapRipple !== false;
+	const enableClusters = options.enableClusters !== false;
 	const PIN_LAYER_ID = options.pinLayerId || "unclustered-pins";
 	const PIN_HITBOX_LAYER_ID =
 		options.pinHitboxLayerId || "unclustered-pins-hitbox";
 	const CLUSTER_LAYER_ID = options.clusterLayerId || "clusters";
 	const PIN_SOURCE_ID = options.pinSourceId || "pins_source";
+	const onAggregateTap =
+		typeof options.onAggregateTap === "function"
+			? options.onAggregateTap
+			: null;
 	let lastPointClickSignature = "";
 	let lastPointClickAt = 0;
+	const getAggregateLevel = (feature, shopData) =>
+		normalizeText(
+			shopData?.aggregate_level ??
+				feature?.properties?.aggregate_level ??
+				shopData?.aggregateLevel,
+		);
+	const isAggregateFeature = (feature, shopData) =>
+		AGGREGATE_LEVELS.has(getAggregateLevel(feature, shopData));
+	const isBuildingLikeFeature = (feature, shopData) => {
+		if (isAggregateFeature(feature, shopData)) return false;
+		const pinType = normalizeText(
+			shopData?.pin_type ?? feature?.properties?.pin_type ?? shopData?.pinType,
+		);
+		const pinState = normalizeText(
+			shopData?.pin_state ??
+				feature?.properties?.pin_state ??
+				shopData?.pinState,
+		);
+		return (
+			pinType === "giant" ||
+			pinType === "event" ||
+			pinState === "event" ||
+			asBool(shopData?.is_giant) ||
+			asBool(shopData?.giant) ||
+			asBool(shopData?.is_event) ||
+			asBool(shopData?.isGiantPin) ||
+			asBool(shopData?.giantActive) ||
+			asBool(shopData?.is_giant_active)
+		);
+	};
 
 	const handlePointClick = (e) => {
 		if (!e.features?.[0]) return;
@@ -84,6 +135,16 @@ export function useMapInteractions(
 			options.onPinTap();
 		}
 
+		if (isAggregateFeature(feature, shopData) && onAggregateTap) {
+			onAggregateTap(feature, resolvedShop || shopData);
+			return;
+		}
+
+		if (isBuildingLikeFeature(feature, shopData)) {
+			emit("open-building", resolvedShop || shopData);
+			return;
+		}
+
 		emit("select-shop", resolvedShop || shopData);
 	};
 
@@ -125,9 +186,6 @@ export function useMapInteractions(
 	const handleMarkerClick = (item) => {
 		if (!item) return;
 		emit("select-shop", item);
-		// showPopup is handled by parent watcher on selectedShop usually,
-		// or we can emit 'show-popup'
-		emit("show-popup", item);
 	};
 
 	const setPointer = () => {
@@ -173,24 +231,58 @@ export function useMapInteractions(
 			safeBind("mouseleave", clickLayer, resetPointer);
 		}
 
-		// Clusters
-		safeBind("click", CLUSTER_LAYER_ID, handleClusterClick);
-		safeBind("mouseenter", CLUSTER_LAYER_ID, setPointer);
-		safeBind("mouseleave", CLUSTER_LAYER_ID, resetPointer);
+		if (enableClusters) {
+			safeBind("click", CLUSTER_LAYER_ID, handleClusterClick);
+			safeBind("mouseenter", CLUSTER_LAYER_ID, setPointer);
+			safeBind("mouseleave", CLUSTER_LAYER_ID, resetPointer);
+		}
 	};
 
 	// --- FlyTo / Focus Logic ---
+	const normalizeFocusCoords = (coords) => {
+		if (!Array.isArray(coords) || coords.length < 2) return null;
+
+		const first = Number(coords[0]);
+		const second = Number(coords[1]);
+		if (!Number.isFinite(first) || !Number.isFinite(second)) return null;
+
+		const looksLikeLatLng =
+			first >= -90 &&
+			first <= 90 &&
+			second >= -180 &&
+			second <= 180 &&
+			(second < -90 || second > 90);
+
+		const lng = looksLikeLatLng ? second : first;
+		const lat = looksLikeLatLng ? first : second;
+		if (lng < -180 || lng > 180 || lat < -90 || lat > 90) return null;
+
+		return [lng, lat];
+	};
+
 	const focusLocation = (
 		coords,
 		targetZoom = 16,
 		pitch = 60,
 		extraBottomOffset = 0,
+		cameraOptions = {},
 	) => {
-		if (!map.value || !Array.isArray(coords) || coords.length < 2) return;
+		if (!map.value) return;
 
-		const lng = Number(coords[0]);
-		const lat = Number(coords[1]);
-		if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
+		const normalizedCoords = normalizeFocusCoords(coords);
+		if (!normalizedCoords) {
+			console.warn("Invalid coordinates for focusLocation:", coords);
+			return;
+		}
+		const [lng, lat] = normalizedCoords;
+		const {
+			cameraMode = "default",
+			duration = null,
+			bearing = 0,
+			speed = 0.6,
+			curve = 1.1,
+			interrupt = true,
+		} = cameraOptions || {};
 
 		// Calculate dynamic padding based on UI offsets
 		const padding = {
@@ -203,16 +295,36 @@ export function useMapInteractions(
 			right: 20,
 		};
 
-		map.value.flyTo({
-			center: [lng, lat],
-			zoom: targetZoom,
-			pitch: pitch ?? 60,
-			bearing: 0,
-			padding,
-			speed: 0.6,
-			curve: 1.1,
-			essential: true,
-		});
+		try {
+			if (interrupt && typeof map.value.stop === "function") {
+				map.value.stop();
+			}
+			if (cameraMode === "locate" && typeof map.value.easeTo === "function") {
+				map.value.easeTo({
+					center: [lng, lat],
+					zoom: targetZoom,
+					pitch: pitch ?? 60,
+					bearing,
+					padding,
+					duration: duration ?? 1200,
+					easing: (t) => 1 - (1 - t) ** 3,
+					essential: true,
+				});
+			} else {
+				map.value.flyTo({
+					center: [lng, lat],
+					zoom: targetZoom,
+					pitch: pitch ?? 60,
+					bearing,
+					padding,
+					speed,
+					curve,
+					essential: true,
+				});
+			}
+		} catch (error) {
+			console.warn("Map focusLocation flyTo failed:", error);
+		}
 
 		// Parent should handle "addHeatmapLayer" if needed.
 	};
