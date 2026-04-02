@@ -105,11 +105,16 @@ jobs:
         run: npm run i18n:validate-thai
 
       - name: Venue data validator
-        if: ${{ vars.SUPABASE_URL != '' && secrets.SUPABASE_SERVICE_ROLE_KEY != '' }}
         env:
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: npm run venue:validate
+        shell: bash
+        run: |
+          if [ -z "${SUPABASE_URL}" ] || [ -z "${SUPABASE_SERVICE_ROLE_KEY}" ]; then
+            echo "Skipping venue:validate (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not configured)."
+            exit 0
+          fi
+          npm run venue:validate
 
   backend-tests:
     needs: [repo-hygiene]
