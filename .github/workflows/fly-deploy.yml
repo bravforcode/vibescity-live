@@ -1,6 +1,12 @@
 name: Fly Deploy
 
 on:
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        description: "Git ref to deploy (defaults to main)"
+        required: false
+        default: "main"
   workflow_run:
     workflows: ["CI"]
     types: [completed]
@@ -16,8 +22,11 @@ jobs:
   deploy-fly:
     if: >-
       ${{
-        github.event.workflow_run.conclusion == 'success' &&
-        github.event.workflow_run.head_branch == 'main'
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.head_branch == 'main'
+        )
       }}
     runs-on: ubuntu-latest
     environment: production
@@ -25,7 +34,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: >-
+            ${{
+              github.event_name == 'workflow_dispatch' &&
+              github.event.inputs.git_ref ||
+              github.event.workflow_run.head_sha
+            }}
 
       - name: Setup flyctl
         uses: superfly/flyctl-actions/setup-flyctl@master
@@ -38,8 +52,11 @@ jobs:
   postdeploy-healthcheck:
     if: >-
       ${{
-        github.event.workflow_run.conclusion == 'success' &&
-        github.event.workflow_run.head_branch == 'main'
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.head_branch == 'main'
+        )
       }}
     needs: [deploy-fly]
     runs-on: ubuntu-latest
@@ -48,7 +65,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: >-
+            ${{
+              github.event_name == 'workflow_dispatch' &&
+              github.event.inputs.git_ref ||
+              github.event.workflow_run.head_sha
+            }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
