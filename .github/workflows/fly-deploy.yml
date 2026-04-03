@@ -47,7 +47,7 @@ jobs:
       - name: Deploy to Fly
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-        run: flyctl deploy --remote-only -a vibecity-api -c fly.toml
+        run: flyctl deploy --local-only -a vibecity-api -c fly.toml
 
   postdeploy-healthcheck:
     if: >-
