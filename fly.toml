@@ -20,7 +20,15 @@ primary_region = "sin"
   protocol = "tcp"
   processes = ["api"]
 
-  [[services.concurrency]]
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+  [services.concurrency]
     type = "requests"
     hard_limit = 250
     soft_limit = 200
