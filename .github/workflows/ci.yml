@@ -47,6 +47,10 @@ jobs:
   frontend:
     needs: [repo-hygiene]
     runs-on: ubuntu-latest
+    env:
+      VITE_API_URL: http://localhost:8000
+      VITE_SUPABASE_URL: https://example.supabase.co
+      VITE_SUPABASE_ANON_KEY: test-anon-key-ci
     steps:
       - uses: actions/checkout@v4
 
