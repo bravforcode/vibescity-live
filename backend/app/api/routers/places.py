@@ -42,8 +42,8 @@ def _search_cache_key(
     province: str | None,
     category: str | None,
 ) -> str:
-    q_hash = hashlib.sha1(q.encode()).hexdigest()[:10]
-    filter_hash = hashlib.sha1(f"{province}|{category}".encode()).hexdigest()[:10]
+    q_hash = hashlib.sha1(q.encode(), usedforsecurity=False).hexdigest()[:10]  # nosec B324
+    filter_hash = hashlib.sha1(f"{province}|{category}".encode(), usedforsecurity=False).hexdigest()[:10]  # nosec B324
     return (
         f"places:search:{round(lat, 3)}:{round(lng, 3)}:{radius}:"
         f"{q_hash}:{filter_hash}:{limit}"

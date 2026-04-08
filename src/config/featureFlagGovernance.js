@@ -29,12 +29,6 @@ export const FLAG_GOVERNANCE = Object.freeze({
 		dependsOn: [],
 		owner: "frontend-oncall",
 	},
-	ff_owner_dashboard_v2: {
-		key: "ff_owner_dashboard_v2",
-		sunsetAfter: "2026-Q4",
-		dependsOn: [],
-		owner: "frontend-oncall",
-	},
 	ff_partner_dashboard_v2: {
 		key: "ff_partner_dashboard_v2",
 		sunsetAfter: "2026-Q4",

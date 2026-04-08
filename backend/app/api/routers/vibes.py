@@ -256,8 +256,9 @@ async def _dispatch_hotspot_loop():
 				snapshot = await asyncio.to_thread(_hotspot_snapshot, 20)
 
 			payload_data = snapshot[:20]
-			payload_hash = hashlib.md5(
-				json.dumps(payload_data, sort_keys=True, default=str).encode("utf-8")
+			payload_hash = hashlib.md5(  # nosec B324 - used for cache key, not security
+				json.dumps(payload_data, sort_keys=True, default=str).encode("utf-8"),
+				usedforsecurity=False,
 			).hexdigest()
 
 			# Skip duplicate payloads to reduce websocket spam

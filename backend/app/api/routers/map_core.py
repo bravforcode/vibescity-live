@@ -175,8 +175,9 @@ async def get_hot_roads(
     except Exception:
         rows = []
 
-    snapshot_id = hashlib.sha1(
-        json.dumps(sorted(r.get("id", "") for r in rows)).encode()
+    snapshot_id = hashlib.sha1(  # nosec B324 - used for cache key, not security
+        json.dumps(sorted(r.get("id", "") for r in rows)).encode(),
+        usedforsecurity=False,
     ).hexdigest()[:16]
 
     if since and since == snapshot_id:

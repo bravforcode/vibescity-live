@@ -44,7 +44,7 @@ apiService.interceptors.request.use(
 
 		config.headers["X-Visitor-Id"] = visitorId;
 		if (token) {
-			config.headers["Authorization"] = `Bearer ${token}`;
+			config.headers.Authorization = `Bearer ${token}`;
 			config.headers["X-Visitor-Token"] = token;
 		}
 
@@ -65,7 +65,7 @@ apiService.interceptors.response.use(
 			try {
 				const { visitorToken } = await bootstrapVisitor({ forceRefresh: true });
 				if (visitorToken) {
-					config.headers["Authorization"] = `Bearer ${visitorToken}`;
+					config.headers.Authorization = `Bearer ${visitorToken}`;
 					config.headers["X-Visitor-Token"] = visitorToken;
 					return apiService(config);
 				}
@@ -149,7 +149,7 @@ export const request = async (config) => {
 	const token = getVisitorToken();
 	axiosConfig.headers["X-Visitor-Id"] = visitorId;
 	if (token) {
-		axiosConfig.headers["Authorization"] = `Bearer ${token}`;
+		axiosConfig.headers.Authorization = `Bearer ${token}`;
 		axiosConfig.headers["X-Visitor-Token"] = token;
 	}
 
