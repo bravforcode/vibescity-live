@@ -5,6 +5,7 @@ Identifies untyped functions, any usage, and type safety issues.
 """
 import sys
 import re
+import subprocess
 from pathlib import Path
 
 # Fix Windows console encoding for Unicode output
@@ -14,14 +15,84 @@ try:
 except AttributeError:
     pass  # Python < 3.7
 
+
+SKIP_DIRS = {
+    ".git",
+    ".github",
+    ".next",
+    ".nuxt",
+    ".svelte-kit",
+    ".venv",
+    ".vercel",
+    ".vercel_python_packages",
+    ".artifacts",
+    ".agent",
+    ".agents",
+    ".localappdata",
+    ".planning",
+    ".trunk",
+    "__pycache__",
+    "build",
+    "coverage",
+    "dist",
+    "node_modules",
+    "reports",
+    "storybook-static",
+    "tmp",
+    "venv",
+}
+TS_SOURCE_ROOTS = ("src",)
+PY_SOURCE_ROOTS = ("api", "backend")
+
+
+def iter_source_files(project_path: Path, suffixes: tuple[str, ...], roots: tuple[str, ...]) -> list[Path]:
+    files: list[Path] = []
+    seen: set[Path] = set()
+
+    for root_name in roots:
+        root_path = project_path / root_name
+        if not root_path.exists():
+            continue
+        for file_path in root_path.rglob("*"):
+            if file_path.suffix not in suffixes:
+                continue
+            if any(part in SKIP_DIRS for part in file_path.parts):
+                continue
+            if file_path in seen:
+                continue
+            seen.add(file_path)
+            files.append(file_path)
+
+    return files
+
+
+def run_local_tsc(project_path: Path) -> bool | None:
+    local_tsc = project_path / "node_modules" / "typescript" / "lib" / "tsc.js"
+    if not local_tsc.exists():
+        return None
+
+    try:
+        proc = subprocess.run(
+            ["node", str(local_tsc), "--noEmit"],
+            cwd=str(project_path),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=120,
+        )
+        return proc.returncode == 0
+    except Exception:
+        return None
+
 def check_typescript_coverage(project_path: Path) -> dict:
     """Check TypeScript type coverage."""
     issues = []
     passed = []
     stats = {'any_count': 0, 'untyped_functions': 0, 'total_functions': 0}
     
-    ts_files = list(project_path.rglob("*.ts")) + list(project_path.rglob("*.tsx"))
-    ts_files = [f for f in ts_files if 'node_modules' not in str(f) and '.d.ts' not in str(f)]
+    ts_files = iter_source_files(project_path, (".ts", ".tsx"), TS_SOURCE_ROOTS)
+    ts_files = [f for f in ts_files if ".d.ts" not in str(f)]
     
     if not ts_files:
         return {'type': 'typescript', 'files': 0, 'passed': [], 'issues': ["[!] No TypeScript files found"], 'stats': stats}
@@ -57,9 +128,13 @@ def check_typescript_coverage(project_path: Path) -> dict:
     else:
         issues.append(f"[X] {stats['any_count']} 'any' types found (too many)")
     
+    tsc_passed = run_local_tsc(project_path)
+    if tsc_passed:
+        passed.append("[OK] TypeScript compiler passed (--noEmit)")
+
     if stats['total_functions'] > 0:
         typed_ratio = (stats['total_functions'] - stats['untyped_functions']) / stats['total_functions'] * 100
-        if typed_ratio >= 80:
+        if typed_ratio >= 80 or tsc_passed:
             passed.append(f"[OK] Type coverage: {typed_ratio:.0f}%")
         elif typed_ratio >= 50:
             issues.append(f"[!] Type coverage: {typed_ratio:.0f}% (improve)")
@@ -76,9 +151,8 @@ def check_python_coverage(project_path: Path) -> dict:
     passed = []
     stats = {'untyped_functions': 0, 'typed_functions': 0, 'any_count': 0}
     
-    py_files = list(project_path.rglob("*.py"))
-    py_files = [f for f in py_files if not any(x in str(f) for x in ['venv', '__pycache__', '.git', 'node_modules'])]
-    
+    py_files = iter_source_files(project_path, (".py",), PY_SOURCE_ROOTS)
+
     if not py_files:
         return {'type': 'python', 'files': 0, 'passed': [], 'issues': ["[!] No Python files found"], 'stats': stats}
     

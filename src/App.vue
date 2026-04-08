@@ -7,6 +7,10 @@ import VibeNotification from "@/components/ui/VibeNotification.vue";
 import { useHomeBase } from "@/composables/useHomeBase";
 import { useNetworkResilience } from "@/composables/useNetworkResilience";
 import { useVisualViewport } from "@/composables/useVisualViewport";
+import {
+	hasAnalyticsConsent,
+	isBrowserAnalyticsEnabled,
+} from "@/lib/analyticsRuntime";
 import { useLocationStore } from "@/store/locationStore";
 import { isAppDebugLoggingEnabled } from "@/utils/debugFlags";
 
@@ -15,31 +19,7 @@ const { setHomeBase, hasHomeBase } = useHomeBase();
 useNetworkResilience();
 useVisualViewport();
 
-const parseEnvBool = (value) => {
-	const raw = String(value ?? "")
-		.trim()
-		.toLowerCase();
-	if (!raw) return null;
-	if (["1", "true", "yes", "on"].includes(raw)) return true;
-	if (["0", "false", "no", "off"].includes(raw)) return false;
-	return null;
-};
-
-// Default: disabled in dev, enabled in prod (unless explicitly overridden).
-const analyticsEnabled =
-	parseEnvBool(import.meta.env.VITE_ANALYTICS_ENABLED) ?? !import.meta.env.DEV;
-
-const hasAnalyticsConsent = () => {
-	try {
-		// Respect Do Not Track as a hard deny.
-		if (typeof navigator !== "undefined" && navigator.doNotTrack === "1") {
-			return false;
-		}
-		return localStorage.getItem("vibe_analytics_consent") === "granted";
-	} catch {
-		return false;
-	}
-};
+const analyticsEnabled = isBrowserAnalyticsEnabled();
 
 const trackSessionIfAllowed = () => {
 	if (!analyticsEnabled) return;

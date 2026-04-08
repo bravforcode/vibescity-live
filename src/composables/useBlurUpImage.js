@@ -29,10 +29,12 @@ export function useBlurUpImage(imageUrl, opts = {}) {
 		const url = resolvedUrl.value;
 		if (!url) return null;
 
-		// Supabase storage: add /render/image/public transform
+		// Supabase object URLs are kept untransformed in-browser for now.
+		// Chromium can flag the query-transform lane with ERR_BLOCKED_BY_ORB
+		// on credentialless/COEP production hosts even though the base image
+		// is otherwise fetchable, so fail open to the original image path.
 		if (url.includes("supabase") && url.includes("/storage/")) {
-			const separator = url.includes("?") ? "&" : "?";
-			return `${url}${separator}width=${thumbWidth}&quality=10`;
+			return null;
 		}
 
 		// Cloudinary: insert w_XX,q_auto:low transform

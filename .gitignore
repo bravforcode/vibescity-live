@@ -270,3 +270,5 @@ mig_list.txt
 
 .vercel
 .env*.local
+
+.vercel

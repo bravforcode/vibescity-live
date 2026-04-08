@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
+
 class TrafficDensity(Enum):
     LOW = "low"
     MODERATE = "moderate"

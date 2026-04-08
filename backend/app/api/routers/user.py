@@ -2,9 +2,6 @@
 User Router - User profile and settings management
 """
 
-import logging
-from typing import Any
-
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
@@ -13,7 +10,7 @@ from app.core.rate_limit import limiter
 from app.services.user_service import user_service
 
 router = APIRouter()
-logger = logging.getLogger("app.user")
+
 
 class UserProfileUpdate(BaseModel):
     display_name: str | None = None

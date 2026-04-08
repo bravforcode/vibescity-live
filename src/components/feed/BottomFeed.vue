@@ -1,6 +1,6 @@
 <script setup>
 import { Heart, MapPin, Navigation, Share2, Sparkles } from "lucide-vue-next";
-import { computed, defineAsyncComponent, ref } from "vue";
+import { computed, defineAsyncComponent, onUnmounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useBottomFeedLogic } from "../../composables/useBottomFeedLogic";
 import { useDragScroll } from "../../composables/useDragScroll";
@@ -73,12 +73,11 @@ const emit = defineEmits([
 
 // Cap DOM nodes for performance — slice in computed keeps v-memo cache stable
 const CAROUSEL_CAP = 30;
-const ACTIVE_CARD_WIDTH = 220;
-const INACTIVE_CARD_WIDTH = 176;
-const CARD_HEIGHT = 264;
+const CARD_WIDTH = 198;
+const CARD_HEIGHT = 272;
 const cappedShops = computed(() => props.carouselShops.slice(0, CAROUSEL_CAP));
 const edgeSpacerWidth = computed(() =>
-	props.isImmersive ? "0px" : `calc(50vw - ${ACTIVE_CARD_WIDTH / 2}px)`,
+	props.isImmersive ? "0px" : `calc(50vw - ${CARD_WIDTH / 2}px)`,
 );
 
 // ✅ Bottom Feed Logic (extracted to composable)
@@ -98,8 +97,6 @@ const { isDragging } = useDragScroll(carouselRef, {
 	momentum: true,
 	snapSelector: ".vibe-card-item",
 	sensitivity: 1.2,
-	onScrollStart: () => emit("scroll-start"),
-	onScrollEnd: () => emit("scroll-end"),
 });
 
 const isFavorited = (shopId) => {
@@ -109,14 +106,48 @@ const isFavorited = (shopId) => {
 };
 
 const isGridView = ref(false);
+const isCarouselInteracting = ref(false);
+let carouselInteractionTimer = null;
+
+const clearCarouselInteractionTimer = () => {
+	if (carouselInteractionTimer) {
+		clearTimeout(carouselInteractionTimer);
+		carouselInteractionTimer = null;
+	}
+};
+
+const settleCarouselInteraction = () => {
+	if (!isCarouselInteracting.value) return;
+	isCarouselInteracting.value = false;
+	emit("scroll-end");
+};
+
+const markCarouselInteraction = () => {
+	if (!isCarouselInteracting.value) {
+		isCarouselInteracting.value = true;
+		emit("scroll-start");
+	}
+	clearCarouselInteractionTimer();
+	carouselInteractionTimer = setTimeout(() => {
+		carouselInteractionTimer = null;
+		settleCarouselInteraction();
+	}, 180);
+};
+
+const handleCarouselScroll = (event) => {
+	markCarouselInteraction();
+	handleScroll(event);
+};
+
+onUnmounted(() => {
+	clearCarouselInteractionTimer();
+});
+
 const getCardItemStyle = (shopId) => {
 	if (props.isImmersive) return null;
-	const isActive = props.activeShopId === shopId;
 	return {
-		width: `${isActive ? ACTIVE_CARD_WIDTH : INACTIVE_CARD_WIDTH}px`,
+		width: `${CARD_WIDTH}px`,
 		height: `${CARD_HEIGHT}px`,
-		transition:
-			"width 0.38s cubic-bezier(0.16, 1, 0.3, 1), transform 0.38s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.24s ease-out, box-shadow 0.24s ease-out",
 	};
 };
 </script>
@@ -248,7 +279,7 @@ const getCardItemStyle = (shopId) => {
       <!-- Loading State -->
       <div
         v-if="isDataLoading"
-        class="flex items-end px-[calc(50vw-110px)] py-3 gap-3 no-scrollbar mb-0 h-[220px] overflow-x-hidden"
+        class="flex items-end px-[calc(50vw-99px)] py-3 gap-3 no-scrollbar mb-0 h-[198px] overflow-x-hidden"
       >
         <SkeletonCard
           v-for="i in 5"
@@ -256,7 +287,7 @@ const getCardItemStyle = (shopId) => {
           variant="carousel"
           :isDarkMode="isDarkMode"
           class="pointer-events-auto"
-          style="width: 220px; height: 200px"
+          style="width: 198px; height: 180px"
         />
       </div>
 
@@ -336,26 +367,22 @@ const getCardItemStyle = (shopId) => {
               }
             "
             data-testid="vibe-carousel"
+            :data-scrolling="isCarouselInteracting ? 'true' : 'false'"
             :class="[
-              'flex gap-2 no-scrollbar transition-[transform,opacity] duration-300 snap-x snap-mandatory scroll-smooth',
+              'flex gap-2 no-scrollbar snap-x snap-proximity',
               isImmersive
                 ? 'flex-col h-full overflow-y-auto overflow-x-hidden pt-0 pb-0 gap-0'
-                : 'flex-row overflow-x-auto overflow-y-visible px-3 pt-1 pb-2 h-[276px] items-end',
+                : 'flex-row overflow-x-auto overflow-y-visible px-3 pt-1 pb-2 h-[286px] items-end',
               'opacity-100',
               isDragging ? 'cursor-grabbing' : 'cursor-grab',
             ]"
             style="
               -webkit-overflow-scrolling: touch;
-              scroll-behavior: smooth;
-              scroll-snap-type: x mandatory;
+              scroll-snap-type: x proximity;
               overscroll-behavior-x: contain;
               touch-action: pan-x pinch-zoom;
             "
-            @scroll="handleScroll"
-            @touchstart="emit('scroll-start')"
-            @touchend="emit('scroll-end')"
-            @mousedown="emit('scroll-start')"
-            @mouseup="emit('scroll-end')"
+            @scroll="handleCarouselScroll"
           >
             <div
               v-if="!isImmersive"
@@ -398,13 +425,17 @@ const getCardItemStyle = (shopId) => {
                 class="vibe-card-item flex-shrink-0 rounded-2xl overflow-visible snap-center"
                 :class="[
                   isImmersive
-                    ? 'w-full h-[100dvh] rounded-none scale-100 opacity-100'
+                    ? 'w-full h-[100dvh] rounded-none opacity-100'
                     : '',
-                  !isImmersive && activeShopId === shop.id
-                    ? 'scale-100 z-20 shadow-[0_0_24px_4px_rgba(139,92,246,0.55),0_0_8px_2px_rgba(236,72,153,0.35)]'
+                  !isImmersive &&
+                  !isCarouselInteracting &&
+                  activeShopId === shop.id
+                    ? 'z-20 shadow-[0_0_24px_4px_rgba(139,92,246,0.55),0_0_8px_2px_rgba(236,72,153,0.35)]'
                     : '',
-                  !isImmersive && activeShopId !== shop.id
-                    ? 'scale-[0.96] opacity-70'
+                  !isImmersive &&
+                  !isCarouselInteracting &&
+                  activeShopId !== shop.id
+                    ? 'opacity-75'
                     : '',
                 ]"
                 :style="getCardItemStyle(shop.id)"
@@ -521,12 +552,8 @@ const getCardItemStyle = (shopId) => {
 
 [data-testid="vibe-carousel"] {
   -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
-  scroll-snap-type: x mandatory;
+  scroll-snap-type: x proximity;
   overscroll-behavior-x: contain;
-  will-change: scroll-position;
-  transform: translateZ(0);
-  backface-visibility: hidden;
   touch-action: pan-x;
   transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -534,9 +561,18 @@ const getCardItemStyle = (shopId) => {
 .vibe-card-item {
   scroll-snap-align: center;
   scroll-snap-stop: normal;
-  transform: translateZ(0);
-  backface-visibility: hidden;
   touch-action: manipulation;
+}
+
+[data-testid="vibe-carousel"][data-scrolling="true"] {
+  scroll-behavior: auto;
+}
+
+[data-testid="vibe-carousel"][data-scrolling="true"] .vibe-card-item {
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+  box-shadow: none !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -993,9 +1029,6 @@ const getCardItemStyle = (shopId) => {
   }
   .glass-button {
     backdrop-filter: blur(12px);
-  }
-  [data-testid="vibe-carousel"] {
-    scroll-behavior: smooth;
   }
 }
 

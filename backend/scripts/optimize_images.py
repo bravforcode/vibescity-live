@@ -1,12 +1,16 @@
-import os
 import sys
-from PIL import Image
 from pathlib import Path
 
-def convert_images(directory, target_formats=['webp', 'avif']):
+from PIL import Image
+
+
+def convert_images(directory, target_formats=None):
     """
     Recursively find all images in a directory and convert them to target formats.
     """
+    if target_formats is None:
+        target_formats = ['webp', 'avif']
+
     extensions = ['.jpg', '.jpeg', '.png']
     path = Path(directory)
     

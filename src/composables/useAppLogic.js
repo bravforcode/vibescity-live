@@ -1085,10 +1085,13 @@ export function useAppLogic() {
 		}
 
 		const normalizedShopId = normalizeVenueId(shop.id);
-		
+
 		// PERFORMANCE FIX: Prevent opening the detail modal if it's already open for this shop.
 		// This avoids duplicate rendering and potential "hangs" when clicking multiple times.
-		if (selectedShop.value && normalizeVenueId(selectedShop.value.id) === normalizedShopId) {
+		if (
+			selectedShop.value &&
+			normalizeVenueId(selectedShop.value.id) === normalizedShopId
+		) {
 			return;
 		}
 
@@ -1186,11 +1189,11 @@ export function useAppLogic() {
 
 	const handleSelectionFlightComplete = (payload = {}) => {
 		const normalizedId = normalizeVenueId(payload?.shopId ?? payload?.shop?.id);
-		
-		// If the source is carousel or map and we finished the flight, 
+
+		// If the source is carousel or map and we finished the flight,
 		// we might want to auto-open the detail if it's not already open.
 		// The original logic was likely more aggressive.
-		
+
 		if (
 			!shouldAutoOpenDetailAfterFlight({
 				shopId: normalizedId,
@@ -1205,7 +1208,7 @@ export function useAppLogic() {
 			// to prevent reopening if the user just closed it.
 			return;
 		}
-		
+
 		if (Date.now() < centeredDetailAutoOpenSuppressedUntil) return;
 		const resolvedShop = payload?.shop || shopStore.getShopById(normalizedId);
 		if (!resolvedShop) return;

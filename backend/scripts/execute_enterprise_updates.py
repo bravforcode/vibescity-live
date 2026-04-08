@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 from pathlib import Path
+
 import asyncpg
 from dotenv import load_dotenv
 

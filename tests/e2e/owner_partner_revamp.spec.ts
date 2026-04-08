@@ -60,7 +60,7 @@ const seedPartnerCanarySession = async (
 		};
 		const storageKeys = [
 			"sb-rukyitpjfmzhqjlfmbie-auth-token",
-			"sb-nluuvnttweesnkrmgzsm-auth-token",
+			"sb-rukyitpjfmzhqjlfmbie-auth-token",
 		];
 		for (const key of storageKeys) {
 			localStorage.setItem(key, JSON.stringify(session));

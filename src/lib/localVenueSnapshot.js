@@ -1,4 +1,4 @@
-import { isFrontendOnlyDevMode } from "./runtimeConfig";
+import { shouldBypassDirectBrowserSupabaseReads } from "./runtimeConfig";
 
 let venueSnapshotPromise = null;
 const LOCALHOST_SNAPSHOT_URL = "/data/venues-localhost-snapshot.json";
@@ -120,19 +120,24 @@ const loadSnapshotFile = async () => {
 	return rows.map(normalizeVenueSnapshotRow).filter(Boolean);
 };
 
-export const shouldUseLocalVenueSnapshot = () => isFrontendOnlyDevMode();
+export const shouldUseLocalVenueSnapshot = () =>
+	shouldBypassDirectBrowserSupabaseReads();
 
-export const loadLocalVenueSnapshotRows = async () => {
-	if (!shouldUseLocalVenueSnapshot()) return [];
+export const loadVenueSnapshotRows = async () => {
 	if (!venueSnapshotPromise) {
 		venueSnapshotPromise = loadSnapshotFile().catch(() => []);
 	}
 	return venueSnapshotPromise;
 };
 
+export const loadLocalVenueSnapshotRows = async () => {
+	if (!shouldUseLocalVenueSnapshot()) return [];
+	return loadVenueSnapshotRows();
+};
+
 export const getLocalVenueSnapshotRowById = async (id) => {
 	if (!id) return null;
-	const rows = await loadLocalVenueSnapshotRows();
+	const rows = await loadVenueSnapshotRows();
 	const key = String(id).trim();
 	return rows.find((row) => String(row?.id || "").trim() === key) || null;
 };

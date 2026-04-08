@@ -189,9 +189,7 @@ export const applySpiderfying = (candidates, { fixedId = "" } = {}) => {
 		if (group.length <= 1) continue;
 
 		// Sort by ID to keep the spiral pattern stable during map moves
-		group.sort((a, b) =>
-			String(a.shop?.id).localeCompare(String(b.shop?.id)),
-		);
+		group.sort((a, b) => String(a.shop?.id).localeCompare(String(b.shop?.id)));
 
 		const count = group.length;
 		// More aggressive spacing for larger groups to ensure 0 overlap
@@ -324,7 +322,12 @@ export function useNeonPinsLayer(
 	mapRef,
 	shopsRef,
 	containerRef,
-	{ onPinClick, highlightedShopId, activePopupShopId, maxVisiblePins = MAX_VISIBLE_NEON_PINS } = {},
+	{
+		onPinClick,
+		highlightedShopId,
+		activePopupShopId,
+		maxVisiblePins = MAX_VISIBLE_NEON_PINS,
+	} = {},
 ) {
 	const showNeonPins = ref(true);
 	const selectedShopId = ref(null);
@@ -639,16 +642,21 @@ export function useNeonPinsLayer(
 			"position:fixed;inset:0;pointer-events:none;overflow:visible;";
 		document.body.appendChild(selectedOverlayEl);
 		syncDetailModalState();
-		
+
 		// PERFORMANCE FIX: Do NOT observe document.body with subtree: true.
 		// This causes massive performance degradation as it fires on every single DOM change.
 		// Instead, we rely on the specific modal surface observer or app-level state changes.
 		if (typeof MutationObserver === "function" && !overlayObserver) {
 			overlayObserver = new MutationObserver((mutations) => {
 				// Only trigger if the modal surface itself might have been added/removed
-				const hasModalChange = mutations.some(m => 
-					Array.from(m.addedNodes).some(n => n.dataset?.testid === 'vibe-modal-surface') ||
-					Array.from(m.removedNodes).some(n => n.dataset?.testid === 'vibe-modal-surface')
+				const hasModalChange = mutations.some(
+					(m) =>
+						Array.from(m.addedNodes).some(
+							(n) => n.dataset?.testid === "vibe-modal-surface",
+						) ||
+						Array.from(m.removedNodes).some(
+							(n) => n.dataset?.testid === "vibe-modal-surface",
+						),
 				);
 				if (hasModalChange) {
 					syncDetailModalState();

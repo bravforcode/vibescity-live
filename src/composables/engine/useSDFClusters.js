@@ -14,6 +14,7 @@ import { SDFClusterLayer } from "@/engine/rendering/SDFClusterLayer.js";
 import { useShopStore } from "@/store/shopStore.js";
 
 const SDF_LAYER_BEFORE = "unclustered-pins";
+const PIN_SOURCE_ID = "pins_source";
 
 // Spring constants for zoom break-apart effect
 const SPRING_STIFFNESS = 12;
@@ -36,6 +37,7 @@ export function useSDFClusters(map) {
 	let _repaintRaf = null;
 	let _idleTimeout = null;
 	let _isAnimating = false;
+	let _setupRetryTimeout = null;
 
 	// Spring state per pin (index → { offsetX, offsetY, t0 })
 	let _springOffsets = [];
@@ -114,14 +116,22 @@ export function useSDFClusters(map) {
 			map.once("style.load", setup);
 			return;
 		}
+		if (map.getLayer(layer.id)) {
+			startRepaintLoop();
+			return;
+		}
+		if (!map.getSource(PIN_SOURCE_ID) || !map.getLayer(SDF_LAYER_BEFORE)) {
+			if (_setupRetryTimeout) return;
+			_setupRetryTimeout = setTimeout(() => {
+				_setupRetryTimeout = null;
+				setup();
+			}, 120);
+			return;
+		}
 		try {
 			map.addLayer(layer, SDF_LAYER_BEFORE);
 		} catch {
-			try {
-				map.addLayer(layer);
-			} catch {
-				/* noop */
-			}
+			/* noop */
 		}
 		startRepaintLoop();
 	};
@@ -254,6 +264,7 @@ export function useSDFClusters(map) {
 		if (_frameThrottle) cancelAnimationFrame(_frameThrottle);
 		stopRepaintLoop();
 		if (_idleTimeout) clearTimeout(_idleTimeout);
+		if (_setupRetryTimeout) clearTimeout(_setupRetryTimeout);
 		try {
 			map.removeLayer(layer.id);
 		} catch {

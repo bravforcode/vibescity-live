@@ -46,8 +46,12 @@ const successTimer = ref(null);
 const resetTimer = ref(null);
 
 const shopReviews = computed(() => shopStore.getShopReviews(props.shopId));
-const venueDensity = computed(() => shopStore.venueDensity[String(props.shopId)]);
-const densityLoading = computed(() => shopStore.densityLoading[String(props.shopId)]);
+const venueDensity = computed(
+	() => shopStore.venueDensity[String(props.shopId)],
+);
+const densityLoading = computed(
+	() => shopStore.densityLoading[String(props.shopId)],
+);
 
 const REACTION_KEYS = new Set(["love", "heart", "haha", "wow", "sad", "angry"]);
 const REACTION_REGEX =

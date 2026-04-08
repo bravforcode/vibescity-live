@@ -12,7 +12,6 @@ from typing import Any, Literal
 import httpx
 from pydantic import BaseModel, HttpUrl
 
-from app.core.config import get_settings
 from app.services.cache import redis_client
 
 logger = logging.getLogger("app.webhooks")
@@ -165,9 +164,10 @@ class WebhookService:
 
     def _generate_signature(self, secret: str, body: str) -> str:
         """HMAC-SHA256 signature for security verification by the merchant."""
-        import hmac
         import hashlib
-        if not secret: return ""
+        import hmac
+        if not secret:
+            return ""
         return hmac.new(secret.encode(), body.encode(), hashlib.sha256).hexdigest()
 
     async def _handle_fallback(self, sub: dict, msg: dict):

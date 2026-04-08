@@ -1,28 +1,56 @@
 import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const venueMaybeSingleMock = vi.fn(async () => ({ data: null, error: null }));
-const venueOrderMock = vi.fn(async () => ({ data: [], error: null }));
-const venueSelectMock = vi.fn(() => ({
-	order: venueOrderMock,
-	eq: vi.fn(() => ({ maybeSingle: venueMaybeSingleMock })),
-	in: vi.fn(async () => ({ data: [], error: null })),
-}));
-const supabaseFromMock = vi.fn(() => ({
-	select: venueSelectMock,
-}));
-const supabaseRpcMock = vi.fn(async () => ({ data: [], error: null }));
-const featureFlagRefreshMock = vi.fn(async () => {});
-const featureFlagIsEnabledMock = vi.fn((key) => {
-	if (key === "enable_feed_virtualization_v2") return true;
-	if (key === "use_v2_feed") return true;
-	if (key === "use_v2_search") return true;
-	return false;
-});
+const {
+	venueMaybeSingleMock,
+	venueOrderMock,
+	venueSelectMock,
+	supabaseFromMock,
+	supabaseRpcMock,
+	featureFlagRefreshMock,
+	featureFlagIsEnabledMock,
+	mockShouldUseLocalVenueSnapshot,
+	mockGetRealVenueMedia,
+	mockApiFetch,
+	mockApiRequest,
+} = vi.hoisted(() => {
+		const venueMaybeSingleMock = vi.fn(async () => ({ data: null, error: null }));
+		const venueOrderMock = vi.fn(async () => ({ data: [], error: null }));
+		const venueSelectMock = vi.fn(() => ({
+			order: venueOrderMock,
+			eq: vi.fn(() => ({ maybeSingle: venueMaybeSingleMock })),
+			in: vi.fn(async () => ({ data: [], error: null })),
+		}));
+		const supabaseFromMock = vi.fn(() => ({
+			select: venueSelectMock,
+		}));
+		const supabaseRpcMock = vi.fn(async () => ({ data: [], error: null }));
+		const featureFlagRefreshMock = vi.fn(async () => {});
+		const featureFlagIsEnabledMock = vi.fn((key) => {
+			if (key === "enable_feed_virtualization_v2") return true;
+			if (key === "use_v2_feed") return true;
+			if (key === "use_v2_search") return true;
+			return false;
+		});
+		const mockShouldUseLocalVenueSnapshot = vi.fn(() => false);
+		const mockGetRealVenueMedia = vi.fn(async () => null);
+		const mockApiFetch = vi.fn(async () => ({ ok: true, json: async () => [] }));
+		const mockApiRequest = vi.fn(async () => null);
 
-const mockShouldUseLocalVenueSnapshot = vi.fn(() => false);
-const mockGetRealVenueMedia = vi.fn(async () => null);
-const mockApiFetch = vi.fn(async () => ({ ok: true, json: async () => [] }));
+		return {
+			venueMaybeSingleMock,
+			venueOrderMock,
+			venueSelectMock,
+			supabaseFromMock,
+			supabaseRpcMock,
+			featureFlagRefreshMock,
+			featureFlagIsEnabledMock,
+			mockShouldUseLocalVenueSnapshot,
+			mockGetRealVenueMedia,
+			mockApiFetch,
+			mockApiRequest,
+		};
+	});
 
 vi.mock("../../../src/lib/supabase", () => ({
 	supabase: {
@@ -64,6 +92,23 @@ vi.mock("../../../src/services/shopService", () => ({
 vi.mock("../../../src/i18n.js", () => ({
 	default: { global: { locale: { value: "en" } } },
 }));
+
+vi.mock("../../../src/lib/runtimeConfig", async (importOriginal) => {
+	const actual = await importOriginal();
+	return {
+		...actual,
+		isFrontendOnlyDevMode: vi.fn(() => false),
+		isLocalBrowserHostname: vi.fn(() => false),
+	};
+});
+
+vi.mock("../../../src/services/apiService", async (importOriginal) => {
+	const actual = await importOriginal();
+	return {
+		...actual,
+		request: mockApiRequest,
+	};
+});
 
 // Pass-through: let shopStore's internal normalizeStatusForUi and normalizeCoords run on raw data
 vi.mock("../../../src/domain/venue/viewModel", () => ({
@@ -118,6 +163,7 @@ describe("shopStore", () => {
 		supabaseRpcMock.mockResolvedValue({ data: [], error: null });
 		mockShouldUseLocalVenueSnapshot.mockReturnValue(false);
 		mockGetRealVenueMedia.mockResolvedValue(null);
+		mockApiRequest.mockResolvedValue(null);
 	});
 
 	afterEach(() => {
@@ -588,7 +634,7 @@ describe("shopStore", () => {
 
 	// ─── Integration Tests: Emoji Reactions & Reviews ──────────────────────
 	describe("emoji reactions and reviews integration", () => {
-		it("submits a reaction via apiFetch with correct headers and structure", async () => {
+		it("submits a reaction via the reviews API with correct payload", async () => {
 			const store = useShopStore();
 			const shopId = "test-shop-123";
 			const reviewData = {
@@ -597,20 +643,20 @@ describe("shopStore", () => {
 				userName: "Vibe Explorer",
 			};
 
-			mockApiFetch.mockResolvedValueOnce({
-				ok: true,
-				json: async () => ({ id: "new-rev-id", ...reviewData }),
+			mockApiRequest.mockResolvedValueOnce({
+				id: "new-rev-id",
+				venue_id: shopId,
+				...reviewData,
 			});
 
 			const result = await store.addReview(shopId, reviewData);
 
 			expect(result.success).toBe(true);
-			expect(mockApiFetch).toHaveBeenCalledWith(
-				`/shops/${shopId}/reviews`,
+			expect(mockApiRequest).toHaveBeenCalledWith(
 				expect.objectContaining({
+					url: `/shops/${shopId}/reviews`,
 					method: "POST",
-					includeVisitor: true,
-					body: expect.objectContaining({
+					data: expect.objectContaining({
 						comment: reviewData.comment,
 						userName: reviewData.userName,
 					}),
@@ -628,10 +674,10 @@ describe("shopStore", () => {
 				userName: "Test User",
 			};
 
-			// mockApiFetch will fail with 404 to trigger fallback
-			mockApiFetch.mockResolvedValueOnce({
-				ok: false,
-				status: 404,
+			mockApiRequest.mockRejectedValueOnce({
+				response: {
+					status: 404,
+				},
 			});
 
 			const insertMock = vi.fn(() => ({

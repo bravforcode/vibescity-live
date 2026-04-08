@@ -5,8 +5,8 @@ Frontend runs on Vercel. API/WS/OCR/Clock run on Fly.
 
 ## Fixed project values for this repository
 - Fly app: `vibecity-api`
-- Supabase project ref: `nluuvnttweesnkrmgzsm`
-- Supabase URL: `https://nluuvnttweesnkrmgzsm.supabase.co`
+- Supabase project ref: `rukyitpjfmzhqjlfmbie`
+- Supabase URL: `https://rukyitpjfmzhqjlfmbie.supabase.co`
 
 ## 1) Install and login
 ```bash
@@ -31,7 +31,7 @@ Required:
 ```bash
 fly secrets set --app vibecity-api \
   ENV=production \
-  SUPABASE_URL="https://nluuvnttweesnkrmgzsm.supabase.co" \
+  SUPABASE_URL="https://rukyitpjfmzhqjlfmbie.supabase.co" \
   SUPABASE_KEY="<SUPABASE_ANON_KEY>" \
   SUPABASE_SERVICE_ROLE_KEY="<SUPABASE_SERVICE_ROLE_KEY>" \
   STRIPE_SECRET_KEY="<STRIPE_SECRET_KEY>" \
@@ -200,16 +200,16 @@ fly logs --app vibecity-api --process clock
 Set these in Vercel project settings:
 - `VITE_API_URL=https://vibecity-api.fly.dev`
 - `VITE_WS_URL=wss://vibecity-api.fly.dev/api/v1/vibes/vibe-stream`
-- `VITE_SUPABASE_URL=https://nluuvnttweesnkrmgzsm.supabase.co`
+- `VITE_SUPABASE_URL=https://rukyitpjfmzhqjlfmbie.supabase.co`
 - `VITE_SUPABASE_ANON_KEY=<SUPABASE_ANON_KEY>`
-- `VITE_SUPABASE_EDGE_URL=https://nluuvnttweesnkrmgzsm.supabase.co/functions/v1`
+- `VITE_SUPABASE_EDGE_URL=https://rukyitpjfmzhqjlfmbie.supabase.co/functions/v1`
 - `VITE_MAPBOX_TOKEN=<MAPBOX_TOKEN>`
 
 ## 9) Post-deploy endpoint checks
 Route existence and health checks (API + optional Edge):
 ```bash
 POSTDEPLOY_API_BASE_URL="https://vibecity-api.fly.dev" \
-POSTDEPLOY_EDGE_BASE_URL="https://nluuvnttweesnkrmgzsm.supabase.co/functions/v1" \
+POSTDEPLOY_EDGE_BASE_URL="https://rukyitpjfmzhqjlfmbie.supabase.co/functions/v1" \
 POSTDEPLOY_SUPABASE_JWT="<USER_OR_ANON_JWT>" \
 POSTDEPLOY_CHECKOUT_VENUE_ID="<venue-uuid>" \
 POSTDEPLOY_ORDER_ID="<order-uuid-optional>" \
@@ -245,7 +245,7 @@ curl -X POST "https://<project-ref>.supabase.co/functions/v1/create-checkout-ses
 
 Correct:
 ```bash
-curl -X POST "https://nluuvnttweesnkrmgzsm.supabase.co/functions/v1/create-checkout-session" \
+curl -X POST "https://rukyitpjfmzhqjlfmbie.supabase.co/functions/v1/create-checkout-session" \
   -H "Authorization: Bearer <REAL_JWT>" \
   -H "Content-Type: application/json" \
   -d '{"venue_id":"<venue-uuid>","sku":"verified","visitor_id":"<visitor-id>","returnUrl":"https://vibecity.live"}'

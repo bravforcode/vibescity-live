@@ -2,9 +2,11 @@
 Google Maps Traffic Adapter
 Uses Google Maps Roads and Distance Matrix APIs for traffic data.
 """
-from typing import Any
+
 import httpx
-from .base import TrafficProvider, StandardTrafficSegment, StandardIncident, TrafficDensity
+
+from .base import StandardIncident, StandardTrafficSegment, TrafficProvider
+
 
 class GoogleTrafficProvider(TrafficProvider):
     """

@@ -17,6 +17,9 @@ class Settings(BaseSettings):
         "http://localhost:5417",
         "http://localhost:5418",
         "https://vibecity.live",
+        "https://www.vibecity.live",
+        "https://vibescity.live",
+        "https://www.vibescity.live",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5417",
         "http://127.0.0.1:5418",
@@ -40,8 +43,13 @@ class Settings(BaseSettings):
     SUPABASE_URL: str = ""
     SUPABASE_KEY: str = ""
     SUPABASE_SERVICE_ROLE_KEY: str = ""
+    SUPABASE_DIRECT_URL: str = ""
     DATABASE_URL: str = ""
     NEON_DATABASE_URL: str = ""
+    NEON_DIRECT_DATABASE_URL: str = ""
+    QDRANT_URL: str = ""
+    QDRANT_API_KEY: str = ""
+    QDRANT_GRPC_PORT: int = 6334
 
     # Redis / Queues
     REDIS_URL: str = ""
@@ -98,6 +106,7 @@ class Settings(BaseSettings):
 
     # PayPal
     PAYPAL_CLIENT_ID: str | None = None
+    TOMTOM_API_KEY: str = ""
 
     # Google Maps / Street View
     GOOGLE_API_KEY: str = ""

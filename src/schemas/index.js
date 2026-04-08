@@ -4,7 +4,9 @@ import { z } from "zod";
  * 🛠️ Common Base Schemas
  */
 export const TimestampSchema = z.string().datetime();
-export const UuidSchema = z.string().uuid({ message: "รูปแบบ ID ไม่ถูกต้อง (UUID)" });
+export const UuidSchema = z
+	.string()
+	.uuid({ message: "รูปแบบ ID ไม่ถูกต้อง (UUID)" });
 export const CoordinatesSchema = z.object({
 	lat: z.number().min(-90).max(90),
 	lng: z.number().min(-180).max(180),
@@ -19,7 +21,11 @@ export const UserProfileSchema = z.object({
 	email: z.string().email("รูปแบบอีเมลไม่ถูกต้อง"),
 	avatar_url: z.string().url().optional().nullable(),
 	full_name: z.string().max(100).optional().nullable(),
-	phone: z.string().regex(/^[0-9+-\s]+$/, "รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง").optional().nullable(),
+	phone: z
+		.string()
+		.regex(/^[0-9+-\s]+$/, "รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง")
+		.optional()
+		.nullable(),
 	created_at: TimestampSchema.optional(),
 });
 
@@ -46,7 +52,7 @@ export const VenueSchema = z.object({
 export const ReviewSchema = z.object({
 	id: z.string().or(z.number()),
 	venue_id: z.string().or(z.number()),
-	rating: z.number().min(1, "กรุณาให้คะแนนอย่างน้อย 1 ดาว").max(5),
+	rating: z.number().min(0, "คะแนนต้องไม่ต่ำกว่า 0").max(5).optional().nullable(),
 	comment: z.string().max(500, "ความคิดเห็นต้องไม่เกิน 500 ตัวอักษร"),
 	userName: z.string().min(1, "กรุณาระบุชื่อผู้แสดงความเห็น").default("Vibe Explorer"),
 	created_at: TimestampSchema.optional(),

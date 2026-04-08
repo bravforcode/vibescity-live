@@ -38,7 +38,7 @@ const EVENT_ALLOWLIST = parseCsvList(Deno.env.get("ANALYTICS_EVENT_ALLOWLIST")).
 
 const DEFAULT_CORS_HEADERS = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-vibe-visitor-id, vibe_visitor_id, vibe-visitor-id",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Max-Age": "86400",
 };
@@ -111,6 +111,36 @@ const safeJson = async (req: Request) => {
   } catch {
     return null;
   }
+};
+
+const writeAnalyticsLog = async (
+  supabase: ReturnType<typeof createClient>,
+  payload: {
+    requestId: string;
+    eventType: string;
+    userId: string | null;
+    sessionId?: string | null;
+    visitorId?: string | null;
+    venueRef?: string | null;
+    shopId?: string | number | null;
+    metadata?: Record<string, unknown>;
+    source: string;
+  },
+) => {
+  const { error } = await supabase.from("analytics_logs").insert({
+    event_type: payload.eventType,
+    user_id: payload.userId,
+    data: {
+      request_id: payload.requestId,
+      session_id: payload.sessionId ?? null,
+      visitor_id: payload.visitorId ?? null,
+      venue_ref: payload.venueRef ?? null,
+      shop_id: payload.shopId ?? null,
+      source: payload.source,
+      ...(payload.metadata || {}),
+    },
+  });
+  return error || null;
 };
 
 serve(async (req) => {
@@ -283,6 +313,22 @@ serve(async (req) => {
         );
       }
 
+      const analyticsLogError = await writeAnalyticsLog(supabase, {
+        requestId,
+        eventType: "web_vital",
+        userId: null,
+        metadata: normalizedMetadata,
+        source: "analytics-ingest:web_vital",
+      });
+      if (analyticsLogError) {
+        console.warn(
+          "[analytics-ingest]",
+          requestId,
+          "analytics_logs insert failed:",
+          analyticsLogError.message,
+        );
+      }
+
       return new Response(JSON.stringify({ success: true }), {
         headers: {
           ...corsHeaders,
@@ -348,42 +394,74 @@ serve(async (req) => {
 
     // Check for existing recent session (last 30 mins)
     let sessionId = null;
-    const { data: existingSession } = await supabase
-      .from("analytics_sessions")
-      .select("id")
-      .eq("visitor_id", visitor_id)
-      .gt("last_seen_at", new Date(Date.now() - 30 * 60 * 1000).toISOString())
-      .limit(1)
-      .single();
-
-    if (existingSession) {
-      sessionId = existingSession.id;
-      // Update last_seen
-      await supabase
+    try {
+      const { data: existingSession, error: existingSessionError } = await supabase
         .from("analytics_sessions")
-        .update({ last_seen_at: new Date() })
-        .eq("id", sessionId);
-    } else {
-      // Create new
-      const { data: newSession, error: sessionError } = await supabase
-        .from("analytics_sessions")
-        .insert({
-          visitor_id,
-          user_id: userId,
-          user_agent: userAgent,
-          ip_hash: ipHash,
-          country,
-          city,
-          referrer: safeMetadata?.referrer,
-          device_type: userAgent.toLowerCase().includes("mobile")
-            ? "mobile"
-            : "desktop", // Simple detection
-        })
         .select("id")
+        .eq("visitor_id", visitor_id)
+        .gt("last_seen_at", new Date(Date.now() - 30 * 60 * 1000).toISOString())
+        .limit(1)
         .single();
 
-      if (sessionError) throw sessionError;
-      sessionId = newSession.id;
+      if (existingSessionError) {
+        console.warn(
+          "[analytics-ingest]",
+          requestId,
+          "analytics_sessions lookup failed:",
+          existingSessionError.message,
+        );
+      }
+
+      if (existingSession?.id) {
+        sessionId = existingSession.id;
+        const { error: touchError } = await supabase
+          .from("analytics_sessions")
+          .update({ last_seen_at: new Date() })
+          .eq("id", sessionId);
+        if (touchError) {
+          console.warn(
+            "[analytics-ingest]",
+            requestId,
+            "analytics_sessions touch failed:",
+            touchError.message,
+          );
+        }
+      } else if (!existingSessionError) {
+        const { data: newSession, error: sessionError } = await supabase
+          .from("analytics_sessions")
+          .insert({
+            visitor_id,
+            user_id: userId,
+            user_agent: userAgent,
+            ip_hash: ipHash,
+            country,
+            city,
+            referrer: safeMetadata?.referrer,
+            device_type: userAgent.toLowerCase().includes("mobile")
+              ? "mobile"
+              : "desktop", // Simple detection
+          })
+          .select("id")
+          .single();
+
+        if (sessionError) {
+          console.warn(
+            "[analytics-ingest]",
+            requestId,
+            "analytics_sessions insert failed:",
+            sessionError.message,
+          );
+        } else {
+          sessionId = newSession?.id ?? null;
+        }
+      }
+    } catch (sessionUnexpectedError) {
+      console.warn(
+        "[analytics-ingest]",
+        requestId,
+        "analytics session path failed open:",
+        sessionUnexpectedError?.message || sessionUnexpectedError,
+      );
     }
 
     // 6. Insert Partitioned Raw Event (preferred)
@@ -452,6 +530,29 @@ serve(async (req) => {
           retryError.message,
         );
       }
+    }
+
+    const analyticsLogError = await writeAnalyticsLog(supabase, {
+      requestId,
+      eventType: event_type,
+      userId,
+      sessionId,
+      visitorId: visitor_id ?? null,
+      venueRef: normalizedVenueRef,
+      shopId: shopIdUuid ?? shopIdNumeric ?? shop_id ?? null,
+      metadata: {
+        ...safeMetadata,
+        referrer: safeMetadata?.referrer ?? null,
+      },
+      source: "analytics-ingest:event",
+    });
+    if (analyticsLogError) {
+      console.warn(
+        "[analytics-ingest]",
+        requestId,
+        "analytics_logs insert failed:",
+        analyticsLogError.message,
+      );
     }
 
     return new Response(JSON.stringify({ success: true }), {

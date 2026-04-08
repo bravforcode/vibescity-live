@@ -1,6 +1,6 @@
 import {
 	getSupabaseEdgeBaseUrl,
-	isFrontendOnlyDevMode,
+	shouldBypassDirectBrowserSupabaseReads,
 } from "@/lib/runtimeConfig";
 import { supabase } from "@/lib/supabase";
 
@@ -122,7 +122,7 @@ class LocalAdService {
 
 	/** Fetch ads that fall within range of a given lat/lng. */
 	async getByLocation(lat, lng) {
-		if (isFrontendOnlyDevMode()) {
+		if (shouldBypassDirectBrowserSupabaseReads()) {
 			return [];
 		}
 		const { data, error } = await supabase.rpc("get_local_ads", {

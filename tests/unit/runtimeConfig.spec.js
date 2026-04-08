@@ -4,7 +4,11 @@ vi.mock("../../src/i18n.js", () => ({
 	default: { global: { t: (key) => key } },
 }));
 
-import { isLocalBrowserHostname } from "../../src/lib/runtimeConfig";
+import {
+	isLocalBrowserHostname,
+	isPublicBrowserHostname,
+	shouldAvoidCrossOriginApiOnPublicHost,
+} from "../../src/lib/runtimeConfig";
 
 describe("runtimeConfig local host detection", () => {
 	it("treats loopback, LAN, and local hostnames as local browser hosts", () => {
@@ -22,5 +26,42 @@ describe("runtimeConfig local host detection", () => {
 		expect(isLocalBrowserHostname("172.32.0.1")).toBe(false);
 		expect(isLocalBrowserHostname("8.8.8.8")).toBe(false);
 		expect(isLocalBrowserHostname("vibecity.live")).toBe(false);
+	});
+
+	it("treats non-local hostnames as public browser hosts", () => {
+		expect(isPublicBrowserHostname("vibecity.live")).toBe(true);
+		expect(isPublicBrowserHostname("preview.vercel.app")).toBe(true);
+		expect(isPublicBrowserHostname("8.8.8.8")).toBe(true);
+		expect(isPublicBrowserHostname("localhost")).toBe(false);
+		expect(isPublicBrowserHostname("192.168.1.15")).toBe(false);
+	});
+
+	it("avoids cross-origin API lanes on public production hosts", () => {
+		expect(
+			shouldAvoidCrossOriginApiOnPublicHost({
+				baseUrl: "https://vibecity-api.fly.dev/api/v1",
+				currentOrigin: "https://www.vibescity.live",
+				currentHostname: "www.vibescity.live",
+				isProd: true,
+			}),
+		).toBe(true);
+
+		expect(
+			shouldAvoidCrossOriginApiOnPublicHost({
+				baseUrl: "https://www.vibescity.live/api/v1",
+				currentOrigin: "https://www.vibescity.live",
+				currentHostname: "www.vibescity.live",
+				isProd: true,
+			}),
+		).toBe(false);
+
+		expect(
+			shouldAvoidCrossOriginApiOnPublicHost({
+				baseUrl: "https://vibecity-api.fly.dev/api/v1",
+				currentOrigin: "http://localhost:5173",
+				currentHostname: "localhost",
+				isProd: false,
+			}),
+		).toBe(false);
 	});
 });

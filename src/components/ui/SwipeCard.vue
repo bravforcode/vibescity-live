@@ -125,11 +125,6 @@ const hasRealImage = computed(() => venueImage.value.hasRealImage);
 const placeholderGradient = computed(
 	() => venueImage.value.placeholderGradient,
 );
-const escapeCssUrl = (value) =>
-	String(value || "")
-		.replace(/\\/g, "\\\\")
-		.replace(/"/g, '\\"');
-
 const isGiantPin = computed(
 	() =>
 		String(props.shop?.pin_type || "").toLowerCase() === "giant" ||
@@ -257,19 +252,13 @@ const showImageFallback = computed(
 const showMediaPlaceholder = computed(
 	() => !primaryImageUrl.value && (!showVideo.value || !videoLoaded.value),
 );
-const surfaceBackdropStyle = computed(() => {
-	if (primaryImageUrl.value) {
-		return {
-			backgroundImage: `url("${escapeCssUrl(primaryImageUrl.value)}")`,
-			backgroundPosition: "center",
-			backgroundRepeat: "no-repeat",
-			backgroundSize: "cover",
-		};
-	}
-	return {
-		background: placeholderGradient.value,
-	};
-});
+const surfaceBackdropStyle = computed(() =>
+	primaryImageUrl.value
+		? null
+		: {
+				background: placeholderGradient.value,
+			},
+);
 const mediaPlaceholderStyle = computed(() => ({
 	background: placeholderGradient.value,
 }));
@@ -575,7 +564,11 @@ const handleRootKeydown = (e) => {
     ref="container"
     data-testid="shop-card"
     class="sc-root"
-    :class="{ 'z-30': isSelected, 'sc-root--giant': isGiantPin }"
+    :class="{
+      'z-30': isSelected,
+      'sc-root--giant': isGiantPin,
+      'sc-root--live': isLive,
+    }"
     :data-active="isActive ? 'true' : 'false'"
     :data-has-real-image="hasRealImage ? 'true' : 'false'"
     :data-card-visual="hasRealImage ? 'full-bleed' : 'placeholder'"
@@ -715,10 +708,10 @@ const handleRootKeydown = (e) => {
               <Car class="w-3 h-3 flex-shrink-0" aria-hidden="true" />
               {{ displayTravelTime }}
             </span>
-            <span v-if="realImageCount > 0" class="sc-meta-item">
+            <span v-if="realImageCount > 0" class="sc-meta-item sc-meta-item--count">
               IMG {{ realImageCount }}
             </span>
-            <span v-if="realVideoCount > 0" class="sc-meta-item">
+            <span v-if="realVideoCount > 0" class="sc-meta-item sc-meta-item--count">
               VID {{ realVideoCount }}
             </span>
           </div>
@@ -1348,6 +1341,35 @@ const handleRootKeydown = (e) => {
   }
 }
 
+@media (hover: none) and (pointer: coarse) {
+  .sc-root {
+    perspective: none;
+  }
+
+  .sc-surface {
+    transform: none;
+    box-shadow:
+      0 8px 20px rgba(15 23 42 / 0.08),
+      0 1px 6px rgba(15 23 42 / 0.06);
+  }
+
+  .sc-media-fill {
+    filter: none;
+    transition: none !important;
+  }
+
+  .sc-root--giant .sc-stat-pill,
+  .sc-root--giant .sc-cta--secondary,
+  .sc-root--giant .sc-cta--primary {
+    backdrop-filter: none;
+  }
+
+  .sc-root--giant .sc-cta--primary,
+  .sc-pill {
+    box-shadow: 0 6px 16px rgba(0 0 0 / 0.18);
+  }
+}
+
 /* ─────────────────────────────────────────────────────────────
    PULSE KEYFRAME (shared)
 ───────────────────────────────────────────────────────────── */
@@ -1363,21 +1385,93 @@ const handleRootKeydown = (e) => {
 
 @container (max-width: 13rem) {
   .sc-info {
-    padding: 0.45rem 0.6rem 0.58rem;
+    padding: 2.2rem 0.6rem 0.62rem;
   }
 
   .sc-info-surface {
     padding: 0.66rem;
   }
 
-  .sc-meta-row,
+  .sc-venue-name {
+    margin-inline-end: 2.9rem;
+    margin-bottom: 0.32rem;
+    font-size: 0.78rem;
+    line-height: 1.06;
+    display: block;
+    -webkit-line-clamp: unset;
+    -webkit-box-orient: initial;
+    overflow: visible;
+  }
+
+  .sc-root--live .sc-venue-name {
+    margin-inline-start: 4.15rem;
+  }
+
+  .sc-meta-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, max-content));
+    align-items: flex-start;
+    justify-content: start;
+    row-gap: 0.28rem;
+    column-gap: 0.34rem;
+    margin-bottom: 0.34rem;
+  }
+
   .sc-sub-row,
   .sc-cta-row {
     gap: 0.38rem;
   }
 
+  .sc-chip {
+    grid-column: 1 / -1;
+    width: fit-content;
+    max-width: 100%;
+    min-height: 20px;
+    padding: 0.22rem 0.44rem;
+    font-size: 0.52rem;
+    letter-spacing: 0.04em;
+    line-height: 1.05;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  .sc-meta-item {
+    font-size: 0.57rem;
+    line-height: 1;
+    min-width: 0;
+  }
+
+  .sc-meta-item--distance {
+    margin-left: 0;
+    max-width: none;
+    padding: 0.24rem 0.46rem;
+  }
+
+  .sc-meta-item--count {
+    color: rgba(15 23 42 / 0.58);
+  }
+
+  .sc-sub-row {
+    margin-bottom: 0.46rem;
+  }
+
+  .sc-stat-pill {
+    min-height: 22px;
+    padding: 0.22rem 0.42rem;
+  }
+
+  .sc-cta-row {
+    gap: 0.34rem;
+  }
+
   .sc-cta {
-    padding-inline: 0.72rem;
+    min-height: 40px;
+    padding: 0.58rem 0.7rem;
+  }
+
+  .sc-cta-distance {
+    font-size: 0.66rem;
   }
 }
 

@@ -140,6 +140,14 @@ const clampText = (value, maxLen) => {
 	return `${s.slice(0, Math.max(0, maxLen - 1)).trim()}…`;
 };
 
+const escapeXml = (value) =>
+	String(value || "")
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&apos;");
+
 const setOrInsertMeta = (html, predicateRegex, metaHtml) => {
 	if (predicateRegex.test(html)) {
 		return html.replace(predicateRegex, metaHtml);
@@ -433,6 +441,63 @@ const writeIndexHtml = async (relDir, html) => {
 	await fs.writeFile(path.join(outDir, "index.html"), html, "utf8");
 };
 
+const buildSitemapXml = ({ venues, categories }) => {
+	const baseUrls = [
+		{ path: "/" },
+		{ path: "/privacy" },
+		{ path: "/terms" },
+	];
+
+	for (const venue of venues) {
+		const canonicalPath = venue.slug
+			? `/v/${encodeURIComponent(venue.slug)}`
+			: `/venue/${encodeURIComponent(venue.id)}`;
+		baseUrls.push({ path: canonicalPath });
+	}
+
+	for (const slug of categories.keys()) {
+		baseUrls.push({ path: `/c/${encodeURIComponent(slug)}` });
+	}
+
+	const urls = [];
+	for (const entry of baseUrls) {
+		const alternates = LOCALES.map((locale) => ({
+			locale,
+			loc: `${SITE_ORIGIN}/${locale}${entry.path === "/" ? "" : entry.path}`,
+		}));
+		const alternateXml = alternates
+			.map(
+				(alt) =>
+					`    <xhtml:link rel="alternate" hreflang="${alt.locale}" href="${escapeXml(
+						alt.loc,
+					)}" />`,
+			)
+			.join("\n");
+		const xDefault = `    <xhtml:link rel="alternate" hreflang="x-default" href="${escapeXml(
+			`${SITE_ORIGIN}/th${entry.path === "/" ? "" : entry.path}`,
+		)}" />`;
+
+		for (const alt of alternates) {
+			urls.push(
+				[
+					"  <url>",
+					`    <loc>${escapeXml(alt.loc)}</loc>`,
+					alternateXml,
+					xDefault,
+					"  </url>",
+				].join("\n"),
+			);
+		}
+	}
+
+	return (
+		'<?xml version="1.0" encoding="UTF-8"?>\n' +
+		'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n' +
+		urls.join("\n") +
+		"\n</urlset>\n"
+	);
+};
+
 const fetchVenues = async () => {
 	if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
 		process.stderr.write(
@@ -623,6 +688,12 @@ const main = async () => {
 			rendered += 1;
 		}
 	}
+
+	await fs.writeFile(
+		path.join(DIST_DIR, "sitemap.xml"),
+		buildSitemapXml({ venues, categories }),
+		"utf8",
+	);
 
 	process.stdout.write(
 		`Prerender complete: ${rendered} pages for ${venues.length} venues and ${categories.size} categories (dist: ${DIST_DIR}).\n`,

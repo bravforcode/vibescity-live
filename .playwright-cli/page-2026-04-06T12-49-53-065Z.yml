@@ -1,0 +1,47 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - button "Back" [ref=e5] [cursor=pointer]:
+      - generic [ref=e6]:
+        - img [ref=e8]
+        - generic [ref=e10]: Back
+    - link "Create Account" [ref=e11] [cursor=pointer]:
+      - /url: "#/signup"
+      - generic [ref=e14]: Create Account
+  - generic [ref=e19]:
+    - generic [ref=e20]:
+      - img [ref=e22]
+      - heading "Log into Squarespace" [level=1] [ref=e24]
+    - generic [ref=e26]:
+      - generic [ref=e28]:
+        - generic [ref=e29]:
+          - generic [ref=e30]: Email address
+          - textbox "Email address" [active] [ref=e34]:
+            - /placeholder: name@example.com
+          - separator [ref=e36]
+        - generic [ref=e39]:
+          - text: Password
+          - generic [ref=e40]:
+            - textbox "Password Show password" [ref=e44]:
+              - /placeholder: Password
+            - separator [ref=e45]
+            - button "Show password" [ref=e46] [cursor=pointer]:
+              - img [ref=e48]
+        - button "Log In" [disabled] [ref=e51]:
+          - generic [ref=e52]: Log In
+      - generic [ref=e55]: or
+      - list [ref=e58]:
+        - listitem [ref=e59]:
+          - button "Continue with Google" [ref=e60] [cursor=pointer]:
+            - img [ref=e61]
+            - generic [ref=e66]: Continue with Google
+        - listitem [ref=e67]:
+          - button "Continue with Apple" [ref=e68] [cursor=pointer]:
+            - img [ref=e69]
+            - generic [ref=e71]: Continue with Apple
+        - listitem [ref=e72]:
+          - button "Continue with Facebook" [ref=e73] [cursor=pointer]:
+            - img [ref=e74]
+            - generic [ref=e76]: Continue with Facebook
+    - link "Can’t log in?" [ref=e77] [cursor=pointer]:
+      - /url: "#/recovery"
+      - generic [ref=e80]: Can’t log in?

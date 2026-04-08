@@ -6410,9 +6410,9 @@ defineExpose({
   pointer-events: none;
   border-radius: inherit;
   background: radial-gradient(
-    ellipse 85% 75% at 50% 50%,
-    transparent 40%,
-    rgba(0, 0, 0, 0.38) 100%
+    ellipse 88% 80% at 50% 50%,
+    transparent 54%,
+    rgba(0, 0, 0, 0.16) 100%
   );
   opacity: 0;
   transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1);
@@ -6420,7 +6420,7 @@ defineExpose({
 }
 
 .map-focus-vignette.active {
-  opacity: 1;
+  opacity: 0.72;
 }
 
 @keyframes slide-up {

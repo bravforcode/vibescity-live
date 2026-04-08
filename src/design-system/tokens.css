@@ -66,9 +66,9 @@
 	--vc-shadow-glow-purple: 0 0 30px rgba(188, 19, 254, 0.4);
 
 	/* UI Standard Controls (WCAG 2.1 compliance) */
-	--vc-ui-brightness: 1.0;
-	--vc-ui-contrast: 1.0;
-	--vc-ui-gamma: 1.0;
+	--vc-ui-brightness: 1;
+	--vc-ui-contrast: 1;
+	--vc-ui-gamma: 1;
 	--vc-ui-selected-brightness: 1.1; /* Standard +10% */
 }
 

@@ -33,7 +33,9 @@ except AttributeError:
 SKIP_DIRS = {
     'node_modules', '.next', 'dist', 'build', '.git', '.github',
     '__pycache__', '.vscode', '.idea', 'coverage', 'test', 'tests',
-    '__tests__', 'spec', 'docs', 'documentation'
+    '__tests__', 'spec', 'docs', 'documentation', '.vercel', '.artifacts',
+    '.agent', '.agents', '.localappdata', '.planning', '.trunk', 'reports',
+    'storybook-static', 'tmp'
 }
 
 # Files to skip (not public pages)
@@ -50,6 +52,8 @@ def is_page_file(file_path: Path) -> bool:
     
     # Skip config/utility files
     if any(skip in name for skip in SKIP_FILES):
+        return False
+    if name == "offline":
         return False
     
     # Skip test files
@@ -80,17 +84,30 @@ def is_page_file(file_path: Path) -> bool:
 
 def find_web_pages(project_path: Path) -> list:
     """Find public-facing web pages only."""
-    patterns = ['**/*.html', '**/*.htm', '**/*.jsx', '**/*.tsx']
-    
     files = []
-    for pattern in patterns:
-        for f in project_path.glob(pattern):
-            # Skip excluded directories
-            if any(skip in f.parts for skip in SKIP_DIRS):
-                continue
-            
-            # Check if it's likely a page
-            if is_page_file(f):
+    seen = set()
+    candidate_roots = [
+        (project_path, ('*.html', '*.htm')),
+        (project_path / 'public', ('**/*.html', '**/*.htm')),
+        (project_path / 'src' / 'pages', ('**/*.jsx', '**/*.tsx')),
+        (project_path / 'src' / 'routes', ('**/*.jsx', '**/*.tsx')),
+        (project_path / 'pages', ('**/*.jsx', '**/*.tsx')),
+        (project_path / 'app', ('**/*.jsx', '**/*.tsx')),
+    ]
+
+    for root, patterns in candidate_roots:
+        if not root.exists():
+            continue
+        for pattern in patterns:
+            for f in root.glob(pattern):
+                if any(skip in f.parts for skip in SKIP_DIRS):
+                    continue
+                if not is_page_file(f):
+                    continue
+                resolved = f.resolve()
+                if resolved in seen:
+                    continue
+                seen.add(resolved)
                 files.append(f)
     
     return files[:30]  # Limit to 30 pages

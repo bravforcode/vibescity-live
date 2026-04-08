@@ -2,9 +2,11 @@
 TomTom Traffic Adapter
 Uses TomTom Traffic Flow and Traffic Incidents APIs.
 """
-from typing import Any
+
 import httpx
-from .base import TrafficProvider, StandardTrafficSegment, StandardIncident, TrafficDensity
+
+from .base import StandardIncident, StandardTrafficSegment, TrafficProvider
+
 
 class TomTomTrafficProvider(TrafficProvider):
     """
@@ -24,12 +26,6 @@ class TomTomTrafficProvider(TrafficProvider):
             return []
 
         try:
-            url = f"https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json"
-            params = {
-                "key": self.api_key,
-                "point": f"{lat},{lng}",
-                "unit": "KMPH"
-            }
             # Placeholder for actual API call
             self.logger.debug(f"Fetching TomTom traffic for {lat}, {lng}")
             return []

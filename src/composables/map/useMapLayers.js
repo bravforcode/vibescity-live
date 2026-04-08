@@ -1716,17 +1716,20 @@ export function useMapLayers(map, options = {}) {
 	const buildAnimatedCarFeatureCollection = (models, elapsedMs) => {
 		const features = [];
 		const len = models.length;
-		
+
 		// PERFORMANCE FIX: Use for loop instead of map/filter for large arrays.
 		// Avoid object spread inside hot loop.
 		for (let i = 0; i < len; i++) {
 			const model = models[i];
-			model.progress = (model.progress + model.direction * model.speed * (Math.max(16, elapsedMs) / 1000)) % 1;
+			model.progress =
+				(model.progress +
+					model.direction * model.speed * (Math.max(16, elapsedMs) / 1000)) %
+				1;
 			if (model.progress < 0) model.progress += 1;
-			
+
 			const state = interpolateCarState(model);
 			if (!state) continue;
-			
+
 			features.push({
 				type: "Feature",
 				id: `road-car-${i}`,
@@ -1741,7 +1744,7 @@ export function useMapLayers(map, options = {}) {
 				},
 			});
 		}
-		
+
 		return {
 			type: "FeatureCollection",
 			features,
@@ -1845,7 +1848,11 @@ export function useMapLayers(map, options = {}) {
 				// Layer exists but maybe hidden or image lost?
 				try {
 					m.setLayoutProperty("road-flow-car-symbol", "visibility", "visible");
-					m.setLayoutProperty("road-flow-car-symbol", "icon-image", FLOW_CAR_ICON_ID);
+					m.setLayoutProperty(
+						"road-flow-car-symbol",
+						"icon-image",
+						FLOW_CAR_ICON_ID,
+					);
 				} catch (e) {
 					// Ignore
 				}
@@ -2085,7 +2092,9 @@ export function useMapLayers(map, options = {}) {
 			let lastCarPointUpdateAt = 0;
 			const scheduleNextTick = () => {
 				if (typeof window !== "undefined") {
-					carAnimFrame = window.requestAnimationFrame(() => animate(performance.now()));
+					carAnimFrame = window.requestAnimationFrame(() =>
+						animate(performance.now()),
+					);
 					return;
 				}
 				carAnimFrame = setTimeout(

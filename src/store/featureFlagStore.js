@@ -4,7 +4,10 @@ import {
 	getFlagGovernanceViolations,
 	validateFlagDependencies,
 } from "@/config/featureFlagGovernance";
-import { isFrontendOnlyDevMode } from "../lib/runtimeConfig";
+import {
+	isFrontendOnlyDevMode,
+	shouldBypassDirectBrowserSupabaseReads,
+} from "../lib/runtimeConfig";
 import { isSupabaseSchemaCacheError, supabase } from "../lib/supabase";
 
 const DEFAULT_FLAGS = Object.freeze({
@@ -93,6 +96,31 @@ const buildLocalDevFlags = () => ({
 	use_v2_search: false,
 	enable_map_effects_pipeline_v2: true,
 });
+
+const applyFlagState = ({ nextFlags, forceDefaults = false }) => {
+	const nextMeta = buildDefaultFlagMeta();
+	for (const [key, enabled] of Object.entries(nextFlags)) {
+		if (!nextMeta[key]) {
+			nextMeta[key] = {
+				key,
+				enabled: Boolean(enabled),
+				rollout_percent: 100,
+				kill_switch: false,
+				config: {},
+			};
+			continue;
+		}
+		nextMeta[key] = {
+			...nextMeta[key],
+			enabled: Boolean(enabled),
+			kill_switch: false,
+			config: forceDefaults
+				? { ...toSafeObject(nextMeta[key].config, {}) }
+				: nextMeta[key].config,
+		};
+	}
+	return { nextFlags, nextMeta };
+};
 
 const readPersistedFlagsForE2E = () => {
 	if (typeof localStorage === "undefined") return {};
@@ -207,16 +235,21 @@ export const useFeatureFlagStore = defineStore("feature-flags", () => {
 		}
 
 		if (isFrontendOnlyDevMode()) {
-			const nextFlags = buildLocalDevFlags();
-			const nextMeta = buildDefaultFlagMeta();
-			for (const [key, enabled] of Object.entries(nextFlags)) {
-				if (!nextMeta[key]) continue;
-				nextMeta[key] = {
-					...nextMeta[key],
-					enabled: Boolean(enabled),
-					kill_switch: false,
-				};
-			}
+			const { nextFlags, nextMeta } = applyFlagState({
+				nextFlags: buildLocalDevFlags(),
+				forceDefaults: true,
+			});
+			flagMeta.value = nextMeta;
+			flags.value = nextFlags;
+			loadedAt.value = Date.now();
+			return;
+		}
+
+		if (shouldBypassDirectBrowserSupabaseReads()) {
+			const { nextFlags, nextMeta } = applyFlagState({
+				nextFlags: { ...DEFAULT_FLAGS },
+				forceDefaults: true,
+			});
 			flagMeta.value = nextMeta;
 			flags.value = nextFlags;
 			loadedAt.value = Date.now();

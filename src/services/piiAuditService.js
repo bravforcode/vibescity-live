@@ -16,17 +16,14 @@ const parseEnvBool = (value) => {
 	return null;
 };
 
-// Default: disabled in dev, enabled in prod (unless explicitly overridden).
-// Prefer VITE_PII_AUDIT_CLIENT_ENABLED; keep VITE_PII_AUDIT_ENABLED as a
-// compatibility fallback for older environments.
+// Browser-side PII audit must be explicitly enabled. The backend/server-side
+// pipeline can remain enabled independently without forcing client pings.
 const isLocalBrowserHost =
 	typeof window !== "undefined" &&
 	LOCALHOST_PATTERN.test(String(window.location?.hostname || ""));
-const piiAuditEnabled = isLocalBrowserHost
-	? false
-	: (parseEnvBool(import.meta.env.VITE_PII_AUDIT_CLIENT_ENABLED) ??
-		parseEnvBool(import.meta.env.VITE_PII_AUDIT_ENABLED) ??
-		!import.meta.env.DEV);
+const piiAuditEnabled =
+	!isLocalBrowserHost &&
+	parseEnvBool(import.meta.env.VITE_PII_AUDIT_CLIENT_ENABLED) === true;
 
 let lastPingAt = 0;
 const MIN_PING_INTERVAL_MS = 2 * 60 * 1000;

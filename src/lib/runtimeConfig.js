@@ -42,6 +42,12 @@ export const isLocalBrowserHostname = (value) => {
 	return false;
 };
 
+export const isPublicBrowserHostname = (value) => {
+	const normalized = normalizeHostname(value);
+	if (!normalized) return false;
+	return !isLocalBrowserHostname(normalized);
+};
+
 export const getCurrentBrowserHostname = () =>
 	typeof window !== "undefined"
 		? normalizeHostname(window.location?.hostname)
@@ -225,6 +231,25 @@ export const getApiV1BaseUrl = () => {
 	return `${base}/api/v1`;
 };
 
+export const shouldAvoidCrossOriginApiOnPublicHost = ({
+	baseUrl = getApiV1BaseUrl(),
+	currentOrigin = typeof window !== "undefined" ? window.location.origin : "",
+	currentHostname = typeof window !== "undefined"
+		? window.location.hostname
+		: "",
+	isProd = import.meta.env.PROD,
+} = {}) => {
+	if (!isProd || !currentOrigin || !currentHostname) return false;
+	if (!isPublicBrowserHostname(currentHostname)) return false;
+
+	try {
+		const parsed = new URL(baseUrl, currentOrigin);
+		return parsed.origin !== currentOrigin;
+	} catch {
+		return false;
+	}
+};
+
 export const getDirectApiBaseUrl = () => resolveExplicitApiBaseUrl();
 
 export const isFrontendOnlyDevMode = () =>
@@ -233,6 +258,12 @@ export const isFrontendOnlyDevMode = () =>
 	!API_DEV_PROXY_ENABLED &&
 	!VISITOR_BOOTSTRAP_DEV_ENABLED &&
 	!DIRECTIONS_DEV_ENABLED;
+
+export const shouldBypassDirectBrowserSupabaseReads = () =>
+	isFrontendOnlyDevMode() ||
+	(typeof window !== "undefined" &&
+		import.meta.env.PROD &&
+		isPublicBrowserHostname(window.location.hostname));
 
 export const shouldPreferRealLocalDevLocation = () =>
 	isFrontendOnlyDevMode() && LOCAL_DEV_REAL_GEO_ENABLED !== false;

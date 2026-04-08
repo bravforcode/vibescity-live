@@ -158,6 +158,8 @@ def run_script(name: str, script_path: Path, project_path: str, url: Optional[st
     
     # Build command
     cmd = ["python", str(script_path), project_path]
+    if script_path.name.lower() == "security_scan.py":
+        cmd.extend(["--output", "summary"])
     if url and ("lighthouse" in script_path.name.lower() or "playwright" in script_path.name.lower()):
         cmd.append(url)
     
@@ -167,6 +169,8 @@ def run_script(name: str, script_path: Path, project_path: str, url: Optional[st
             cmd,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=600  # 10 minute timeout for slow checks
         )
         

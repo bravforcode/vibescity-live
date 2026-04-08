@@ -159,8 +159,10 @@ const isFavorited = computed(() => {
 const getOptimizedUrl = (url, width) => {
 	if (!url) return "";
 	if (url.includes("supabase.co")) {
-		const separator = url.includes("?") ? "&" : "?";
-		return `${url}${separator}width=${width}&format=webp&quality=80`;
+		// Keep browser-side Supabase media on the canonical object URL.
+		// Production Chromium has intermittently blocked the direct query
+		// transform lane with ERR_BLOCKED_BY_ORB on custom-domain hosts.
+		return url;
 	}
 	return url;
 };
@@ -423,7 +425,7 @@ watch(
       <div
         class="absolute bottom-0 left-0 right-0 p-4 pb-2 z-10 flex flex-col justify-end h-full pointer-events-none"
       >
-        <div class="pointer-events-auto shop-info-panel rounded-xl p-3">
+        <div class="pointer-events-auto shop-info-panel rounded-xl p-4">
           <!-- Stats Mode Toggle (Merchant Only) -->
           <div v-if="showStats" class="mb-2">
             <MerchantStats :shopId="shop.id" :isDarkMode="isDarkMode" />
@@ -439,7 +441,7 @@ watch(
             <!-- Header -->
             <div class="shop-header">
               <h3
-                class="text-xl font-black text-white leading-none tracking-tighter font-sans line-clamp-1"
+                class="text-3xl font-black text-black leading-tight tracking-tight font-sans line-clamp-2"
               >
                 {{ shop.name }}
               </h3>
@@ -653,8 +655,8 @@ watch(
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 0.55rem;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
 }
 
 .shop-meta-row {

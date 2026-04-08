@@ -8,7 +8,7 @@ import SmartHeader from "../components/layout/SmartHeader.vue";
 import AppModals from "../components/system/AppModals.vue";
 import { preloadAssets } from "../utils/performance";
 
-const ASSETS_TO_PRELOAD = ["/map-style-dark.json", "/fonts/vibe-font.woff2"];
+const ASSETS_TO_PRELOAD = ["/map-style-dark.json"];
 
 preloadAssets(ASSETS_TO_PRELOAD);
 

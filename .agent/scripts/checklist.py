@@ -88,16 +88,22 @@ def run_script(name: str, script_path: Path, project_path: str, url: Optional[st
     
     # Build command
     cmd = ["python", str(script_path), project_path]
+    if script_path.name.lower() == "security_scan.py":
+        cmd.extend(["--output", "summary"])
     if url and ("lighthouse" in script_path.name.lower() or "playwright" in script_path.name.lower()):
         cmd.append(url)
     
     # Run script
     try:
+        timeout_seconds = 600 if script_path.name.lower() == "security_scan.py" else 300
+
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
-            timeout=300  # 5 minute timeout
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout_seconds
         )
         
         passed = result.returncode == 0

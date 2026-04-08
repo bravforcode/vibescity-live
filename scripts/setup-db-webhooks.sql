@@ -11,7 +11,7 @@ begin
   -- NOTE: In production, use the project secret via a secure method or hardcode if necessary
   -- Here we use net.http_post
   select net.http_post(
-      url := 'https://nluuvnttweesnkrmgzsm.supabase.co/functions/v1/webhook-handler',
+      url := 'https://rukyitpjfmzhqjlfmbie.supabase.co/functions/v1/webhook-handler',
       headers := '{"Content-Type": "application/json", "x-webhook-secret": "vibecity_secret_key"}'::jsonb,
       body := jsonb_build_object(
           'type', TG_OP,

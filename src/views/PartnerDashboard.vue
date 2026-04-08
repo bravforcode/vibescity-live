@@ -1,9 +1,18 @@
 <script setup lang="ts">
+import {
+	ChevronUp,
+	CreditCard,
+	Gift,
+	Landmark,
+	RefreshCw,
+	Share2,
+	User,
+	Users,
+} from "lucide-vue-next";
 import generatePayload from "promptpay-qr";
 import QrcodeVue from "qrcode.vue";
 import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { RefreshCw, Users, CreditCard, Gift, Landmark, User, Share2, ChevronUp } from "lucide-vue-next";
 import ErrorBoundary from "@/components/ui/ErrorBoundary.vue";
 import { usePermission } from "@/composables/usePermission";
 import {

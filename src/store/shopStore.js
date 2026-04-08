@@ -15,15 +15,17 @@ import {
 import {
 	getLocalVenueSnapshotRowById,
 	loadLocalVenueSnapshotRows,
+	loadVenueSnapshotRows,
 	shouldUseLocalVenueSnapshot,
 } from "../lib/localVenueSnapshot";
 import {
 	isFrontendOnlyDevMode,
 	isLocalBrowserHostname,
+	shouldAvoidCrossOriginApiOnPublicHost,
 } from "../lib/runtimeConfig";
 import { isSupabaseSchemaCacheError, supabase } from "../lib/supabase";
-import { request, DensitySchema, ReviewSchema } from "../services/apiService";
 import { parseApiError } from "../services/apiClient";
+import { DensitySchema, ReviewSchema, request } from "../services/apiService";
 import {
 	enrichVenueRowsWithRealMedia,
 	getRealVenueMedia,
@@ -37,6 +39,17 @@ const DEFAULT_NEARBY_VIEW_LIMIT = 30;
 const DEFAULT_NEARBY_RADIUS_KM = 20;
 const LOCATION_SCOPED_REFETCH_THRESHOLD_KM = 2;
 const LOCATION_SCOPED_REFETCH_COOLDOWN_MS = 15_000;
+const parseEnvBool = (value) => {
+	const raw = String(value ?? "")
+		.trim()
+		.toLowerCase();
+	if (!raw) return null;
+	if (["1", "true", "yes", "on"].includes(raw)) return true;
+	if (["0", "false", "no", "off"].includes(raw)) return false;
+	return null;
+};
+const clientVenueViewTrackingEnabled =
+	parseEnvBool(import.meta.env.VITE_CLIENT_VIEW_TRACKING_ENABLED) === true;
 
 // ═══════════════════════════════════════════
 // 🛠️ Utilities
@@ -173,14 +186,25 @@ const resolveVenueDistanceKm = (shop, coords) => {
 	const normalizedCoords = normalizeUserCoords(coords);
 	if (!normalizedCoords) return Number.POSITIVE_INFINITY;
 
-	const distanceMeters = Number(shop?.distance_meters);
+	const rawDistanceMeters = shop?.distance_meters;
+	const distanceMeters =
+		rawDistanceMeters === null ||
+		rawDistanceMeters === undefined ||
+		rawDistanceMeters === ""
+			? Number.NaN
+			: Number(rawDistanceMeters);
 	if (Number.isFinite(distanceMeters)) {
 		return distanceMeters / 1000;
 	}
 
-	const existingDistance = Number(
-		shop?.distance ?? shop?.distanceKm ?? shop?.distance_km,
-	);
+	const rawExistingDistance =
+		shop?.distance ?? shop?.distanceKm ?? shop?.distance_km;
+	const existingDistance =
+		rawExistingDistance === null ||
+		rawExistingDistance === undefined ||
+		rawExistingDistance === ""
+			? Number.NaN
+			: Number(rawExistingDistance);
 	if (Number.isFinite(existingDistance)) {
 		return existingDistance;
 	}
@@ -459,531 +483,634 @@ const DEFAULT_USER_LOCATION = [DEFAULT_CITY.lat, DEFAULT_CITY.lng];
 // ═══════════════════════════════════════════
 // 🏪 Store Definition
 // ═══════════════════════════════════════════
-export const useShopStore = defineStore(
-	"shop",
-	() => {
-		const locationStore = useLocationStore();
-		const featureFlagStore = useFeatureFlagStore();
+export const useShopStore = defineStore("shop", () => {
+	const locationStore = useLocationStore();
+	const featureFlagStore = useFeatureFlagStore();
 
-		// ═══════════════════════════════════════════
-		// 📦 State
-		// ═══════════════════════════════════════════
-		const rawShops = shallowRef([]); // shallowRef for performance
-		const shopMap = shallowRef(new Map()); // shallowRef: no proxy traversal
-		const slugMap = shallowRef(new Map()); // shallowRef: no proxy traversal
-		const reviewsApiDisabled = ref(false);
-		const reviewsUnavailable = ref(false);
-		const reviews = ref({});
-		const collectedCoins = shallowRef(new Set());
-		const currentTime = ref(new Date()); // ✅ Current time for status calculations
+	// ═══════════════════════════════════════════
+	// 📦 State
+	// ═══════════════════════════════════════════
+	const rawShops = shallowRef([]); // shallowRef for performance
+	const shopMap = shallowRef(new Map()); // shallowRef: no proxy traversal
+	const slugMap = shallowRef(new Map()); // shallowRef: no proxy traversal
+	const reviewsApiDisabled = ref(false);
+	const reviewsUnavailable = ref(false);
+	const reviews = ref({});
+	const collectedCoins = shallowRef(new Set());
+	const currentTime = ref(new Date()); // ✅ Current time for status calculations
 
-		// Debounced GPS location — prevents 5000+ Haversine recalcs per GPS ping.
-		// processedShops depends on this ref, NOT directly on locationStore.userLocation.
-		const debouncedUserLocation = shallowRef(
-			locationStore.userLocation || null,
-		);
-		let _locationDebounceTimer = null;
-		watch(
-			() => locationStore.userLocation,
-			(newLoc, oldLoc) => {
-				clearTimeout(_locationDebounceTimer);
-				if (Array.isArray(newLoc) && !Array.isArray(oldLoc)) {
-					debouncedUserLocation.value = newLoc;
-					return;
-				}
-				_locationDebounceTimer = setTimeout(() => {
-					debouncedUserLocation.value = newLoc;
-				}, 400);
-			},
-		);
-
-		// UI State
-		const activeShopId = ref(null);
-		const activeCategories = ref([]);
-		const activeStatus = ref("ALL");
-		const searchQuery = ref("");
-		const sortBy = ref("distance"); // distance | rating | popular | newest
-
-		// Loading & Error States
-		const isLoading = ref(true);
-		const error = shallowRef(null);
-		const lastFetchTime = ref(null);
-		const v2FeedCircuitUntil = ref(0);
-		const schemaCacheRetryAfter = ref(0);
-		const lastLocationScopedFetch = shallowRef(null);
-		const lastLocationScopedRefreshAt = ref(0);
-		let locationScopedRefreshPromise = null;
-
-		// Rotation for randomization
-		const rotationSeed = ref(Math.floor(Date.now() / 1800000));
-		let rotationInterval = null;
-
-		const getUserLocationForNormalize = () =>
-			locationStore.userLocation || DEFAULT_USER_LOCATION;
-
-		const normalizeVenueRows = (rows) =>
-			normalizeVenueCollection(rows, {
-				userLocation: getUserLocationForNormalize(),
-				collectedCoinIds: collectedCoins.value,
-			});
-
-		const hasCompleteRealMedia = (shop) => {
-			if (shop?.has_real_image === true && shop?.has_real_video === true) {
-				return true;
+	// Debounced GPS location — prevents 5000+ Haversine recalcs per GPS ping.
+	// processedShops depends on this ref, NOT directly on locationStore.userLocation.
+	const debouncedUserLocation = shallowRef(locationStore.userLocation || null);
+	let _locationDebounceTimer = null;
+	watch(
+		() => locationStore.userLocation,
+		(newLoc, oldLoc) => {
+			clearTimeout(_locationDebounceTimer);
+			if (Array.isArray(newLoc) && !Array.isArray(oldLoc)) {
+				debouncedUserLocation.value = newLoc;
+				return;
 			}
-			if (
-				shop?.coverage?.has_complete_media === true ||
-				shop?.media_coverage?.has_complete_media === true
-			) {
-				return true;
-			}
-			const imageCount = Number(
-				shop?.media_counts?.images ||
-					shop?.media?.counts?.images ||
-					shop?.counts?.images ||
-					0,
-			);
-			const videoCount = Number(
-				shop?.media_counts?.videos ||
-					shop?.media?.counts?.videos ||
-					shop?.counts?.videos ||
-					0,
-			);
-			if (imageCount > 0 && videoCount > 0) {
-				return true;
-			}
-			return buildDirectCompleteMediaFallback(shop) !== null;
-		};
+			_locationDebounceTimer = setTimeout(() => {
+				debouncedUserLocation.value = newLoc;
+			}, 400);
+		},
+	);
 
-		const applyVenueRows = (rows) => {
-			const normalized = normalizeVenueRows(
-				(rows || []).map((row) => applyDirectCompleteMediaFallback(row)),
-			);
-			const filtered = shouldUseLocalVenueSnapshot()
-				? normalized
-				: normalized.filter((shop) => hasCompleteRealMedia(shop));
+	// UI State
+	const activeShopId = ref(null);
+	const activeCategories = ref([]);
+	const activeStatus = ref("ALL");
+	const searchQuery = ref("");
+	const sortBy = ref("distance"); // distance | rating | popular | newest
 
-			rawShops.value = filtered;
-			shopMap.value = new Map(
-				filtered.map((shop) => [normalizeId(shop.id), shop]),
-			);
-			slugMap.value = new Map(
-				filtered
-					.map((shop) => [normalizeSlug(shop.slug), shop])
-					.filter(([slug]) => !!slug),
-			);
-		};
+	// Loading & Error States
+	const isLoading = ref(true);
+	const error = shallowRef(null);
+	const lastFetchTime = ref(null);
+	const v2FeedCircuitUntil = ref(0);
+	const schemaCacheRetryAfter = ref(0);
+	const lastLocationScopedFetch = shallowRef(null);
+	const lastLocationScopedRefreshAt = ref(0);
+	let locationScopedRefreshPromise = null;
 
-		// ═══════════════════════════════════════════
-		// 📊 Computed Properties
-		// ═══════════════════════════════════════════
-		const shops = computed(() => rawShops.value);
-		const shopCount = computed(() => rawShops.value.length);
-		const activeShop = computed(
-			() => shopMap.value.get(normalizeId(activeShopId.value)) || null,
-		);
+	// Rotation for randomization
+	const rotationSeed = ref(Math.floor(Date.now() / 1800000));
+	let rotationInterval = null;
 
-		const processedShops = computed(() => {
-			const userLoc = debouncedUserLocation.value || DEFAULT_USER_LOCATION;
-			const rotationMix = hashStringToInt(String(rotationSeed.value));
-			const seen = new Set();
+	const getUserLocationForNormalize = () =>
+		locationStore.userLocation || DEFAULT_USER_LOCATION;
 
-			return rawShops.value
-				.map((shop) => {
-					if (seen.has(shop.id)) return null;
-					seen.add(shop.id);
-
-					const normalizedShop = normalizeVenueViewModel(shop, {
-						userLocation: userLoc,
-						collectedCoinIds: collectedCoins.value,
-					});
-					const coords = normalizeCoords(normalizedShop);
-					const normalizedStatus = normalizeStatusForUi(
-						normalizedShop.status || normalizedShop.Status,
-					);
-					const hasCoords = Boolean(coords);
-					const lat = hasCoords ? coords.lat : null;
-					const lng = hasCoords ? coords.lng : null;
-
-					return {
-						...normalizedShop,
-						statusRaw:
-							normalizedShop.statusRaw ||
-							normalizedShop.status ||
-							normalizedShop.Status ||
-							"",
-						status: normalizedStatus,
-						lat,
-						lng,
-						hasValidCoords: hasCoords,
-						distance: (() => {
-							if (!hasCoords) return Number.POSITIVE_INFINITY;
-							const k = _distKey(normalizedShop.id, userLoc[0], userLoc[1]);
-							let d = _distCache.get(k);
-							if (d === undefined) {
-								d = calculateDistance(
-									userLoc[0],
-									userLoc[1],
-									coords.lat,
-									coords.lng,
-								);
-								if (_distCache.size > 10_000) _distCache.clear();
-								_distCache.set(k, d);
-							}
-							return d;
-						})(),
-						travelTimeMin: (() => {
-							if (!hasCoords) return null;
-							const k = _distKey(normalizedShop.id, userLoc[0], userLoc[1]);
-							const d = _distCache.get(k);
-							return calculateTravelTimeMin(d);
-						})(),
-						randomKey:
-							(hashStringToInt(normalizeId(normalizedShop.id)) ^
-								rotationMix) >>>
-							0,
-					};
-				})
-				.filter(Boolean);
+	const normalizeVenueRows = (rows) =>
+		normalizeVenueCollection(rows, {
+			userLocation: getUserLocationForNormalize(),
+			collectedCoinIds: collectedCoins.value,
 		});
 
-		const filteredShops = computed(() => {
-			let result = processedShops.value;
+	const hasCompleteRealMedia = (shop) => {
+		if (shop?.has_real_image === true && shop?.has_real_video === true) {
+			return true;
+		}
+		if (
+			shop?.coverage?.has_complete_media === true ||
+			shop?.media_coverage?.has_complete_media === true
+		) {
+			return true;
+		}
+		const imageCount = Number(
+			shop?.media_counts?.images ||
+				shop?.media?.counts?.images ||
+				shop?.counts?.images ||
+				0,
+		);
+		const videoCount = Number(
+			shop?.media_counts?.videos ||
+				shop?.media?.counts?.videos ||
+				shop?.counts?.videos ||
+				0,
+		);
+		if (imageCount > 0 && videoCount > 0) {
+			return true;
+		}
+		return buildDirectCompleteMediaFallback(shop) !== null;
+	};
 
-			// Category filter
-			if (activeCategories.value.length > 0) {
-				result = result.filter((s) =>
-					activeCategories.value.includes(s.category),
+	const applyVenueRows = (rows) => {
+		const normalized = normalizeVenueRows(
+			(rows || []).map((row) => applyDirectCompleteMediaFallback(row)),
+		);
+		const filtered = shouldUseLocalVenueSnapshot()
+			? normalized
+			: normalized.filter((shop) => hasCompleteRealMedia(shop));
+
+		rawShops.value = filtered;
+		shopMap.value = new Map(
+			filtered.map((shop) => [normalizeId(shop.id), shop]),
+		);
+		slugMap.value = new Map(
+			filtered
+				.map((shop) => [normalizeSlug(shop.slug), shop])
+				.filter(([slug]) => !!slug),
+		);
+	};
+
+	// ═══════════════════════════════════════════
+	// 📊 Computed Properties
+	// ═══════════════════════════════════════════
+	const shops = computed(() => rawShops.value);
+	const shopCount = computed(() => rawShops.value.length);
+	const activeShop = computed(
+		() => shopMap.value.get(normalizeId(activeShopId.value)) || null,
+	);
+
+	const processedShops = computed(() => {
+		const userLoc = debouncedUserLocation.value || DEFAULT_USER_LOCATION;
+		const rotationMix = hashStringToInt(String(rotationSeed.value));
+		const seen = new Set();
+
+		return rawShops.value
+			.map((shop) => {
+				if (seen.has(shop.id)) return null;
+				seen.add(shop.id);
+
+				const normalizedShop = normalizeVenueViewModel(shop, {
+					userLocation: userLoc,
+					collectedCoinIds: collectedCoins.value,
+				});
+				const coords = normalizeCoords(normalizedShop);
+				const normalizedStatus = normalizeStatusForUi(
+					normalizedShop.status || normalizedShop.Status,
 				);
-			}
+				const hasCoords = Boolean(coords);
+				const lat = hasCoords ? coords.lat : null;
+				const lng = hasCoords ? coords.lng : null;
 
-			// Status filter
-			if (activeStatus.value !== "ALL") {
-				result = result.filter((s) => s.status === activeStatus.value);
-			}
+				return {
+					...normalizedShop,
+					statusRaw:
+						normalizedShop.statusRaw ||
+						normalizedShop.status ||
+						normalizedShop.Status ||
+						"",
+					status: normalizedStatus,
+					lat,
+					lng,
+					hasValidCoords: hasCoords,
+					distance: (() => {
+						if (!hasCoords) return Number.POSITIVE_INFINITY;
+						const k = _distKey(normalizedShop.id, userLoc[0], userLoc[1]);
+						let d = _distCache.get(k);
+						if (d === undefined) {
+							d = calculateDistance(
+								userLoc[0],
+								userLoc[1],
+								coords.lat,
+								coords.lng,
+							);
+							if (_distCache.size > 10_000) _distCache.clear();
+							_distCache.set(k, d);
+						}
+						return d;
+					})(),
+					travelTimeMin: (() => {
+						if (!hasCoords) return null;
+						const k = _distKey(normalizedShop.id, userLoc[0], userLoc[1]);
+						const d = _distCache.get(k);
+						return calculateTravelTimeMin(d);
+					})(),
+					randomKey:
+						(hashStringToInt(normalizeId(normalizedShop.id)) ^ rotationMix) >>>
+						0,
+				};
+			})
+			.filter(Boolean);
+	});
 
-			// Search filter
-			if (searchQuery.value.trim()) {
-				const q = searchQuery.value.toLowerCase();
-				result = result.filter(
-					(s) =>
-						s.name?.toLowerCase().includes(q) ||
-						s.description?.toLowerCase().includes(q) ||
-						s.category?.toLowerCase().includes(q),
+	const filteredShops = computed(() => {
+		let result = processedShops.value;
+
+		// Category filter
+		if (activeCategories.value.length > 0) {
+			result = result.filter((s) =>
+				activeCategories.value.includes(s.category),
+			);
+		}
+
+		// Status filter
+		if (activeStatus.value !== "ALL") {
+			result = result.filter((s) => s.status === activeStatus.value);
+		}
+
+		// Search filter
+		if (searchQuery.value.trim()) {
+			const q = searchQuery.value.toLowerCase();
+			result = result.filter(
+				(s) =>
+					s.name?.toLowerCase().includes(q) ||
+					s.description?.toLowerCase().includes(q) ||
+					s.category?.toLowerCase().includes(q),
+			);
+		}
+
+		return result;
+	});
+
+	const visibleShops = computed(() => {
+		const shops = [...filteredShops.value];
+		const feedVirtualizationEnabled = featureFlagStore.isEnabled(
+			"enable_feed_virtualization_v2",
+		);
+		const filteredViewLimit = feedVirtualizationEnabled ? 100 : 60;
+		const isDefaultView =
+			activeCategories.value.length === 0 &&
+			activeStatus.value === "ALL" &&
+			!searchQuery.value;
+
+		// Sorting
+		switch (sortBy.value) {
+			case "rating":
+				shops.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+				break;
+			case "popular":
+				shops.sort((a, b) => (b.total_views || 0) - (a.total_views || 0));
+				break;
+			case "newest":
+				shops.sort(
+					(a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0),
 				);
-			}
+				break;
+			default:
+				shops.sort((a, b) => a.distance - b.distance);
+		}
 
-			return result;
+		// Default view: keep the first slice anchored to the user's nearest venues.
+		if (isDefaultView) {
+			return buildNearbyVenueSlice(shops);
+		}
+
+		return shops.slice(0, filteredViewLimit); // Limit for performance
+	});
+
+	const categories = computed(() => {
+		const cats = new Map();
+		rawShops.value.forEach((s) => {
+			if (s.category) cats.set(s.category, (cats.get(s.category) || 0) + 1);
 		});
+		return Array.from(cats.entries())
+			.map(([name, count]) => ({ name, count }))
+			.sort((a, b) => b.count - a.count);
+	});
 
-		const visibleShops = computed(() => {
-			const shops = [...filteredShops.value];
-			const feedVirtualizationEnabled = featureFlagStore.isEnabled(
-				"enable_feed_virtualization_v2",
-			);
-			const filteredViewLimit = feedVirtualizationEnabled ? 100 : 60;
-			const isDefaultView =
-				activeCategories.value.length === 0 &&
-				activeStatus.value === "ALL" &&
-				!searchQuery.value;
+	const nearbyShops = computed(() =>
+		buildNearbyVenueSlice(processedShops.value),
+	);
+	const liveShops = computed(() =>
+		processedShops.value.filter((s) => s.status === "LIVE"),
+	);
 
-			// Sorting
-			switch (sortBy.value) {
-				case "rating":
-					shops.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-					break;
-				case "popular":
-					shops.sort((a, b) => (b.total_views || 0) - (a.total_views || 0));
-					break;
-				case "newest":
-					shops.sort(
-						(a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0),
+	// ═══════════════════════════════════════════
+	// 🔄 Actions
+	// ═══════════════════════════════════════════
+	const venueDetailInFlight = new Map();
+	const venueDetailLoaded = new Set();
+	const isTransientAuthLockTimeout = (err) => {
+		const message = String(err?.message || "").toLowerCase();
+		return (
+			message.includes("navigator lockmanager lock") ||
+			message.includes("lock:sb-")
+		);
+	};
+	const isV2CircuitError = (err) => {
+		if (isSupabaseSchemaCacheError(err)) return true;
+		const code = String(err?.code || "").toLowerCase();
+		const status = Number(err?.status || err?.statusCode || 0);
+		const message = String(err?.message || "").toLowerCase();
+		return (
+			status >= 500 ||
+			code === "57014" ||
+			message.includes("statement timeout") ||
+			message.includes("internal server error") ||
+			message.includes("timeout")
+		);
+	};
+	const enrichVenueRows = async (rows) => {
+		if (!Array.isArray(rows) || rows.length === 0) return rows || [];
+		const ids = rows
+			.map((row) => row?.id)
+			.filter((id) => id !== null && id !== undefined)
+			.slice(0, 200);
+		if (ids.length === 0) return rows;
+
+		try {
+			const { data, error: enrichErr } = await supabase
+				.from("venues_public")
+				.select(OPTIONAL_VENUE_COLUMNS)
+				.in("id", ids);
+			if (enrichErr || !Array.isArray(data) || data.length === 0) {
+				if (import.meta.env.DEV && enrichErr) {
+					console.warn(
+						"🏪 Optional venue enrichment skipped:",
+						enrichErr?.message || enrichErr,
 					);
-					break;
-				default:
-					shops.sort((a, b) => a.distance - b.distance);
-			}
-
-			// Default view: keep the first slice anchored to the user's nearest venues.
-			if (isDefaultView) {
-				return buildNearbyVenueSlice(shops);
-			}
-
-			return shops.slice(0, filteredViewLimit); // Limit for performance
-		});
-
-		const categories = computed(() => {
-			const cats = new Map();
-			rawShops.value.forEach((s) => {
-				if (s.category) cats.set(s.category, (cats.get(s.category) || 0) + 1);
-			});
-			return Array.from(cats.entries())
-				.map(([name, count]) => ({ name, count }))
-				.sort((a, b) => b.count - a.count);
-		});
-
-		const nearbyShops = computed(() =>
-			buildNearbyVenueSlice(processedShops.value),
-		);
-		const liveShops = computed(() =>
-			processedShops.value.filter((s) => s.status === "LIVE"),
-		);
-
-		// ═══════════════════════════════════════════
-		// 🔄 Actions
-		// ═══════════════════════════════════════════
-		const venueDetailInFlight = new Map();
-		const venueDetailLoaded = new Set();
-		const isTransientAuthLockTimeout = (err) => {
-			const message = String(err?.message || "").toLowerCase();
-			return (
-				message.includes("navigator lockmanager lock") ||
-				message.includes("lock:sb-")
-			);
-		};
-		const isV2CircuitError = (err) => {
-			if (isSupabaseSchemaCacheError(err)) return true;
-			const code = String(err?.code || "").toLowerCase();
-			const status = Number(err?.status || err?.statusCode || 0);
-			const message = String(err?.message || "").toLowerCase();
-			return (
-				status >= 500 ||
-				code === "57014" ||
-				message.includes("statement timeout") ||
-				message.includes("internal server error") ||
-				message.includes("timeout")
-			);
-		};
-		const enrichVenueRows = async (rows) => {
-			if (!Array.isArray(rows) || rows.length === 0) return rows || [];
-			const ids = rows
-				.map((row) => row?.id)
-				.filter((id) => id !== null && id !== undefined)
-				.slice(0, 200);
-			if (ids.length === 0) return rows;
-
-			try {
-				const { data, error: enrichErr } = await supabase
-					.from("venues_public")
-					.select(OPTIONAL_VENUE_COLUMNS)
-					.in("id", ids);
-				if (enrichErr || !Array.isArray(data) || data.length === 0) {
-					if (import.meta.env.DEV && enrichErr) {
-						console.warn(
-							"🏪 Optional venue enrichment skipped:",
-							enrichErr?.message || enrichErr,
-						);
-					}
-					return rows;
 				}
-				const mapById = new Map(data.map((row) => [String(row.id), row]));
-				return rows.map((row) => ({
-					...row,
-					...(mapById.get(String(row?.id)) || {}),
-				}));
-			} catch {
 				return rows;
 			}
+			const mapById = new Map(data.map((row) => [String(row.id), row]));
+			return rows.map((row) => ({
+				...row,
+				...(mapById.get(String(row?.id)) || {}),
+			}));
+		} catch {
+			return rows;
+		}
+	};
+
+	const clearLocationScopedFetch = () => {
+		lastLocationScopedFetch.value = null;
+	};
+
+	const recordLocationScopedFetch = (source, coords, isMock) => {
+		const normalizedCoords = normalizeUserCoords(coords);
+		if (!normalizedCoords) {
+			clearLocationScopedFetch();
+			return;
+		}
+		lastLocationScopedFetch.value = {
+			source,
+			coords: normalizedCoords,
+			isMock: Boolean(isMock),
+			at: Date.now(),
 		};
+	};
 
-		const clearLocationScopedFetch = () => {
-			lastLocationScopedFetch.value = null;
-		};
+	const refreshLocationScopedFeed = async () => {
+		if (shouldUseLocalVenueSnapshot()) return false;
+		if (searchQuery.value.trim()) return false;
+		const currentCoords = normalizeUserCoords(locationStore.userLocation);
+		if (!currentCoords || locationStore.isMockLocation) return false;
+		const lastScopedFetch = lastLocationScopedFetch.value;
+		if (!lastScopedFetch || lastScopedFetch.source !== "v2-feed") return false;
 
-		const recordLocationScopedFetch = (source, coords, isMock) => {
-			const normalizedCoords = normalizeUserCoords(coords);
-			if (!normalizedCoords) {
-				clearLocationScopedFetch();
-				return;
-			}
-			lastLocationScopedFetch.value = {
-				source,
-				coords: normalizedCoords,
-				isMock: Boolean(isMock),
-				at: Date.now(),
-			};
-		};
+		const shouldRefresh =
+			lastScopedFetch.isMock ||
+			calculateDistance(
+				lastScopedFetch.coords[0],
+				lastScopedFetch.coords[1],
+				currentCoords[0],
+				currentCoords[1],
+			) >= LOCATION_SCOPED_REFETCH_THRESHOLD_KM;
+		if (!shouldRefresh) return false;
 
-		const refreshLocationScopedFeed = async () => {
-			if (shouldUseLocalVenueSnapshot()) return false;
-			if (searchQuery.value.trim()) return false;
-			const currentCoords = normalizeUserCoords(locationStore.userLocation);
-			if (!currentCoords || locationStore.isMockLocation) return false;
-			const lastScopedFetch = lastLocationScopedFetch.value;
-			if (!lastScopedFetch || lastScopedFetch.source !== "v2-feed")
-				return false;
+		const now = Date.now();
+		if (
+			now - Number(lastLocationScopedRefreshAt.value || 0) <
+			LOCATION_SCOPED_REFETCH_COOLDOWN_MS
+		) {
+			return false;
+		}
 
-			const shouldRefresh =
-				lastScopedFetch.isMock ||
-				calculateDistance(
-					lastScopedFetch.coords[0],
-					lastScopedFetch.coords[1],
-					currentCoords[0],
-					currentCoords[1],
-				) >= LOCATION_SCOPED_REFETCH_THRESHOLD_KM;
-			if (!shouldRefresh) return false;
-
-			const now = Date.now();
-			if (
-				now - Number(lastLocationScopedRefreshAt.value || 0) <
-				LOCATION_SCOPED_REFETCH_COOLDOWN_MS
-			) {
-				return false;
-			}
-
-			if (locationScopedRefreshPromise) {
-				return locationScopedRefreshPromise;
-			}
-
-			lastLocationScopedRefreshAt.value = now;
-			locationScopedRefreshPromise = fetchShops(true)
-				.then(() => true)
-				.catch(() => false)
-				.finally(() => {
-					locationScopedRefreshPromise = null;
-				});
+		if (locationScopedRefreshPromise) {
 			return locationScopedRefreshPromise;
-		};
+		}
 
-		const fetchStandardVenueRows = async () => {
-			const fetchWithSelect = async (select) =>
-				supabase.from("venues").select(select).order("created_at", {
-					ascending: false,
-				});
+		lastLocationScopedRefreshAt.value = now;
+		locationScopedRefreshPromise = fetchShops(true)
+			.then(() => true)
+			.catch(() => false)
+			.finally(() => {
+				locationScopedRefreshPromise = null;
+			});
+		return locationScopedRefreshPromise;
+	};
 
-			let data = null;
-			let err = null;
+	const fetchStandardVenueRows = async () => {
+		const fetchWithSelect = async (select) =>
+			supabase.from("venues").select(select).order("created_at", {
+				ascending: false,
+			});
 
-			({ data, error: err } = await fetchWithSelect(BASE_VENUE_COLUMNS));
-			if (err) {
-				if (import.meta.env.DEV) {
-					console.warn(
-						"🏪 Base venues select failed; falling back to select('*'):",
-						err?.message || err,
-					);
-				}
-				({ data, error: err } = await fetchWithSelect("*"));
+		let data = null;
+		let err = null;
+
+		({ data, error: err } = await fetchWithSelect(BASE_VENUE_COLUMNS));
+		if (err) {
+			if (import.meta.env.DEV) {
+				console.warn(
+					"🏪 Base venues select failed; falling back to select('*'):",
+					err?.message || err,
+				);
 			}
+			({ data, error: err } = await fetchWithSelect("*"));
+		}
 
-			if (err) throw err;
-			data = await enrichVenueRows(data || []);
-			data = await enrichVenueRowsWithRealMedia(data || []);
-			return data || [];
-		};
+		if (err) throw err;
+		data = await enrichVenueRows(data || []);
+		data = await enrichVenueRowsWithRealMedia(data || []);
+		return data || [];
+	};
 
-		const fetchShops = async (force = false) => {
-			if (import.meta.env.VITE_E2E === "true") {
-				const data = buildE2eShops();
-				applyVenueRows(data);
-				lastFetchTime.value = Date.now();
-				isLoading.value = false;
-				error.value = null;
-				return;
-			}
+	const loadDegradedVenueSnapshot = async () => {
+		const rows = await loadVenueSnapshotRows();
+		if (!Array.isArray(rows) || rows.length === 0) return false;
+		applyVenueRows(rows);
+		clearLocationScopedFetch();
+		lastFetchTime.value = Date.now();
+		return true;
+	};
 
-			if (shouldUseLocalVenueSnapshot()) {
-				isLoading.value = true;
-				error.value = null;
-				try {
-					const rows = await loadLocalVenueSnapshotRows();
-					applyVenueRows(rows);
-					lastFetchTime.value = Date.now();
-				} catch (e) {
-					error.value = { message: e?.message || String(e), code: e?.code };
-				} finally {
-					isLoading.value = false;
-				}
-				return;
-			}
+	const fetchShops = async (force = false) => {
+		if (import.meta.env.VITE_E2E === "true") {
+			const data = buildE2eShops();
+			applyVenueRows(data);
+			lastFetchTime.value = Date.now();
+			isLoading.value = false;
+			error.value = null;
+			return;
+		}
 
-			const now = Date.now();
-			if (!force && now < schemaCacheRetryAfter.value) {
-				if (import.meta.env.DEV) {
-					console.warn("🏪 Skipping venue fetch during schema-cache cooldown");
-				}
-				return;
-			}
-
-			// Cache check: refetch only if >5 min old
-			if (!force && lastFetchTime.value && now - lastFetchTime.value < 300000) {
-				if (shouldLogVenueStoreInfo()) console.log("🏪 Using cached shops");
-				return;
-			}
-
+		if (shouldUseLocalVenueSnapshot()) {
 			isLoading.value = true;
 			error.value = null;
-
 			try {
-				await featureFlagStore.refreshFlags();
-				if (
-					featureFlagStore.isEnabled("use_v2_feed") &&
-					now >= v2FeedCircuitUntil.value &&
-					!isFrontendOnlyDevMode()
-				) {
-					try {
-						await fetchShopsV2(force);
-						return;
-					} catch (v2Err) {
-						if (isV2CircuitError(v2Err)) {
-							v2FeedCircuitUntil.value = Date.now() + V2_FEED_COOLDOWN_MS;
-							if (import.meta.env.DEV) {
-								console.warn(
-									"🏪 V2 feed circuit opened. Cooling down before retry.",
-								);
-							}
-						}
-						// V2 feed RPC may not exist yet – fall through to standard query
-						if (import.meta.env.DEV && !isTransientAuthLockTimeout(v2Err)) {
-							console.warn(
-								"🏪 V2 feed failed, falling back to standard query:",
-								v2Err?.message || v2Err,
-							);
-						}
-					}
-				}
-
-				const data = await fetchStandardVenueRows();
-
-				applyVenueRows(data || []);
-				clearLocationScopedFetch();
+				const rows = await loadLocalVenueSnapshotRows();
+				applyVenueRows(rows);
 				lastFetchTime.value = Date.now();
-
-				if (shouldLogVenueStoreInfo())
-					console.log(`🏪 Fetched ${data?.length || 0} venues`);
 			} catch (e) {
-				if (isSupabaseSchemaCacheError(e)) {
-					schemaCacheRetryAfter.value =
-						Date.now() + SCHEMA_CACHE_FETCH_COOLDOWN_MS;
-					if (import.meta.env.DEV) {
-						console.warn(
-							"🏪 Supabase schema cache unavailable; keeping current venues.",
-						);
-					}
-					if (rawShops.value.length > 0) {
-						error.value = null;
-						return;
-					}
-				}
-				if (import.meta.env.DEV) console.error("❌ Failed to fetch shops:", e);
-				error.value = { message: e.message, code: e.code };
+				error.value = { message: e?.message || String(e), code: e?.code };
 			} finally {
 				isLoading.value = false;
 			}
-		};
+			return;
+		}
 
-		const fetchShopsV2 = async (force = false) => {
+		const now = Date.now();
+		if (!force && now < schemaCacheRetryAfter.value) {
+			if (import.meta.env.DEV) {
+				console.warn("🏪 Skipping venue fetch during schema-cache cooldown");
+			}
+			return;
+		}
+
+		// Cache check: refetch only if >5 min old
+		if (!force && lastFetchTime.value && now - lastFetchTime.value < 300000) {
+			if (shouldLogVenueStoreInfo()) console.log("🏪 Using cached shops");
+			return;
+		}
+
+		isLoading.value = true;
+		error.value = null;
+
+		try {
+			await featureFlagStore.refreshFlags();
 			if (
-				!force &&
-				lastFetchTime.value &&
-				Date.now() - lastFetchTime.value < 300000
+				featureFlagStore.isEnabled("use_v2_feed") &&
+				now >= v2FeedCircuitUntil.value &&
+				!isFrontendOnlyDevMode()
 			) {
-				return;
+				try {
+					await fetchShopsV2(force);
+					return;
+				} catch (v2Err) {
+					if (isV2CircuitError(v2Err)) {
+						v2FeedCircuitUntil.value = Date.now() + V2_FEED_COOLDOWN_MS;
+						if (rawShops.value.length === 0) {
+							const restoredFromSnapshot =
+								await loadDegradedVenueSnapshot().catch(() => false);
+							if (restoredFromSnapshot) {
+								error.value = null;
+								return;
+							}
+						}
+						if (import.meta.env.DEV) {
+							console.warn(
+								"🏪 V2 feed circuit opened. Cooling down before retry.",
+							);
+						}
+					}
+					// V2 feed RPC may not exist yet – fall through to standard query
+					if (import.meta.env.DEV && !isTransientAuthLockTimeout(v2Err)) {
+						console.warn(
+							"🏪 V2 feed failed, falling back to standard query:",
+							v2Err?.message || v2Err,
+						);
+					}
+				}
 			}
 
-			const userLoc = locationStore.userLocation || DEFAULT_USER_LOCATION;
-			const { data, error: err } = await supabase.rpc("get_feed_cards", {
+			const data = await fetchStandardVenueRows();
+
+			applyVenueRows(data || []);
+			clearLocationScopedFetch();
+			lastFetchTime.value = Date.now();
+
+			if (shouldLogVenueStoreInfo())
+				console.log(`🏪 Fetched ${data?.length || 0} venues`);
+		} catch (e) {
+			if (isSupabaseSchemaCacheError(e)) {
+				schemaCacheRetryAfter.value =
+					Date.now() + SCHEMA_CACHE_FETCH_COOLDOWN_MS;
+				if (import.meta.env.DEV) {
+					console.warn(
+						"🏪 Supabase schema cache unavailable; keeping current venues.",
+					);
+				}
+				if (rawShops.value.length > 0) {
+					error.value = null;
+					return;
+				}
+			}
+			if (import.meta.env.DEV) console.error("❌ Failed to fetch shops:", e);
+			if (rawShops.value.length === 0) {
+				const restoredFromSnapshot = await loadDegradedVenueSnapshot().catch(
+					() => false,
+				);
+				if (restoredFromSnapshot) {
+					error.value = null;
+					return;
+				}
+			}
+			error.value = { message: e.message, code: e.code };
+		} finally {
+			isLoading.value = false;
+		}
+	};
+
+	const fetchShopsV2 = async (force = false) => {
+		if (
+			!force &&
+			lastFetchTime.value &&
+			Date.now() - lastFetchTime.value < 300000
+		) {
+			return;
+		}
+
+		const userLoc = locationStore.userLocation || DEFAULT_USER_LOCATION;
+		const { data, error: err } = await supabase.rpc("get_feed_cards", {
+			p_lat: userLoc[0],
+			p_lng: userLoc[1],
+		});
+		if (err) throw err;
+
+		const mapped = (data || []).map((s) => ({
+			id: s.id,
+			name: s.name,
+			slug: s.slug,
+			category: s.category,
+			status: s.status,
+			rating: Number(s.rating || 0),
+			total_views: Number(s.view_count || s.total_views || 0),
+			image_urls: s.image_url ? [s.image_url] : s.image_urls || [],
+			Image_URL1: s.image_url || s.image_url1 || "",
+			video_url: s.video_url || s.Video_URL || "",
+			Video_URL: s.video_url || s.Video_URL || "",
+			lat: s.latitude ?? s.lat,
+			lng: s.longitude ?? s.lng,
+			distance_meters:
+				s.distance_meters != null
+					? s.distance_meters
+					: s.distance_km != null
+						? s.distance_km * 1000
+						: null,
+			pin_type: s.pin_type || "normal",
+			pin_metadata: s.pin_metadata || {},
+			verifiedActive: Boolean(s.verified_active),
+			glowActive: Boolean(s.glow_active),
+			boostActive: Boolean(s.boost_active),
+			giantActive: Boolean(s.giant_active),
+			is_giant_active: Boolean(s.giant_active),
+			isGiantPin: Boolean(s.giant_active),
+			visibilityScore: Number(s.visibility_score || 0),
+			isPromoted: Boolean(s.is_promoted),
+		}));
+
+		const enriched = await enrichVenueRowsWithRealMedia(mapped);
+		applyVenueRows(enriched);
+		const needsBroaderNearbyCoverage =
+			!locationStore.isMockLocation &&
+			countVenuesWithinRadius(rawShops.value, userLoc) === 0;
+		if (needsBroaderNearbyCoverage) {
+			const broaderRows = await fetchStandardVenueRows();
+			applyVenueRows(broaderRows);
+			clearLocationScopedFetch();
+			lastFetchTime.value = Date.now();
+			return;
+		}
+		recordLocationScopedFetch("v2-feed", userLoc, locationStore.isMockLocation);
+		lastFetchTime.value = Date.now();
+	};
+
+	const searchV2 = async (query, { limit = 30, offset = 0 } = {}) => {
+		const q = String(query || "").trim();
+		if (!q) {
+			clearFilters();
+			return fetchShops(true);
+		}
+
+		if (shouldUseLocalVenueSnapshot()) {
+			if (rawShops.value.length === 0) {
+				await fetchShops(true);
+			}
+			searchQuery.value = q;
+			return;
+		}
+
+		await featureFlagStore.refreshFlags();
+		if (!featureFlagStore.isEnabled("use_v2_search")) {
+			searchQuery.value = q;
+			return;
+		}
+
+		isLoading.value = true;
+		error.value = null;
+		const userLoc = locationStore.userLocation || DEFAULT_USER_LOCATION;
+
+		try {
+			const { data, error: err } = await supabase.rpc("search_venues_v2", {
+				p_query: q,
 				p_lat: userLoc[0],
 				p_lng: userLoc[1],
+				p_limit: limit,
+				p_offset: offset,
 			});
 			if (err) throw err;
 
@@ -994,143 +1121,118 @@ export const useShopStore = defineStore(
 				category: s.category,
 				status: s.status,
 				rating: Number(s.rating || 0),
-				total_views: Number(s.view_count || s.total_views || 0),
-				image_urls: s.image_url ? [s.image_url] : s.image_urls || [],
-				Image_URL1: s.image_url || s.image_url1 || "",
-				video_url: s.video_url || s.Video_URL || "",
-				Video_URL: s.video_url || s.Video_URL || "",
-				lat: s.latitude ?? s.lat,
-				lng: s.longitude ?? s.lng,
-				distance_meters:
-					s.distance_meters != null
-						? s.distance_meters
-						: s.distance_km != null
-							? s.distance_km * 1000
-							: null,
+				total_views: Number(s.view_count || 0),
+				image_urls: s.image_url ? [s.image_url] : [],
+				Image_URL1: s.image_url || "",
+				floor: s.floor || null,
+				Zone: s.zone || null,
+				highlight_snippet: s.highlight_snippet || "",
+				distance_meters: s.distance_meters,
+				lat: s.lat,
+				lng: s.lng,
 				pin_type: s.pin_type || "normal",
-				pin_metadata: s.pin_metadata || {},
-				verifiedActive: Boolean(s.verified_active),
-				glowActive: Boolean(s.glow_active),
-				boostActive: Boolean(s.boost_active),
 				giantActive: Boolean(s.giant_active),
 				is_giant_active: Boolean(s.giant_active),
 				isGiantPin: Boolean(s.giant_active),
-				visibilityScore: Number(s.visibility_score || 0),
-				isPromoted: Boolean(s.is_promoted),
 			}));
 
 			const enriched = await enrichVenueRowsWithRealMedia(mapped);
 			applyVenueRows(enriched);
-			const needsBroaderNearbyCoverage =
-				!locationStore.isMockLocation &&
-				countVenuesWithinRadius(rawShops.value, userLoc) === 0;
-			if (needsBroaderNearbyCoverage) {
-				const broaderRows = await fetchStandardVenueRows();
-				applyVenueRows(broaderRows);
-				clearLocationScopedFetch();
-				lastFetchTime.value = Date.now();
-				return;
+		} catch (e) {
+			error.value = { message: e.message, code: e.code };
+		} finally {
+			isLoading.value = false;
+		}
+	};
+
+	/**
+	 * Fetch full details for a single venue without reloading the whole list.
+	 * Used for lazy hydration when opening detail views.
+	 */
+	const fetchVenueDetail = async (id, { syncCollection = false } = {}) => {
+		const key = normalizeId(id);
+		if (!key) return null;
+
+		const existing = shopMap.value.get(key) || null;
+		if (shouldUseLocalVenueSnapshot()) {
+			const snapshotRow = await getLocalVenueSnapshotRowById(key);
+			if (!snapshotRow) {
+				return hasCompleteRealMedia(existing) ? existing : null;
 			}
-			recordLocationScopedFetch(
-				"v2-feed",
-				userLoc,
-				locationStore.isMockLocation,
+
+			const merged = normalizeVenueViewModel(
+				{ ...(existing || {}), ...snapshotRow },
+				{
+					userLocation: getUserLocationForNormalize(),
+					collectedCoinIds: collectedCoins.value,
+				},
 			);
-			lastFetchTime.value = Date.now();
-		};
+			if (!hasCompleteRealMedia(merged)) {
+				return null;
+			}
+			venueDetailLoaded.add(key);
+			shopMap.value = new Map(shopMap.value);
+			shopMap.value.set(key, merged);
 
-		const searchV2 = async (query, { limit = 30, offset = 0 } = {}) => {
-			const q = String(query || "").trim();
-			if (!q) {
-				clearFilters();
-				return fetchShops(true);
+			const slugKey = normalizeSlug(merged.slug);
+			if (slugKey) {
+				slugMap.value = new Map(slugMap.value);
+				slugMap.value.set(slugKey, merged);
 			}
 
-			if (shouldUseLocalVenueSnapshot()) {
-				if (rawShops.value.length === 0) {
-					await fetchShops(true);
+			if (syncCollection) {
+				const next = Array.isArray(rawShops.value) ? [...rawShops.value] : [];
+				const idx = next.findIndex((shop) => normalizeId(shop?.id) === key);
+				if (idx >= 0) {
+					next[idx] = merged;
+					rawShops.value = next;
 				}
-				searchQuery.value = q;
-				return;
 			}
 
-			await featureFlagStore.refreshFlags();
-			if (!featureFlagStore.isEnabled("use_v2_search")) {
-				searchQuery.value = q;
-				return;
-			}
+			return merged;
+		}
+		if (existing && Date.now() < schemaCacheRetryAfter.value) {
+			return existing;
+		}
+		if (existing && venueDetailLoaded.has(key)) return existing;
 
-			isLoading.value = true;
-			error.value = null;
-			const userLoc = locationStore.userLocation || DEFAULT_USER_LOCATION;
+		if (venueDetailInFlight.has(key)) {
+			return venueDetailInFlight.get(key);
+		}
 
+		const promise = (async () => {
 			try {
-				const { data, error: err } = await supabase.rpc("search_venues_v2", {
-					p_query: q,
-					p_lat: userLoc[0],
-					p_lng: userLoc[1],
-					p_limit: limit,
-					p_offset: offset,
-				});
+				const { data, error: err } = await supabase
+					.from("venues")
+					.select("*")
+					.eq("id", key)
+					.maybeSingle();
+
 				if (err) throw err;
+				if (!data) return null;
 
-				const mapped = (data || []).map((s) => ({
-					id: s.id,
-					name: s.name,
-					slug: s.slug,
-					category: s.category,
-					status: s.status,
-					rating: Number(s.rating || 0),
-					total_views: Number(s.view_count || 0),
-					image_urls: s.image_url ? [s.image_url] : [],
-					Image_URL1: s.image_url || "",
-					floor: s.floor || null,
-					Zone: s.zone || null,
-					highlight_snippet: s.highlight_snippet || "",
-					distance_meters: s.distance_meters,
-					lat: s.lat,
-					lng: s.lng,
-					pin_type: s.pin_type || "normal",
-					giantActive: Boolean(s.giant_active),
-					is_giant_active: Boolean(s.giant_active),
-					isGiantPin: Boolean(s.giant_active),
-				}));
-
-				const enriched = await enrichVenueRowsWithRealMedia(mapped);
-				applyVenueRows(enriched);
-			} catch (e) {
-				error.value = { message: e.message, code: e.code };
-			} finally {
-				isLoading.value = false;
-			}
-		};
-
-		/**
-		 * Fetch full details for a single venue without reloading the whole list.
-		 * Used for lazy hydration when opening detail views.
-		 */
-		const fetchVenueDetail = async (id, { syncCollection = false } = {}) => {
-			const key = normalizeId(id);
-			if (!key) return null;
-
-			const existing = shopMap.value.get(key) || null;
-			if (shouldUseLocalVenueSnapshot()) {
-				const snapshotRow = await getLocalVenueSnapshotRowById(key);
-				if (!snapshotRow) {
-					return hasCompleteRealMedia(existing) ? existing : null;
+				let mergedRow = applyDirectCompleteMediaFallback({
+					...(existing || {}),
+					...data,
+				});
+				if (!hasCompleteRealMedia(mergedRow)) {
+					const realMedia = await getRealVenueMedia(key);
+					if (realMedia && hasCompleteRealMedia(realMedia)) {
+						mergedRow = mergeVenueRowWithRealMedia(mergedRow, realMedia);
+					}
 				}
-
-				const merged = normalizeVenueViewModel(
-					{ ...(existing || {}), ...snapshotRow },
-					{
-						userLocation: getUserLocationForNormalize(),
-						collectedCoinIds: collectedCoins.value,
-					},
-				);
-				if (!hasCompleteRealMedia(merged)) {
+				mergedRow = applyDirectCompleteMediaFallback(mergedRow);
+				if (!hasCompleteRealMedia(mergedRow)) {
 					return null;
 				}
+
+				const merged = normalizeVenueViewModel(mergedRow, {
+					userLocation: getUserLocationForNormalize(),
+					collectedCoinIds: collectedCoins.value,
+				});
 				venueDetailLoaded.add(key);
+
+				// Update maps
 				shopMap.value = new Map(shopMap.value);
 				shopMap.value.set(key, merged);
 
@@ -1140,548 +1242,493 @@ export const useShopStore = defineStore(
 					slugMap.value.set(slugKey, merged);
 				}
 
-				if (syncCollection) {
-					const next = Array.isArray(rawShops.value) ? [...rawShops.value] : [];
-					const idx = next.findIndex((shop) => normalizeId(shop?.id) === key);
-					if (idx >= 0) {
-						next[idx] = merged;
-						rawShops.value = next;
-					}
+				// Update list (preserve ordering)
+				const next = Array.isArray(rawShops.value) ? [...rawShops.value] : [];
+				const idx = next.findIndex((s) => normalizeId(s?.id) === key);
+				if (idx < 0) {
+					next.unshift(merged);
+					rawShops.value = next;
+				} else if (syncCollection) {
+					next[idx] = merged;
+					rawShops.value = next;
 				}
 
 				return merged;
-			}
-			if (existing && Date.now() < schemaCacheRetryAfter.value) {
-				return existing;
-			}
-			if (existing && venueDetailLoaded.has(key)) return existing;
-
-			if (venueDetailInFlight.has(key)) {
-				return venueDetailInFlight.get(key);
-			}
-
-			const promise = (async () => {
-				try {
-					const { data, error: err } = await supabase
-						.from("venues")
-						.select("*")
-						.eq("id", key)
-						.maybeSingle();
-
-					if (err) throw err;
-					if (!data) return null;
-
-					let mergedRow = applyDirectCompleteMediaFallback({
-						...(existing || {}),
-						...data,
-					});
-					if (!hasCompleteRealMedia(mergedRow)) {
-						const realMedia = await getRealVenueMedia(key);
-						if (realMedia && hasCompleteRealMedia(realMedia)) {
-							mergedRow = mergeVenueRowWithRealMedia(mergedRow, realMedia);
-						}
-					}
-					mergedRow = applyDirectCompleteMediaFallback(mergedRow);
-					if (!hasCompleteRealMedia(mergedRow)) {
-						return null;
-					}
-
-					const merged = normalizeVenueViewModel(mergedRow, {
-						userLocation: getUserLocationForNormalize(),
-						collectedCoinIds: collectedCoins.value,
-					});
-					venueDetailLoaded.add(key);
-
-					// Update maps
-					shopMap.value = new Map(shopMap.value);
-					shopMap.value.set(key, merged);
-
-					const slugKey = normalizeSlug(merged.slug);
-					if (slugKey) {
-						slugMap.value = new Map(slugMap.value);
-						slugMap.value.set(slugKey, merged);
-					}
-
-					// Update list (preserve ordering)
-					const next = Array.isArray(rawShops.value) ? [...rawShops.value] : [];
-					const idx = next.findIndex((s) => normalizeId(s?.id) === key);
-					if (idx < 0) {
-						next.unshift(merged);
-						rawShops.value = next;
-					} else if (syncCollection) {
-						next[idx] = merged;
-						rawShops.value = next;
-					}
-
-					return merged;
-				} catch (e) {
-					if (isSupabaseSchemaCacheError(e)) {
-						schemaCacheRetryAfter.value =
-							Date.now() + SCHEMA_CACHE_FETCH_COOLDOWN_MS;
-						return existing;
-					}
-					if (import.meta.env.DEV) {
-						console.warn("🏪 fetchVenueDetail failed:", e?.message || e);
-					}
-					return null;
-				}
-			})();
-
-			venueDetailInFlight.set(key, promise);
-			try {
-				return await promise;
-			} finally {
-				venueDetailInFlight.delete(key);
-			}
-		};
-
-		const getShopById = (id) => {
-			const key = normalizeId(id);
-			if (!key) return null;
-			const fromMap = shopMap.value.get(key);
-			if (fromMap) return fromMap;
-
-			const numeric = Number(id);
-			if (Number.isFinite(numeric)) {
-				const numericKey = normalizeId(numeric);
-				const numericHit = shopMap.value.get(numericKey);
-				if (numericHit) return numericHit;
-			}
-
-			return (
-				processedShops.value.find((s) => normalizeId(s.id) === key) || null
-			);
-		};
-
-		const getShopBySlug = (slug) => {
-			const key = normalizeSlug(slug);
-			if (!key) return null;
-			const fromMap = slugMap.value.get(key);
-			if (fromMap) return fromMap;
-			return (
-				processedShops.value.find((s) => normalizeSlug(s.slug) === key) || null
-			);
-		};
-
-		const setActiveShop = (id) => {
-			activeShopId.value = normalizeId(id) || null;
-		};
-		const setCategories = (cats) => {
-			activeCategories.value = cats;
-		};
-		const setStatus = (status) => {
-			activeStatus.value = status;
-		};
-		const setSearch = (query) => {
-			searchQuery.value = query;
-		};
-		const setSortBy = (sort) => {
-			sortBy.value = sort;
-		};
-		const clearFilters = () => {
-			activeCategories.value = [];
-			activeStatus.value = "ALL";
-			searchQuery.value = "";
-		};
-
-		// ═══════════════════════════════════════════
-		// 📝 Reviews
-		// ═══════════════════════════════════════════
-		const getShopReviews = (shopId) => reviews.value[String(shopId)] || [];
-		const parseReviewListResponse = async (response) => {
-			const payload = await response.json().catch(() => []);
-			return Array.isArray(payload) ? payload : [];
-		};
-		const parseReviewCreateResponse = async (response) => {
-			const payload = await response.json().catch(() => null);
-			return payload && typeof payload === "object" ? payload : null;
-		};
-		const shouldFallbackReviewsApi = (status) =>
-			[404, 405, 422].includes(Number(status));
-		const shouldShortCircuitReviewsApiInLocalDev = () =>
-			import.meta.env.DEV &&
-			typeof window !== "undefined" &&
-			isLocalBrowserHostname(window.location.hostname) &&
-			import.meta.env.VITE_API_PROXY_DEV !== "true";
-		const shouldSkipReviewsApi = () =>
-			isFrontendOnlyDevMode() || shouldShortCircuitReviewsApiInLocalDev();
-		const isReviewAccessError = (err) => {
-			const status = Number(err?.status || err?.statusCode || 0);
-			const code = String(err?.code || "").toUpperCase();
-			const message = String(err?.message || "").toLowerCase();
-			return (
-				status === 401 ||
-				status === 403 ||
-				code === "PGRST301" ||
-				code === "42501" ||
-				message.includes("unauthorized") ||
-				message.includes("permission denied")
-			);
-		};
-		const isReviewNetworkError = (err) => {
-			const message = String(err?.message || "").toLowerCase();
-			return (
-				message.includes("failed to fetch") ||
-				message.includes("networkerror") ||
-				message.includes("load failed") ||
-				message.includes("cors") ||
-				message.includes("preflight")
-			);
-		};
-
-		const fetchShopReviews = async (shopId) => {
-			if (reviewsUnavailable.value) {
-				reviews.value[String(shopId)] = [];
-				return;
-			}
-			const key = String(shopId);
-			const shouldUseReviewsApi =
-				!reviewsApiDisabled.value && !shouldSkipReviewsApi();
-
-			if (shouldUseReviewsApi) {
-				try {
-					const payload = await request({
-						url: `/shops/${encodeURIComponent(shopId)}/reviews?limit=50`,
-						method: "GET",
-						schema: z.array(ReviewSchema),
-					});
-
-					reviews.value[key] = payload || [];
-					return;
-				} catch (apiError) {
-					if (import.meta.env.DEV) {
-						console.warn("🏪 Reviews API fetch failed:", apiError);
-					}
-					// If it's an API error that should trigger fallback
-					if (apiError.response && shouldFallbackReviewsApi(apiError.response.status)) {
-						reviewsApiDisabled.value = true;
-					} else if (apiError.response && (apiError.response.status === 401 || apiError.response.status === 403)) {
-						reviewsUnavailable.value = true;
-						reviews.value[key] = [];
-						return;
-					}
-				}
-			}
-
-			try {
-				const { data, error: err } = await supabase
-					.from("reviews")
-					.select("*")
-					.eq("venue_id", shopId)
-					.order("created_at", { ascending: false })
-					.limit(50);
-
-				if (err) throw err;
-				reviews.value[key] = data || [];
 			} catch (e) {
+				if (isSupabaseSchemaCacheError(e)) {
+					schemaCacheRetryAfter.value =
+						Date.now() + SCHEMA_CACHE_FETCH_COOLDOWN_MS;
+					return existing;
+				}
+				if (import.meta.env.DEV) {
+					console.warn("🏪 fetchVenueDetail failed:", e?.message || e);
+				}
+				return null;
+			}
+		})();
+
+		venueDetailInFlight.set(key, promise);
+		try {
+			return await promise;
+		} finally {
+			venueDetailInFlight.delete(key);
+		}
+	};
+
+	const getShopById = (id) => {
+		const key = normalizeId(id);
+		if (!key) return null;
+		const fromMap = shopMap.value.get(key);
+		if (fromMap) return fromMap;
+
+		const numeric = Number(id);
+		if (Number.isFinite(numeric)) {
+			const numericKey = normalizeId(numeric);
+			const numericHit = shopMap.value.get(numericKey);
+			if (numericHit) return numericHit;
+		}
+
+		return processedShops.value.find((s) => normalizeId(s.id) === key) || null;
+	};
+
+	const getShopBySlug = (slug) => {
+		const key = normalizeSlug(slug);
+		if (!key) return null;
+		const fromMap = slugMap.value.get(key);
+		if (fromMap) return fromMap;
+		return (
+			processedShops.value.find((s) => normalizeSlug(s.slug) === key) || null
+		);
+	};
+
+	const setActiveShop = (id) => {
+		activeShopId.value = normalizeId(id) || null;
+	};
+	const setCategories = (cats) => {
+		activeCategories.value = cats;
+	};
+	const setStatus = (status) => {
+		activeStatus.value = status;
+	};
+	const setSearch = (query) => {
+		searchQuery.value = query;
+	};
+	const setSortBy = (sort) => {
+		sortBy.value = sort;
+	};
+	const clearFilters = () => {
+		activeCategories.value = [];
+		activeStatus.value = "ALL";
+		searchQuery.value = "";
+	};
+
+	// ═══════════════════════════════════════════
+	// 📝 Reviews
+	// ═══════════════════════════════════════════
+	const getShopReviews = (shopId) => reviews.value[String(shopId)] || [];
+	const parseReviewListResponse = async (response) => {
+		const payload = await response.json().catch(() => []);
+		return Array.isArray(payload) ? payload : [];
+	};
+	const parseReviewCreateResponse = async (response) => {
+		const payload = await response.json().catch(() => null);
+		return payload && typeof payload === "object" ? payload : null;
+	};
+	const shouldFallbackReviewsApi = (status) =>
+		[404, 405, 422].includes(Number(status));
+	const shouldShortCircuitReviewsApiInLocalDev = () =>
+		import.meta.env.DEV &&
+		typeof window !== "undefined" &&
+		isLocalBrowserHostname(window.location.hostname) &&
+		import.meta.env.VITE_API_PROXY_DEV !== "true";
+	const shouldSkipReviewsApi = () =>
+		isFrontendOnlyDevMode() ||
+		shouldShortCircuitReviewsApiInLocalDev() ||
+		shouldAvoidCrossOriginApiOnPublicHost();
+	const isReviewAccessError = (err) => {
+		const status = Number(err?.status || err?.statusCode || 0);
+		const code = String(err?.code || "").toUpperCase();
+		const message = String(err?.message || "").toLowerCase();
+		return (
+			status === 401 ||
+			status === 403 ||
+			code === "PGRST301" ||
+			code === "42501" ||
+			message.includes("unauthorized") ||
+			message.includes("permission denied")
+		);
+	};
+	const isReviewNetworkError = (err) => {
+		const message = String(err?.message || "").toLowerCase();
+		return (
+			message.includes("failed to fetch") ||
+			message.includes("networkerror") ||
+			message.includes("load failed") ||
+			message.includes("cors") ||
+			message.includes("preflight")
+		);
+	};
+
+	const fetchShopReviews = async (shopId) => {
+		if (reviewsUnavailable.value) {
+			reviews.value[String(shopId)] = [];
+			return;
+		}
+		const key = String(shopId);
+		const shouldUseReviewsApi =
+			!reviewsApiDisabled.value && !shouldSkipReviewsApi();
+
+		if (shouldUseReviewsApi) {
+			try {
+				const payload = await request({
+					url: `/shops/${encodeURIComponent(shopId)}/reviews?limit=50`,
+					method: "GET",
+					schema: z.array(ReviewSchema),
+				});
+
+				reviews.value[key] = payload || [];
+				return;
+			} catch (apiError) {
+				if (import.meta.env.DEV) {
+					console.warn("🏪 Reviews API fetch failed:", apiError);
+				}
+				// If it's an API error that should trigger fallback
 				if (
-					isReviewAccessError(e) ||
-					(shouldSkipReviewsApi() && isReviewNetworkError(e))
+					apiError.response &&
+					shouldFallbackReviewsApi(apiError.response.status)
+				) {
+					reviewsApiDisabled.value = true;
+				} else if (
+					apiError.response &&
+					(apiError.response.status === 401 || apiError.response.status === 403)
 				) {
 					reviewsUnavailable.value = true;
 					reviews.value[key] = [];
 					return;
 				}
-				if (import.meta.env.DEV) {
-					console.error("❌ Failed to fetch reviews:", e);
-				}
 			}
-		};
+		}
 
-		const addReview = async (shopId, review) => {
-			if (reviewsUnavailable.value) {
-				return {
-					success: false,
-					error: "reviews_unavailable",
-				};
+		try {
+			const { data, error: err } = await supabase
+				.from("reviews")
+				.select("*")
+				.eq("venue_id", shopId)
+				.order("created_at", { ascending: false })
+				.limit(50);
+
+			if (err) throw err;
+			reviews.value[key] = data || [];
+		} catch (e) {
+			if (
+				isReviewAccessError(e) ||
+				(shouldSkipReviewsApi() && isReviewNetworkError(e))
+			) {
+				reviewsUnavailable.value = true;
+				reviews.value[key] = [];
+				return;
 			}
-			const shouldUseReviewsApi =
-				!reviewsApiDisabled.value && !shouldSkipReviewsApi();
-
-			if (shouldUseReviewsApi) {
-				try {
-					const data = await request({
-						url: `/shops/${encodeURIComponent(shopId)}/reviews`,
-						method: "POST",
-						data: {
-							rating: review?.rating ?? null,
-							comment: String(review?.comment || ""),
-							userName: String(review?.userName || "Vibe Explorer"),
-						},
-						schema: ReviewSchema,
-					});
-
-					if (!reviews.value[String(shopId)])
-						reviews.value[String(shopId)] = [];
-					if (data) reviews.value[String(shopId)].unshift(data);
-					return { success: true, data };
-				} catch (apiError) {
-					if (import.meta.env.DEV) {
-						console.warn("🏪 Reviews API insert failed:", apiError);
-					}
-					if (apiError.response) {
-						if (shouldFallbackReviewsApi(apiError.response.status)) {
-							reviewsApiDisabled.value = true;
-						} else if (apiError.response.status === 401 || apiError.response.status === 403) {
-							reviewsUnavailable.value = true;
-							return { success: false, error: "reviews_unavailable" };
-						}
-					}
-				}
+			if (import.meta.env.DEV) {
+				console.error("❌ Failed to fetch reviews:", e);
 			}
+		}
+	};
 
+	const addReview = async (shopId, review) => {
+		if (reviewsUnavailable.value) {
+			return {
+				success: false,
+				error: "reviews_unavailable",
+			};
+		}
+		const shouldUseReviewsApi =
+			!reviewsApiDisabled.value && !shouldSkipReviewsApi();
+
+		if (shouldUseReviewsApi) {
 			try {
-				const { data, error: err } = await supabase
-					.from("reviews")
-					.insert({
-						venue_id: shopId,
+				const data = await request({
+					url: `/shops/${encodeURIComponent(shopId)}/reviews`,
+					method: "POST",
+					data: {
 						rating: review?.rating ?? null,
 						comment: String(review?.comment || ""),
-						user_name: String(review?.userName || "Vibe Explorer"),
-					})
-					.select()
-					.single();
-
-				if (err) throw err;
-				if (!reviews.value[String(shopId)]) reviews.value[String(shopId)] = [];
-				reviews.value[String(shopId)].unshift(data);
-				return { success: true, data };
-			} catch (e) {
-				if (
-					isReviewAccessError(e) ||
-					(shouldSkipReviewsApi() && isReviewNetworkError(e))
-				) {
-					reviewsUnavailable.value = true;
-					return { success: false, error: "reviews_unavailable" };
-				}
-				return { success: false, error: e.message };
-			}
-		};
-
-		// ═══════════════════════════════════════════
-		// 📈 Analytics
-		// ═══════════════════════════════════════════
-		const trackView = async (shopId) => {
-			if (!shopId) return;
-			const shop = shopMap.value.get(shopId);
-			if (shop) shop.total_views = (shop.total_views || 0) + 1;
-			if (isFrontendOnlyDevMode()) return;
-			if (unavailableRpcNames.has("increment_venue_views")) return;
-
-			// Fire and forget with proper error handling
-			try {
-				const { error: rpcError } = await supabase.rpc(
-					"increment_venue_views",
-					{
-						venue_id: shopId,
+						userName: String(review?.userName || "Vibe Explorer"),
 					},
-				);
-				if (rpcError) {
-					if (isRpcMissingError(rpcError)) {
-						unavailableRpcNames.add("increment_venue_views");
-						return;
-					}
-					throw rpcError;
-				}
-			} catch (e) {
-				// Silently ignore - analytics failure shouldn't break the app
-				if (import.meta.env.DEV)
-					console.debug("Analytics trackView failed:", e);
-			}
-		};
-
-		const trackClick = async (shopId) => {
-			const shop = shopMap.value.get(shopId);
-			if (shop) shop.pin_clicks = (shop.pin_clicks || 0) + 1;
-		};
-
-		// ═══════════════════════════════════════════
-		// 🔄 Rotation Timer
-		// ═══════════════════════════════════════════
-		const startRotationTimer = () => {
-			if (rotationInterval) return;
-			rotationInterval = setInterval(() => {
-				const newSeed = Math.floor(Date.now() / 1800000);
-				if (newSeed !== rotationSeed.value) {
-					rotationSeed.value = newSeed;
-					if (import.meta.env.DEV) console.log("🔄 Rotation updated");
-				}
-			}, 60000);
-		};
-
-		const stopRotationTimer = () => {
-			if (rotationInterval) {
-				clearInterval(rotationInterval);
-				rotationInterval = null;
-			}
-		};
-
-		// Auto-start rotation
-		startRotationTimer();
-
-		// ═══════════════════════════════════════════
-		// 🔌 Real-time Subscriptions
-		// ═══════════════════════════════════════════
-		let subscription = null;
-
-		const subscribeToChanges = () => {
-			subscription = supabase
-				.channel("venues-changes")
-				.on(
-					"postgres_changes",
-					{ event: "*", schema: "public", table: "venues" },
-					(payload) => {
-						const next = Array.isArray(rawShops.value)
-							? [...rawShops.value]
-							: [];
-						if (payload.eventType === "INSERT") {
-							next.unshift(payload.new);
-						} else if (payload.eventType === "UPDATE") {
-							const idx = next.findIndex((s) => s.id === payload.new.id);
-							if (idx >= 0) {
-								next[idx] = { ...next[idx], ...payload.new };
-							}
-						} else if (payload.eventType === "DELETE") {
-							const deletedId = payload?.old?.id;
-							applyVenueRows(next.filter((s) => s.id !== deletedId));
-							return;
-						}
-						applyVenueRows(next);
-					},
-				)
-				.subscribe();
-		};
-
-		const unsubscribe = () => subscription?.unsubscribe();
-
-		const normalizeCoinCollection = (value) => {
-			if (value instanceof Set) return new Set(value);
-			if (Array.isArray(value)) return new Set(value);
-			if (value && typeof value[Symbol.iterator] === "function") {
-				try {
-					return new Set(value);
-				} catch {
-					return new Set();
-				}
-			}
-			return new Set();
-		};
-
-		const addCoin = (shopId) => {
-			if (shopId === undefined || shopId === null) return;
-			const next = normalizeCoinCollection(collectedCoins.value);
-			next.add(shopId);
-			collectedCoins.value = next;
-		};
-
-		const venueDensity = ref({});
-		const densityLoading = ref({});
-		const densityError = ref({});
-		const densityCache = new Map();
-		const DENSITY_CACHE_TTL = 60 * 1000; // 1 minute
-
-		const fetchVenueDensity = async (shopId) => {
-			const key = String(shopId);
-			const now = Date.now();
-			
-			if (densityCache.has(key)) {
-				const cached = densityCache.get(key);
-				if (now - cached.at < DENSITY_CACHE_TTL) {
-					venueDensity.value[key] = cached.data;
-					return;
-				}
-			}
-
-			densityLoading.value[key] = true;
-			densityError.value[key] = null;
-
-			try {
-				const payload = await request({
-					url: `/shops/${encodeURIComponent(shopId)}/density`,
-					method: "GET",
-					schema: DensitySchema,
+					schema: ReviewSchema,
 				});
 
-				const data = payload?.data || payload || { level: 1, label: "Quiet" };
-				venueDensity.value[key] = data;
-				densityCache.set(key, { data, at: now });
-			} catch (err) {
+				if (!reviews.value[String(shopId)]) reviews.value[String(shopId)] = [];
+				if (data) reviews.value[String(shopId)].unshift(data);
+				return { success: true, data };
+			} catch (apiError) {
 				if (import.meta.env.DEV) {
-					console.warn(`🏪 Failed to fetch density for ${shopId}:`, err);
+					console.warn("🏪 Reviews API insert failed:", apiError);
 				}
-				densityError.value[key] = err.message;
-				// Fallback to quiet if real API fails
-				venueDensity.value[key] = { level: 1, label: "Quiet" };
-			} finally {
-				densityLoading.value[key] = false;
+				if (apiError.response) {
+					if (shouldFallbackReviewsApi(apiError.response.status)) {
+						reviewsApiDisabled.value = true;
+					} else if (
+						apiError.response.status === 401 ||
+						apiError.response.status === 403
+					) {
+						reviewsUnavailable.value = true;
+						return { success: false, error: "reviews_unavailable" };
+					}
+				}
 			}
-		};
+		}
 
-		return {
-			// State
-			rawShops,
-			reviews,
-			venueDensity,
-			densityLoading,
-			densityError,
-			collectedCoins,
-			currentTime,
-			activeShopId,
-			activeCategories,
-			activeStatus,
-			searchQuery,
-			sortBy,
-			isLoading,
-			error,
-			lastFetchTime,
-			rotationSeed,
-			// Computed
-			shops,
-			shopCount,
-			activeShop,
-			processedShops,
-			filteredShops,
-			visibleShops,
-			categories,
-			nearbyShops,
-			liveShops,
-			// Actions
-			fetchShops,
-			fetchShopsV2,
-			searchV2,
-			refreshLocationScopedFeed,
-			fetchVenueDetail,
-			fetchVenueDensity,
-			getShopById,
-			getShopBySlug,
-			setActiveShop,
-			setCategories,
-			setStatus,
-			setSearch,
-			setSortBy,
-			clearFilters,
-			// Reviews
-			getShopReviews,
-			fetchShopReviews,
-			addReview,
-			// Analytics
-			trackView,
-			trackClick,
-			incrementView: trackView, // ✅ Alias for backward compatibility
-			// Coins
-			addCoin,
-			// Subscriptions
-			subscribeToChanges,
-			unsubscribe,
-			// Compat aliases
-			setShops: (s) => {
-				applyVenueRows(Array.isArray(s) ? s : []);
-			},
-			setLoading: (v) => {
-				isLoading.value = v;
-			},
-			setUserLocation: (l) => locationStore.setUserLocation(l),
-			userLocation: computed(() => locationStore.userLocation),
-		};
-	},
-);
+		try {
+			const { data, error: err } = await supabase
+				.from("reviews")
+				.insert({
+					venue_id: shopId,
+					rating: review?.rating ?? null,
+					comment: String(review?.comment || ""),
+					user_name: String(review?.userName || "Vibe Explorer"),
+				})
+				.select()
+				.single();
+
+			if (err) throw err;
+			if (!reviews.value[String(shopId)]) reviews.value[String(shopId)] = [];
+			reviews.value[String(shopId)].unshift(data);
+			return { success: true, data };
+		} catch (e) {
+			if (
+				isReviewAccessError(e) ||
+				(shouldSkipReviewsApi() && isReviewNetworkError(e))
+			) {
+				reviewsUnavailable.value = true;
+				return { success: false, error: "reviews_unavailable" };
+			}
+			return { success: false, error: e.message };
+		}
+	};
+
+	// ═══════════════════════════════════════════
+	// 📈 Analytics
+	// ═══════════════════════════════════════════
+	const trackView = async (shopId) => {
+		if (!shopId) return;
+		const shop = shopMap.value.get(shopId);
+		if (shop) shop.total_views = (shop.total_views || 0) + 1;
+		if (isFrontendOnlyDevMode() || !clientVenueViewTrackingEnabled) return;
+		if (unavailableRpcNames.has("increment_venue_views")) return;
+
+		// Fire and forget with proper error handling
+		try {
+			const { error: rpcError } = await supabase.rpc("increment_venue_views", {
+				venue_id: shopId,
+			});
+			if (rpcError) {
+				if (isRpcMissingError(rpcError)) {
+					unavailableRpcNames.add("increment_venue_views");
+					return;
+				}
+				throw rpcError;
+			}
+		} catch (e) {
+			// Silently ignore - analytics failure shouldn't break the app
+			if (import.meta.env.DEV) console.debug("Analytics trackView failed:", e);
+		}
+	};
+
+	const trackClick = async (shopId) => {
+		const shop = shopMap.value.get(shopId);
+		if (shop) shop.pin_clicks = (shop.pin_clicks || 0) + 1;
+	};
+
+	// ═══════════════════════════════════════════
+	// 🔄 Rotation Timer
+	// ═══════════════════════════════════════════
+	const startRotationTimer = () => {
+		if (rotationInterval) return;
+		rotationInterval = setInterval(() => {
+			const newSeed = Math.floor(Date.now() / 1800000);
+			if (newSeed !== rotationSeed.value) {
+				rotationSeed.value = newSeed;
+				if (import.meta.env.DEV) console.log("🔄 Rotation updated");
+			}
+		}, 60000);
+	};
+
+	const stopRotationTimer = () => {
+		if (rotationInterval) {
+			clearInterval(rotationInterval);
+			rotationInterval = null;
+		}
+	};
+
+	// Auto-start rotation
+	startRotationTimer();
+
+	// ═══════════════════════════════════════════
+	// 🔌 Real-time Subscriptions
+	// ═══════════════════════════════════════════
+	let subscription = null;
+
+	const subscribeToChanges = () => {
+		subscription = supabase
+			.channel("venues-changes")
+			.on(
+				"postgres_changes",
+				{ event: "*", schema: "public", table: "venues" },
+				(payload) => {
+					const next = Array.isArray(rawShops.value) ? [...rawShops.value] : [];
+					if (payload.eventType === "INSERT") {
+						next.unshift(payload.new);
+					} else if (payload.eventType === "UPDATE") {
+						const idx = next.findIndex((s) => s.id === payload.new.id);
+						if (idx >= 0) {
+							next[idx] = { ...next[idx], ...payload.new };
+						}
+					} else if (payload.eventType === "DELETE") {
+						const deletedId = payload?.old?.id;
+						applyVenueRows(next.filter((s) => s.id !== deletedId));
+						return;
+					}
+					applyVenueRows(next);
+				},
+			)
+			.subscribe();
+	};
+
+	const unsubscribe = () => subscription?.unsubscribe();
+
+	const normalizeCoinCollection = (value) => {
+		if (value instanceof Set) return new Set(value);
+		if (Array.isArray(value)) return new Set(value);
+		if (value && typeof value[Symbol.iterator] === "function") {
+			try {
+				return new Set(value);
+			} catch {
+				return new Set();
+			}
+		}
+		return new Set();
+	};
+
+	const addCoin = (shopId) => {
+		if (shopId === undefined || shopId === null) return;
+		const next = normalizeCoinCollection(collectedCoins.value);
+		next.add(shopId);
+		collectedCoins.value = next;
+	};
+
+	const venueDensity = ref({});
+	const densityLoading = ref({});
+	const densityError = ref({});
+	const densityCache = new Map();
+	const DENSITY_CACHE_TTL = 60 * 1000; // 1 minute
+
+	const fetchVenueDensity = async (shopId) => {
+		const key = String(shopId);
+		const now = Date.now();
+
+		if (densityCache.has(key)) {
+			const cached = densityCache.get(key);
+			if (now - cached.at < DENSITY_CACHE_TTL) {
+				venueDensity.value[key] = cached.data;
+				return;
+			}
+		}
+
+		densityLoading.value[key] = true;
+		densityError.value[key] = null;
+
+		if (shouldAvoidCrossOriginApiOnPublicHost()) {
+			venueDensity.value[key] = { level: 1, label: "Quiet" };
+			densityLoading.value[key] = false;
+			return;
+		}
+
+		try {
+			const payload = await request({
+				url: `/shops/${encodeURIComponent(shopId)}/density`,
+				method: "GET",
+				schema: DensitySchema,
+			});
+
+			const data = payload?.data || payload || { level: 1, label: "Quiet" };
+			venueDensity.value[key] = data;
+			densityCache.set(key, { data, at: now });
+		} catch (err) {
+			if (import.meta.env.DEV) {
+				console.warn(`🏪 Failed to fetch density for ${shopId}:`, err);
+			}
+			densityError.value[key] = err.message;
+			// Fallback to quiet if real API fails
+			venueDensity.value[key] = { level: 1, label: "Quiet" };
+		} finally {
+			densityLoading.value[key] = false;
+		}
+	};
+
+	return {
+		// State
+		rawShops,
+		reviews,
+		venueDensity,
+		densityLoading,
+		densityError,
+		collectedCoins,
+		currentTime,
+		activeShopId,
+		activeCategories,
+		activeStatus,
+		searchQuery,
+		sortBy,
+		isLoading,
+		error,
+		lastFetchTime,
+		rotationSeed,
+		// Computed
+		shops,
+		shopCount,
+		activeShop,
+		processedShops,
+		filteredShops,
+		visibleShops,
+		categories,
+		nearbyShops,
+		liveShops,
+		// Actions
+		fetchShops,
+		fetchShopsV2,
+		searchV2,
+		refreshLocationScopedFeed,
+		fetchVenueDetail,
+		fetchVenueDensity,
+		getShopById,
+		getShopBySlug,
+		setActiveShop,
+		setCategories,
+		setStatus,
+		setSearch,
+		setSortBy,
+		clearFilters,
+		// Reviews
+		getShopReviews,
+		fetchShopReviews,
+		addReview,
+		// Analytics
+		trackView,
+		trackClick,
+		incrementView: trackView, // ✅ Alias for backward compatibility
+		// Coins
+		addCoin,
+		// Subscriptions
+		subscribeToChanges,
+		unsubscribe,
+		// Compat aliases
+		setShops: (s) => {
+			applyVenueRows(Array.isArray(s) ? s : []);
+		},
+		setLoading: (v) => {
+			isLoading.value = v;
+		},
+		setUserLocation: (l) => locationStore.setUserLocation(l),
+		userLocation: computed(() => locationStore.userLocation),
+	};
+});

@@ -2,9 +2,11 @@
 Thai Government Traffic Adapter (DOH/DLT)
 Integrates with Department of Highways (DOH) or Department of Land Transport (DLT) APIs.
 """
-from typing import Any
+
 import httpx
-from .base import TrafficProvider, StandardTrafficSegment, StandardIncident, TrafficDensity
+
+from .base import StandardIncident, StandardTrafficSegment, TrafficProvider
+
 
 class ThaiGovTrafficProvider(TrafficProvider):
     """

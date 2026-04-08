@@ -56,7 +56,7 @@ pwsh -File scripts/release/prod-one-shot.ps1 \
   -SourceRepo "C:\vibecity.live" \
   -ReleaseWorktree "C:\vibecity.live.release\2026-02-05-prod" \
   -ProdEnvFile "C:\secure\.env.production.local" \
-  -SupabaseProjectRef "nluuvnttweesnkrmgzsm" \
+  -SupabaseProjectRef "rukyitpjfmzhqjlfmbie" \
   -SupabaseCliVersion "2.75.4" \
   -VercelProject "bravforcode-vibescity-live" \
   -VercelScope "team_OZhFXLaozxmZHvJu3NWvyzg9" \
@@ -74,7 +74,7 @@ pwsh -File scripts/release/prod-one-shot.ps1 \
   -SourceRepo "C:\vibecity.live" \
   -ReleaseWorktree "C:\vibecity.live.release\2026-02-05-prod" \
   -ProdEnvFile "C:\secure\.env.production.local" \
-  -SupabaseProjectRef "nluuvnttweesnkrmgzsm" \
+  -SupabaseProjectRef "rukyitpjfmzhqjlfmbie" \
   -SupabaseCliVersion "2.75.4" \
   -VercelProject "bravforcode-vibescity-live" \
   -VercelScope "team_OZhFXLaozxmZHvJu3NWvyzg9" \

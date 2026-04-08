@@ -1,8 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const { mockApiRequest } = vi.hoisted(() => ({
+	mockApiRequest: vi.fn(),
+}));
+
 vi.mock("../../src/lib/runtimeConfig", () => ({
 	getApiV1BaseUrl: () => "https://api.test/api/v1",
 }));
+
+vi.mock("../../src/services/apiService", async (importOriginal) => {
+	const actual = await importOriginal();
+	return {
+		...actual,
+		request: mockApiRequest,
+	};
+});
 
 import {
 	isRuntimeLaneUnavailable,
@@ -18,6 +30,7 @@ describe("visitorIdentity", () => {
 		localStorage.clear();
 		sessionStorage.clear();
 		vi.clearAllMocks();
+		mockApiRequest.mockReset();
 		localStorage.setItem(
 			"vibe_visitor_id",
 			"11111111-1111-4111-8111-111111111111",
@@ -25,18 +38,20 @@ describe("visitorIdentity", () => {
 	});
 
 	it("cools down bootstrap retries after the live backend reports the endpoint missing", async () => {
-		const fetchSpy = vi.fn(
-			async () =>
-				new Response(JSON.stringify({ detail: "Not Found" }), {
+		const missingEndpointError = Object.assign(
+			new Error("Not Found"),
+			{
+				response: {
 					status: 404,
-					headers: { "Content-Type": "application/json" },
-				}),
+					data: { detail: "Not Found" },
+				},
+			},
 		);
-		vi.stubGlobal("fetch", fetchSpy);
+		mockApiRequest.mockRejectedValue(missingEndpointError);
 
 		const first = await bootstrapVisitor();
 
-		expect(fetchSpy).toHaveBeenCalledTimes(2);
+		expect(mockApiRequest).toHaveBeenCalledTimes(2);
 		expect(first.visitorId).toBe("11111111-1111-4111-8111-111111111111");
 		expect(first.visitorToken).toMatch(/\.legacy$/);
 		expect(getVisitorToken()).toBe(first.visitorToken);
@@ -44,7 +59,7 @@ describe("visitorIdentity", () => {
 
 		const second = await bootstrapVisitor({ forceRefresh: true });
 
-		expect(fetchSpy).toHaveBeenCalledTimes(2);
+		expect(mockApiRequest).toHaveBeenCalledTimes(2);
 		expect(second.visitorToken).toMatch(/\.legacy$/);
 	});
 });

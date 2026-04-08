@@ -29,11 +29,22 @@ export function useDragScroll(containerRef, options = {}) {
 	let lastX = 0;
 	let lastTime = 0;
 	let momentumFrame = null;
+	let prefersNativeTouchScroll = false;
+
+	const resolveShouldUseNativeTouchScroll = () => {
+		if (typeof window === "undefined") return false;
+		const coarsePointer =
+			window.matchMedia?.("(hover: none) and (pointer: coarse)").matches ??
+			false;
+		const touchPoints = Number(globalThis.navigator?.maxTouchPoints || 0);
+		return coarsePointer || touchPoints > 0;
+	};
 
 	// Handle mouse/touch start
 	const handleStart = (e) => {
 		const container = containerRef.value;
 		if (!container) return;
+		if (e.type.includes("touch") && prefersNativeTouchScroll) return;
 
 		isDragging.value = true;
 		isScrolling.value = true;
@@ -62,6 +73,7 @@ export function useDragScroll(containerRef, options = {}) {
 		if (!isDragging.value) return;
 		const container = containerRef.value;
 		if (!container) return;
+		if (e.type.includes("touch") && prefersNativeTouchScroll) return;
 
 		const pageX = e.type.includes("touch") ? e.touches[0].pageX : e.pageX;
 		const x = pageX - container.offsetLeft;
@@ -119,8 +131,7 @@ export function useDragScroll(containerRef, options = {}) {
 		const container = containerRef.value;
 		if (!container) return;
 
-		// Restore smooth scroll for snapping
-		container.style.scrollBehavior = "smooth";
+		container.style.scrollBehavior = "auto";
 		isScrolling.value = false;
 
 		// Snap to nearest element if selector provided
@@ -145,10 +156,12 @@ export function useDragScroll(containerRef, options = {}) {
 				});
 
 				if (closestItem) {
-					closestItem.scrollIntoView({
+					const targetLeft =
+						closestItem.offsetLeft -
+						(container.clientWidth - closestItem.clientWidth) / 2;
+					container.scrollTo({
+						left: Math.max(0, targetLeft),
 						behavior: "smooth",
-						inline: "center",
-						block: "nearest",
 					});
 				}
 			}
@@ -161,6 +174,7 @@ export function useDragScroll(containerRef, options = {}) {
 	const setupListeners = () => {
 		const container = containerRef.value;
 		if (!container) return;
+		prefersNativeTouchScroll = resolveShouldUseNativeTouchScroll();
 
 		container.style.cursor = "grab";
 
@@ -170,10 +184,12 @@ export function useDragScroll(containerRef, options = {}) {
 		container.addEventListener("mouseup", handleEnd);
 		container.addEventListener("mouseleave", handleEnd);
 
-		// Touch events
-		container.addEventListener("touchstart", handleStart, { passive: true });
-		container.addEventListener("touchmove", handleMove, { passive: false });
-		container.addEventListener("touchend", handleEnd);
+		// Let mobile/coarse-pointer devices keep native scrolling physics.
+		if (!prefersNativeTouchScroll) {
+			container.addEventListener("touchstart", handleStart, { passive: true });
+			container.addEventListener("touchmove", handleMove, { passive: false });
+			container.addEventListener("touchend", handleEnd);
+		}
 	};
 
 	// Cleanup

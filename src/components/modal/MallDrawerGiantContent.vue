@@ -113,6 +113,10 @@ const shopCountLabel = computed(() =>
 	t("giant_pin.shops_inside", { count: shopsInBuilding.value.length }),
 );
 
+const preloadShops = computed(() =>
+	preloadTargets.value.slice(1).filter((shop) => Boolean(getShopImage(shop))),
+);
+
 const heroDescription = computed(
 	() =>
 		selectedShop.value?.description ||
@@ -347,7 +351,7 @@ const isSelectedCard = (shop) =>
 
         <div class="giant-preload" aria-hidden="true">
           <img
-            v-for="shop in preloadTargets.slice(1).filter((item) => getShopImage(item))"
+            v-for="shop in preloadShops"
             :key="`preload-${shop.id}`"
             :src="getShopImage(shop)"
             alt=""

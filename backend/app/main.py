@@ -15,6 +15,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.api.routers import (
     analytics,
     emergency,
+    export,
     map_core,
     owner,
     partner,
@@ -25,13 +26,16 @@ from app.api.routers import (
     rides,
     seo,
     shops,
+    traffic,
     ugc,
+    user,
     vibes,
     visitor,
-    traffic,
-    export,
-    user,
+)
+from app.api.routers import (
     notifications as notifications_router,
+)
+from app.api.routers import (
     settings as settings_router,
 )
 from app.core.config import get_settings, validate_settings
@@ -85,6 +89,9 @@ if settings.FRONTEND_URL:
 if not cors_origins:
     cors_origins = [
         "https://vibecity.live",
+        "https://www.vibecity.live",
+        "https://vibescity.live",
+        "https://www.vibescity.live",
         "http://localhost:5418",
         "http://127.0.0.1:5418",
         "http://localhost:5417",
@@ -254,6 +261,12 @@ async def health_readiness():
 async def health_check():
     overall, checks = _run_readiness_checks()
     return {"status": overall, "version": settings.VERSION, "checks": checks}
+
+
+@app.get(f"{settings.API_V1_STR}/health")
+async def health_check_v1():
+    return await health_check()
+
 
 @app.get("/")
 async def root():

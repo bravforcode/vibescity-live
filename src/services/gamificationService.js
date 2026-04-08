@@ -1,8 +1,9 @@
-import { isFrontendOnlyDevMode } from "../lib/runtimeConfig";
+import { shouldBypassDirectBrowserSupabaseReads } from "../lib/runtimeConfig";
 import { supabase } from "../lib/supabase";
 
 const IS_E2E = import.meta.env.VITE_E2E === "true";
-const shouldUseLocalGamificationState = () => IS_E2E || isFrontendOnlyDevMode();
+const shouldUseLocalGamificationState = () =>
+	IS_E2E || shouldBypassDirectBrowserSupabaseReads();
 
 /**
  * Get or create a persistent visitor ID for anonymous users.

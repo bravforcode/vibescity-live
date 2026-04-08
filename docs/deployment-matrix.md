@@ -171,14 +171,14 @@ rg -n "supabase login|supabase secrets set" supabase/migrations
 
 ## Current deployment targets for this repo
 - Fly app: `vibecity-api`
-- Supabase ref: `nluuvnttweesnkrmgzsm`
+- Supabase ref: `rukyitpjfmzhqjlfmbie`
 - API health URL: `https://vibecity-api.fly.dev/health`
 
 ## Local `.env` Example
 ```bash
 VITE_API_URL="https://vibecity-api.fly.dev"
 VITE_WS_URL="wss://vibecity-api.fly.dev/api/v1/vibes/vibe-stream"
-VITE_SUPABASE_URL="https://nluuvnttweesnkrmgzsm.supabase.co"
+VITE_SUPABASE_URL="https://rukyitpjfmzhqjlfmbie.supabase.co"
 VITE_SUPABASE_ANON_KEY="<your-anon-key>"
 VITE_MAPBOX_TOKEN="pk.XXXXXXXXXXXXXXXX"
 ```
@@ -220,7 +220,7 @@ fly logs --app vibecity-api
 
 # Endpoint route checks (safe, no real payment)
 POSTDEPLOY_API_BASE_URL="https://vibecity-api.fly.dev" \
-POSTDEPLOY_EDGE_BASE_URL="https://nluuvnttweesnkrmgzsm.supabase.co/functions/v1" \
+POSTDEPLOY_EDGE_BASE_URL="https://rukyitpjfmzhqjlfmbie.supabase.co/functions/v1" \
 POSTDEPLOY_SUPABASE_JWT="<USER_OR_ANON_JWT>" \
 POSTDEPLOY_CHECKOUT_VENUE_ID="<venue-uuid>" \
 POSTDEPLOY_ORDER_ID="<order-uuid-optional>" \

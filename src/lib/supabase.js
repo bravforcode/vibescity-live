@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { getNetworkOnlineState } from "../services/networkState";
+import { sanitizeSupabaseRequestHeaders } from "./supabaseRequestHeaders";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -14,6 +15,9 @@ const SCHEMA_CACHE_RETRY_MAX_DELAY_MS = 1_200;
 const OFFLINE_STATUS_CODE =
 	Number(import.meta.env.VITE_OFFLINE_HTTP_STATUS) || 503;
 const OFFLINE_ERROR_CODE = "VIBECITY_OFFLINE";
+const UPSTREAM_TIMEOUT_ERROR_CODE = "VIBECITY_UPSTREAM_TIMEOUT";
+const SUPABASE_READ_TIMEOUT_MS =
+	Number(import.meta.env.VITE_SUPABASE_READ_TIMEOUT_MS) || 8_000;
 const RETRYABLE_HTTP_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const RETRYABLE_READONLY_RPCS = new Set([
 	"get_map_pins",
@@ -127,10 +131,16 @@ const isAbortLikeError = (errorLike) => {
 	);
 };
 
-const buildOfflineResponse = (meta) => {
+const buildOfflineResponse = (
+	meta,
+	{
+		code = OFFLINE_ERROR_CODE,
+		message = "Network offline. Request queued or deferred.",
+	} = {},
+) => {
 	const body = JSON.stringify({
-		code: OFFLINE_ERROR_CODE,
-		message: "Network offline. Request queued or deferred.",
+		code,
+		message,
 		method: meta?.method || "GET",
 		url: meta?.url || "",
 	});
@@ -182,22 +192,35 @@ const createSupabaseFetch = () => {
 
 	return async (input, init = {}) => {
 		const meta = getRequestMeta(input, init);
-		
-		// Defensive fix: Ensure apikey is present if missing from init.headers
+		let requestInit = {
+			...init,
+			headers: sanitizeSupabaseRequestHeaders({
+				requestUrl: meta.url,
+				headersInit: init?.headers,
+				supabaseBaseUrl: supabaseUrl,
+			}),
+		};
+		const shouldApplyReadTimeout =
+			isSupabaseRequest(meta.url) &&
+			isSchemaCacheRetryableRequest(meta) &&
+			Number.isFinite(SUPABASE_READ_TIMEOUT_MS) &&
+			SUPABASE_READ_TIMEOUT_MS > 0;
+
+		// Defensive fix: Ensure apikey is present if missing from request headers.
 		// Some supabase-js versions might not inject it correctly into custom fetch
 		if (isSupabaseRequest(meta.url)) {
-			const headers = init.headers || {};
-			const hasApiKey = 
-				headers.apikey || 
+			const headers = requestInit.headers || {};
+			const hasApiKey =
+				headers.apikey ||
 				(headers instanceof Headers && headers.has("apikey")) ||
 				(typeof headers.get === "function" && headers.get("apikey"));
-				
+
 			if (!hasApiKey) {
-				if (init.headers instanceof Headers) {
-					init.headers.set("apikey", supabaseAnonKey);
-					init.headers.set("Authorization", `Bearer ${supabaseAnonKey}`);
+				if (requestInit.headers instanceof Headers) {
+					requestInit.headers.set("apikey", supabaseAnonKey);
+					requestInit.headers.set("Authorization", `Bearer ${supabaseAnonKey}`);
 				} else {
-					init.headers = {
+					requestInit.headers = {
 						...headers,
 						apikey: supabaseAnonKey,
 						Authorization: `Bearer ${supabaseAnonKey}`,
@@ -223,10 +246,37 @@ const createSupabaseFetch = () => {
 			}
 
 			let response;
+			let timeoutId = null;
+			let timedOut = false;
+			let timeoutController = null;
+			let externalAbortListener = null;
+			const externalSignal = requestInit?.signal || null;
+			if (shouldApplyReadTimeout) {
+				timeoutController = new AbortController();
+				if (externalSignal?.aborted) {
+					timeoutController.abort();
+				} else if (externalSignal) {
+					externalAbortListener = () => timeoutController.abort();
+					externalSignal.addEventListener("abort", externalAbortListener, {
+						once: true,
+					});
+				}
+				timeoutId = setTimeout(() => {
+					timedOut = true;
+					timeoutController.abort();
+				}, SUPABASE_READ_TIMEOUT_MS);
+				requestInit = { ...requestInit, signal: timeoutController.signal };
+			}
 			try {
-				response = await nativeFetch(input, init);
+				response = await nativeFetch(input, requestInit);
 			} catch (fetchError) {
 				if (isAbortLikeError(fetchError)) {
+					if (timedOut) {
+						return buildOfflineResponse(meta, {
+							code: UPSTREAM_TIMEOUT_ERROR_CODE,
+							message: "Upstream request timeout. Request deferred.",
+						});
+					}
 					throw fetchError;
 				}
 				if (isSupabaseRequest(meta.url)) {
@@ -236,6 +286,13 @@ const createSupabaseFetch = () => {
 					return buildOfflineResponse(meta);
 				}
 				throw fetchError;
+			} finally {
+				if (timeoutId) {
+					clearTimeout(timeoutId);
+				}
+				if (externalSignal && externalAbortListener) {
+					externalSignal.removeEventListener("abort", externalAbortListener);
+				}
 			}
 			if (response.ok || !canRetry) return response;
 
@@ -251,10 +308,10 @@ const createSupabaseFetch = () => {
 				SCHEMA_CACHE_RETRY_MAX_DELAY_MS,
 				SCHEMA_CACHE_RETRY_BASE_DELAY_MS * 2 ** (attempt - 1),
 			);
-			await sleep(delayMs, init?.signal);
+			await sleep(delayMs, requestInit?.signal);
 		}
 
-		return nativeFetch(input, init);
+		return nativeFetch(input, requestInit);
 	};
 };
 

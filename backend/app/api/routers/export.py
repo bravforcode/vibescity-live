@@ -7,8 +7,8 @@ import logging
 from datetime import UTC, datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
-from fastapi.responses import Response, StreamingResponse
+from fastapi import APIRouter, Header, HTTPException, Query, Request
+from fastapi.responses import Response
 
 from app.core.rate_limit import limiter
 from app.core.visitor_auth import require_valid_visitor
@@ -16,6 +16,7 @@ from app.services.export_service import export_service
 
 router = APIRouter()
 logger = logging.getLogger("app.export")
+
 
 @router.get("/merchant")
 @limiter.limit("5/minute")
@@ -62,19 +63,25 @@ async def export_merchant_report(
             )
             
         elif format == "excel":
-            excel_content = await export_service.generate_excel(data, sheet_name=report_type.capitalize())
+            excel_content = await export_service.generate_excel(
+                data,
+                sheet_name=report_type.capitalize(),
+            )
             return Response(
                 content=excel_content,
                 media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                headers={"Content-Disposition": f"attachment; filename={filename}.xlsx"}
+                headers={"Content-Disposition": f"attachment; filename={filename}.xlsx"},
             )
             
         elif format == "pdf":
-            pdf_content = await export_service.generate_pdf(data, title=f"Merchant {report_type.capitalize()} Report")
+            pdf_content = await export_service.generate_pdf(
+                data,
+                title=f"Merchant {report_type.capitalize()} Report",
+            )
             return Response(
                 content=pdf_content,
                 media_type="application/pdf",
-                headers={"Content-Disposition": f"attachment; filename={filename}.pdf"}
+                headers={"Content-Disposition": f"attachment; filename={filename}.pdf"},
             )
             
         else:

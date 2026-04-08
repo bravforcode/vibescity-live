@@ -1,14 +1,14 @@
 import axios from "axios";
-import { getApiV1BaseUrl } from "../lib/runtimeConfig";
-import { 
-	getVisitorToken, 
-	getOrCreateVisitorId, 
-	bootstrapVisitor, 
-	isVisitorTokenExpired 
-} from "./visitorIdentity";
-import { useNotifications } from "../composables/useNotifications";
 import { z } from "zod";
+import { useNotifications } from "../composables/useNotifications";
+import { getApiV1BaseUrl } from "../lib/runtimeConfig";
 import * as schemas from "../schemas";
+import {
+	bootstrapVisitor,
+	getOrCreateVisitorId,
+	getVisitorToken,
+	isVisitorTokenExpired,
+} from "./visitorIdentity";
 
 const { notifyError } = useNotifications();
 
@@ -58,7 +58,7 @@ apiService.interceptors.response.use(
 	(response) => response,
 	async (error) => {
 		const { config, response } = error;
-		
+
 		// 1. Handle 401 Unauthorized (Token Refresh)
 		if (response?.status === 401 && !config._retry) {
 			config._retry = true;
@@ -77,11 +77,14 @@ apiService.interceptors.response.use(
 		// 2. Exponential Backoff Retry for Network Errors or 5xx
 		const isNetworkError = !response;
 		const isServerError = response?.status >= 500;
-		
-		if ((isNetworkError || isServerError) && (config._retryCount || 0) < MAX_RETRIES) {
+
+		if (
+			(isNetworkError || isServerError) &&
+			(config._retryCount || 0) < MAX_RETRIES
+		) {
 			config._retryCount = (config._retryCount || 0) + 1;
 			const delay = INITIAL_RETRY_DELAY * 2 ** (config._retryCount - 1);
-			
+
 			console.warn(`API Retry attempt ${config._retryCount} in ${delay}ms...`);
 			await sleep(delay);
 			return apiService(config);
@@ -103,8 +106,9 @@ function handleApiError(error) {
 
 	if (error.response) {
 		const { status, data } = error.response;
-		message = data?.message || data?.detail || `Error ${status}: ${error.message}`;
-		
+		message =
+			data?.message || data?.detail || `Error ${status}: ${error.message}`;
+
 		// Some status codes might be warnings instead of errors
 		if (status === 404) severity = "info";
 		else if (status === 429) message = "คุณทำรายการบ่อยเกินไป กรุณารอสักครู่";
@@ -134,12 +138,12 @@ function handleApiError(error) {
  */
 export const request = async (config) => {
 	const { schema, ...axiosConfig } = config;
-	
+
 	// Ensure headers object exists
 	axiosConfig.headers = { ...axiosConfig.headers };
-	
+
 	// Manually apply request interceptor logic for axios instance
-	// (Note: In a real axios instance, this happens automatically, 
+	// (Note: In a real axios instance, this happens automatically,
 	// but we do it explicitly here to ensure headers are present even in mocks)
 	const visitorId = getOrCreateVisitorId();
 	const token = getVisitorToken();
@@ -187,10 +191,11 @@ export const UserProfileSchema = schemas.UserProfileSchema;
 /**
  * Type-safe wrapper for API calls with optional Zod validation
  */
-export const fetchVenues = () => request({ 
-	url: "/shops", 
-	method: "get",
-	schema: z.array(VenueSchema)
-});
+export const fetchVenues = () =>
+	request({
+		url: "/shops",
+		method: "get",
+		schema: z.array(VenueSchema),
+	});
 
 export default apiService;

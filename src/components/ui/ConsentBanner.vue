@@ -68,25 +68,13 @@
 
 <script setup>
 import { nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { isBrowserAnalyticsEnabled } from "@/lib/analyticsRuntime";
 
 const show = ref(false);
 const isPersisting = ref(false);
 const dialogRef = ref(null);
 let previousActiveElement = null;
-
-const parseEnvBool = (value) => {
-	const raw = String(value ?? "")
-		.trim()
-		.toLowerCase();
-	if (!raw) return null;
-	if (["1", "true", "yes", "on"].includes(raw)) return true;
-	if (["0", "false", "no", "off"].includes(raw)) return false;
-	return null;
-};
-
-// Default: disabled in dev, enabled in prod (unless explicitly overridden).
-const analyticsEnabled =
-	parseEnvBool(import.meta.env.VITE_ANALYTICS_ENABLED) ?? !import.meta.env.DEV;
+const analyticsEnabled = isBrowserAnalyticsEnabled();
 
 const focusableSelector =
 	'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -129,6 +117,9 @@ const handleEsc = (event) => {
 onMounted(() => {
 	if (typeof window === "undefined") return;
 	if (import.meta.env.VITE_E2E === "true") {
+		return;
+	}
+	if (!analyticsEnabled) {
 		return;
 	}
 	const choice = localStorage.getItem("vibe_analytics_consent");

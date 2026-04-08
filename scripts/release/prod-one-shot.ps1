@@ -586,7 +586,6 @@ try {
     if ($prevMatch) {
         $previousProdDeploymentUrl = $prevMatch.Value
     }
-
     $deployOutput = Invoke-Checked -FilePath "vercel" -Arguments @("deploy", "--prod", "--skip-domain", "--yes", "--scope", $VercelScope) -WorkingDirectory $ReleaseWorktree -CaptureOutput
     $deployOutput | Out-File -FilePath (Join-Path $artifactsDir "vercel_staged_deploy.log") -Encoding UTF8
 

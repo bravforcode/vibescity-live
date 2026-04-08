@@ -1,6 +1,8 @@
 import asyncio
 import logging
+
 import httpx
+
 from app.core.config import settings
 from app.core.supabase import supabase_admin as supabase
 
@@ -40,15 +42,6 @@ async def fetch_street_view_for_venues():
 
             # 2. Construct Google Street View URL
             # size=640x480 is standard, fov=90 for wide angle
-            params = {
-                "size": "640x480",
-                "location": f"{lat},{lng}",
-                "fov": 90,
-                "heading": 0,
-                "pitch": 0,
-                "key": api_key
-            }
-
             # 3. Check if Street View is available (Metadata API is free)
             metadata_url = f"{GOOGLE_STREETVIEW_URL}/metadata"
             try:

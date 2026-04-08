@@ -6,6 +6,17 @@
     <title>VibeCity — Offline</title>
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
+      .skip-link {
+        position: absolute;
+        top: -40px;
+        left: 0;
+        background: #7c3aed;
+        color: white;
+        padding: 8px 12px;
+        z-index: 1000;
+        transition: top 0.2s ease;
+      }
+      .skip-link:focus { top: 0; }
       body {
         min-height: 100dvh;
         display: flex;
@@ -48,9 +59,17 @@
     </style>
   </head>
   <body>
-    <div class="icon">📡</div>
-    <h1>You're offline</h1>
-    <p>Check your connection and try again. VibeCity needs the internet to show venues near you.</p>
-    <button onclick="location.reload()">Try again</button>
+    <a class="skip-link" href="#offline-main">Skip to offline message</a>
+    <main id="offline-main">
+      <div class="icon">📡</div>
+      <h1>You're offline</h1>
+      <p>Check your connection and try again. VibeCity needs the internet to show venues near you.</p>
+      <button id="retry-button" type="button">Try again</button>
+    </main>
+    <script>
+      document.getElementById("retry-button")?.addEventListener("click", () => {
+        window.location.reload();
+      });
+    </script>
   </body>
 </html>

@@ -4,28 +4,28 @@
  */
 
 export interface paths {
-  "/api/v1/shops": {
-    get: {
-      responses: {
-        200: {
-          content: {
-            "application/json": components["schemas"]["Venue"][];
-          };
-        };
-      };
-    };
-  };
+	"/api/v1/shops": {
+		get: {
+			responses: {
+				200: {
+					content: {
+						"application/json": components["schemas"]["Venue"][];
+					};
+				};
+			};
+		};
+	};
 }
 
 export interface components {
-  schemas: {
-    Venue: {
-      id: string;
-      name: string;
-      lat: number;
-      lng: number;
-      category?: string;
-      is_live?: boolean;
-    };
-  };
+	schemas: {
+		Venue: {
+			id: string;
+			name: string;
+			lat: number;
+			lng: number;
+			category?: string;
+			is_live?: boolean;
+		};
+	};
 }

@@ -47,7 +47,7 @@ const seedPartnerSession = async (page: Page) => {
 		};
 		const authKeys = [
 			"sb-rukyitpjfmzhqjlfmbie-auth-token",
-			"sb-nluuvnttweesnkrmgzsm-auth-token",
+			"sb-rukyitpjfmzhqjlfmbie-auth-token",
 		];
 		for (const key of authKeys) {
 			localStorage.setItem(key, JSON.stringify(session));

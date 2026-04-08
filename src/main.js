@@ -11,6 +11,11 @@ import { headSymbol } from "@unhead/vue";
 import { createHead } from "@unhead/vue/client";
 import { vTestId } from "./directives/testid.js";
 import i18n from "./i18n.js";
+import {
+	hasAnalyticsConsent,
+	isBrowserAnalyticsEnabled,
+	parseEnvBool,
+} from "./lib/analyticsRuntime";
 import { vueQueryOptions } from "./plugins/queryClient";
 import router from "./router"; // ✅ Import Router
 import { useFeatureFlagStore } from "./store/featureFlagStore";
@@ -33,33 +38,9 @@ if (!head.install) {
 app.use(head);
 
 const clarityId = import.meta.env.VITE_CLARITY_PROJECT_ID;
-const parseEnvBool = (value) => {
-	const raw = String(value ?? "")
-		.trim()
-		.toLowerCase();
-	if (!raw) return null;
-	if (["1", "true", "yes", "on"].includes(raw)) return true;
-	if (["0", "false", "no", "off"].includes(raw)) return false;
-	return null;
-};
-
-// Default: disabled in dev, enabled in prod (unless explicitly overridden).
 const analyticsDisabledByEnv =
 	parseEnvBool(import.meta.env.VITE_DISABLE_ANALYTICS) === true;
-const analyticsEnabled = analyticsDisabledByEnv
-	? false
-	: (parseEnvBool(import.meta.env.VITE_ANALYTICS_ENABLED) ??
-		!import.meta.env.DEV);
-const hasAnalyticsConsent = () => {
-	try {
-		// Respect Do Not Track as a hard deny.
-		if (typeof navigator !== "undefined" && navigator.doNotTrack === "1")
-			return false;
-		return localStorage.getItem("vibe_analytics_consent") === "granted";
-	} catch {
-		return false;
-	}
-};
+const analyticsEnabled = isBrowserAnalyticsEnabled();
 
 // Defer task execution to idle time to keep TTI low.
 const deferTask = (fn) => {

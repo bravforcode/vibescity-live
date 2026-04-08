@@ -2,11 +2,13 @@
 OSM/Overpass Traffic Adapter
 Uses OpenStreetMap data with fallback logic.
 """
+
 import random
-from datetime import UTC, datetime
-from typing import Any
+
 import httpx
-from .base import TrafficProvider, StandardTrafficSegment, StandardIncident, TrafficDensity
+
+from .base import StandardIncident, StandardTrafficSegment, TrafficProvider
+
 
 class OSMTrafficProvider(TrafficProvider):
     """

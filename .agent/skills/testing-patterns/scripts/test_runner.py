@@ -14,6 +14,7 @@ Supports:
 import subprocess
 import sys
 import json
+import platform
 from pathlib import Path
 from datetime import datetime
 
@@ -22,6 +23,18 @@ try:
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 except:
     pass
+
+
+def _safe_terminal_text(value: str) -> str:
+    encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+    return str(value).encode(encoding, errors="replace").decode(
+        encoding,
+        errors="replace",
+    )
+
+
+def safe_print(value: str = ""):
+    print(_safe_terminal_text(value))
 
 
 def _resolve_python_runner(project_path: Path) -> tuple[list[str], Path]:
@@ -80,7 +93,10 @@ def detect_test_framework(project_path: Path) -> dict:
             pass
     
     # Python project
-    if (project_path / "pyproject.toml").exists() or (project_path / "requirements.txt").exists():
+    if (
+        result["framework"] is None
+        and ((project_path / "pyproject.toml").exists() or (project_path / "requirements.txt").exists())
+    ):
         python_cmd, python_cwd = _resolve_python_runner(project_path)
         result["type"] = "python"
         result["framework"] = "pytest"
@@ -103,6 +119,9 @@ def run_tests(cmd: list, cwd: Path) -> dict:
     }
     
     try:
+        if platform.system() == "Windows" and cmd[0] in {"npm", "npx"}:
+            cmd = [f"{cmd[0]}.cmd", *cmd[1:]]
+
         proc = subprocess.run(
             cmd,
             cwd=str(cwd),
@@ -156,21 +175,21 @@ def main():
     project_path = Path(sys.argv[1] if len(sys.argv) > 1 else ".").resolve()
     with_coverage = "--coverage" in sys.argv
     
-    print(f"\n{'='*60}")
-    print("[TEST RUNNER] Unified Test Execution")
-    print(f"{'='*60}")
-    print(f"Project: {project_path}")
-    print(f"Coverage: {'enabled' if with_coverage else 'disabled'}")
-    print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    safe_print(f"\n{'='*60}")
+    safe_print("[TEST RUNNER] Unified Test Execution")
+    safe_print(f"{'='*60}")
+    safe_print(f"Project: {project_path}")
+    safe_print(f"Coverage: {'enabled' if with_coverage else 'disabled'}")
+    safe_print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     # Detect test framework
     test_info = detect_test_framework(project_path)
-    print(f"Type: {test_info['type']}")
-    print(f"Framework: {test_info['framework']}")
-    print("-"*60)
+    safe_print(f"Type: {test_info['type']}")
+    safe_print(f"Framework: {test_info['framework']}")
+    safe_print("-"*60)
     
     if not test_info["cmd"]:
-        print("No test framework found for this project.")
+        safe_print("No test framework found for this project.")
         output = {
             "script": "test_runner",
             "project": str(project_path),
@@ -179,14 +198,14 @@ def main():
             "passed": True,
             "message": "No tests configured"
         }
-        print(json.dumps(output, indent=2))
+        safe_print(json.dumps(output, indent=2))
         sys.exit(0)
     
     # Choose command
     cmd = test_info["coverage_cmd"] if with_coverage and test_info["coverage_cmd"] else test_info["cmd"]
     
-    print(f"Running: {' '.join(cmd)}")
-    print("-"*60)
+    safe_print(f"Running: {' '.join(cmd)}")
+    safe_print("-"*60)
     
     # Run tests
     result = run_tests(cmd, test_info.get("cwd", project_path))
@@ -195,24 +214,26 @@ def main():
     if result["output"]:
         lines = result["output"].split("\n")
         for line in lines[:30]:
-            print(line)
+            safe_print(line)
         if len(lines) > 30:
-            print(f"... ({len(lines) - 30} more lines)")
+            safe_print(f"... ({len(lines) - 30} more lines)")
     
     # Summary
-    print("\n" + "="*60)
-    print("SUMMARY")
-    print("="*60)
+    safe_print("\n" + "="*60)
+    safe_print("SUMMARY")
+    safe_print("="*60)
     
     if result["passed"]:
-        print("[PASS] All tests passed")
+        safe_print("[PASS] All tests passed")
     else:
-        print("[FAIL] Some tests failed")
+        safe_print("[FAIL] Some tests failed")
         if result["error"]:
-            print(f"Error: {result['error'][:200]}")
+            safe_print(f"Error: {result['error'][:200]}")
     
     if result["tests_run"] > 0:
-        print(f"Tests: {result['tests_run']} total, {result['tests_passed']} passed, {result['tests_failed']} failed")
+        safe_print(
+            f"Tests: {result['tests_run']} total, {result['tests_passed']} passed, {result['tests_failed']} failed"
+        )
     
     output = {
         "script": "test_runner",
@@ -225,7 +246,7 @@ def main():
         "passed": result["passed"]
     }
     
-    print("\n" + json.dumps(output, indent=2))
+    safe_print("\n" + json.dumps(output, indent=2))
     
     sys.exit(0 if result["passed"] else 1)
 

@@ -3,9 +3,8 @@ Settings Router - Application and User Configuration
 """
 
 import logging
-from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from app.core.auth import verify_admin
@@ -13,6 +12,7 @@ from app.core.config import get_settings as get_app_settings
 
 router = APIRouter()
 logger = logging.getLogger("app.settings")
+
 
 class AppSettingsUpdate(BaseModel):
     maintenance_mode: bool | None = None
@@ -43,7 +43,11 @@ async def get_admin_settings(user: dict = Depends(verify_admin)):
     """
     settings = get_app_settings()
     # Filter sensitive keys
-    safe_settings = {k: v for k, v in settings.model_dump().items() if "SECRET" not in k and "KEY" not in k}
+    safe_settings = {
+        k: v
+        for k, v in settings.model_dump().items()
+        if "SECRET" not in k and "KEY" not in k
+    }
     return {"success": True, "settings": safe_settings}
 
 

@@ -48,6 +48,8 @@ export default defineConfig({
 							swDest: "./dist/sw.js",
 							globDirectory: "./dist",
 							globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+							// offline.html is manually precached in public/sw.js.
+							globIgnores: ["offline.html"],
 							maximumFileSizeToCacheInBytes: 2 * 1024 * 1024,
 						});
 						console.log(

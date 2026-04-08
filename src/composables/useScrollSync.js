@@ -25,6 +25,7 @@ export function useScrollSync({
 	let ticking = false;
 	let lastHapticAt = 0;
 	const HAPTIC_INTERVAL_MS = 300;
+	const CENTER_TOLERANCE_PX = 24;
 	let cachedCardMetrics = [];
 	let cachedContainerWidth = 0;
 	let cachedCardCount = 0;
@@ -193,6 +194,9 @@ export function useScrollSync({
 		if (programmaticTimeout) clearTimeout(programmaticTimeout);
 
 		const containerWidth = container.clientWidth;
+		const currentCenterX = container.scrollLeft + containerWidth / 2;
+		const centerDelta = Math.abs(metric.center - currentCenterX);
+		if (centerDelta <= CENTER_TOLERANCE_PX) return;
 		const targetScroll = metric.left - containerWidth / 2 + metric.width / 2;
 
 		container.scrollTo({
@@ -203,7 +207,7 @@ export function useScrollSync({
 		programmaticTimeout = setTimeout(() => {
 			isProgrammaticScroll.value = false;
 			lastProgrammaticScrollEnd = Date.now();
-		}, 800);
+		}, 520);
 	};
 
 	const commitCenteredShop = () => {
@@ -261,7 +265,7 @@ export function useScrollSync({
 		settleTimeout = setTimeout(() => {
 			isUserScrolling.value = false;
 			commitCenteredShop();
-		}, 400);
+		}, 220);
 
 		if (!ticking) {
 			window.requestAnimationFrame(() => {

@@ -1,0 +1,441 @@
+- main [ref=e2]:
+  - navigation [ref=e4]:
+    - generic [ref=e5]:
+      - link "Squarespace Logo" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - img "Squarespace Logo" [ref=e7]
+      - generic [ref=e31]:
+        - link "Transfer a domain" [ref=e32] [cursor=pointer]:
+          - /url: /transfer-a-domain
+        - link "Build a website" [ref=e33] [cursor=pointer]:
+          - /url: https://www.squarespace.com/templates/get-started
+      - link "Log In" [ref=e36] [cursor=pointer]:
+        - /url: /auth/protected-redirect/login?location=https://domains.squarespace.com/
+  - generic [ref=e38]:
+    - heading "Buy your dream domain" [level=1] [ref=e40]
+    - paragraph [ref=e42]: Every dream needs a domain. Start building yours with Squarespace.
+    - generic [ref=e43]:
+      - generic:
+        - img
+      - textbox "Start your search here" [ref=e44]
+      - button "Search" [disabled] [ref=e45] [cursor=pointer]:
+        - img [ref=e46]
+    - paragraph [ref=e49]:
+      - text: Need inspiration?
+      - link "Generate a domain using AI" [ref=e50] [cursor=pointer]:
+        - /url: /tools/domain-name-generator
+  - generic [ref=e51]:
+    - generic [ref=e52]:
+      - heading "Inclusive, transparent pricing" [level=2] [ref=e53]
+      - paragraph [ref=e54]: The price you see is the price you pay. Your domain comes with everything included — every feature, every tool, even taxes and fees are accounted for, so there are no surprises at check-out.
+    - table [ref=e55]:
+      - rowgroup [ref=e56]:
+        - row "Features Squarespace Others" [ref=e57]:
+          - columnheader "Features" [ref=e58]:
+            - paragraph [ref=e59]: Features
+          - columnheader "Squarespace" [ref=e60]:
+            - paragraph [ref=e61]: Squarespace
+          - columnheader "Others" [ref=e62]:
+            - paragraph [ref=e63]: Others
+      - rowgroup [ref=e64]:
+        - row "WHOIS privacy Information" [ref=e65]:
+          - cell "WHOIS privacy Information" [ref=e66]:
+            - paragraph [ref=e67]:
+              - generic [ref=e68]: WHOIS privacy
+            - button "Information" [ref=e71] [cursor=pointer]:
+              - img "Information" [ref=e72]
+          - cell [ref=e76]:
+            - img [ref=e77]
+          - cell [ref=e79]:
+            - img [ref=e80]
+        - row "SSL certificate Information" [ref=e82]:
+          - cell "SSL certificate Information" [ref=e83]:
+            - paragraph [ref=e84]:
+              - generic [ref=e85]: SSL certificate
+            - button "Information" [ref=e88] [cursor=pointer]:
+              - img "Information" [ref=e89]
+          - cell [ref=e93]:
+            - img [ref=e94]
+          - cell [ref=e96]:
+            - img [ref=e97]
+        - row "Premium DNS Information" [ref=e99]:
+          - cell "Premium DNS Information" [ref=e100]:
+            - paragraph [ref=e101]:
+              - generic [ref=e102]: Premium DNS
+            - button "Information" [ref=e105] [cursor=pointer]:
+              - img "Information" [ref=e106]
+          - cell [ref=e110]:
+            - img [ref=e111]
+          - cell [ref=e113]:
+            - img [ref=e114]
+        - row "Email forwarding Information" [ref=e116]:
+          - cell "Email forwarding Information" [ref=e117]:
+            - paragraph [ref=e118]:
+              - generic [ref=e119]: Email forwarding
+            - button "Information" [ref=e122] [cursor=pointer]:
+              - img "Information" [ref=e123]
+          - cell [ref=e127]:
+            - img [ref=e128]
+          - cell [ref=e130]:
+            - img [ref=e131]
+        - row "Spam-free parking pages Information" [ref=e133]:
+          - cell "Spam-free parking pages Information" [ref=e134]:
+            - paragraph [ref=e135]:
+              - generic [ref=e136]: Spam-free parking pages
+            - button "Information" [ref=e139] [cursor=pointer]:
+              - img "Information" [ref=e140]
+          - cell [ref=e144]:
+            - img [ref=e145]
+          - cell [ref=e147]:
+            - img [ref=e148]
+        - row "Two-factor authentication Information" [ref=e150]:
+          - cell "Two-factor authentication Information" [ref=e151]:
+            - paragraph [ref=e152]:
+              - generic [ref=e153]: Two-factor authentication
+            - button "Information" [ref=e156] [cursor=pointer]:
+              - img "Information" [ref=e157]
+          - cell [ref=e161]:
+            - img [ref=e162]
+          - cell [ref=e164]:
+            - img [ref=e165]
+        - row "Domain / URL forwarding Information" [ref=e167]:
+          - cell "Domain / URL forwarding Information" [ref=e168]:
+            - paragraph [ref=e169]:
+              - generic [ref=e170]: Domain / URL forwarding
+            - button "Information" [ref=e173] [cursor=pointer]:
+              - img "Information" [ref=e174]
+          - cell [ref=e178]:
+            - img [ref=e179]
+          - cell [ref=e181]:
+            - img [ref=e182]
+        - row "24/7 customer support Information" [ref=e184]:
+          - cell "24/7 customer support Information" [ref=e185]:
+            - paragraph [ref=e186]:
+              - generic [ref=e187]: 24/7 customer support
+            - button "Information" [ref=e190] [cursor=pointer]:
+              - img "Information" [ref=e191]
+          - cell [ref=e195]:
+            - img [ref=e196]
+          - cell [ref=e198]:
+            - img [ref=e199]
+        - row "Total value Included $11 - $130" [ref=e201]:
+          - cell "Total value" [ref=e202]:
+            - paragraph [ref=e203]: Total value
+          - cell "Included" [ref=e204]:
+            - paragraph [ref=e205]: Included
+          - cell "$11 - $130" [ref=e206]:
+            - paragraph [ref=e207]: $11 - $130
+  - generic [ref=e208]:
+    - generic [ref=e209]:
+      - heading "Why choose Squarespace?" [level=2] [ref=e210]
+      - paragraph [ref=e211]: "For over 20 years, Squarespace has helped entrepreneurs turn their dreams into reality. Here, getting online is simple, because your domain comes with everything it should: powerful, built-in security and privacy protection, award-winning support, and tools that help you grow, for one transparent price."
+    - generic [ref=e213]:
+      - generic [ref=e215]:
+        - generic [ref=e216]:
+          - heading "Privacy" [level=3] [ref=e217]
+          - paragraph [ref=e218]: WHOIS privacy is included for all eligible domains.
+        - button "Play video" [ref=e224] [cursor=pointer]:
+          - img [ref=e225]
+      - generic [ref=e229]:
+        - heading "Email forwarding" [level=3] [ref=e230]
+        - paragraph [ref=e231]: Up to 100 email forwarding addresses, included at no extra cost.
+      - generic [ref=e236]:
+        - heading "Security" [level=3] [ref=e237]
+        - paragraph [ref=e238]:
+          - text: Your site is secure with a free, automatically updated, SSL/TLS certificate from
+          - link "Let's Encrypt" [ref=e239] [cursor=pointer]:
+            - /url: https://letsencrypt.org/
+          - text: .
+      - generic [ref=e243]:
+        - generic [ref=e244]:
+          - heading "Domain forwarding" [level=3] [ref=e245]
+          - paragraph [ref=e246]: Connect your custom domain to your Squarespace website, or set up free domain forwarding to drive visitors to a desired landing experience (like your Bio Site or social media profile).
+        - button "Play video" [ref=e252] [cursor=pointer]:
+          - img [ref=e253]
+  - generic [ref=e255]:
+    - generic [ref=e256]:
+      - heading "Security without compromise" [level=2] [ref=e257]
+      - paragraph [ref=e258]: Securing your domain shouldn’t cost you extra, with Squarespace, it doesn’t. Every Squarespace domain includes advanced security and privacy protection.
+    - generic [ref=e259]:
+      - heading "Built-in security, backed by the best" [level=3] [ref=e261]
+      - paragraph [ref=e262]: End-to-end encryption with DNSSEC powered by CloudDNS and SSL certificates to keep your connection safe, free with every domain.
+      - heading "Extra security, where you need it most" [level=3] [ref=e264]
+      - paragraph [ref=e265]: Two-factor authentication options provide an additional layer of protection for your account and your most important domain settings.
+      - heading "Free privacy protection" [level=3] [ref=e267]
+      - paragraph [ref=e268]: WHOIS privacy comes with every eligible domain, so your private information stays private.
+      - heading "Stay informed and protected" [level=3] [ref=e270]
+      - paragraph [ref=e271]: Your domain activity log keeps track of any changes made to your domain by domain owners and managers, so you remain in the know and in control.
+  - generic [ref=e273]:
+    - generic [ref=e274]:
+      - heading "Buy a domain and bring your idea to life." [level=2] [ref=e275]
+      - paragraph [ref=e276]: Register your custom domain or transfer an existing domain to Squarespace and manage everything in one place. Build your site in minutes with powerful AI tools and bespoke templates or add a custom business email with Google Workspace. Do more with your domain, do it all with Squarespace.
+    - generic [ref=e278]:
+      - link "Already have a domain? Transfer an existing domain →" [ref=e281] [cursor=pointer]:
+        - /url: /transfer-a-domain
+        - paragraph [ref=e282]: Already have a domain?
+        - paragraph [ref=e283]: Transfer an existing domain
+        - paragraph [ref=e284]: →
+      - link "Communicate with confidence Private, professional email from Google Workspace →" [ref=e287] [cursor=pointer]:
+        - /url: https://www.squarespace.com/professional-email
+        - paragraph [ref=e288]: Communicate with confidence
+        - paragraph [ref=e289]: Private, professional email from Google Workspace
+        - paragraph [ref=e290]: →
+      - link "Expand your brand Start building your own website →" [ref=e293] [cursor=pointer]:
+        - /url: https://www.squarespace.com/templates/get-started
+        - paragraph [ref=e294]: Expand your brand
+        - paragraph [ref=e295]: Start building your own website
+        - paragraph [ref=e296]: →
+  - generic [ref=e298]:
+    - generic [ref=e299]:
+      - heading "Register a domain name from over 400+ extensions" [level=2] [ref=e300]
+      - paragraph [ref=e301]: Squarespace offers a wide-range of top-level domains, allowing you to customize your online presence to fit your brand or business.
+    - generic [ref=e302]:
+      - link "Go to .com page" [ref=e303] [cursor=pointer]:
+        - /url: /tlds/com-domain
+        - paragraph [ref=e305]: .com
+      - link "Go to .net page" [ref=e306] [cursor=pointer]:
+        - /url: /tlds/net-domain
+        - paragraph [ref=e308]: .net
+      - link "Go to .org page" [ref=e309] [cursor=pointer]:
+        - /url: /tlds/org-domain
+        - paragraph [ref=e311]: .org
+      - link "Go to .io page" [ref=e312] [cursor=pointer]:
+        - /url: /tlds/io-domain
+        - paragraph [ref=e314]: .io
+      - link "Go to .co page" [ref=e315] [cursor=pointer]:
+        - /url: /tlds/co-domain
+        - paragraph [ref=e317]: .co
+      - link "Go to .xyz page" [ref=e318] [cursor=pointer]:
+        - /url: /tlds/xyz-domain
+        - paragraph [ref=e320]: .xyz
+      - link "Go to .me page" [ref=e321] [cursor=pointer]:
+        - /url: /tlds/me-domain
+        - paragraph [ref=e323]: .me
+      - link "Go to .music page" [ref=e324] [cursor=pointer]:
+        - /url: /tlds/music-domain
+        - paragraph [ref=e326]: .music
+      - link "Go to .tech page" [ref=e327] [cursor=pointer]:
+        - /url: /tlds/tech-domain
+        - paragraph [ref=e329]: .tech
+      - link "Go to .site page" [ref=e330] [cursor=pointer]:
+        - /url: /tlds/site-domain
+        - paragraph [ref=e332]: .site
+      - link "Go to .shop page" [ref=e333] [cursor=pointer]:
+        - /url: /tlds/shop-domain
+        - paragraph [ref=e335]: .shop
+      - link "Go to .store page" [ref=e336] [cursor=pointer]:
+        - /url: /tlds/store-domain
+        - paragraph [ref=e338]: .store
+    - link "Explore all options" [ref=e340] [cursor=pointer]:
+      - /url: /tlds
+      - text: Explore all options
+      - generic [ref=e341]: →
+  - generic [ref=e342]:
+    - heading "For those coming from Google Domains" [level=2] [ref=e344]
+    - generic [ref=e345]:
+      - button "Play video" [ref=e351] [cursor=pointer]:
+        - img [ref=e352]
+      - generic [ref=e354]:
+        - heading "Expect a clean, familiar, experience" [level=3] [ref=e355]
+        - paragraph [ref=e356]: Squarespace Domains includes the best of Google Domains, fair, all-in pricing that includes premium features like email forwarding, and a clean, easy-to-use interface.
+        - heading "World class domain registration" [level=3] [ref=e357]
+        - paragraph [ref=e358]: Register a domain with or without a website from Squarespace. Easily link your domain to any email provider, web host, or custom application.
+        - link "Learn more" [ref=e360] [cursor=pointer]:
+          - /url: /google-domains
+          - text: Learn more
+          - generic [ref=e361]: →
+  - generic [ref=e363]:
+    - heading "How to search for and buy available domain names" [level=2] [ref=e365]
+    - list [ref=e366]:
+      - listitem [ref=e367]:
+        - paragraph [ref=e369]: Enter your desired domain name into our domain name search tool or use our AI-powered domain name generator to get ideas.
+      - listitem [ref=e370]:
+        - paragraph [ref=e372]: Check the availability of domain names on a wide range of TLDs, country codes, and domain extensions.
+      - listitem [ref=e373]:
+        - paragraph [ref=e375]: Select one or more domain names and domain extensions – register misspellings and alternative domains to protect your brand name.
+      - listitem [ref=e376]:
+        - paragraph [ref=e378]: Complete your domain registration with Squarespace so you can manage them in one place.
+      - listitem [ref=e379]:
+        - paragraph [ref=e381]: Check out and pay.
+  - generic [ref=e383]:
+    - heading "Frequently asked questions" [level=2] [ref=e385]
+    - generic [ref=e386]:
+      - button "What is a domain name?" [ref=e388] [cursor=pointer]:
+        - heading "What is a domain name?" [level=3] [ref=e389]
+        - img [ref=e391]
+      - button "What is domain name registration?" [ref=e394] [cursor=pointer]:
+        - heading "What is domain name registration?" [level=3] [ref=e395]
+        - img [ref=e397]
+      - button "How do I choose a domain registrar?" [ref=e400] [cursor=pointer]:
+        - heading "How do I choose a domain registrar?" [level=3] [ref=e401]
+        - img [ref=e403]
+      - button "Do I have to use any other Squarespace services to use Squarespace Domains for my domains?" [ref=e406] [cursor=pointer]:
+        - heading "Do I have to use any other Squarespace services to use Squarespace Domains for my domains?" [level=3] [ref=e407]
+        - img [ref=e409]
+      - button "How do I get email for my domain?" [ref=e412] [cursor=pointer]:
+        - heading "How do I get email for my domain?" [level=3] [ref=e413]
+        - img [ref=e415]
+      - button "What top-level domains are available on Squarespace?" [ref=e418] [cursor=pointer]:
+        - heading "What top-level domains are available on Squarespace?" [level=3] [ref=e419]
+        - img [ref=e421]
+      - button "Will I have domain or WHOIS privacy?" [ref=e424] [cursor=pointer]:
+        - heading "Will I have domain or WHOIS privacy?" [level=3] [ref=e425]
+        - img [ref=e427]
+      - button "Do Squarespace domains come with an SSL certificate?" [ref=e430] [cursor=pointer]:
+        - heading "Do Squarespace domains come with an SSL certificate?" [level=3] [ref=e431]
+        - img [ref=e433]
+      - button "How do I choose a domain name?" [ref=e436] [cursor=pointer]:
+        - heading "How do I choose a domain name?" [level=3] [ref=e437]
+        - img [ref=e439]
+      - button "How do I ensure nobody else claims my domain?" [ref=e442] [cursor=pointer]:
+        - heading "How do I ensure nobody else claims my domain?" [level=3] [ref=e443]
+        - img [ref=e445]
+      - button "Does Squarespace offer free domains?" [ref=e448] [cursor=pointer]:
+        - heading "Does Squarespace offer free domains?" [level=3] [ref=e449]
+        - img [ref=e451]
+      - button "If I buy a domain, but my site isn't ready, what happens?" [ref=e454] [cursor=pointer]:
+        - heading "If I buy a domain, but my site isn't ready, what happens?" [level=3] [ref=e455]
+        - img [ref=e457]
+      - button "Can my business sell Squarespace Domains?" [ref=e460] [cursor=pointer]:
+        - heading "Can my business sell Squarespace Domains?" [level=3] [ref=e461]
+        - img [ref=e463]
+  - generic [ref=e465]:
+    - paragraph [ref=e466]: Find the perfect domain for your website
+    - generic [ref=e467]:
+      - generic:
+        - img
+      - textbox "Start your search here" [ref=e468]
+      - button "Search" [disabled] [ref=e469] [cursor=pointer]:
+        - img [ref=e470]
+    - paragraph [ref=e472]:
+      - text: Already have a domain?
+      - link "Transfer your domain" [ref=e473] [cursor=pointer]:
+        - /url: /transfer-a-domain
+  - generic [ref=e474]:
+    - list [ref=e475]:
+      - listitem [ref=e476]:
+        - button "Products" [disabled] [ref=e477]:
+          - generic [ref=e478]: Products
+        - list [ref=e480]:
+          - listitem [ref=e481]:
+            - link "Websites" [ref=e482] [cursor=pointer]:
+              - /url: https://www.squarespace.com/website-design
+          - listitem [ref=e483]:
+            - link "Designer Templates" [ref=e484] [cursor=pointer]:
+              - /url: https://www.squarespace.com/websites/designer-templates
+          - listitem [ref=e485]:
+            - link "Online Stores" [ref=e486] [cursor=pointer]:
+              - /url: https://www.squarespace.com/online-stores
+          - listitem [ref=e487]:
+            - link "Services" [ref=e488] [cursor=pointer]:
+              - /url: https://www.squarespace.com/online-stores
+          - listitem [ref=e489]:
+            - link "Scheduling" [ref=e490] [cursor=pointer]:
+              - /url: https://www.squarespace.com/scheduling
+          - listitem [ref=e491]:
+            - link "Invoicing" [ref=e492] [cursor=pointer]:
+              - /url: https://www.squarespace.com/invoicing
+          - listitem [ref=e493]:
+            - link "Content & Memberships" [ref=e494] [cursor=pointer]:
+              - /url: https://www.squarespace.com/content
+          - listitem [ref=e495]:
+            - link "Marketing Tools" [ref=e496] [cursor=pointer]:
+              - /url: https://www.squarespace.com/website-marketing
+          - listitem [ref=e497]:
+            - link "Professional Email" [ref=e498] [cursor=pointer]:
+              - /url: https://www.squarespace.com/professional-email
+      - listitem [ref=e499]:
+        - button "Domain Endings" [disabled] [ref=e500]:
+          - generic [ref=e501]: Domain Endings
+        - list [ref=e503]:
+          - listitem [ref=e504]:
+            - link "ALL TLDS" [ref=e505] [cursor=pointer]:
+              - /url: /tlds
+          - listitem [ref=e506]:
+            - link "COM" [ref=e507] [cursor=pointer]:
+              - /url: /tlds/com-domain
+          - listitem [ref=e508]:
+            - link "NET" [ref=e509] [cursor=pointer]:
+              - /url: /tlds/net-domain
+          - listitem [ref=e510]:
+            - link "ORG" [ref=e511] [cursor=pointer]:
+              - /url: /tlds/org-domain
+          - listitem [ref=e512]:
+            - link "IO" [ref=e513] [cursor=pointer]:
+              - /url: /tlds/io-domain
+          - listitem [ref=e514]:
+            - link "CO" [ref=e515] [cursor=pointer]:
+              - /url: /tlds/co-domain
+          - listitem [ref=e516]:
+            - link "AI" [ref=e517] [cursor=pointer]:
+              - /url: /tlds/ai-domain
+          - listitem [ref=e518]:
+            - link "ME" [ref=e519] [cursor=pointer]:
+              - /url: /tlds/me-domain
+          - listitem [ref=e520]:
+            - link "TECH" [ref=e521] [cursor=pointer]:
+              - /url: /tlds/tech-domain
+          - listitem [ref=e522]:
+            - link "SITE" [ref=e523] [cursor=pointer]:
+              - /url: /tlds/site-domain
+          - listitem [ref=e524]:
+            - link "SHOP" [ref=e525] [cursor=pointer]:
+              - /url: /tlds/shop-domain
+          - listitem [ref=e526]:
+            - link "STORE" [ref=e527] [cursor=pointer]:
+              - /url: /tlds/store-domain
+      - listitem [ref=e528]:
+        - button "Resources" [disabled] [ref=e529]:
+          - generic [ref=e530]: Resources
+        - list [ref=e532]:
+          - listitem [ref=e533]:
+            - link "Google Domains" [ref=e534] [cursor=pointer]:
+              - /url: /google-domains
+          - listitem [ref=e535]:
+            - link "Help Center" [ref=e536] [cursor=pointer]:
+              - /url: https://support.squarespace.com/
+          - listitem [ref=e537]:
+            - link "Forum" [ref=e538] [cursor=pointer]:
+              - /url: https://forum.squarespace.com/
+          - listitem [ref=e539]:
+            - link "Website Examples" [ref=e540] [cursor=pointer]:
+              - /url: https://www.squarespace.com/showcase
+          - listitem [ref=e541]:
+            - link "Hire An Expert" [ref=e542] [cursor=pointer]:
+              - /url: https://www.squarespace.com/designer
+          - listitem [ref=e543]:
+            - link "Business Name Generator" [ref=e544] [cursor=pointer]:
+              - /url: https://www.squarespace.com/tools/business-name-generator
+          - listitem [ref=e545]:
+            - link "Domain Name Generator" [ref=e546] [cursor=pointer]:
+              - /url: /tools/domain-name-generator
+      - listitem [ref=e547]:
+        - button "Company" [disabled] [ref=e548]:
+          - generic [ref=e549]: Company
+        - list [ref=e551]:
+          - listitem [ref=e552]:
+            - link "About" [ref=e553] [cursor=pointer]:
+              - /url: https://www.squarespace.com/about/company
+          - listitem [ref=e554]:
+            - link "Contact Us" [ref=e555] [cursor=pointer]:
+              - /url: https://www.squarespace.com/contact
+          - listitem [ref=e556]:
+            - link "Security & Trust" [ref=e557] [cursor=pointer]:
+              - /url: https://www.squarespace.com/security
+          - listitem [ref=e558]:
+            - link "Report Abuse" [ref=e559] [cursor=pointer]:
+              - /url: https://support.squarespace.com/hc/articles/11580957865869-Report
+          - listitem [ref=e560]:
+            - link "Terms of Service" [ref=e561] [cursor=pointer]:
+              - /url: https://www.squarespace.com/terms-of-service
+          - listitem [ref=e562]:
+            - link "Privacy Policy" [ref=e563] [cursor=pointer]:
+              - /url: https://www.squarespace.com/privacy
+    - generic [ref=e564]:
+      - link "Squarespace Logo" [ref=e565] [cursor=pointer]:
+        - /url: /
+        - img "Squarespace Logo" [ref=e566]
+      - button "Select your language" [ref=e572] [cursor=pointer]: English ↓
+      - generic [ref=e573]:
+        - img [ref=e574]
+        - generic [ref=e602]: We are an ICANN accredited registrar.

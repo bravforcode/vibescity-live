@@ -29,13 +29,31 @@ except:
 
 def find_html_files(project_path: Path) -> list:
     """Find all HTML/JSX/TSX files."""
-    patterns = ['**/*.html', '**/*.jsx', '**/*.tsx']
-    skip_dirs = {'node_modules', '.next', 'dist', 'build', '.git'}
+    skip_dirs = {
+        'node_modules', '.next', 'dist', 'build', '.git', '.vercel', '.artifacts',
+        '.agent', '.agents', '.localappdata', '.planning', '.trunk', 'coverage',
+        'reports', 'storybook-static', 'tmp'
+    }
     
     files = []
-    for pattern in patterns:
-        for f in project_path.glob(pattern):
-            if not any(skip in f.parts for skip in skip_dirs):
+    seen = set()
+    candidate_roots = [
+        (project_path, ('*.html',)),
+        (project_path / 'public', ('**/*.html',)),
+        (project_path / 'src', ('**/*.jsx', '**/*.tsx')),
+    ]
+
+    for root, patterns in candidate_roots:
+        if not root.exists():
+            continue
+        for pattern in patterns:
+            for f in root.glob(pattern):
+                if any(skip in f.parts for skip in skip_dirs):
+                    continue
+                resolved = f.resolve()
+                if resolved in seen:
+                    continue
+                seen.add(resolved)
                 files.append(f)
     
     return files[:50]

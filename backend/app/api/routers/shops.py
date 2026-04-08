@@ -307,4 +307,4 @@ async def upload_shop_storefront(
         return {"status": "success", "storefront_image_url": public_url}
     except Exception as exc:
         logger.error("shop_storefront_upload_failed", extra={"shop_id": shop_id, "err": str(exc)})
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(exc)}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(exc)}") from exc

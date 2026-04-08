@@ -1,12 +1,11 @@
 <script setup>
-import { RefreshCw, WifiOff, X } from "lucide-vue-next";
+import { RefreshCw, X } from "lucide-vue-next";
 import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 
 // ✅ Native PWA Service Worker Detection (Rsbuild-compatible)
-const offlineReady = ref(false);
 const needRefresh = ref(false);
 let sw = null;
 
@@ -36,7 +35,6 @@ onMounted(() => {
 	if ("serviceWorker" in navigator) {
 		navigator.serviceWorker.ready.then((registration) => {
 			sw = registration;
-			offlineReady.value = true;
 
 			// Check for updates
 			registration.addEventListener("updatefound", () => {
@@ -57,7 +55,6 @@ onMounted(() => {
 });
 
 const close = async () => {
-	offlineReady.value = false;
 	needRefresh.value = false;
 };
 </script>
@@ -65,7 +62,7 @@ const close = async () => {
 <template>
   <!-- Global PWA Toast Container -->
   <div
-    v-if="offlineReady || needRefresh"
+    v-if="needRefresh"
     class="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 z-[9999] flex flex-col gap-2"
     role="alert"
   >
@@ -82,24 +79,19 @@ const close = async () => {
         "
       >
         <RefreshCw v-if="needRefresh" class="w-5 h-5 animate-spin-slow" />
-        <WifiOff v-else class="w-5 h-5" />
       </div>
 
       <!-- Content -->
       <div class="flex-1 pt-0.5">
         <h3 class="text-sm font-bold text-white mb-0.5">
-          {{ needRefresh ? t('pwa.new_content_title') : t('pwa.offline_ready_title') }}
+          {{ t('pwa.new_content_title') }}
         </h3>
         <p class="text-xs text-zinc-400 leading-relaxed">
-          {{
-            needRefresh
-              ? t('pwa.new_content_desc')
-              : t('pwa.offline_ready_desc')
-          }}
+          {{ t('pwa.new_content_desc') }}
         </p>
 
         <!-- Actions -->
-        <div class="mt-3 flex gap-2" v-if="needRefresh">
+        <div class="mt-3 flex gap-2">
           <button
             @click="updateServiceWorker()"
             class="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-colors shadow-lg shadow-blue-500/20"
@@ -111,13 +103,6 @@ const close = async () => {
             {{ t('pwa.dismiss') }}
           </button>
         </div>
-        <button
-          v-else
-          @click="close"
-          class="mt-3 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white text-xs font-medium transition-colors"
-        >
-          {{ t('common.close') }}
-        </button>
       </div>
 
       <!-- Close X -->

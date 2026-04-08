@@ -44,6 +44,14 @@ DEFAULT_PYTHON_EXCLUDES = [
 FALLBACK_RESULT_CACHE = {}
 
 
+def resolve_typescript_cmd(project_path: Path) -> list[str]:
+    """Prefer the repo-local TypeScript compiler over `npx tsc`."""
+    local_tsc = project_path / "node_modules" / "typescript" / "lib" / "tsc.js"
+    if local_tsc.exists():
+        return ["node", str(local_tsc), "--noEmit"]
+    return ["npx", "tsc", "--noEmit"]
+
+
 def detect_project_type(project_path: Path) -> dict:
     """Detect project type and available linters."""
     result = {
@@ -79,7 +87,7 @@ def detect_project_type(project_path: Path) -> dict:
             if "typescript" in deps or (project_path / "tsconfig.json").exists():
                 result["linters"].append({
                     "name": "tsc",
-                    "cmd": ["npx", "tsc", "--noEmit"],
+                    "cmd": resolve_typescript_cmd(project_path),
                     "fallback_cmd": build_cmd,
                 })
                 

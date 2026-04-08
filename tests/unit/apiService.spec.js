@@ -58,7 +58,13 @@ describe("apiService", () => {
 	});
 
 	it("should validate response data against schema", async () => {
-		const validData = { id: "1", name: "Shop 1", lat: 13.7, lng: 100.5 };
+		const validData = {
+			id: "1",
+			name: "Shop 1",
+			slug: "shop-1",
+			lat: 13.7,
+			lng: 100.5,
+		};
 		mockRequest.mockResolvedValue({ data: validData });
 
 		const result = await request({ 
@@ -67,7 +73,13 @@ describe("apiService", () => {
 			schema: VenueSchema 
 		});
 
-		expect(result).toEqual(validData);
+		expect(result).toEqual({
+			...validData,
+			status: "LIVE",
+			view_count: 0,
+			image_urls: [],
+			is_verified: false,
+		});
 	});
 
 	it("should throw if validation fails", async () => {

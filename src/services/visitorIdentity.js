@@ -1,5 +1,4 @@
 import { getApiV1BaseUrl } from "../lib/runtimeConfig";
-import { request, VisitorBootstrapSchema } from "./apiService";
 import {
 	clearRuntimeLaneUnavailable,
 	isKnownMissingRuntimeLane,
@@ -7,6 +6,7 @@ import {
 	markRuntimeLaneUnavailable,
 	RUNTIME_LANES,
 } from "../lib/runtimeLaneAvailability";
+import { request, VisitorBootstrapSchema } from "./apiService";
 
 const VISITOR_ID_KEY = "vibe_visitor_id";
 const VISITOR_TOKEN_KEY = "vibe_visitor_token";

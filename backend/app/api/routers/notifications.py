@@ -2,6 +2,7 @@
 Notification Router - Push and in-app notifications
 """
 
+import asyncio
 import logging
 from typing import Any
 
@@ -14,6 +15,7 @@ from app.services.notifications import send_push_notification
 
 router = APIRouter()
 logger = logging.getLogger("app.notifications")
+
 
 class PushNotificationRequest(BaseModel):
     user_ids: list[str]
@@ -48,8 +50,7 @@ async def get_notification_inbox(request: Request, user: dict = Depends(verify_u
     Fetch current user's in-app notification history.
     """
     from app.core.supabase import supabase_admin as supabase
-    import asyncio
-    
+
     user_id = user.get("id")
     response = await asyncio.to_thread(
         lambda: supabase.table("notifications")

@@ -6,7 +6,7 @@ Provides nearby traffic segments and road status
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from app.core.rate_limit import limiter
@@ -14,6 +14,7 @@ from app.services.traffic_service import traffic_service
 
 router = APIRouter()
 logger = logging.getLogger("app.traffic")
+
 
 class TrafficIncidentInput(BaseModel):
     id: str
@@ -72,17 +73,21 @@ async def subscribe_traffic_webhook(
     request: Request,
     merchant_id: str = Query(...),
     webhook_url: str = Query(...),
-    conditions: list[dict[str, Any]] = []
+    conditions: list[dict[str, Any]] | None = None,
 ):
     """
     Subscribe a merchant to real-time traffic alerts via webhook.
     """
     try:
-        subscription = await traffic_service.subscribe_merchant_webhook(merchant_id, webhook_url, conditions)
+        subscription = await traffic_service.subscribe_merchant_webhook(
+            merchant_id,
+            webhook_url,
+            conditions or [],
+        )
         return {"success": True, "subscription": subscription}
     except Exception as e:
         logger.exception("Webhook subscription failed: %s", str(e))
-        raise HTTPException(status_code=500, detail="Failed to subscribe to webhooks")
+        raise HTTPException(status_code=500, detail="Failed to subscribe to webhooks") from e
 
 
 @router.get("/status")

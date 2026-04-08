@@ -407,19 +407,27 @@ export const useUserStore = defineStore(
 				document.documentElement.style.colorScheme = isDark ? "dark" : "light";
 
 				// Set global brightness variables based on accessibility guidelines
-				document.documentElement.style.setProperty("--vc-ui-brightness", isDark ? "1.0" : "0.95");
-				document.documentElement.style.setProperty("--vc-ui-contrast", isDark ? "1.0" : "1.05");
+				document.documentElement.style.setProperty(
+					"--vc-ui-brightness",
+					isDark ? "1.0" : "0.95",
+				);
+				document.documentElement.style.setProperty(
+					"--vc-ui-contrast",
+					isDark ? "1.0" : "1.05",
+				);
 			},
 			{ immediate: true },
 		);
 
 		// Watch for system preference changes
 		if (typeof window !== "undefined") {
-			window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-				if (preferences.value.isSystemTheme) {
-					// isDarkMode computed property will update automatically
-				}
-			});
+			window
+				.matchMedia("(prefers-color-scheme: dark)")
+				.addEventListener("change", () => {
+					if (preferences.value.isSystemTheme) {
+						// isDarkMode computed property will update automatically
+					}
+				});
 		}
 
 		return {

@@ -7,6 +7,8 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
+    <meta name="author" content="VibeCity Team" />
+    <meta name="dateModified" content="2026-04-06" />
     <!-- PWA & Theme Color -->
     <meta name="theme-color" content="#8B5CF6" />
     <link rel="manifest" href="/manifest.json" />
@@ -61,6 +63,40 @@
         "inLanguage": ["th", "en"]
       }
     </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "VibeCity",
+        "url": "https://vibecity.live",
+        "description": "Thailand entertainment discovery platform for nightlife, cafes, events, wellness, and local experiences.",
+        "foundingDate": "2026-01-01"
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What is VibeCity?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "VibeCity is defined as a live Thailand entertainment map that helps people discover venues, events, and useful local context in one place."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How does VibeCity help visitors?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "VibeCity surfaces nearby nightlife, cafes, attractions, and practical venue details so users can make faster local decisions."
+            }
+          }
+        ]
+      }
+    </script>
 
     <!-- Mobile Web App Capable -->
     <meta name="mobile-web-app-capable" content="yes" />
@@ -92,48 +128,6 @@
     <!-- Google APIs — for venue photos via Places Photos API -->
     <link rel="preconnect" href="https://maps.googleapis.com" />
     <link rel="dns-prefetch" href="https://maps.gstatic.com" />
-    <script>
-      (() => {
-        const hostname = window.location.hostname;
-        const isLocalhost =
-          hostname === "localhost" ||
-          hostname === "127.0.0.1" ||
-          hostname === "[::1]";
-
-        if (isLocalhost) return;
-
-        const fontHref =
-          "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap";
-        const head = document.head;
-
-        const preconnectGoogle = document.createElement("link");
-        preconnectGoogle.rel = "preconnect";
-        preconnectGoogle.href = "https://fonts.googleapis.com";
-        head.appendChild(preconnectGoogle);
-
-        const preconnectGstatic = document.createElement("link");
-        preconnectGstatic.rel = "preconnect";
-        preconnectGstatic.href = "https://fonts.gstatic.com";
-        preconnectGstatic.crossOrigin = "anonymous";
-        head.appendChild(preconnectGstatic);
-
-        const preload = document.createElement("link");
-        preload.rel = "preload";
-        preload.as = "style";
-        preload.href = fontHref;
-        head.appendChild(preload);
-
-        const stylesheet = document.createElement("link");
-        stylesheet.rel = "stylesheet";
-        stylesheet.media = "print";
-        stylesheet.onload = function onFontStylesheetLoad() {
-          this.media = "all";
-        };
-        stylesheet.href = fontHref;
-        head.appendChild(stylesheet);
-      })();
-    </script>
-
     <style>
       :root {
         --font-display: "Inter", "Sarabun", system-ui, sans-serif;
@@ -153,6 +147,9 @@
         height: 100%;
         width: 100%;
       }
+      main {
+        height: 100%;
+      }
       /* Critical app-shell skeleton shown before JS hydrates */
       #app:empty::before {
         content: '';
@@ -165,6 +162,35 @@
   </head>
   <body>
     <a href="#main-content" class="skip-link">Skip to Map Content</a>
-    <div id="app"></div>
+    <main id="main-content" tabindex="-1">
+      <div id="app"></div>
+      <noscript>
+        <section aria-labelledby="vibecity-noscript-title">
+          <h1 id="vibecity-noscript-title">VibeCity Thailand Entertainment Map</h1>
+          <p>
+            Simply put, VibeCity helps people find nightlife, cafes, events, and
+            local experiences across Thailand with live venue context.
+          </p>
+          <h2>How VibeCity works</h2>
+          <ul>
+            <li>Discover nearby venues and categories across Thailand.</li>
+            <li>Review practical details before deciding where to go.</li>
+            <li>Use live venue context to plan nightlife and local exploration.</li>
+          </ul>
+          <h2>Frequently asked questions</h2>
+          <details>
+            <summary>What can I discover with VibeCity?</summary>
+            <p>
+              According to live venue data, VibeCity covers cafes, nightlife,
+              wellness, shopping, and other local categories in one map-first experience.
+            </p>
+          </details>
+          <details>
+            <summary>Who publishes this content?</summary>
+            <p>Written by the VibeCity Team and updated for the 2026 public launch.</p>
+          </details>
+        </section>
+      </noscript>
+    </main>
   </body>
 </html>

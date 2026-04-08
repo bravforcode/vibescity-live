@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 from datetime import UTC, datetime
 from typing import Any
 
@@ -7,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 router = APIRouter(tags=["map-core"])
+logger = logging.getLogger("app.map_core")
 
 # ── bbox parser ───────────────────────────────────────────────────
 

@@ -2,19 +2,21 @@
 Traffic Fusion Service - Merges traffic data from multiple sources.
 Uses confidence scores and historical weighting for accuracy.
 """
+import json
 import logging
-import anyio
 from datetime import UTC, datetime
 from typing import Any
-import json
 
-from app.core.config import get_settings
+import anyio
+
+from app.core.config import get_settings as get_app_settings
 from app.services.cache import redis_client
-from .base import TrafficProvider, StandardTrafficSegment, StandardIncident, TrafficDensity
+
+from .base import StandardTrafficSegment, TrafficProvider
 from .google import GoogleTrafficProvider
-from .tomtom import TomTomTrafficProvider
 from .osm import OSMTrafficProvider
 from .thai_gov import ThaiGovTrafficProvider
+from .tomtom import TomTomTrafficProvider
 
 logger = logging.getLogger("app.traffic.fusion")
 
@@ -95,7 +97,7 @@ class TrafficFusionService:
             grouped[key].append(s)
             
         fused = []
-        for key, group in grouped.items():
+        for _key, group in grouped.items():
             if len(group) == 1:
                 fused.append(group[0])
                 continue
@@ -129,8 +131,9 @@ class TrafficFusionService:
         Stores historical traffic snapshots for trend analysis.
         Writes to 'traffic_history' table in Supabase.
         """
-        from app.core.supabase import supabase_admin as supabase
         import asyncio
+
+        from app.core.supabase import supabase_admin as supabase
 
         if not segments:
             return
@@ -185,5 +188,4 @@ class TrafficFusionService:
             } for s in segments
         ]
 
-from app.core.config import get_settings as get_app_settings # added missing import
 traffic_fusion_service = TrafficFusionService()
