@@ -24,6 +24,7 @@ const RULES = [
 const getTrackedFiles = () => {
   const out = execSync("git ls-files -z", {
     stdio: ["ignore", "pipe", "ignore"],
+    maxBuffer: 10 * 1024 * 1024, // 10MB buffer for large repos
   });
   return out
     .toString("utf8")
