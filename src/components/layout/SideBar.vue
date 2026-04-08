@@ -84,7 +84,7 @@ const enrichedShopState = computed(() => {
 const enrichedShops = computed(() => enrichedShopState.value.enriched);
 const liveShopsCount = computed(() => enrichedShopState.value.liveCount);
 const categories = computed(() => uniqueCategories.value);
-const statusOptions = computed(() => {
+const resolvedStatusOptions = computed(() => {
 	const statuses = Array.isArray(props.statusOptions)
 		? props.statusOptions.filter(
 				(status) => typeof status === "string" && status.trim().length > 0,
@@ -402,7 +402,7 @@ onUnmounted(() => {
                   </span>
                   <div class="grid grid-cols-2 gap-2">
                     <button
-                      v-for="status in statusOptions"
+                      v-for="status in resolvedStatusOptions"
                       :key="status"
                       @click="selectStatus(status)"
                       :aria-pressed="activeStatus === status"
