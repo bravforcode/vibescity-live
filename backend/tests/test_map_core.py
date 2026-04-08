@@ -21,6 +21,32 @@ class _FakeRPC:
         return SimpleNamespace(data=self._data)
 
 
+class _FakeTable:
+    """Mimics supabase.table().select().filter().limit().execute() chain."""
+
+    def __init__(self, data, parent_sb=None):
+        self._data = data
+        self._parent_sb = parent_sb
+
+    def select(self, *args, **kwargs):
+        if self._parent_sb:
+            self._parent_sb.calls.append(("select", args, kwargs))
+        return self
+
+    def filter(self, *args, **kwargs):
+        if self._parent_sb:
+            self._parent_sb.calls.append(("filter", args, kwargs))
+        return self
+
+    def limit(self, _n):
+        if self._parent_sb:
+            self._parent_sb.calls.append(("limit", _n))
+        return self
+
+    def execute(self):
+        return SimpleNamespace(data=self._data)
+
+
 class FakeSupabase:
     def __init__(self, rpc_data=None):
         self._rpc_data = rpc_data if rpc_data is not None else []
@@ -29,6 +55,11 @@ class FakeSupabase:
     def rpc(self, name, params):
         self.calls.append((name, params))
         return _FakeRPC(self._rpc_data)
+
+    def table(self, _name):
+        """Mock table() for materialized view queries."""
+        self.calls.append(("table", _name))
+        return _FakeTable(self._rpc_data, parent_sb=self)
 
 
 @pytest.fixture()
@@ -60,15 +91,8 @@ def test_venues_happy_path(client, fake_supabase):
     assert data["venues"][0]["id"] == "1"
     assert "timestamp" in data
     assert sb.calls
-    rpc_name, rpc_params = sb.calls[-1]
-    assert rpc_name == "get_map_pins"
-    assert rpc_params == {
-        "p_min_lng": 100.0,
-        "p_min_lat": 13.0,
-        "p_max_lng": 101.0,
-        "p_max_lat": 14.0,
-        "p_zoom": 12,
-    }
+    # By default use_cache=True, so should use .table() path
+    assert sb.calls[0] == ("table", "mv_venue_geodata")
 
 
 def test_venues_bbox_bad_format(client, fake_supabase):
