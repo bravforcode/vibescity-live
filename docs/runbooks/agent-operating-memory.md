@@ -3,7 +3,7 @@
 > Read this file before every work session in `C:\vibecity.live`.
 
 - Last updated: 2026-04-09
-- Current focus: Keep `vibescity.live` stable on the latest Vercel `frontend` production deployment, keep `www.vibescity.live` permanently redirecting to the apex via the tiny `vercel-domain-redirect` deployment, keep the Vercel-side `vibecity.live` redirect ready while external DNS still points elsewhere, and preserve the brighter visible basemap, the taller `198x272` bottom-feed card footprint, the larger near-black compact card copy, the left-aligned compact live-card titles, the silent geolocation startup path, the passive modal touch listeners, the removed `Ready for Offline` toast, browser analytics/Clarity, and the existing public-host fallbacks that suppress broken cross-origin Supabase and Fly lanes.
+- Current focus: Keep `vibescity.live` stable on the latest Vercel `frontend` production deployment, keep `www.vibescity.live` permanently redirecting to the apex via the tiny `vercel-domain-redirect` deployment, keep the Vercel-side `vibecity.live` redirect ready while external DNS still points elsewhere, and preserve the brighter visible basemap, the taller `198x272` bottom-feed card footprint, the larger near-black compact card copy, the left-aligned compact live-card titles, the startup geolocation flow that reuses the last real location and only prompts when no real location is stored, the passive modal touch listeners, the removed `Ready for Offline` toast, browser analytics/Clarity, and the existing public-host fallbacks that suppress broken cross-origin Supabase and Fly lanes.
 - Canonical skill: `.agents/skills/vibecity-session-handoff/SKILL.md`
 
 ## Start Every Session
@@ -78,7 +78,7 @@
 - Localhost/coarse-pointer startup now defers the heavy heatmap/atmosphere/traffic effect pass until interaction or later idle, and style load no longer triggers a duplicate early traffic refresh.
 - `SwipeCard` now keeps the info layer transparent with dark copy plus a light image-friendly bottom wash, so venue imagery stays visible without the old dark-glass blur or large matte panel.
 - `BottomFeed` now keeps compact mobile/public carousel cards at `198x272`, and `SwipeCard` compact typography now uses larger near-black title/meta/time copy plus left-aligned live-card titles while still reserving only the right gutter for the favorite button.
-- `locationStore` now auto-requests geolocation only when permission is already granted; startup/background watchers stay silent until the user explicitly taps `My Location` or another location action that allows prompting.
+- Startup geolocation now requests a real fix only when no persisted real location exists; once a real fix is captured, `locationStore` persists it, reuses it on revisit without calling the native geolocation APIs again, and silently continues tracking after the first granted fix.
 - `VibeModal` touch listeners now mount as passive listeners, removing the noisy Chrome scroll-blocking touch listener violations from the detail-sheet flow.
 - `MapLibreContainer` now mirrors user position with a DOM-based blue location marker overlay during locate flows, so `My Location` still shows an obvious self-position marker even when style-layer setup is interrupted by unrelated MapLibre layer errors.
 - Sentient auto-detect detail handoff now waits for `selection-flight-complete` from the map preview flow; carousel/startup preview auto-open still stays once-per-shop-per-tab via session memory.
@@ -163,7 +163,7 @@
 ## Current Focus
 
 - Keep the repo and the live public domains aligned to the single Supabase project `rukyitpjfmzhqjlfmbie`.
-- Keep `vibescity.live` stable with the brighter visible basemap, the taller `198x272` bottom-feed cards, the larger near-black compact typography, the left-aligned compact live-card titles, the silent geolocation startup path, and no offline-ready toast.
+- Keep `vibescity.live` stable with the brighter visible basemap, the taller `198x272` bottom-feed cards, the larger near-black compact typography, the left-aligned compact live-card titles, the startup geolocation flow that reuses the last real location and only prompts when no real location is stored, and no offline-ready toast.
 - Keep `www.vibescity.live` on a dedicated redirect deployment that returns `301` to `https://vibescity.live/`.
 - Preserve the current deploy split between the linked `vibecity.live` Vercel project, the public `frontend` Vercel project that serves `vibescity.live`, and the tiny `vercel-domain-redirect` project used for `www.vibescity.live`.
 
@@ -172,7 +172,7 @@
 - The tracked worktree is currently clean on `main`; only local untracked tool folders such as `.cursor/rules/` and `.windsurf/` remain outside the deploy scope.
 - Plain `vercel deploy -y` hit the free-tier `api-upload-free` limit on 2026-04-06; use `vercel deploy --archive=tgz -y` for preview deploys and `vercel deploy --prod --archive=tgz -y --force` for production deploys from this workspace.
 - The linked Vercel project in `.vercel/project.json` remains `vibecity.live` (`prj_iHipyu1Egd903Uvb6aZYirWB7ULE`); to deploy the live apex domain `vibescity.live` you must temporarily relink to project `frontend` (`prj_OtVXP7mJx8umDqNoL3F5OIAbouIh`), deploy, then restore `.vercel/project.json`.
-- The current live `frontend` production deployment is `dpl_5gmrdBf3UaVK798HVDRmzDVP3p8t` at `https://frontend-e05kbjraa-phirawits-projects.vercel.app`, serving `https://vibescity.live`.
+- The current live `frontend` production deployment is `dpl_9fd39jTiYFwXKKtEaNVtA72Z6cAB` at `https://frontend-lc8fr8vu0-phirawits-projects.vercel.app`, serving `https://vibescity.live`.
 - The current live redirect deployment is `dpl_DUPtU8mUvZsi7F4YfTXLD9ixumW7` at `https://vercel-domain-redirect-i9ywt93sl-phirawits-projects.vercel.app`, aliased to `https://www.vibescity.live`.
 - The current Vercel-side `vibecity.live` production deployment is `dpl_ATiYJck2kn6oC5U1rb7M1335BMYr` at `https://vibecitylive-c4rif6b79-phirawits-projects.vercel.app`, aliased inside Vercel to `https://vibecity.live`.
 - Production, development, and preview Vercel env vars for `SUPABASE_*` and `VITE_SUPABASE_*` now point to `https://rukyitpjfmzhqjlfmbie.supabase.co`.
@@ -183,7 +183,7 @@
 - `analytics-ingest` version `10` on project `rukyitpjfmzhqjlfmbie` accepts the custom visitor headers, fails open when `analytics_sessions` is unavailable, and writes best-effort rows into `analytics_logs`.
 - `BottomFeed.vue` now owns the compact mobile/public card footprint at `198x272` with a taller carousel rail so full compact-copy details fit without clipping.
 - `SwipeCard.vue` now keeps the category chip on its own row, restores `IMG/VID` counts on narrow cards, removes the compact-card title clamp, renders larger near-black compact copy, and leaves compact live-card titles left-aligned while only reserving the right gutter for the favorite button.
-- `locationStore.js` now gates startup/background geolocation behind an already-granted permission state; only explicit user-triggered locate actions pass `allowPrompt: true`.
+- `useAppLogic.js` now requests a startup geolocation prompt only when no real stored location exists, and `locationStore.js` now keeps tracking after the first successful prompted fix so the saved real location is reused on revisit without another startup geolocation API call.
 - `App.vue` and `MapLibreContainer.vue` now start silent background watching only when permission is already granted.
 - `VibeModal.vue` now registers passive `touchstart`/`touchmove` listeners for the detail sheet.
 - `ReloadPrompt.vue` now keeps only the update/reload path and never shows the passive `Ready for Offline` toast.
@@ -198,40 +198,31 @@
 ## Current Snapshot
 
 - Focus of this session:
-  - cut the public root domain over to `vibescity.live`, move `www.vibescity.live` to a permanent redirect, and attempt the same redirect for `vibecity.live`
+  - restore accurate startup geolocation on the live public app without forcing repeat permission prompts on revisits, then deploy that fix to `https://vibescity.live`
 - Session plan artifact:
-  - `.planning/20260409-vibescity-live-domain-cutover.md`
+  - `.planning/20260409-startup-geolocation-fix.md`
 - Files touched in this session:
   - `docs/runbooks/agent-operating-memory.md`
-  - `public/index.html`
-  - `public/robots.txt`
-  - `src/components/ui/ReferralShare.vue`
-  - `src/lib/runtimeConfig.js`
-  - `src/lib/runtimeLaneAvailability.js`
-  - `src/utils/mapRenderer.js`
-  - `src/utils/mediaSourceGuard.js`
-  - `src/views/PrivacyView.vue`
-  - `src/views/TermsView.vue`
-  - `vercel.json`
-  - `.planning/20260409-vibescity-live-domain-cutover.md`
+  - `src/composables/useAppLogic.js`
+  - `src/store/locationStore.js`
+  - `tests/unit/stores/locationStore.spec.js`
+  - `.planning/20260409-startup-geolocation-fix.md`
 - Behavior changed in this session:
-  - Public metadata, sitemap, referral share links, and browser/runtime fallback origins now point to `https://vibescity.live` instead of `https://vibecity.live`.
-  - The live public apex domain `https://vibescity.live` now serves the latest deployed build from Vercel project `frontend` with canonical/OG URLs set to the `vibescity.live` root domain.
-  - `https://www.vibescity.live` now returns a permanent `301` redirect to `https://vibescity.live/` via the standalone `vercel-domain-redirect` deployment.
-  - `vercel.json` in the main app now also contains host-based `301` redirect rules for `www.vibescity.live` and `vibecity.live`; the `www` lane is publicly live, while the `vibecity.live` redirect is only ready inside Vercel until external DNS is moved over.
+  - Startup now requests a real geolocation fix only when no stored real location exists, instead of silently booting into the Thailand-wide fallback shell on first visit.
+  - After the first successful prompted fix, `locationStore` immediately starts silent tracking and persists the real coordinates, so revisits reuse the last real location without calling the native geolocation APIs again at startup.
+  - The latest `frontend` production deployment with this startup geolocation fix is now live on `https://vibescity.live`.
+  - `https://www.vibescity.live` still returns a permanent `301` redirect to `https://vibescity.live/` via the standalone `vercel-domain-redirect` deployment.
 - Validation confirmed in this session:
-  - `npx biome check public/index.html public/robots.txt src/lib/runtimeConfig.js src/lib/runtimeLaneAvailability.js src/utils/mapRenderer.js src/utils/mediaSourceGuard.js src/components/ui/ReferralShare.vue src/views/PrivacyView.vue src/views/TermsView.vue` passes on 2026-04-09.
-  - `npm run build` passes on 2026-04-09 after the domain-reference patch.
-  - `$env:PYTHONIOENCODING='utf-8'; python .agent/scripts/checklist.py .` still times out at `Security Scan` on this Windows host after 5 minutes.
-  - `$env:PYTHONIOENCODING='utf-8'; python .agent/scripts/verify_all.py . --url https://vibescity.live` passes every lane except `Security Scan`, which times out after 600 seconds on this Windows host.
-  - `vercel deploy --prod --archive=tgz -y --force` to linked project `vibecity.live` produced deployment `dpl_987qQjVVmXZTBmAzyNADGNSXwdKt`, and the later Vercel-side refresh now has `vibecity.live` attached to deployment `dpl_ATiYJck2kn6oC5U1rb7M1335BMYr` / `https://vibecitylive-c4rif6b79-phirawits-projects.vercel.app`.
-  - `vercel redeploy frontend-47wxffku3-phirawits-projects.vercel.app --target production` produced deployment `dpl_5gmrdBf3UaVK798HVDRmzDVP3p8t`, now aliased to `https://vibescity.live`.
-  - `git push origin main` published commit `6031a7f61165b85a7cc0dc1bff4e5d79d678a736` with the redirect/domain patch.
-  - Tiny redirect deployment `dpl_DUPtU8mUvZsi7F4YfTXLD9ixumW7` succeeded on project `vercel-domain-redirect`, and `vercel alias set ... www.vibescity.live` succeeded.
-  - `curl -I https://www.vibescity.live` now returns `301 Moved Permanently` with `Location: https://vibescity.live/`.
-  - `vercel alias list` now shows both `frontend-e05kbjraa-phirawits-projects.vercel.app -> vibescity.live` and `vibecitylive-c4rif6b79-phirawits-projects.vercel.app -> vibecity.live`.
-  - `curl -I https://vibecity.live` still returns `301 Moved Permanently` from `Squarespace` to `https://avondale.io/bands/vibe-city`, proving public DNS still bypasses the Vercel-side redirect.
-  - `vercel domains inspect vibecity.live` still reports the external DNS is not configured for Vercel and recommends `A vibecity.live 76.76.21.21`, while `nslookup vibecity.live 1.1.1.1` still resolves to `198.185.159.144/145` and `198.49.23.144/145`.
+  - `npx biome check src/store/locationStore.js src/composables/useAppLogic.js tests/unit/stores/locationStore.spec.js .planning/20260409-startup-geolocation-fix.md` passes on 2026-04-10.
+  - `npx vitest run tests/unit/stores/locationStore.spec.js` passes on 2026-04-10.
+  - `& .\\node_modules\\.bin\\rsbuild.exe build` passes on 2026-04-10.
+  - `npm run build` still fails on this Windows host during `scripts/generate-localhost-venue-snapshot.mjs` with a Node heap OOM before the actual frontend bundle step.
+  - `$env:PYTHONIOENCODING='utf-8'; python .agent/scripts/checklist.py .` still times out at `Security Scan` on this Windows host.
+  - `vercel deploy --prod --archive=tgz -y --force` to temporary link `frontend` produced deployment `dpl_9fd39jTiYFwXKKtEaNVtA72Z6cAB`, now aliased to `https://vibescity.live`.
+  - `vercel alias set vercel-domain-redirect-i9ywt93sl-phirawits-projects.vercel.app www.vibescity.live` succeeded again after the production deploy, and `vercel link --project vibecity.live` restored the local link baseline.
+  - `curl -I https://vibescity.live` now returns `200 OK` from the latest frontend deployment, and `curl -I https://www.vibescity.live` returns `301 Moved Permanently` to `https://vibescity.live/`.
+  - A headless Playwright run against `https://vibescity.live` with granted geolocation stored `{\"userLocation\":[13.7563,100.5018],\"isMockLocation\":false,\"permissionStatus\":\"granted\"...}` in `localStorage`.
+  - A second headless Playwright revisit with that stored state recorded `getCurrentPosition: 0` and `watchPosition: 0`, confirming startup reuses the stored real location without calling the native geolocation APIs again.
 ## Update Protocol
 
 Replace the `Current focus`, `Current Resume Items`, and `Current Snapshot` sections instead of appending endless history. Keep updates factual and short.
