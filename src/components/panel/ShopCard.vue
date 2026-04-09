@@ -441,14 +441,14 @@ watch(
             <!-- Header -->
             <div class="shop-header">
               <h3
-                class="text-3xl font-black text-black leading-tight tracking-tight font-sans line-clamp-1"
+                class="text-4xl font-black text-black leading-tight tracking-tight font-sans line-clamp-1 flex-1"
               >
                 {{ shop.name }}
               </h3>
               <!-- Chart Toggle Button -->
               <button
                 @click.stop="showStats = true"
-                class="shop-fab shop-fab--idle"
+                class="shop-fab shop-fab--idle ml-2"
                 :aria-label="t('shop.view_stats')"
               >
                 <BarChart class="w-4 h-4" aria-hidden="true" />
@@ -654,8 +654,8 @@ watch(
 .shop-header {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
+  justify-content: flex-start;
+  gap: 0.75rem;
   margin-bottom: 0.75rem;
 }
 

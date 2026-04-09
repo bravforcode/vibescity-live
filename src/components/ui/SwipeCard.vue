@@ -1013,7 +1013,7 @@ const handleRootKeydown = (e) => {
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 2.5rem 0.65rem 0.75rem;
+  padding: 2.6rem 0.72rem 0.82rem;
   z-index: 20;
   overflow: hidden;
   background: none;
@@ -1028,12 +1028,12 @@ const handleRootKeydown = (e) => {
 }
 
 .sc-venue-name {
-  font-size: clamp(0.88rem, 0.72rem + 0.9cqi, 1.25rem);
+  font-size: clamp(0.96rem, 0.8rem + 0.95cqi, 1.38rem);
   font-weight: 900;
-  color: rgba(12 18 28 / 0.96);
-  line-height: 1.12;
+  color: #05070c;
+  line-height: 1.08;
   letter-spacing: -0.02em;
-  margin-bottom: 0.42rem;
+  margin-bottom: 0.5rem;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   /* Keep long venue names readable on narrow cards. */
@@ -1069,11 +1069,11 @@ const handleRootKeydown = (e) => {
   border-radius: 999px;
   background: rgba(15 23 42 / 0.05);
   border: 1px solid rgba(15 23 42 / 0.09);
-  font-size: clamp(0.58rem, 0.5rem + 0.4cqi, 0.65rem);
+  font-size: clamp(0.62rem, 0.54rem + 0.42cqi, 0.7rem);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: rgba(15 23 42 / 0.82);
+  color: rgba(5 10 18 / 0.88);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1091,8 +1091,8 @@ const handleRootKeydown = (e) => {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: clamp(0.6rem, 0.55rem + 0.36cqi, 0.72rem);
-  color: rgba(15 23 42 / 0.66);
+  font-size: clamp(0.64rem, 0.58rem + 0.4cqi, 0.78rem);
+  color: rgba(5 10 18 / 0.84);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1110,7 +1110,7 @@ const handleRootKeydown = (e) => {
   border-radius: 999px;
   background: rgba(14 165 233 / 0.1);
   border: 1px solid rgba(14 165 233 / 0.22);
-  color: rgba(3 105 161 / 0.92);
+  color: rgba(5 10 18 / 0.9);
 }
 
 .sc-root--giant .sc-meta-item--distance {
@@ -1137,7 +1137,7 @@ const handleRootKeydown = (e) => {
   border-radius: 999px;
   background: rgba(15 23 42 / 0.05);
   border: 1px solid rgba(15 23 42 / 0.08);
-  color: rgba(15 23 42 / 0.64);
+  color: rgba(5 10 18 / 0.84);
   flex-shrink: 0;
 }
 
@@ -1149,7 +1149,7 @@ const handleRootKeydown = (e) => {
 }
 
 .sc-stat-pill--time {
-  color: rgba(15 23 42 / 0.62);
+  color: rgba(5 10 18 / 0.84);
   flex-shrink: 1;
   min-width: 0;
   overflow: hidden;
@@ -1385,7 +1385,7 @@ const handleRootKeydown = (e) => {
 
 @container (max-width: 13rem) {
   .sc-info {
-    padding: 2.2rem 0.6rem 0.62rem;
+    padding: 2.1rem 0.68rem 0.68rem;
   }
 
   .sc-info-surface {
@@ -1393,10 +1393,10 @@ const handleRootKeydown = (e) => {
   }
 
   .sc-venue-name {
-    margin-inline-end: 2.9rem;
-    margin-bottom: 0.32rem;
-    font-size: 0.78rem;
-    line-height: 1.06;
+    margin-inline-end: 2.8rem;
+    margin-bottom: 0.38rem;
+    font-size: 0.92rem;
+    line-height: 1.08;
     display: block;
     -webkit-line-clamp: unset;
     -webkit-box-orient: initial;
@@ -1404,7 +1404,7 @@ const handleRootKeydown = (e) => {
   }
 
   .sc-root--live .sc-venue-name {
-    margin-inline-start: 4.15rem;
+    margin-inline-start: 4rem;
   }
 
   .sc-meta-row {
@@ -1426,9 +1426,9 @@ const handleRootKeydown = (e) => {
     grid-column: 1 / -1;
     width: fit-content;
     max-width: 100%;
-    min-height: 20px;
-    padding: 0.22rem 0.44rem;
-    font-size: 0.52rem;
+    min-height: 21px;
+    padding: 0.24rem 0.46rem;
+    font-size: 0.56rem;
     letter-spacing: 0.04em;
     line-height: 1.05;
     white-space: normal;
@@ -1437,7 +1437,7 @@ const handleRootKeydown = (e) => {
   }
 
   .sc-meta-item {
-    font-size: 0.57rem;
+    font-size: 0.61rem;
     line-height: 1;
     min-width: 0;
   }
@@ -1445,11 +1445,11 @@ const handleRootKeydown = (e) => {
   .sc-meta-item--distance {
     margin-left: 0;
     max-width: none;
-    padding: 0.24rem 0.46rem;
+    padding: 0.28rem 0.5rem;
   }
 
   .sc-meta-item--count {
-    color: rgba(15 23 42 / 0.58);
+    color: rgba(5 10 18 / 0.78);
   }
 
   .sc-sub-row {
@@ -1457,8 +1457,8 @@ const handleRootKeydown = (e) => {
   }
 
   .sc-stat-pill {
-    min-height: 22px;
-    padding: 0.22rem 0.42rem;
+    min-height: 23px;
+    padding: 0.24rem 0.44rem;
   }
 
   .sc-cta-row {
@@ -1471,7 +1471,7 @@ const handleRootKeydown = (e) => {
   }
 
   .sc-cta-distance {
-    font-size: 0.66rem;
+    font-size: 0.7rem;
   }
 }
 
