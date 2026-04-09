@@ -27,7 +27,7 @@ const emit = defineEmits(["share", "copy"]);
 const isCopied = ref(false);
 
 const shareUrl = computed(() => {
-	return `https://vibecity.live/?ref=${props.referralCode}`;
+	return `https://vibescity.live/?ref=${props.referralCode}`;
 });
 
 const copyCode = async () => {

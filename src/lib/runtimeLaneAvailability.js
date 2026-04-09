@@ -92,7 +92,7 @@ export const isKnownMissingRuntimeLane = (lane, baseUrl) => {
 			baseUrl,
 			typeof window !== "undefined"
 				? window.location.origin
-				: "https://vibecity.live",
+				: "https://vibescity.live",
 		);
 		return Boolean(KNOWN_HOST_RUNTIME_GAPS[parsed.hostname]?.has(lane));
 	} catch {

@@ -100,7 +100,7 @@ const consent = ref(
 		: localStorage.getItem(STORAGE_KEY) || "unset",
 );
 
-const SITE_ORIGIN = "https://vibecity.live";
+const SITE_ORIGIN = "https://vibescity.live";
 const SUPPORTED_LOCALES = new Set(["th", "en"]);
 const normalizeLocale = (value) => {
 	const raw = String(value || "")

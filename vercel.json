@@ -1,4 +1,18 @@
 {
+	"redirects": [
+		{
+			"source": "/(.*)",
+			"has": [{ "type": "host", "value": "www.vibescity.live" }],
+			"destination": "https://vibescity.live/$1",
+			"statusCode": 301
+		},
+		{
+			"source": "/(.*)",
+			"has": [{ "type": "host", "value": "vibecity.live" }],
+			"destination": "https://vibescity.live/$1",
+			"statusCode": 301
+		}
+	],
 	"headers": [
 		{
 			"source": "/(.*)",

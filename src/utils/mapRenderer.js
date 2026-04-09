@@ -64,7 +64,7 @@ export const escapeHtml = (value) =>
 const sanitizeUrl = (url) => {
 	if (!url) return "";
 	try {
-		const base = globalThis.location?.origin || "https://vibecity.live";
+		const base = globalThis.location?.origin || "https://vibescity.live";
 		const parsed = new URL(url, base);
 		if (parsed.protocol === "data:") {
 			return String(url).startsWith("data:image/") ? String(url) : "";

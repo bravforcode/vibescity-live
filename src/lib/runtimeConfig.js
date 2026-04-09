@@ -181,7 +181,7 @@ export const getSiteOrigin = (options = {}) => {
 		return trimTrailingSlash(window.location.origin);
 	}
 
-	return "https://vibecity.live";
+	return "https://vibescity.live";
 };
 
 export const requireClientEnv = (name, options = {}) => {

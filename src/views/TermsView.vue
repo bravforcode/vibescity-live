@@ -54,7 +54,7 @@ import { computed } from "vue";
 import { useRoute } from "vue-router";
 
 const lastUpdated = "2026-02-10";
-const SITE_ORIGIN = "https://vibecity.live";
+const SITE_ORIGIN = "https://vibescity.live";
 const SUPPORTED_LOCALES = new Set(["th", "en"]);
 const normalizeLocale = (value) => {
 	const raw = String(value || "")

@@ -18,7 +18,7 @@ export const normalizeMediaUrl = (value) => {
 		const base =
 			typeof window !== "undefined" && window.location?.origin
 				? window.location.origin
-				: "https://www.vibescity.live";
+				: "https://vibescity.live";
 		const parsed = new URL(raw, base);
 		if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
 		parsed.hash = "";

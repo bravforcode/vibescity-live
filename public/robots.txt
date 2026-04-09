@@ -1,5 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://vibecity.live/sitemap.xml
-
+Sitemap: https://vibescity.live/sitemap.xml
