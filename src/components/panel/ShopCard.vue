@@ -441,7 +441,7 @@ watch(
             <!-- Header -->
             <div class="shop-header">
               <h3
-                class="text-3xl font-black text-black leading-tight tracking-tight font-sans line-clamp-2"
+                class="text-3xl font-black text-black leading-tight tracking-tight font-sans line-clamp-1"
               >
                 {{ shop.name }}
               </h3>
