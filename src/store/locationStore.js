@@ -180,6 +180,7 @@ export const useLocationStore = defineStore(
 				return applyDeterministicLocalDevLocation();
 			}
 			const allowPrompt = options?.allowPrompt === true;
+			const continueTracking = options?.continueTracking === true;
 			const permissionState = await syncPermissionStatus();
 			if (permissionState === "denied") {
 				const deniedError = {
@@ -217,6 +218,9 @@ export const useLocationStore = defineStore(
 				navigator.geolocation.getCurrentPosition(
 					(pos) => {
 						handlePositionSuccess(pos);
+						if (continueTracking && !isTracking.value) {
+							void startWatching({ allowPrompt: false }).catch(() => {});
+						}
 						isLoading.value = false;
 						resolve(userLocation.value);
 					},
@@ -325,6 +329,7 @@ export const useLocationStore = defineStore(
 			altitude.value = alt;
 			lastUpdated.value = Date.now();
 			isMockLocation.value = false;
+			permissionStatus.value = "granted";
 			error.value = null;
 			isLoading.value = false;
 

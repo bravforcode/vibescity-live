@@ -513,7 +513,10 @@ export function useAppLogic() {
 		}
 		try {
 			await awaitWithTimeout(
-				locationStore.getCurrentPosition({ allowPrompt: false }),
+				locationStore.getCurrentPosition({
+					allowPrompt: true,
+					continueTracking: true,
+				}),
 				STARTUP_LOCATION_PRIME_TIMEOUT_MS,
 			);
 		} catch {}
