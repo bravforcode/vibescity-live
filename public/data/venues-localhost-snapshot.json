@@ -1,5 +1,5 @@
 {
-	"generated_at": "2026-04-08T14:48:02.231Z",
+	"generated_at": "2026-04-09T06:47:18.427Z",
 	"source_path": "supabase:venues+venue_photos_any_real_media",
 	"selection_strategy": "thailand_grid_round_robin_any_real_media_plus_major_city_coverage",
 	"thailand_bounds": {
@@ -15,7 +15,7 @@
 	"major_city_anchor_count": 7,
 	"major_city_coverage_count": 104,
 	"grid_step_degrees": 1,
-	"source_row_count": 161418,
+	"source_row_count": 161432,
 	"complete_media_index_count": 47186,
 	"nationwide_pool_count": 32627,
 	"selected_bucket_count": 69,
@@ -5562,13 +5562,13 @@
 			"cover_image": "https://rukyitpjfmzhqjlfmbie.supabase.co/storage/v1/object/public/venue-media/images/3449b8ddccb14918c8a56fa4651c36ace37e2a75.png",
 			"rating": 0,
 			"review_count": 0,
-			"lat": 13.753862,
-			"lng": 100.501174,
-			"latitude": 13.753862,
-			"longitude": 100.501174,
+			"lat": 13.753799,
+			"lng": 100.501078,
+			"latitude": 13.753799,
+			"longitude": 100.501078,
 			"created_at": "2026-02-18T19:02:35.834835+00:00",
 			"status": "active",
-			"location": "0101000020E6100000C1E61C3C132059403E5EA340FA812B40"
+			"location": "0101000020E6100000509033A811205940257DB5FEF1812B40"
 		},
 		{
 			"id": "206c2e41-bc08-45a4-8019-175cc713258b",
