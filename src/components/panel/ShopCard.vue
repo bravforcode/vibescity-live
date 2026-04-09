@@ -245,7 +245,7 @@ watch(
     tabindex="0"
     :aria-label="cardAriaLabel"
     :class="[
-      'shop-card-panel group relative w-full min-h-[300px] md:min-h-[340px] aspect-[4/5] rounded-2xl overflow-hidden cursor-pointer transition-transform transition-shadow duration-300 hover:scale-[1.02] hover:-translate-y-1',
+      'shop-card-panel group relative w-full min-h-[300px] md:min-h-[340px] aspect-[4/5] rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1',
       isActive
         ? 'card-active-glow ring-1 ring-white/50 shadow-2xl scale-[1.01]'
         : 'shadow-lg hover:shadow-2xl',
