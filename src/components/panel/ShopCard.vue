@@ -156,7 +156,7 @@ const isFavorited = computed(() => {
 });
 
 // Helper to optimize Supabase/remote images
-const getOptimizedUrl = (url, width) => {
+const getOptimizedUrl = (url, _width) => {
 	if (!url) return "";
 	if (url.includes("supabase.co")) {
 		// Keep browser-side Supabase media on the canonical object URL.

@@ -143,7 +143,7 @@ onUnmounted(() => {
 	clearCarouselInteractionTimer();
 });
 
-const getCardItemStyle = (shopId) => {
+const getCardItemStyle = (_shopId) => {
 	if (props.isImmersive) return null;
 	return {
 		width: `${CARD_WIDTH}px`,
