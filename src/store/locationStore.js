@@ -163,13 +163,23 @@ export const useLocationStore = defineStore(
 			}
 		};
 
+		const shouldAllowNativeGeolocationRequest = ({
+			permissionState,
+			allowPrompt = false,
+		} = {}) => {
+			if (permissionState === "denied") return false;
+			if (allowPrompt) return true;
+			return permissionState === "granted";
+		};
+
 		/**
 		 * Request current position once
 		 */
-		const getCurrentPosition = async () => {
+		const getCurrentPosition = async (options = {}) => {
 			if (useDeterministicLocalDevLocation) {
 				return applyDeterministicLocalDevLocation();
 			}
+			const allowPrompt = options?.allowPrompt === true;
 			const permissionState = await syncPermissionStatus();
 			if (permissionState === "denied") {
 				const deniedError = {
@@ -181,6 +191,15 @@ export const useLocationStore = defineStore(
 					return userLocation.value;
 				}
 				throw deniedError;
+			}
+			if (
+				!shouldAllowNativeGeolocationRequest({
+					permissionState,
+					allowPrompt,
+				})
+			) {
+				isLoading.value = false;
+				return userLocation.value;
 			}
 			return new Promise((resolve, reject) => {
 				if (!navigator.geolocation) {
@@ -218,11 +237,12 @@ export const useLocationStore = defineStore(
 		/**
 		 * Start watching position continuously
 		 */
-		const startWatching = async () => {
+		const startWatching = async (options = {}) => {
 			if (useDeterministicLocalDevLocation) {
 				applyDeterministicLocalDevLocation();
 				return;
 			}
+			const allowPrompt = options?.allowPrompt === true;
 			if (isTracking.value) return;
 			if (!navigator.geolocation) {
 				maybeApplyDeterministicLocalDevFallback();
@@ -239,6 +259,16 @@ export const useLocationStore = defineStore(
 						setUserLocation(DEFAULT_LOCATION, true);
 					}
 				}
+				return;
+			}
+			if (
+				!shouldAllowNativeGeolocationRequest({
+					permissionState,
+					allowPrompt,
+				})
+			) {
+				isTracking.value = false;
+				isLoading.value = false;
 				return;
 			}
 

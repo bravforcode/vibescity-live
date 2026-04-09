@@ -503,7 +503,7 @@ export function useAppLogic() {
 			!locationStore.isMockLocation;
 		if (hasRealUserLocation) {
 			if (!locationStore.isTracking) {
-				void locationStore.startWatching();
+				void locationStore.startWatching({ allowPrompt: false });
 			}
 			return locationStore.userLocation;
 		}
@@ -513,7 +513,7 @@ export function useAppLogic() {
 		}
 		try {
 			await awaitWithTimeout(
-				locationStore.getCurrentPosition(),
+				locationStore.getCurrentPosition({ allowPrompt: false }),
 				STARTUP_LOCATION_PRIME_TIMEOUT_MS,
 			);
 		} catch {}
@@ -521,7 +521,7 @@ export function useAppLogic() {
 			locationStore.useDefaultLocation();
 		}
 		if (!locationStore.isTracking) {
-			void locationStore.startWatching();
+			void locationStore.startWatching({ allowPrompt: false });
 		}
 		return locationStore.userLocation;
 	};
@@ -1465,7 +1465,7 @@ export function useAppLogic() {
 			// Geolocation (delegate to locationStore for unified lifecycle)
 			if (navigator.geolocation) {
 				if (!locationStore.isTracking) {
-					void locationStore.startWatching();
+					void locationStore.startWatching({ allowPrompt: false });
 				}
 			} else if (!locationStore.userLocation) {
 				locationStore.useDefaultLocation();
@@ -1802,7 +1802,7 @@ export function useAppLogic() {
 
 	const requestGeolocation = () => {
 		if (!locationStore.isTracking) {
-			locationStore.startWatching();
+			void locationStore.startWatching({ allowPrompt: true });
 		}
 	};
 
@@ -1946,7 +1946,7 @@ export function useAppLogic() {
 
 		try {
 			await awaitWithTimeout(
-				locationStore.getCurrentPosition(),
+				locationStore.getCurrentPosition({ allowPrompt: true }),
 				initialLocation ? 1800 : STARTUP_LOCATION_PRIME_TIMEOUT_MS,
 			);
 		} catch {}

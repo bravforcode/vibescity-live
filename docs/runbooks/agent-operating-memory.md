@@ -2,8 +2,8 @@
 
 > Read this file before every work session in `C:\vibecity.live`.
 
-- Last updated: 2026-04-08
-- Current focus: Keep `www.vibescity.live` stable on the sibling Vercel production project while preserving the brighter visible basemap, the taller `198x272` bottom-feed card footprint for full compact-copy visibility, the removed `Ready for Offline` toast, browser analytics/Clarity, and the existing public-host fallbacks that suppress broken cross-origin Supabase and Fly lanes.
+- Last updated: 2026-04-09
+- Current focus: Keep `www.vibescity.live` stable on the sibling Vercel production project while preserving the brighter visible basemap, the taller `198x272` bottom-feed card footprint, the larger near-black compact card copy, the left-aligned compact live-card titles, the silent geolocation startup path, the passive modal touch listeners, the removed `Ready for Offline` toast, browser analytics/Clarity, and the existing public-host fallbacks that suppress broken cross-origin Supabase and Fly lanes.
 - Canonical skill: `.agents/skills/vibecity-session-handoff/SKILL.md`
 
 ## Start Every Session
@@ -77,7 +77,9 @@
 - Neon sign overlays now keep up to 30 nearby venues rendered during preview/detail selection, freeze regular sign set churn during pan gestures to avoid flicker, hide regular signs that would render clipped against the viewport edge, keep the default preview/detail camera framing tight, and cluster nearby neon signs only when the user zooms out below the clustering threshold.
 - Localhost/coarse-pointer startup now defers the heavy heatmap/atmosphere/traffic effect pass until interaction or later idle, and style load no longer triggers a duplicate early traffic refresh.
 - `SwipeCard` now keeps the info layer transparent with dark copy plus a light image-friendly bottom wash, so venue imagery stays visible without the old dark-glass blur or large matte panel.
-- `BottomFeed` now keeps mobile carousel cards slightly smaller (`214x256` active, `170x256` inactive), and `SwipeCard` default info copy now renders near-solid black instead of translucent charcoal so the light info wash reads cleaner.
+- `BottomFeed` now keeps compact mobile/public carousel cards at `198x272`, and `SwipeCard` compact typography now uses larger near-black title/meta/time copy plus left-aligned live-card titles while still reserving only the right gutter for the favorite button.
+- `locationStore` now auto-requests geolocation only when permission is already granted; startup/background watchers stay silent until the user explicitly taps `My Location` or another location action that allows prompting.
+- `VibeModal` touch listeners now mount as passive listeners, removing the noisy Chrome scroll-blocking touch listener violations from the detail-sheet flow.
 - `MapLibreContainer` now mirrors user position with a DOM-based blue location marker overlay during locate flows, so `My Location` still shows an obvious self-position marker even when style-layer setup is interrupted by unrelated MapLibre layer errors.
 - Sentient auto-detect detail handoff now waits for `selection-flight-complete` from the map preview flow; carousel/startup preview auto-open still stays once-per-shop-per-tab via session memory.
 - `usePrefetchEngine` now skips speculative venue prefetch entirely in frontend-only dev and while the browser is offline, and transient network failures trigger a short backoff instead of hammering the low-priority Supabase lane.
@@ -161,7 +163,7 @@
 ## Current Focus
 
 - Keep the repo and the live `vibescity` production deployment aligned to the single Supabase project `rukyitpjfmzhqjlfmbie`.
-- Keep `www.vibescity.live` stable with the brighter visible basemap, the taller `198x272` bottom-feed cards that now show full compact-copy details, and no offline-ready toast.
+- Keep `www.vibescity.live` stable with the brighter visible basemap, the taller `198x272` bottom-feed cards, the larger near-black compact typography, the left-aligned compact live-card titles, the silent geolocation startup path, and no offline-ready toast.
 - Preserve the documented deploy split between the linked `vibecity.live` Vercel project and the sibling `vibescity` project that actually owns `www.vibescity.live`.
 
 ## Current Resume Items
@@ -177,7 +179,10 @@
 - The browser Supabase client strips custom visitor headers only for `supabase/functions/v1/*` requests, and production analytics stay gated by `VITE_ANALYTICS_ENABLED` plus user consent.
 - `analytics-ingest` version `10` on project `rukyitpjfmzhqjlfmbie` accepts the custom visitor headers, fails open when `analytics_sessions` is unavailable, and writes best-effort rows into `analytics_logs`.
 - `BottomFeed.vue` now owns the compact mobile/public card footprint at `198x272` with a taller carousel rail so full compact-copy details fit without clipping.
-- `SwipeCard.vue` now offsets live-card titles away from the `LIVE` badge and favorite button using real left/right gutters, keeps the category chip on its own row, restores `IMG/VID` counts on narrow cards, and removes the compact-card title clamp so mobile cards can show full names and details without overlap.
+- `SwipeCard.vue` now keeps the category chip on its own row, restores `IMG/VID` counts on narrow cards, removes the compact-card title clamp, renders larger near-black compact copy, and leaves compact live-card titles left-aligned while only reserving the right gutter for the favorite button.
+- `locationStore.js` now gates startup/background geolocation behind an already-granted permission state; only explicit user-triggered locate actions pass `allowPrompt: true`.
+- `App.vue` and `MapLibreContainer.vue` now start silent background watching only when permission is already granted.
+- `VibeModal.vue` now registers passive `touchstart`/`touchmove` listeners for the detail sheet.
 - `ReloadPrompt.vue` now keeps only the update/reload path and never shows the passive `Ready for Offline` toast.
 - The production basemap visibility fix lives in `public/map-styles/vibecity-neon.json` and `src/components/map/MapLibreContainer.vue`; the style palette is brighter and the selection vignette is softer so detail routes do not black out the map.
 - `useSDFClusters` still waits for both source `pins_source` and layer `unclustered-pins` before inserting `sdf-cluster-layer`, preventing the MapLibre layer-order race on production detail/map views.
@@ -189,36 +194,23 @@
 ## Current Snapshot
 
 - Focus of this session:
-  - shrink the bottom-feed cards by about 10% without destabilizing the production layout
-  - make the production basemap visibly readable again on detail/mobile flows
-  - remove the passive `Ready for Offline` toast while keeping the update prompt logic intact
-  - let compact mobile `SwipeCard` cards show full names and full detail copy without truncation or overlap
+  - suppress startup geolocation console violations and the detail-sheet non-passive touch listener violations without breaking explicit locate actions
 - Session plan artifact:
   - `.planning/20260407-card-map-offline-polish.md`
 - Files touched in this session:
-  - `.planning/20260407-card-map-offline-polish.md`
-  - `.vercel/project.json` (temporary relink for deploy, then restored)
   - `docs/runbooks/agent-operating-memory.md`
-- `src/components/feed/BottomFeed.vue`
-- `src/components/ui/SwipeCard.vue`
-- `src/components/pwa/ReloadPrompt.vue`
+  - `src/store/locationStore.js`
+  - `src/composables/useAppLogic.js`
+  - `src/App.vue`
   - `src/components/map/MapLibreContainer.vue`
-  - `public/map-styles/vibecity-neon.json`
+  - `src/components/modal/VibeModal.vue`
 - Behavior changed in this session:
-- `BottomFeed.vue` now uses `198x272` mobile/public cards with a taller rail so the full compact-copy stack fits without clipping.
-- `SwipeCard.vue` now uses unclamped multi-line titles on narrow cards, preserves all compact metadata including `IMG/VID` counts, and keeps the title text clear of both the `LIVE` badge and favorite button by using real left/right gutters.
-- `ReloadPrompt.vue` now only exposes the update/reload path and never shows the passive `Ready for Offline` toast.
-  - `vibecity-neon.json` now uses a brighter basemap palette and `MapLibreContainer.vue` applies a softer venue-focus vignette, so production detail flows keep visible roads/water/buildings instead of looking blacked out.
+  - Startup/background geolocation calls now no-op unless the browser has already granted location permission, while explicit locate actions still allow prompting and resume watch mode afterward.
+  - `VibeModal.vue` now mounts passive touch listeners, which removes the Chrome scroll-blocking touch listener violations from the detail-sheet flow.
 - Validation confirmed in this session:
-  - `npx biome check src/components/ui/SwipeCard.vue src/components/feed/BottomFeed.vue` passes on 2026-04-08 after the compact-card full-copy change.
-  - `npm run build` passes on 2026-04-08 after the compact-card full-copy change.
-  - `$env:PYTHONIOENCODING='utf-8'; python .agent/scripts/checklist.py .` times out at the checklist wrapper's `Security Scan` 5-minute cap on 2026-04-08, but the stronger `$env:PYTHONIOENCODING='utf-8'; python .agent/scripts/verify_all.py . --url https://www.vibescity.live` run passes on the same host; dependency analysis and bundle analysis remain skipped because those helper scripts are absent.
-  - `$env:PYTHONIOENCODING='utf-8'; python .agent/scripts/verify_all.py . --url https://www.vibescity.live` passes on 2026-04-08; dependency analysis and bundle analysis were skipped because those helper scripts are absent.
-  - `vercel deploy --prod --archive=tgz -y --force` against the sibling `vibescity` project produced ready deployment `dpl_EcTxBwF4fXx3e2WyP34vQcFoxJph` at `https://vibescity-4u4dfjd7h-phirawits-projects.vercel.app` on 2026-04-08; it is aliased to `https://www.vibescity.live`.
-  - `vercel inspect www.vibescity.live` resolves to deployment `dpl_EcTxBwF4fXx3e2WyP34vQcFoxJph` on 2026-04-08.
-  - A production text-range smoke for the first compact live cards confirmed the rendered title text no longer overlaps either the `LIVE` badge or the favorite button after the latest deploy.
-  - `$env:PYTHONIOENCODING='utf-8'; python .agent/scripts/checklist.py .` still hits the checklist wrapper timeout after the latest deploy because `Security Scan` exceeds 5 minutes on this host.
-  - Production DOM smoke on `https://www.vibescity.live/th?fulldetail=20260408b` confirms the active compact card renders `titleLineClamp: none`, keeps `distance / travel time / IMG / VID` visible, and the title text-range no longer overlaps either the `LIVE` badge or the favorite button.
+  - `npx biome check src/store/locationStore.js src/composables/useAppLogic.js src/App.vue src/components/map/MapLibreContainer.vue src/components/modal/VibeModal.vue` passes on 2026-04-09 after the console-noise fixes.
+  - Local Playwright smoke on `http://127.0.0.1:5173/th?consolefix=20260409a` no longer shows the geolocation prompt violation or non-passive touch listener violations; only the pre-existing map readiness warning remains.
+  - `$env:PYTHONIOENCODING='utf-8'; python .agent/scripts/checklist.py .` timed out twice on 2026-04-09 on this Windows host before completing, so this session relies on targeted lint plus browser-console verification instead of a full checklist pass.
 ## Update Protocol
 
 Replace the `Current focus`, `Current Resume Items`, and `Current Snapshot` sections instead of appending endless history. Keep updates factual and short.

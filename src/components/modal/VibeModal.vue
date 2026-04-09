@@ -492,11 +492,6 @@ const handleTouchMove = (e) => {
 	}
 	if (deltaY <= DRAG_START_SLOP_PX) return;
 
-	// Some mobile browsers mark touchmove as non-cancelable once scroll starts.
-	// Keep driving the sheet drag anyway when the gesture began from the top.
-	if (e.cancelable) {
-		e.preventDefault();
-	}
 	if (!isDragging.value) {
 		isDragging.value = true;
 	}
@@ -1112,8 +1107,8 @@ watch(
     <div
       ref="modalCard"
       data-testid="vibe-modal-surface"
-      @touchstart.stop="handleTouchStart"
-      @touchmove.stop="handleTouchMove"
+      @touchstart.passive.stop="handleTouchStart"
+      @touchmove.passive.stop="handleTouchMove"
       @touchend.stop="handleTouchEnd"
       :class="modalSurfaceClass"
       :style="modalSurfaceStyle"

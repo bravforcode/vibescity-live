@@ -326,9 +326,9 @@ onMounted(() => {
 	if (!IS_E2E && !IS_STRICT_MAP_E2E) {
 		void featureFlagStore.refreshFlags().catch(() => {});
 	}
-	// Initialize location tracking
+	// Only auto-start when geolocation permission was already granted.
 	const locationStore = useLocationStore();
-	void locationStore.startWatching().catch(() => {});
+	void locationStore.startWatching({ allowPrompt: false }).catch(() => {});
 });
 
 // Add Heatmap Layer

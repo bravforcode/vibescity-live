@@ -1403,10 +1403,6 @@ const handleRootKeydown = (e) => {
     overflow: visible;
   }
 
-  .sc-root--live .sc-venue-name {
-    margin-inline-start: 4rem;
-  }
-
   .sc-meta-row {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, max-content));

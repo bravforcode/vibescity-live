@@ -32,8 +32,8 @@ const trackSessionIfAllowed = () => {
 onMounted(() => {
 	trackSessionIfAllowed();
 
-	// Start tracking location for Home Base
-	locationStore.startWatching();
+	// Only auto-start when geolocation permission was already granted.
+	void locationStore.startWatching({ allowPrompt: false });
 });
 
 // Auto-set Home Base on first location fix
