@@ -3,7 +3,7 @@
 > Read this file before every work session in `C:\vibecity.live`.
 
 - Last updated: 2026-04-09
-- Current focus: Keep `vibescity.live` stable on the Vercel `frontend` production project, keep `www.vibescity.live` permanently redirecting to the apex via the tiny `vercel-domain-redirect` deployment, and preserve the brighter visible basemap, the taller `198x272` bottom-feed card footprint, the larger near-black compact card copy, the left-aligned compact live-card titles, the silent geolocation startup path, the passive modal touch listeners, the removed `Ready for Offline` toast, browser analytics/Clarity, and the existing public-host fallbacks that suppress broken cross-origin Supabase and Fly lanes.
+- Current focus: Keep `vibescity.live` stable on the latest Vercel `frontend` production deployment, keep `www.vibescity.live` permanently redirecting to the apex via the tiny `vercel-domain-redirect` deployment, keep the Vercel-side `vibecity.live` redirect ready while external DNS still points elsewhere, and preserve the brighter visible basemap, the taller `198x272` bottom-feed card footprint, the larger near-black compact card copy, the left-aligned compact live-card titles, the silent geolocation startup path, the passive modal touch listeners, the removed `Ready for Offline` toast, browser analytics/Clarity, and the existing public-host fallbacks that suppress broken cross-origin Supabase and Fly lanes.
 - Canonical skill: `.agents/skills/vibecity-session-handoff/SKILL.md`
 
 ## Start Every Session
@@ -169,12 +169,12 @@
 
 ## Current Resume Items
 
-- The worktree is still globally dirty; do not assume unrelated modified files belong to the latest deploy tranche.
+- The tracked worktree is currently clean on `main`; only local untracked tool folders such as `.cursor/rules/` and `.windsurf/` remain outside the deploy scope.
 - Plain `vercel deploy -y` hit the free-tier `api-upload-free` limit on 2026-04-06; use `vercel deploy --archive=tgz -y` for preview deploys and `vercel deploy --prod --archive=tgz -y --force` for production deploys from this workspace.
 - The linked Vercel project in `.vercel/project.json` remains `vibecity.live` (`prj_iHipyu1Egd903Uvb6aZYirWB7ULE`); to deploy the live apex domain `vibescity.live` you must temporarily relink to project `frontend` (`prj_OtVXP7mJx8umDqNoL3F5OIAbouIh`), deploy, then restore `.vercel/project.json`.
-- The current live `frontend` production deployment is `dpl_H1gDaNypFEXx5F1RMdXx6RrWFxyj` at `https://frontend-47wxffku3-phirawits-projects.vercel.app`, serving `https://vibescity.live`.
+- The current live `frontend` production deployment is `dpl_5gmrdBf3UaVK798HVDRmzDVP3p8t` at `https://frontend-e05kbjraa-phirawits-projects.vercel.app`, serving `https://vibescity.live`.
 - The current live redirect deployment is `dpl_DUPtU8mUvZsi7F4YfTXLD9ixumW7` at `https://vercel-domain-redirect-i9ywt93sl-phirawits-projects.vercel.app`, aliased to `https://www.vibescity.live`.
-- The current live `vibecity.live` production deployment is `dpl_987qQjVVmXZTBmAzyNADGNSXwdKt` at `https://vibecitylive-h173hqjb2-phirawits-projects.vercel.app`, aliased to `https://vibecity.live`.
+- The current Vercel-side `vibecity.live` production deployment is `dpl_ATiYJck2kn6oC5U1rb7M1335BMYr` at `https://vibecitylive-c4rif6b79-phirawits-projects.vercel.app`, aliased inside Vercel to `https://vibecity.live`.
 - Production, development, and preview Vercel env vars for `SUPABASE_*` and `VITE_SUPABASE_*` now point to `https://rukyitpjfmzhqjlfmbie.supabase.co`.
 - Public production still bypasses direct browser-side Supabase reads on non-local production hosts for venue feed/detail, feature flags, local ads, and anonymous gamification status; it relies on snapshot/default/local fallbacks instead.
 - Public production also skips cross-origin Fly review and density browser requests on public hosts, so `shopStore` returns quiet/review-unavailable fallbacks instead of surfacing browser CORS noise while Fly remains undeployed.
@@ -193,7 +193,7 @@
 - The backend Fly CORS allowlist patch for `https://www.vibescity.live` and `https://vibescity.live` exists locally in `backend/app/core/config.py` and `backend/app/main.py`, but the actual Fly deploy is still blocked by overdue invoices, so the live mitigation remains frontend-side.
 - The Antigravity validation scripts require `PYTHONIOENCODING=utf-8` on this Windows host.
 - `vibescity.live` remains a third-party-managed Vercel domain (current nameservers still outside Vercel), and `www.vibescity.live` now points to the standalone `vercel-domain-redirect` deployment instead of the app deployment.
-- Public DNS for `vibecity.live` is still outside Vercel and currently resolves to the old `198.*` targets; because of that external DNS misconfiguration, aliasing the old bought domain to a new redirect deployment still fails at the certificate step.
+- `vibecity.live` is now attached and aliased inside the Vercel project, but public DNS is still outside Vercel and currently resolves to the old `198.*` targets, so real browser traffic still bypasses the Vercel redirect and lands on the legacy Squarespace-controlled lane until DNS is cut over.
 
 ## Current Snapshot
 
@@ -218,18 +218,20 @@
   - Public metadata, sitemap, referral share links, and browser/runtime fallback origins now point to `https://vibescity.live` instead of `https://vibecity.live`.
   - The live public apex domain `https://vibescity.live` now serves the latest deployed build from Vercel project `frontend` with canonical/OG URLs set to the `vibescity.live` root domain.
   - `https://www.vibescity.live` now returns a permanent `301` redirect to `https://vibescity.live/` via the standalone `vercel-domain-redirect` deployment.
-  - `vercel.json` in the main app now also contains host-based `301` redirect rules for `www.vibescity.live` and `vibecity.live`, but only the `www` lane is currently live because the old `vibecity.live` DNS is still misconfigured outside Vercel.
+  - `vercel.json` in the main app now also contains host-based `301` redirect rules for `www.vibescity.live` and `vibecity.live`; the `www` lane is publicly live, while the `vibecity.live` redirect is only ready inside Vercel until external DNS is moved over.
 - Validation confirmed in this session:
   - `npx biome check public/index.html public/robots.txt src/lib/runtimeConfig.js src/lib/runtimeLaneAvailability.js src/utils/mapRenderer.js src/utils/mediaSourceGuard.js src/components/ui/ReferralShare.vue src/views/PrivacyView.vue src/views/TermsView.vue` passes on 2026-04-09.
   - `npm run build` passes on 2026-04-09 after the domain-reference patch.
   - `$env:PYTHONIOENCODING='utf-8'; python .agent/scripts/checklist.py .` still times out at `Security Scan` on this Windows host after 5 minutes.
   - `$env:PYTHONIOENCODING='utf-8'; python .agent/scripts/verify_all.py . --url https://vibescity.live` passes every lane except `Security Scan`, which times out after 600 seconds on this Windows host.
-  - `vercel deploy --prod --archive=tgz -y --force` to linked project `vibecity.live` produced deployment `dpl_987qQjVVmXZTBmAzyNADGNSXwdKt` for `https://vibecity.live`.
-  - Temporary relink to Vercel project `frontend` plus `vercel deploy --prod --archive=tgz -y --force` produced deployment `dpl_H1gDaNypFEXx5F1RMdXx6RrWFxyj`, aliased to `https://vibescity.live`.
+  - `vercel deploy --prod --archive=tgz -y --force` to linked project `vibecity.live` produced deployment `dpl_987qQjVVmXZTBmAzyNADGNSXwdKt`, and the later Vercel-side refresh now has `vibecity.live` attached to deployment `dpl_ATiYJck2kn6oC5U1rb7M1335BMYr` / `https://vibecitylive-c4rif6b79-phirawits-projects.vercel.app`.
+  - `vercel redeploy frontend-47wxffku3-phirawits-projects.vercel.app --target production` produced deployment `dpl_5gmrdBf3UaVK798HVDRmzDVP3p8t`, now aliased to `https://vibescity.live`.
   - `git push origin main` published commit `6031a7f61165b85a7cc0dc1bff4e5d79d678a736` with the redirect/domain patch.
   - Tiny redirect deployment `dpl_DUPtU8mUvZsi7F4YfTXLD9ixumW7` succeeded on project `vercel-domain-redirect`, and `vercel alias set ... www.vibescity.live` succeeded.
   - `curl -I https://www.vibescity.live` now returns `301 Moved Permanently` with `Location: https://vibescity.live/`.
-  - `vercel alias set ... vibecity.live` still fails with a certificate response error because `vercel domains inspect vibecity.live` reports the external DNS is not configured for Vercel and `nslookup vibecity.live 1.1.1.1` still resolves to `198.185.159.144/145` and `198.49.23.144/145`.
+  - `vercel alias list` now shows both `frontend-e05kbjraa-phirawits-projects.vercel.app -> vibescity.live` and `vibecitylive-c4rif6b79-phirawits-projects.vercel.app -> vibecity.live`.
+  - `curl -I https://vibecity.live` still returns `301 Moved Permanently` from `Squarespace` to `https://avondale.io/bands/vibe-city`, proving public DNS still bypasses the Vercel-side redirect.
+  - `vercel domains inspect vibecity.live` still reports the external DNS is not configured for Vercel and recommends `A vibecity.live 76.76.21.21`, while `nslookup vibecity.live 1.1.1.1` still resolves to `198.185.159.144/145` and `198.49.23.144/145`.
 ## Update Protocol
 
 Replace the `Current focus`, `Current Resume Items`, and `Current Snapshot` sections instead of appending endless history. Keep updates factual and short.
