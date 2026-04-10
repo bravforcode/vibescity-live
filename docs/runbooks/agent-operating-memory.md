@@ -173,7 +173,7 @@
 - The tracked worktree on `main` currently includes the startup-location/card-overlap patch plus the refreshed generated snapshot artifacts `public/data/venues-localhost-snapshot.json` and `public/data/venues-real-media-index.json`; local untracked tool folders such as `.cursor/rules/` and `.windsurf/` remain outside the deploy scope.
 - Plain `vercel deploy -y` hit the free-tier `api-upload-free` limit on 2026-04-06; use `vercel deploy --archive=tgz -y` for preview deploys and `vercel deploy --prod --archive=tgz -y --force` for production deploys from this workspace.
 - The linked Vercel project in `.vercel/project.json` remains `vibecity.live` (`prj_iHipyu1Egd903Uvb6aZYirWB7ULE`); to deploy the live apex domain `vibescity.live` you must temporarily relink to project `frontend` (`prj_OtVXP7mJx8umDqNoL3F5OIAbouIh`), deploy, then restore `.vercel/project.json`.
-- The current live `frontend` production deployment is `dpl_7uLpdEhKYAjhduu1xBrh4bPr1zcU` at `https://frontend-c23hsj4io-phirawits-projects.vercel.app`, serving `https://vibescity.live`.
+- The current live `frontend` production deployment is `dpl_6rBfDWvEvzNygszwQTRUCXHphhXR` at `https://frontend-d78ye4ouo-phirawits-projects.vercel.app`, serving `https://vibescity.live`.
 - The current live redirect deployment is `dpl_DUPtU8mUvZsi7F4YfTXLD9ixumW7` at `https://vercel-domain-redirect-i9ywt93sl-phirawits-projects.vercel.app`, aliased to `https://www.vibescity.live`.
 - The current Vercel-side `vibecity.live` production deployment is `dpl_ATiYJck2kn6oC5U1rb7M1335BMYr` at `https://vibecitylive-c4rif6b79-phirawits-projects.vercel.app`, aliased inside Vercel to `https://vibecity.live`.
 - Production, development, and preview Vercel env vars for `SUPABASE_*` and `VITE_SUPABASE_*` now point to `https://rukyitpjfmzhqjlfmbie.supabase.co`.
@@ -225,7 +225,7 @@
   - `$env:PYTHONIOENCODING='utf-8'; python .agent/scripts/checklist.py .` passes on 2026-04-10.
   - `$env:PYTHONIOENCODING='utf-8'; python .agent/scripts/verify_all.py . --url http://localhost:5173` passes on 2026-04-10 with 13 checks passed and 2 optional checks skipped.
   - A Playwright browser check against `https://vibescity.live/en` with granted geolocation confirms `activeCards: 0`, `modalOpen: false`, `overlappingTitles: []`, and a stored `vibe-location` matching the granted coordinates.
-  - `vercel deploy --prod --archive=tgz -y --force` to temporary link `frontend` produced deployment `dpl_7uLpdEhKYAjhduu1xBrh4bPr1zcU`, now aliased to `https://vibescity.live`.
+  - `vercel deploy --prod --archive=tgz -y --force` to temporary link `frontend` produced deployment `dpl_6rBfDWvEvzNygszwQTRUCXHphhXR`, now aliased to `https://vibescity.live`.
   - `vercel alias set vercel-domain-redirect-i9ywt93sl-phirawits-projects.vercel.app www.vibescity.live` succeeded again after the production deploy, and `vercel link --project vibecity.live` restored the local link baseline.
   - `curl -I https://vibescity.live` returns `200 OK`, and `curl -I https://www.vibescity.live` returns `301 Moved Permanently` to `https://vibescity.live/`.
 ## Update Protocol
