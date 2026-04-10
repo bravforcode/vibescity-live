@@ -1040,11 +1040,9 @@ const handleRootKeydown = (e) => {
   margin-bottom: 0.5rem;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* Keep long venue names readable on narrow cards. */
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  display: block;
+  text-align: left;
+  overflow: visible;
   overflow-wrap: anywhere;
   max-width: 100%;
   text-rendering: optimizeLegibility;
@@ -1390,11 +1388,11 @@ const handleRootKeydown = (e) => {
 
 @container (max-width: 13rem) {
   .sc-info {
-    padding: 2.1rem 0.68rem 0.68rem;
+    padding: 3.45rem 0.68rem 0.68rem;
   }
 
   .sc-root--has-top-badges .sc-info {
-    padding-top: 3.6rem;
+    padding-top: 4.15rem;
   }
 
   .sc-info-surface {
@@ -1402,18 +1400,9 @@ const handleRootKeydown = (e) => {
   }
 
   .sc-venue-name {
-    margin-inline-end: 2.8rem;
     margin-bottom: 0.38rem;
-    font-size: 0.92rem;
-    line-height: 1.08;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  .sc-root--has-top-badges .sc-venue-name {
-    margin-inline-start: 3.2rem;
+    font-size: 0.88rem;
+    line-height: 1.04;
   }
 
   .sc-meta-row {

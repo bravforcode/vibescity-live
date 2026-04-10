@@ -170,7 +170,7 @@
 
 ## Current Resume Items
 
-- The tracked worktree on `main` currently includes the startup-location/card-overlap patch plus the refreshed generated snapshot artifacts `public/data/venues-localhost-snapshot.json` and `public/data/venues-real-media-index.json`; local untracked tool folders such as `.cursor/rules/` and `.windsurf/` remain outside the deploy scope.
+- The tracked worktree on `main` is currently dirty only in `src/components/ui/SwipeCard.vue` with an uncommitted compact-card title tweak that keeps venue names left-aligned and fully visible; local untracked tool folders such as `.cursor/rules/` and `.windsurf/` remain outside the deploy scope.
 - Plain `vercel deploy -y` hit the free-tier `api-upload-free` limit on 2026-04-06; use `vercel deploy --archive=tgz -y` for preview deploys and `vercel deploy --prod --archive=tgz -y --force` for production deploys from this workspace.
 - The linked Vercel project in `.vercel/project.json` remains `vibecity.live` (`prj_iHipyu1Egd903Uvb6aZYirWB7ULE`); to deploy the live apex domain `vibescity.live` you must temporarily relink to project `frontend` (`prj_OtVXP7mJx8umDqNoL3F5OIAbouIh`), deploy, then restore `.vercel/project.json`.
 - The current live `frontend` production deployment is `dpl_6rBfDWvEvzNygszwQTRUCXHphhXR` at `https://frontend-d78ye4ouo-phirawits-projects.vercel.app`, serving `https://vibescity.live`.
@@ -200,34 +200,19 @@
 ## Current Snapshot
 
 - Focus of this session:
-  - keep cold start pinned to the user's own location instead of auto-opening a Chiang Mai venue, stop compact titles from colliding with the `LIVE` badge, and redeploy the public app with the fix
+  - keep compact carousel titles left-aligned and fully visible without reintroducing the `LIVE` badge overlap
 - Session plan artifact:
-  - `.planning/20260410-startup-location-and-card-overlap.md`
+  - none
 - Files touched in this session:
   - `docs/runbooks/agent-operating-memory.md`
-  - `.planning/20260410-startup-location-and-card-overlap.md`
-  - `src/composables/useAppLogic.js`
-  - `src/composables/useScrollSync.js`
-  - `src/components/feed/BottomFeed.vue`
   - `src/components/ui/SwipeCard.vue`
-  - `tests/unit/composables/useScrollSync.spec.js`
-  - `public/data/venues-localhost-snapshot.json`
-  - `public/data/venues-real-media-index.json`
 - Behavior changed in this session:
-  - Cold start on home no longer auto-commits the first centered carousel venue when there is no explicit selection context, so the app stays on the user's location/home route instead of jumping to a random Chiang Mai shop.
-  - Compact live cards now reserve badge space, keep long venue names inside a three-line narrow-card clamp, and no longer overlap the `LIVE` badge on mobile.
-  - The latest `frontend` production deployment with the startup-location/card-overlap fix is now live on `https://vibescity.live`.
-  - `https://www.vibescity.live` still returns a permanent `301` redirect to `https://vibescity.live/` via the standalone `vercel-domain-redirect` deployment.
+  - Compact card titles now render left-aligned, use the full text width below the top controls, and no longer clamp or hide long venue names on the carousel.
+  - The card is still using the same live/deploy baseline from deployment `dpl_6rBfDWvEvzNygszwQTRUCXHphhXR`; this title-layout tweak is local only until the next commit/deploy.
 - Validation confirmed in this session:
-  - `npx biome check src/composables/useAppLogic.js src/composables/useScrollSync.js src/components/feed/BottomFeed.vue src/components/ui/SwipeCard.vue tests/unit/composables/useScrollSync.spec.js .planning/20260410-startup-location-and-card-overlap.md` passes on 2026-04-10.
-  - `npx vitest run tests/unit/composables/useScrollSync.spec.js tests/unit/stores/locationStore.spec.js` passes on 2026-04-10.
-  - `npm run build` passes on 2026-04-10 and completes the nationwide sync, localhost snapshot generation, Rsbuild bundle, and prerender phases on this Windows host.
+  - `npx biome check src/components/ui/SwipeCard.vue` passes on 2026-04-10.
   - `$env:PYTHONIOENCODING='utf-8'; python .agent/scripts/checklist.py .` passes on 2026-04-10.
-  - `$env:PYTHONIOENCODING='utf-8'; python .agent/scripts/verify_all.py . --url http://localhost:5173` passes on 2026-04-10 with 13 checks passed and 2 optional checks skipped.
-  - A Playwright browser check against `https://vibescity.live/en` with granted geolocation confirms `activeCards: 0`, `modalOpen: false`, `overlappingTitles: []`, and a stored `vibe-location` matching the granted coordinates.
-  - `vercel deploy --prod --archive=tgz -y --force` to temporary link `frontend` produced deployment `dpl_6rBfDWvEvzNygszwQTRUCXHphhXR`, now aliased to `https://vibescity.live`.
-  - `vercel alias set vercel-domain-redirect-i9ywt93sl-phirawits-projects.vercel.app www.vibescity.live` succeeded again after the production deploy, and `vercel link --project vibecity.live` restored the local link baseline.
-  - `curl -I https://vibescity.live` returns `200 OK`, and `curl -I https://www.vibescity.live` returns `301 Moved Permanently` to `https://vibescity.live/`.
+  - A local Playwright browser check against `http://localhost:5173/en` confirms compact titles report `textAlign: left`, `webkitLineClamp: none`, `overflow: visible`, and `overlaps: false` for the inspected live cards.
 ## Update Protocol
 
 Replace the `Current focus`, `Current Resume Items`, and `Current Snapshot` sections instead of appending endless history. Keep updates factual and short.
