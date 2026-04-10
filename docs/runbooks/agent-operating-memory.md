@@ -170,10 +170,10 @@
 
 ## Current Resume Items
 
-- The tracked worktree on `main` is currently dirty only in `src/components/ui/SwipeCard.vue` with an uncommitted compact-card title tweak that keeps venue names left-aligned and fully visible; local untracked tool folders such as `.cursor/rules/` and `.windsurf/` remain outside the deploy scope.
+- The tracked worktree on `main` is currently clean apart from local untracked tool folders such as `.cursor/rules/` and `.windsurf/`, which remain outside the deploy scope.
 - Plain `vercel deploy -y` hit the free-tier `api-upload-free` limit on 2026-04-06; use `vercel deploy --archive=tgz -y` for preview deploys and `vercel deploy --prod --archive=tgz -y --force` for production deploys from this workspace.
 - The linked Vercel project in `.vercel/project.json` remains `vibecity.live` (`prj_iHipyu1Egd903Uvb6aZYirWB7ULE`); to deploy the live apex domain `vibescity.live` you must temporarily relink to project `frontend` (`prj_OtVXP7mJx8umDqNoL3F5OIAbouIh`), deploy, then restore `.vercel/project.json`.
-- The current live `frontend` production deployment is `dpl_6rBfDWvEvzNygszwQTRUCXHphhXR` at `https://frontend-d78ye4ouo-phirawits-projects.vercel.app`, serving `https://vibescity.live`.
+- The current live `frontend` production deployment is `dpl_mmqfYStxMAXfF4p1c15oH7sKiipm` at `https://frontend-aor1os6bd-phirawits-projects.vercel.app`, serving `https://vibescity.live`.
 - The current live redirect deployment is `dpl_DUPtU8mUvZsi7F4YfTXLD9ixumW7` at `https://vercel-domain-redirect-i9ywt93sl-phirawits-projects.vercel.app`, aliased to `https://www.vibescity.live`.
 - The current Vercel-side `vibecity.live` production deployment is `dpl_ATiYJck2kn6oC5U1rb7M1335BMYr` at `https://vibecitylive-c4rif6b79-phirawits-projects.vercel.app`, aliased inside Vercel to `https://vibecity.live`.
 - Production, development, and preview Vercel env vars for `SUPABASE_*` and `VITE_SUPABASE_*` now point to `https://rukyitpjfmzhqjlfmbie.supabase.co`.
@@ -200,7 +200,7 @@
 ## Current Snapshot
 
 - Focus of this session:
-  - keep compact carousel titles left-aligned and fully visible without reintroducing the `LIVE` badge overlap
+  - ship the compact carousel title layout so venue names stay left-aligned and fully visible on live
 - Session plan artifact:
   - none
 - Files touched in this session:
@@ -208,11 +208,13 @@
   - `src/components/ui/SwipeCard.vue`
 - Behavior changed in this session:
   - Compact card titles now render left-aligned, use the full text width below the top controls, and no longer clamp or hide long venue names on the carousel.
-  - The card is still using the same live/deploy baseline from deployment `dpl_6rBfDWvEvzNygszwQTRUCXHphhXR`; this title-layout tweak is local only until the next commit/deploy.
+  - The compact title layout tweak is now live on `https://vibescity.live` via the latest `frontend` production deployment.
 - Validation confirmed in this session:
-  - `npx biome check src/components/ui/SwipeCard.vue` passes on 2026-04-10.
+  - `npx biome check src/components/ui/SwipeCard.vue docs/runbooks/agent-operating-memory.md` passes on 2026-04-10.
   - `$env:PYTHONIOENCODING='utf-8'; python .agent/scripts/checklist.py .` passes on 2026-04-10.
   - A local Playwright browser check against `http://localhost:5173/en` confirms compact titles report `textAlign: left`, `webkitLineClamp: none`, `overflow: visible`, and `overlaps: false` for the inspected live cards.
+  - `vercel deploy --prod --archive=tgz -y --force` to temporary link `frontend` produced deployment `dpl_mmqfYStxMAXfF4p1c15oH7sKiipm`, now aliased to `https://vibescity.live`.
+  - `vercel alias set vercel-domain-redirect-i9ywt93sl-phirawits-projects.vercel.app www.vibescity.live` succeeded again after the production deploy, and `vercel link --project vibecity.live` restored the local link baseline.
 ## Update Protocol
 
 Replace the `Current focus`, `Current Resume Items`, and `Current Snapshot` sections instead of appending endless history. Keep updates factual and short.
