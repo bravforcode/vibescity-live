@@ -164,16 +164,16 @@
 ## Current Focus
 
 - Keep the repo and the live public domains aligned to the single Supabase project `rukyitpjfmzhqjlfmbie`.
-- Keep `vibescity.live` stable with the brighter visible basemap, the taller `198x272` bottom-feed cards, the larger near-black compact typography, the left-aligned compact live-card titles, the startup geolocation flow that reuses the last real location and only prompts when no real location is stored, the Windows-safe 4 GB heap guard on localhost snapshot generation, and no offline-ready toast.
+- Keep `vibescity.live` stable with the brighter visible basemap, the taller `198x272` bottom-feed cards, the badge-safe compact title layout, the cold-start geolocation flow that stays on the user's own location instead of auto-selecting a Chiang Mai venue, the Windows-safe 4 GB heap guard on localhost snapshot generation, and no offline-ready toast.
 - Keep `www.vibescity.live` on a dedicated redirect deployment that returns `301` to `https://vibescity.live/`.
 - Preserve the current deploy split between the linked `vibecity.live` Vercel project, the public `frontend` Vercel project that serves `vibescity.live`, and the tiny `vercel-domain-redirect` project used for `www.vibescity.live`.
 
 ## Current Resume Items
 
-- The tracked worktree is currently clean on `main`; only local untracked tool folders such as `.cursor/rules/` and `.windsurf/` remain outside the deploy scope.
+- The tracked worktree on `main` currently includes the startup-location/card-overlap patch plus the refreshed generated snapshot artifacts `public/data/venues-localhost-snapshot.json` and `public/data/venues-real-media-index.json`; local untracked tool folders such as `.cursor/rules/` and `.windsurf/` remain outside the deploy scope.
 - Plain `vercel deploy -y` hit the free-tier `api-upload-free` limit on 2026-04-06; use `vercel deploy --archive=tgz -y` for preview deploys and `vercel deploy --prod --archive=tgz -y --force` for production deploys from this workspace.
 - The linked Vercel project in `.vercel/project.json` remains `vibecity.live` (`prj_iHipyu1Egd903Uvb6aZYirWB7ULE`); to deploy the live apex domain `vibescity.live` you must temporarily relink to project `frontend` (`prj_OtVXP7mJx8umDqNoL3F5OIAbouIh`), deploy, then restore `.vercel/project.json`.
-- The current live `frontend` production deployment is `dpl_8PfgPEZpvNcKyygxNWfQ7foMqLis` at `https://frontend-aq73rhknt-phirawits-projects.vercel.app`, serving `https://vibescity.live`.
+- The current live `frontend` production deployment is `dpl_7uLpdEhKYAjhduu1xBrh4bPr1zcU` at `https://frontend-c23hsj4io-phirawits-projects.vercel.app`, serving `https://vibescity.live`.
 - The current live redirect deployment is `dpl_DUPtU8mUvZsi7F4YfTXLD9ixumW7` at `https://vercel-domain-redirect-i9ywt93sl-phirawits-projects.vercel.app`, aliased to `https://www.vibescity.live`.
 - The current Vercel-side `vibecity.live` production deployment is `dpl_ATiYJck2kn6oC5U1rb7M1335BMYr` at `https://vibecitylive-c4rif6b79-phirawits-projects.vercel.app`, aliased inside Vercel to `https://vibecity.live`.
 - Production, development, and preview Vercel env vars for `SUPABASE_*` and `VITE_SUPABASE_*` now point to `https://rukyitpjfmzhqjlfmbie.supabase.co`.
@@ -183,8 +183,9 @@
 - The browser Supabase client strips custom visitor headers only for `supabase/functions/v1/*` requests, and production analytics stay gated by `VITE_ANALYTICS_ENABLED` plus user consent.
 - `analytics-ingest` version `10` on project `rukyitpjfmzhqjlfmbie` accepts the custom visitor headers, fails open when `analytics_sessions` is unavailable, and writes best-effort rows into `analytics_logs`.
 - `BottomFeed.vue` now owns the compact mobile/public card footprint at `198x272` with a taller carousel rail so full compact-copy details fit without clipping.
-- `SwipeCard.vue` now keeps the category chip on its own row, restores `IMG/VID` counts on narrow cards, removes the compact-card title clamp, renders larger near-black compact copy, and leaves compact live-card titles left-aligned while only reserving the right gutter for the favorite button.
-- `useAppLogic.js` now requests a startup geolocation prompt only when no real stored location exists, and `locationStore.js` now keeps tracking after the first successful prompted fix so the saved real location is reused on revisit without another startup geolocation API call.
+- `SwipeCard.vue` now keeps the category chip on its own row, restores `IMG/VID` counts on narrow cards, reserves a top-left safe area when live/promo/giant badges are present, re-clamps compact titles to three lines on narrow cards, and prevents long names from colliding with the badge stack.
+- `BottomFeed.vue`, `useScrollSync.js`, and `useAppLogic.js` now block cold-start carousel commits until there is real user carousel intent or an explicit deep-link/selection context, so opening the app no longer auto-selects a random Chiang Mai venue before the user touches the feed.
+- `useAppLogic.js` still requests a startup geolocation prompt only when no real stored location exists, and `locationStore.js` still keeps tracking after the first successful prompted fix so the saved real location is reused on revisit without another startup geolocation API call.
 - `App.vue` and `MapLibreContainer.vue` now start silent background watching only when permission is already granted.
 - `VibeModal.vue` now registers passive `touchstart`/`touchmove` listeners for the detail sheet.
 - `ReloadPrompt.vue` now keeps only the update/reload path and never shows the passive `Ready for Offline` toast.
@@ -199,23 +200,32 @@
 ## Current Snapshot
 
 - Focus of this session:
-  - make the Windows local build lane reliable again after the snapshot-generator OOM, then redeploy the public app and keep the domain baseline intact
+  - keep cold start pinned to the user's own location instead of auto-opening a Chiang Mai venue, stop compact titles from colliding with the `LIVE` badge, and redeploy the public app with the fix
 - Session plan artifact:
-  - `.planning/20260410-build-reliability-followup.md`
+  - `.planning/20260410-startup-location-and-card-overlap.md`
 - Files touched in this session:
   - `docs/runbooks/agent-operating-memory.md`
-  - `package.json`
-  - `.planning/20260410-build-reliability-followup.md`
+  - `.planning/20260410-startup-location-and-card-overlap.md`
+  - `src/composables/useAppLogic.js`
+  - `src/composables/useScrollSync.js`
+  - `src/components/feed/BottomFeed.vue`
+  - `src/components/ui/SwipeCard.vue`
+  - `tests/unit/composables/useScrollSync.spec.js`
+  - `public/data/venues-localhost-snapshot.json`
+  - `public/data/venues-real-media-index.json`
 - Behavior changed in this session:
-  - `npm run build` on this Windows host now gives the localhost snapshot generator a 4 GB Node heap, preventing the previous `NewSpace::EnsureCurrentCapacity` OOM while loading the full venue/media snapshot from Supabase.
-  - The latest `frontend` production deployment with the current build reliability patch is now live on `https://vibescity.live`.
+  - Cold start on home no longer auto-commits the first centered carousel venue when there is no explicit selection context, so the app stays on the user's location/home route instead of jumping to a random Chiang Mai shop.
+  - Compact live cards now reserve badge space, keep long venue names inside a three-line narrow-card clamp, and no longer overlap the `LIVE` badge on mobile.
+  - The latest `frontend` production deployment with the startup-location/card-overlap fix is now live on `https://vibescity.live`.
   - `https://www.vibescity.live` still returns a permanent `301` redirect to `https://vibescity.live/` via the standalone `vercel-domain-redirect` deployment.
 - Validation confirmed in this session:
-  - `npx biome check package.json .planning/20260410-build-reliability-followup.md` passes on 2026-04-10.
+  - `npx biome check src/composables/useAppLogic.js src/composables/useScrollSync.js src/components/feed/BottomFeed.vue src/components/ui/SwipeCard.vue tests/unit/composables/useScrollSync.spec.js .planning/20260410-startup-location-and-card-overlap.md` passes on 2026-04-10.
+  - `npx vitest run tests/unit/composables/useScrollSync.spec.js tests/unit/stores/locationStore.spec.js` passes on 2026-04-10.
   - `npm run build` passes on 2026-04-10 and completes the nationwide sync, localhost snapshot generation, Rsbuild bundle, and prerender phases on this Windows host.
   - `$env:PYTHONIOENCODING='utf-8'; python .agent/scripts/checklist.py .` passes on 2026-04-10.
-  - `$env:PYTHONIOENCODING='utf-8'; python .agent/scripts/verify_all.py . --url https://vibescity.live` passes on 2026-04-10 with 13 checks passed and 2 optional checks skipped.
-  - `vercel deploy --prod --archive=tgz -y --force` to temporary link `frontend` produced deployment `dpl_8PfgPEZpvNcKyygxNWfQ7foMqLis`, now aliased to `https://vibescity.live`.
+  - `$env:PYTHONIOENCODING='utf-8'; python .agent/scripts/verify_all.py . --url http://localhost:5173` passes on 2026-04-10 with 13 checks passed and 2 optional checks skipped.
+  - A Playwright browser check against `https://vibescity.live/en` with granted geolocation confirms `activeCards: 0`, `modalOpen: false`, `overlappingTitles: []`, and a stored `vibe-location` matching the granted coordinates.
+  - `vercel deploy --prod --archive=tgz -y --force` to temporary link `frontend` produced deployment `dpl_7uLpdEhKYAjhduu1xBrh4bPr1zcU`, now aliased to `https://vibescity.live`.
   - `vercel alias set vercel-domain-redirect-i9ywt93sl-phirawits-projects.vercel.app www.vibescity.live` succeeded again after the production deploy, and `vercel link --project vibecity.live` restored the local link baseline.
   - `curl -I https://vibescity.live` returns `200 OK`, and `curl -I https://www.vibescity.live` returns `301 Moved Permanently` to `https://vibescity.live/`.
 ## Update Protocol

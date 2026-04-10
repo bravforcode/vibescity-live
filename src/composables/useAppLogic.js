@@ -286,7 +286,6 @@ export function useAppLogic() {
 		openedDetailShopIds.add(normalized);
 	};
 	let mapSelectionRequestSeq = 0;
-	let hasBootstrappedStartupPreview = false;
 	let handleCenteredShopCommit = null;
 	let drawerStateResetTimerId = null;
 	const DETAIL_AUTO_REOPEN_COOLDOWN_MS = 900;
@@ -583,7 +582,7 @@ export function useAppLogic() {
 		mobileCardScrollRef,
 		onScrollDecelerate: intentPredictor.recordCarouselDeceleration,
 		onCenteredShopCommit: (payload) => handleCenteredShopCommit?.(payload),
-		enableInitialCenteredShopCommit: !initialDeepLinkRequested,
+		enableInitialCenteredShopCommit: false,
 	});
 	const { handleHorizontalScroll, scrollToCard, onScrollStart, onScrollEnd } =
 		scrollSync;
@@ -1060,6 +1059,13 @@ export function useAppLogic() {
 	// The sentient controller already manages its own cooldown/re-entry rules.
 	const handleSentientAutoSelect = (shop) => {
 		if (!shop) return;
+		if (
+			!initialDeepLinkRequested &&
+			!activeShopId.value &&
+			!selectedShop.value
+		) {
+			return;
+		}
 		applyShopSelection(shop.id, false, {
 			syncRoute: false,
 			trackEvent: false,
@@ -1160,6 +1166,14 @@ export function useAppLogic() {
 	handleCenteredShopCommit = ({ shop, shopId, reason }) => {
 		const normalizedId = normalizeVenueId(shopId || shop?.id);
 		if (!normalizedId) return;
+		if (
+			reason === "startup" &&
+			!initialDeepLinkRequested &&
+			!activeShopId.value &&
+			!selectedShop.value
+		) {
+			return;
+		}
 		const resolvedShop = shop || shopStore.getShopById(normalizedId);
 		if (!resolvedShop) return;
 		if (
@@ -1411,8 +1425,8 @@ export function useAppLogic() {
 			// Load saved coins/stats if needed
 			// (Assumed handled by shopStore persistence, but original had manual load)
 
-			// Prime user position and venue data together so startup centers on the user
-			// instead of the Thailand-wide fallback shell whenever geolocation is available.
+			// Prime user position and venue data together so the map shell can start from
+			// the user's position without auto-locking onto the first venue card.
 			await Promise.allSettled([
 				primeStartupLocation(),
 				shopStore.fetchShops(),
@@ -1421,21 +1435,6 @@ export function useAppLogic() {
 
 			// Mark primary UI as ready (events/stats can load in the background).
 			isDataLoading.value = false;
-
-			if (!initialDeepLinkRequested && !activeShopId.value) {
-				const startupShop =
-					shopStore.visibleShops?.[0] || shopStore.processedShops?.[0] || null;
-				if (startupShop) {
-					runAfterNextPaint(() => {
-						if (activeShopId.value || selectedShop.value) return;
-						handleCenteredShopCommit({
-							shop: startupShop,
-							shopId: startupShop.id,
-							reason: "startup",
-						});
-					});
-				}
-			}
 
 			// Background tasks (must not block initial interactivity).
 			void coinStore.fetchUserStats()?.catch?.(() => {});
@@ -1760,23 +1759,6 @@ export function useAppLogic() {
 			...surfaceShops.value,
 		]);
 	});
-	watch(
-		() => surfaceShops.value?.[0] || null,
-		(startupShop) => {
-			if (hasBootstrappedStartupPreview || initialDeepLinkRequested) return;
-			if (!startupShop || activeShopId.value || selectedShop.value) return;
-			hasBootstrappedStartupPreview = true;
-			runAfterNextPaint(() => {
-				if (activeShopId.value || selectedShop.value) return;
-				handleCenteredShopCommit({
-					shop: startupShop,
-					shopId: startupShop.id,
-					reason: "startup",
-				});
-			});
-		},
-		{ immediate: true },
-	);
 	const isInitialLoad = computed(
 		() => isDataLoading.value && surfaceShops.value.length === 0,
 	);

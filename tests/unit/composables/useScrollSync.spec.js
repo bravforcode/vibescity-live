@@ -75,7 +75,7 @@ describe("useScrollSync", () => {
 		expect(onCenteredShopCommit).toHaveBeenCalledWith(
 			expect.objectContaining({
 				shopId: "2",
-				reason: "startup",
+				reason: "carousel",
 			}),
 		);
 	});

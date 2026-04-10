@@ -107,6 +107,7 @@ const isFavorited = (shopId) => {
 
 const isGridView = ref(false);
 const isCarouselInteracting = ref(false);
+const hasManualCarouselIntent = ref(false);
 let carouselInteractionTimer = null;
 
 const clearCarouselInteractionTimer = () => {
@@ -134,7 +135,12 @@ const markCarouselInteraction = () => {
 	}, 180);
 };
 
+const markManualCarouselIntent = () => {
+	hasManualCarouselIntent.value = true;
+};
+
 const handleCarouselScroll = (event) => {
+	if (!hasManualCarouselIntent.value) return;
 	markCarouselInteraction();
 	handleScroll(event);
 };
@@ -382,6 +388,9 @@ const getCardItemStyle = (_shopId) => {
               overscroll-behavior-x: contain;
               touch-action: pan-x pinch-zoom;
             "
+            @pointerdown="markManualCarouselIntent"
+            @touchstart.passive="markManualCarouselIntent"
+            @wheel.passive="markManualCarouselIntent"
             @scroll="handleCarouselScroll"
           >
             <div

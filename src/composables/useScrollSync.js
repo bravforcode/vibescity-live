@@ -82,7 +82,7 @@ export function useScrollSync({
 	const onScrollEnd = () => {
 		isUserScrolling.value = false;
 		if (!isProgrammaticScroll.value) {
-			commitCenteredShop();
+			commitCenteredShop({ allowInitial: true });
 		}
 	};
 
@@ -137,7 +137,7 @@ export function useScrollSync({
 				return;
 			}
 			if (shouldAutoCommitInitialCenteredShop()) {
-				commitCenteredShop();
+				commitCenteredShop({ allowInitial: true });
 			}
 		});
 	};
@@ -210,7 +210,10 @@ export function useScrollSync({
 		}, 520);
 	};
 
-	const commitCenteredShop = () => {
+	const commitCenteredShop = ({ allowInitial = false } = {}) => {
+		if (!hasCommittedInitialCenteredShop && !allowInitial) {
+			return;
+		}
 		const centerId = getCenteredCardId();
 		if (
 			!centerId ||
@@ -238,10 +241,14 @@ export function useScrollSync({
 			onScrollDecelerate(centerId);
 		}
 		if (shop && typeof onCenteredShopCommit === "function") {
+			const commitReason =
+				!enableInitialCenteredShopCommit || hasCommittedInitialCenteredShop
+					? "carousel"
+					: "startup";
 			onCenteredShopCommit({
 				shop,
 				shopId: centerId,
-				reason: hasCommittedInitialCenteredShop ? "carousel" : "startup",
+				reason: commitReason,
 			});
 		}
 		hasCommittedInitialCenteredShop = true;
@@ -264,7 +271,7 @@ export function useScrollSync({
 		if (settleTimeout) clearTimeout(settleTimeout);
 		settleTimeout = setTimeout(() => {
 			isUserScrolling.value = false;
-			commitCenteredShop();
+			commitCenteredShop({ allowInitial: true });
 		}, 220);
 
 		if (!ticking) {

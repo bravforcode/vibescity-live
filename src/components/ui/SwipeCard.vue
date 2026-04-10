@@ -139,6 +139,9 @@ const isPromoted = computed(
 		Number(props.shop?.visibilityScore || 0) > 0,
 );
 const isLive = computed(() => props.shop?.status === "LIVE");
+const hasTopBadges = computed(
+	() => isLive.value || isPromoted.value || isGiantPin.value,
+);
 const isFavorite = computed(() =>
 	props.shop?.id ? favoritesStore.isFavorite(props.shop.id) : false,
 );
@@ -568,6 +571,7 @@ const handleRootKeydown = (e) => {
       'z-30': isSelected,
       'sc-root--giant': isGiantPin,
       'sc-root--live': isLive,
+      'sc-root--has-top-badges': hasTopBadges,
     }"
     :data-active="isActive ? 'true' : 'false'"
     :data-has-real-image="hasRealImage ? 'true' : 'false'"
@@ -1042,6 +1046,7 @@ const handleRootKeydown = (e) => {
   -webkit-box-orient: vertical;
   overflow: hidden;
   overflow-wrap: anywhere;
+  max-width: 100%;
   text-rendering: optimizeLegibility;
 }
 
@@ -1388,6 +1393,10 @@ const handleRootKeydown = (e) => {
     padding: 2.1rem 0.68rem 0.68rem;
   }
 
+  .sc-root--has-top-badges .sc-info {
+    padding-top: 3.6rem;
+  }
+
   .sc-info-surface {
     padding: 0.66rem;
   }
@@ -1397,10 +1406,14 @@ const handleRootKeydown = (e) => {
     margin-bottom: 0.38rem;
     font-size: 0.92rem;
     line-height: 1.08;
-    display: block;
-    -webkit-line-clamp: unset;
-    -webkit-box-orient: initial;
-    overflow: visible;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .sc-root--has-top-badges .sc-venue-name {
+    margin-inline-start: 3.2rem;
   }
 
   .sc-meta-row {
