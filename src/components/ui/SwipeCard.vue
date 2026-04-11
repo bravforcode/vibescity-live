@@ -311,6 +311,26 @@ watch(
 	{ immediate: true },
 );
 
+watch(showVideo, async (show) => {
+	if (!show) return;
+	await nextTick();
+	if (videoEl.value && !videoLoaded.value) {
+		videoEl.value.load();
+	}
+});
+
+watch(videoLoaded, async (loaded) => {
+	if (!loaded) return;
+	if (!props.isActive) return;
+	if (!videoEl.value) return;
+	try {
+		await videoEl.value.play();
+	} catch {
+		videoEl.value.muted = true;
+		videoEl.value.play().catch(() => {});
+	}
+});
+
 onUnmounted(() => {
 	if (videoEl.value) {
 		videoEl.value.pause();
