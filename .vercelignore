@@ -4,6 +4,8 @@
 vibecity.live/
 
 # Git worktrees & agent-generated dirs
+.cursor/
+.windsurf/
 .agent/
 .worktrees/
 .codex-*/

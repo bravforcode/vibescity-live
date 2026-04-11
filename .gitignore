@@ -47,6 +47,10 @@ coverage/
 mcp_config_ready_to_copy.json
 mcp_config*.local.json
 
+# Local agent/editor tool folders
+.cursor/
+.windsurf/
+
 # ----------------------------------------
 # 5. Editor & OS Files
 # ----------------------------------------
