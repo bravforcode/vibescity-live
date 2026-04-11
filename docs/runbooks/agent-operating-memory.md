@@ -2,8 +2,8 @@
 
 > Read this file before every work session in `C:\vibecity.live`.
 
-- Last updated: 2026-04-11
-- Current focus: Keep `vibescity.live` stable on the latest Vercel `frontend` production deployment, keep `www.vibescity.live` permanently redirecting to the apex via the tiny `vercel-domain-redirect` deployment, keep the Vercel-side `vibecity.live` redirect ready while external DNS still points elsewhere, and preserve the brighter visible basemap, the taller `198x272` bottom-feed card footprint, the larger near-black compact card copy, the left-aligned compact live-card titles, the startup geolocation flow that reuses the last real location and only prompts when no real location is stored, the 4 GB heap guard on the localhost snapshot generator so Windows `npm run build` stays reliable, the passive modal touch listeners, the removed `Ready for Offline` toast, browser analytics/Clarity, and the existing public-host fallbacks that suppress broken cross-origin Supabase and Fly lanes.
+- Last updated: 2026-04-12
+- Current focus: Keep `vibescity.live` stable on Vercel `frontend` production deployment `dpl_CedME52k9iNK67zYURYcQe52WEWh`, keep `www.vibescity.live` redirected through the tiny `vercel-domain-redirect` deployment, keep the Vercel-side `vibecity.live` redirect project ready while external DNS still points elsewhere, and preserve the latest video playback, map location marker, interaction idempotency, refreshed venue snapshot, browser analytics/Clarity, and public-host fallbacks.
 - Canonical skill: `.agents/skills/vibecity-session-handoff/SKILL.md`
 
 ## Start Every Session
@@ -164,19 +164,25 @@
 ## Current Focus
 
 - Keep the repo and the live public domains aligned to the single Supabase project `rukyitpjfmzhqjlfmbie`.
-- Keep `vibescity.live` stable with the brighter visible basemap, the taller `198x272` bottom-feed cards, the badge-safe compact title layout, the cold-start geolocation flow that stays on the user's own location instead of auto-selecting a Chiang Mai venue, the Windows-safe 4 GB heap guard on localhost snapshot generation, and no offline-ready toast.
+- Keep `vibescity.live` stable with the latest runtime fixes: active card videos call `load()`/`play()` at the right lifecycle point, the map user-location marker retries after slow style loads, map interactions are idempotent per style epoch, drag-scroll listeners are idempotent per composable lifecycle, and the refreshed public venue media snapshot remains available.
 - Keep `www.vibescity.live` on a dedicated redirect deployment that returns `301` to `https://vibescity.live/`.
 - Preserve the current deploy split between the linked `vibecity.live` Vercel project, the public `frontend` Vercel project that serves `vibescity.live`, and the tiny `vercel-domain-redirect` project used for `www.vibescity.live`.
 
 ## Current Resume Items
 
-- The tracked worktree on `main` is currently clean apart from local untracked tool folders such as `.cursor/rules/` and `.windsurf/`, which remain outside the deploy scope.
+- The latest deployed app/data commit is `4d4bbaf146df3b226594b169c54f58ecdd75b958` (`chore(deploy): refresh venue snapshots`); a memory-only docs commit may follow it on `main`.
+- `.cursor/` and `.windsurf/` are now ignored in `.gitignore` and `.vercelignore`; keep local tool folders outside git and deploy scope.
 - Plain `vercel deploy -y` hit the free-tier `api-upload-free` limit on 2026-04-06; use `vercel deploy --archive=tgz -y` for preview deploys and `vercel deploy --prod --archive=tgz -y --force` for production deploys from this workspace.
-- The linked Vercel project in `.vercel/project.json` remains `vibecity.live` (`prj_iHipyu1Egd903Uvb6aZYirWB7ULE`); to deploy the live apex domain `vibescity.live` you must temporarily relink to project `frontend` (`prj_OtVXP7mJx8umDqNoL3F5OIAbouIh`), deploy, then restore `.vercel/project.json`.
-- The current live `frontend` production deployment is `dpl_mmqfYStxMAXfF4p1c15oH7sKiipm` at `https://frontend-aor1os6bd-phirawits-projects.vercel.app`, serving `https://vibescity.live`.
+- Best current live deploy pattern: create a clean git worktree from the target commit, link that worktree to Vercel project `frontend`, run `vercel deploy --prod --archive=tgz -y --force`, then remove the worktree. This avoids uploading local caches and preserves the workspace root `.vercel/project.json`.
+- The linked Vercel project in `.vercel/project.json` remains `vibecity.live` (`prj_iHipyu1Egd903Uvb6aZYirWB7ULE`); deploying from the workspace root targets the Vercel-side redirect project, not the live public app project.
+- The current live `frontend` production deployment is `dpl_CedME52k9iNK67zYURYcQe52WEWh` at `https://frontend-b16l86zv4-phirawits-projects.vercel.app`, serving `https://vibescity.live`.
 - The current live redirect deployment is `dpl_DUPtU8mUvZsi7F4YfTXLD9ixumW7` at `https://vercel-domain-redirect-i9ywt93sl-phirawits-projects.vercel.app`, aliased to `https://www.vibescity.live`.
-- The current Vercel-side `vibecity.live` production deployment is `dpl_ATiYJck2kn6oC5U1rb7M1335BMYr` at `https://vibecitylive-c4rif6b79-phirawits-projects.vercel.app`, aliased inside Vercel to `https://vibecity.live`.
+- The current Vercel-side `vibecity.live` production deployment is `dpl_3cBDqyRnrBK9DMkkPr9XQ4myJWdA` at `https://vibecitylive-n0vqyarcl-phirawits-projects.vercel.app`, aliased inside Vercel to `https://vibecity.live`.
+- A workspace-root preview deploy for `vibecity.live` also completed as `dpl_FeawpTHj52eYFNiXm1d1i4rYwknV` at `https://vibecitylive-nneiobig3-phirawits-projects.vercel.app`; this is not the live `vibescity.live` app.
+- After deploying `frontend`, Vercel temporarily assigned `www.vibescity.live` to the new `frontend` deployment. `vercel alias set vercel-domain-redirect-i9ywt93sl-phirawits-projects.vercel.app www.vibescity.live --scope phirawits-projects` restored the intended redirect alias.
 - Production, development, and preview Vercel env vars for `SUPABASE_*` and `VITE_SUPABASE_*` now point to `https://rukyitpjfmzhqjlfmbie.supabase.co`.
+- The latest Vercel `frontend` production build could not pull a fresh Supabase snapshot during remote build (`SUPABASE_SNAPSHOT_UNAVAILABLE`) and preserved the committed authoritative media artifacts from `4d4bbaf`; local `bun run build` did regenerate them successfully before commit.
+- The latest Vercel `frontend` production build skipped venue prerender because remote build env exposed no `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`; this is current behavior to keep in mind if SEO prerender coverage needs to be enforced remotely.
 - Public production still bypasses direct browser-side Supabase reads on non-local production hosts for venue feed/detail, feature flags, local ads, and anonymous gamification status; it relies on snapshot/default/local fallbacks instead.
 - Public production also skips cross-origin Fly review and density browser requests on public hosts, so `shopStore` returns quiet/review-unavailable fallbacks instead of surfacing browser CORS noise while Fly remains undeployed.
 - Browser-side Supabase image transform query strings on the custom-domain production host can trigger Chromium `ERR_BLOCKED_BY_ORB`; keep public media requests on canonical object URLs unless the storage lane is redesigned.
@@ -199,22 +205,28 @@
 
 ## Current Snapshot
 
-- Last modified: 2026-04-11
-- Focus of this session: implement frontend runtime fix plan — video playback, map location marker race, interaction jank
+- Last modified: 2026-04-12
+- Focus of this session: merge, commit, push, validate, and deploy the frontend runtime fix batch to Vercel production
 - Files touched:
-  - `src/components/ui/SwipeCard.vue` — Added `watch(showVideo)` to call `videoEl.load()` after `nextTick` when the `<video>` mounts (v-if). Added `watch(videoLoaded)` to call `play()` once buffered if card is still active. Fixes `preload="none"` circular-dependency deadlock where `@loadeddata` never fired.
-  - `src/components/map/MapLibreContainer.vue` — (1) `ensureUserLocationLayers`: added `once("style.load", ...)` self-retry inside the `isStyleLoaded()` early-return guard. Fixes blue dot never appearing on slow connections. (2) `setupMapInteractions`: added `mapInteractionsInitialized` epoch-reset boolean flag to make the function idempotent per style load. Prevents spurious double-registration.
-  - `src/composables/useDragScroll.js` — Added `listenersSetup` boolean flag (instance-scoped) in `setupListeners()`. Resets in `cleanup()` so remounted components re-attach correctly. Prevents listener accumulation from double-calls.
+  - `.gitignore` — Added `.cursor/` and `.windsurf/` so local tool folders stay out of git status.
+  - `.vercelignore` — Added `.cursor/` and `.windsurf/` so local tool folders stay out of Vercel upload packages.
+  - `.planning/fix-map-video-jank.md` — Committed the runtime fix plan artifact.
+  - `public/data/venues-localhost-snapshot.json` — Regenerated during local build; source rows now `161555`, complete media index `47186`.
+  - `public/data/venues-real-media-index.json` — Regenerated during local build from authoritative media source.
+  - `docs/runbooks/agent-operating-memory.md` — Recorded this merge/commit/deploy handoff.
 - Behavior changed:
-  - Venue card videos now buffer and play on first card activation (was: never played due to preload=none deadlock).
-  - Map blue location dot now appears even when style loads after `isMapReady` watcher fires (was: silently dropped on slow connections).
-  - `setupMapInteractions()` is idempotent per style epoch (was: could double-register handlers).
-  - Drag scroll listeners are idempotent per composable mount lifecycle (was: accumulated on remount or external re-call).
+  - No new runtime app code changed in this deploy commit; it ships the already-committed video, map marker, map interaction, and drag-scroll fixes plus refreshed venue data artifacts.
+  - `vibescity.live` now points at Vercel `frontend` production deployment `dpl_CedME52k9iNK67zYURYcQe52WEWh`.
+  - `www.vibescity.live` was restored to the standalone redirect deployment after the `frontend` production deploy.
 - Validation:
+  - `python .agent/scripts/checklist.py .`: passed 6/6 checks, 0 failed
   - `bun run check`: 0 errors, 0 warnings (311 files, all locale keys green)
-  - `bun run build`: exit 0 — Total 990.1 kB gzip (bundle delta < 1 kB from these changes)
-  - Security validator: Bandit no critical issues
-  - Commits: 99e01dc, dc5916f, cd8a747, 8de883b
+  - `bun run build`: exit 0 — Total 990.1 kB gzip locally
+  - `python .agent/scripts/verify_all.py . --url http://127.0.0.1:3000`: passed 13/15 checks, 0 failed, 2 skipped because optional scripts were missing (`Dependency Analysis`, `Bundle Analysis`)
+  - `git push origin main`: pushed `4d4bbaf` and prior runtime fix commits to `origin/main`; GitHub warned `public/data/venues-real-media-index.json` is 61.47 MB
+  - Vercel `frontend` production deploy: `dpl_CedME52k9iNK67zYURYcQe52WEWh`, `https://frontend-b16l86zv4-phirawits-projects.vercel.app`, aliased to `https://vibescity.live`
+  - Redirect alias restore: `https://www.vibescity.live` points to `https://vercel-domain-redirect-i9ywt93sl-phirawits-projects.vercel.app`
+  - Commits shipped: 99e01dc, dc5916f, cd8a747, 8de883b, 7e7e62f, 4d4bbaf
 ## Update Protocol
 
 Replace the `Current focus`, `Current Resume Items`, and `Current Snapshot` sections instead of appending endless history. Keep updates factual and short.
