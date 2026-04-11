@@ -2,7 +2,7 @@
 
 > Read this file before every work session in `C:\vibecity.live`.
 
-- Last updated: 2026-04-09
+- Last updated: 2026-04-11
 - Current focus: Keep `vibescity.live` stable on the latest Vercel `frontend` production deployment, keep `www.vibescity.live` permanently redirecting to the apex via the tiny `vercel-domain-redirect` deployment, keep the Vercel-side `vibecity.live` redirect ready while external DNS still points elsewhere, and preserve the brighter visible basemap, the taller `198x272` bottom-feed card footprint, the larger near-black compact card copy, the left-aligned compact live-card titles, the startup geolocation flow that reuses the last real location and only prompts when no real location is stored, the 4 GB heap guard on the localhost snapshot generator so Windows `npm run build` stays reliable, the passive modal touch listeners, the removed `Ready for Offline` toast, browser analytics/Clarity, and the existing public-host fallbacks that suppress broken cross-origin Supabase and Fly lanes.
 - Canonical skill: `.agents/skills/vibecity-session-handoff/SKILL.md`
 
@@ -199,22 +199,22 @@
 
 ## Current Snapshot
 
-- Focus of this session:
-  - ship the compact carousel title layout so venue names stay left-aligned and fully visible on live
-- Session plan artifact:
-  - none
-- Files touched in this session:
-  - `docs/runbooks/agent-operating-memory.md`
-  - `src/components/ui/SwipeCard.vue`
-- Behavior changed in this session:
-  - Compact card titles now render left-aligned, use the full text width below the top controls, and no longer clamp or hide long venue names on the carousel.
-  - The compact title layout tweak is now live on `https://vibescity.live` via the latest `frontend` production deployment.
-- Validation confirmed in this session:
-  - `npx biome check src/components/ui/SwipeCard.vue docs/runbooks/agent-operating-memory.md` passes on 2026-04-10.
-  - `$env:PYTHONIOENCODING='utf-8'; python .agent/scripts/checklist.py .` passes on 2026-04-10.
-  - A local Playwright browser check against `http://localhost:5173/en` confirms compact titles report `textAlign: left`, `webkitLineClamp: none`, `overflow: visible`, and `overlaps: false` for the inspected live cards.
-  - `vercel deploy --prod --archive=tgz -y --force` to temporary link `frontend` produced deployment `dpl_mmqfYStxMAXfF4p1c15oH7sKiipm`, now aliased to `https://vibescity.live`.
-  - `vercel alias set vercel-domain-redirect-i9ywt93sl-phirawits-projects.vercel.app www.vibescity.live` succeeded again after the production deploy, and `vercel link --project vibecity.live` restored the local link baseline.
+- Last modified: 2026-04-11
+- Focus of this session: implement frontend runtime fix plan — video playback, map location marker race, interaction jank
+- Files touched:
+  - `src/components/ui/SwipeCard.vue` — Added `watch(showVideo)` to call `videoEl.load()` after `nextTick` when the `<video>` mounts (v-if). Added `watch(videoLoaded)` to call `play()` once buffered if card is still active. Fixes `preload="none"` circular-dependency deadlock where `@loadeddata` never fired.
+  - `src/components/map/MapLibreContainer.vue` — (1) `ensureUserLocationLayers`: added `once("style.load", ...)` self-retry inside the `isStyleLoaded()` early-return guard. Fixes blue dot never appearing on slow connections. (2) `setupMapInteractions`: added `mapInteractionsInitialized` epoch-reset boolean flag to make the function idempotent per style load. Prevents spurious double-registration.
+  - `src/composables/useDragScroll.js` — Added `listenersSetup` boolean flag (instance-scoped) in `setupListeners()`. Resets in `cleanup()` so remounted components re-attach correctly. Prevents listener accumulation from double-calls.
+- Behavior changed:
+  - Venue card videos now buffer and play on first card activation (was: never played due to preload=none deadlock).
+  - Map blue location dot now appears even when style loads after `isMapReady` watcher fires (was: silently dropped on slow connections).
+  - `setupMapInteractions()` is idempotent per style epoch (was: could double-register handlers).
+  - Drag scroll listeners are idempotent per composable mount lifecycle (was: accumulated on remount or external re-call).
+- Validation:
+  - `bun run check`: 0 errors, 0 warnings (311 files, all locale keys green)
+  - `bun run build`: exit 0 — Total 990.1 kB gzip (bundle delta < 1 kB from these changes)
+  - Security validator: Bandit no critical issues
+  - Commits: 99e01dc, dc5916f, cd8a747, 8de883b
 ## Update Protocol
 
 Replace the `Current focus`, `Current Resume Items`, and `Current Snapshot` sections instead of appending endless history. Keep updates factual and short.
