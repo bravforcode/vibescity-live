@@ -989,6 +989,7 @@ const updateSelectedPinLayerFilter = (highlightedId) => {
 
 const maplessMode = ref(false); // User chose to continue without map
 let mapTeardownDone = false;
+let mapInteractionsInitialized = false;
 
 const teardownMap = () => {
 	if (mapTeardownDone) return;
@@ -4805,6 +4806,8 @@ scheduleIdleTask(
 scheduleIdleTask(initDollyZoom, { timeout: 4000 });
 
 const setupMapInteractions = () => {
+	if (mapInteractionsInitialized) return;
+	mapInteractionsInitialized = true;
 	setupInteractionsCore();
 };
 
@@ -5246,6 +5249,7 @@ const applyStyleIfNeeded = (isDarkMode) => {
 	}
 
 	map.value.once("style.load", async () => {
+		mapInteractionsInitialized = false;
 		if (!map.value) return;
 		if (seq !== styleApplySeq) return;
 		await setupMapLayers();
