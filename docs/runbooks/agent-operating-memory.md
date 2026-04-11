@@ -170,14 +170,14 @@
 
 ## Current Resume Items
 
-- The latest deployed app/data commit is `4d4bbaf146df3b226594b169c54f58ecdd75b958` (`chore(deploy): refresh venue snapshots`); a memory-only docs commit may follow it on `main`.
+- The latest deployed app/data commit is `4d4bbaf146df3b226594b169c54f58ecdd75b958` (`chore(deploy): refresh venue snapshots`); `main` also includes memory-only docs commits after it, which do not affect the app bundle because docs are excluded from Vercel uploads.
 - `.cursor/` and `.windsurf/` are now ignored in `.gitignore` and `.vercelignore`; keep local tool folders outside git and deploy scope.
 - Plain `vercel deploy -y` hit the free-tier `api-upload-free` limit on 2026-04-06; use `vercel deploy --archive=tgz -y` for preview deploys and `vercel deploy --prod --archive=tgz -y --force` for production deploys from this workspace.
 - Best current live deploy pattern: create a clean git worktree from the target commit, link that worktree to Vercel project `frontend`, run `vercel deploy --prod --archive=tgz -y --force`, then remove the worktree. This avoids uploading local caches and preserves the workspace root `.vercel/project.json`.
 - The linked Vercel project in `.vercel/project.json` remains `vibecity.live` (`prj_iHipyu1Egd903Uvb6aZYirWB7ULE`); deploying from the workspace root targets the Vercel-side redirect project, not the live public app project.
 - The current live `frontend` production deployment is `dpl_CedME52k9iNK67zYURYcQe52WEWh` at `https://frontend-b16l86zv4-phirawits-projects.vercel.app`, serving `https://vibescity.live`.
 - The current live redirect deployment is `dpl_DUPtU8mUvZsi7F4YfTXLD9ixumW7` at `https://vercel-domain-redirect-i9ywt93sl-phirawits-projects.vercel.app`, aliased to `https://www.vibescity.live`.
-- The current Vercel-side `vibecity.live` production deployment is `dpl_3cBDqyRnrBK9DMkkPr9XQ4myJWdA` at `https://vibecitylive-n0vqyarcl-phirawits-projects.vercel.app`, aliased inside Vercel to `https://vibecity.live`.
+- The current Vercel-side `vibecity.live` production deployment is `dpl_2FEJhRgHKYjxUmXaeJyBB46Y4hXA` at `https://vibecitylive-r4dpohot1-phirawits-projects.vercel.app`, aliased inside Vercel to `https://vibecity.live`.
 - A workspace-root preview deploy for `vibecity.live` also completed as `dpl_FeawpTHj52eYFNiXm1d1i4rYwknV` at `https://vibecitylive-nneiobig3-phirawits-projects.vercel.app`; this is not the live `vibescity.live` app.
 - After deploying `frontend`, Vercel temporarily assigned `www.vibescity.live` to the new `frontend` deployment. `vercel alias set vercel-domain-redirect-i9ywt93sl-phirawits-projects.vercel.app www.vibescity.live --scope phirawits-projects` restored the intended redirect alias.
 - Production, development, and preview Vercel env vars for `SUPABASE_*` and `VITE_SUPABASE_*` now point to `https://rukyitpjfmzhqjlfmbie.supabase.co`.
@@ -226,6 +226,7 @@
   - `git push origin main`: pushed `4d4bbaf` and prior runtime fix commits to `origin/main`; GitHub warned `public/data/venues-real-media-index.json` is 61.47 MB
   - Vercel `frontend` production deploy: `dpl_CedME52k9iNK67zYURYcQe52WEWh`, `https://frontend-b16l86zv4-phirawits-projects.vercel.app`, aliased to `https://vibescity.live`
   - Redirect alias restore: `https://www.vibescity.live` points to `https://vercel-domain-redirect-i9ywt93sl-phirawits-projects.vercel.app`
+  - Vercel-side `vibecity.live` production auto-deploy from docs memory commit: `dpl_2FEJhRgHKYjxUmXaeJyBB46Y4hXA`, `https://vibecitylive-r4dpohot1-phirawits-projects.vercel.app`, Ready after 10m
   - Commits shipped: 99e01dc, dc5916f, cd8a747, 8de883b, 7e7e62f, 4d4bbaf
 ## Update Protocol
 
