@@ -835,7 +835,14 @@ const buildUserLocationFeatureCollectionFromLngLat = (lngLat) => {
 const ensureUserLocationLayers = () => {
 	if (!isMapOperational()) return false;
 	const mapInstance = map.value;
-	if (!mapInstance?.isStyleLoaded?.()) return false;
+	if (!mapInstance?.isStyleLoaded?.()) {
+		mapInstance?.once?.("style.load", () => {
+			if (isMapOperational()) {
+				ensureUserLocationLayers();
+			}
+		});
+		return false;
+	}
 
 	try {
 		if (!mapInstance.getSource(USER_LOCATION_SOURCE_ID)) {
