@@ -30,6 +30,7 @@ export function useDragScroll(containerRef, options = {}) {
 	let lastTime = 0;
 	let momentumFrame = null;
 	let prefersNativeTouchScroll = false;
+	let listenersSetup = false;
 
 	const resolveShouldUseNativeTouchScroll = () => {
 		if (typeof window === "undefined") return false;
@@ -172,8 +173,13 @@ export function useDragScroll(containerRef, options = {}) {
 
 	// Setup event listeners
 	const setupListeners = () => {
+		if (listenersSetup) return;
+		listenersSetup = true;
 		const container = containerRef.value;
-		if (!container) return;
+		if (!container) {
+			listenersSetup = false;
+			return;
+		}
 		prefersNativeTouchScroll = resolveShouldUseNativeTouchScroll();
 
 		container.style.cursor = "grab";
@@ -208,6 +214,7 @@ export function useDragScroll(containerRef, options = {}) {
 		if (momentumFrame) {
 			cancelAnimationFrame(momentumFrame);
 		}
+		listenersSetup = false;
 	};
 
 	onMounted(() => {
