@@ -2,7 +2,7 @@
 
 > Read this file before every work session in `C:\vibecity.live`.
 
-- Last updated: 2026-04-12
+- Last updated: 2026-04-17
 - Current focus: Keep `vibescity.live` stable on Vercel `frontend` production deployment `dpl_CedME52k9iNK67zYURYcQe52WEWh`, keep `www.vibescity.live` redirected through the tiny `vercel-domain-redirect` deployment, keep the Vercel-side `vibecity.live` redirect project ready while external DNS still points elsewhere, and preserve the latest video playback, map location marker, interaction idempotency, refreshed venue snapshot, browser analytics/Clarity, and public-host fallbacks.
 - Canonical skill: `.agents/skills/vibecity-session-handoff/SKILL.md`
 
@@ -13,6 +13,18 @@
 3. If the task resumes previous runtime or map work, inspect the files listed under `Hot Files` first.
 4. If the task is browser-facing, verify the current behavior in a real browser before claiming a fix.
 5. When the task changes the stable baseline, update this file before finishing.
+
+## Latest Session Notes (2026-04-17)
+
+- Ran local validation and runtime smoke tests (dev `5173`, E2E preview `5417`).
+- Playwright smoke passed on `Desktop Chromium` and `Mobile Safari (iOS)` after stabilizing selectors and mobile timing in [smoke.spec.ts](file:///c:/vibecity.live/tests/e2e/smoke.spec.ts).
+- Mobile Chrome (Android) smoke now passes on the same preview target after startup hardening (`12 passed`, `3 skipped`), so the previous reproducible timeout is no longer observed in this local lane.
+- New profiling + CI automation landed for daily performance tracking: `scripts/performance/profile-home-runtime.mjs` supports `--steps home|full`, `scripts/performance/capture-har.mjs` captures HAR, and `scripts/ci/build-daily-performance-dashboard.mjs` emits `reports/ci/daily-performance-dashboard.json` with threshold-based alerts.
+- New performance gate evaluator `scripts/ci/evaluate-lighthouse-perf-gate.mjs` enforces p75-style Lighthouse thresholds and now fails explicitly when `.lighthouseci` has no usable LHR JSON.
+- Added scheduled workflow `.github/workflows/daily-performance-dashboard.yml` to build preview, capture mobile profile + HAR, generate dashboard artifacts, and fail on threshold breaches.
+- Lighthouse (simulated throttling) on `http://localhost:5417/en` remains poor (`LCP ~11.1s`, `TBT ~3.1s`, perf score `~0.33`), so merge-blocking perf thresholds (`LCP <= 2.5s`, `TBT <= 200ms`) are intentionally still unmet.
+- Repo security scan flagged patterns (localStorage reads, unescaped map popup html); review findings before shipping any user-derived strings into DOM.
+- Backend pytest needs `$env:PYTHONDONTWRITEBYTECODE="1"` in this sandbox environment to avoid blocked `.pyc` writes.
 
 ## Stable Baseline
 

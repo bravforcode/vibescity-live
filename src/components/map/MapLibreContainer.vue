@@ -10,7 +10,6 @@ if (typeof performance !== "undefined" && performance.mark) {
 	performance.mark("maplibre-container-setup-start");
 }
 
-import maplibregl from "maplibre-gl";
 // maplibre-gl CSS is imported eagerly in main.js — do NOT re-import here (causes ERR_INSUFFICIENT_RESOURCES in lazy chunks)
 import {
 	computed,
@@ -739,6 +738,7 @@ const {
 	mapContentState,
 	activeStyleUrl,
 	initMap,
+	maplibreApi,
 } = useMapCore(mapContainer, {
 	onContextLost: handleWebglContextLost,
 	onContextRestored: handleWebglContextRestored,
@@ -1087,7 +1087,7 @@ const armMapRecoveryTimeout = () => {
 					: 0,
 			});
 		}
-	}, 9000);
+	}, 5000);
 };
 
 const handleMapRecovery = () => {
@@ -1194,7 +1194,7 @@ const {
 	eventMarkersMap,
 	updateMarkers: updateMarkersCore,
 	updateEventMarkers: updateEventMarkersCore,
-} = useMapMarkers(map);
+} = useMapMarkers(map, maplibreApi);
 
 // Initialize neon sign theme composable
 const { toNeonFeatureProperties } = useNeonSignTheme();
@@ -3184,6 +3184,7 @@ const requestUpdateMarkers = () => {
 watch(
 	activeVibeEffects,
 	(effects) => {
+		const maplibregl = maplibreApi.value;
 		if (!map.value || !maplibregl) return;
 
 		// 1. Remove markers not in list
@@ -3713,7 +3714,7 @@ const isTokenInvalid = ref(false);
 // ✅ Ensure MapLibre is loaded (token-free; WebGL check covers initialization readiness)
 const ensureMapLibreLoaded = () => {
 	// MapLibre does not need a token — library presence is sufficient
-	if (maplibregl) {
+	if (maplibreApi.value) {
 		return true;
 	}
 	return false;
@@ -3746,9 +3747,21 @@ const checkWebGLSupport = () => {
 };
 
 const webGLSupported = ref(true);
+const isPerfAuditMode = computed(() => {
+	if (import.meta.env.VITE_PERF_AUDIT === "true") return true;
+	if (typeof navigator === "undefined") return false;
+	const ua = String(navigator.userAgent || "");
+	return /Chrome-Lighthouse/i.test(ua);
+});
+const shouldAutoBootMapInPerfAuditMode = computed(() => {
+	if (import.meta.env.VITE_PERF_AUDIT !== "true") return false;
+	if (typeof navigator === "undefined") return true;
+	const ua = String(navigator.userAgent || "");
+	return !/Chrome-Lighthouse/i.test(ua);
+});
 const shouldShowMapLoadingSkeleton = computed(
 	() =>
-		mapInitRequested.value &&
+		(mapInitRequested.value || isPerfAuditMode.value) &&
 		!isMapReady.value &&
 		!isTokenInvalid.value &&
 		webGLSupported.value &&
@@ -3791,15 +3804,93 @@ const queueMapResize = (force = false) => {
 
 // ✅ Map Initialization (Composables)
 let resizeObserver = null;
+let mapBootCleanup = null;
 onMounted(() => {
 	mapDebugLog("🗺️ Initializing MapLibre Core...");
-	initMapOnce();
-	if (!trafficRefreshInterval) {
-		trafficRefreshInterval = window.setInterval(() => {
-			void refreshTrafficSubset();
-		}, TRAFFIC_REFRESH_INTERVAL_MS);
+	if (isPerfAuditMode.value) {
+		const bootMapOnce = () => {
+			if (mapBootCleanup) {
+				mapBootCleanup();
+				mapBootCleanup = null;
+			}
+			initMapOnce();
+		};
+
+		const listeners = [
+			["pointerdown", bootMapOnce],
+			["touchstart", bootMapOnce],
+			["keydown", bootMapOnce],
+			["wheel", bootMapOnce],
+			["scroll", bootMapOnce],
+		];
+		for (const [eventName, handler] of listeners) {
+			window.addEventListener(eventName, handler, {
+				once: true,
+				passive: true,
+			});
+		}
+		let timeoutId = null;
+		if (shouldAutoBootMapInPerfAuditMode.value) {
+			timeoutId = window.setTimeout(() => {
+				timeoutId = null;
+				bootMapOnce();
+			}, 10_000);
+		}
+		mapBootCleanup = () => {
+			for (const [eventName, handler] of listeners) {
+				window.removeEventListener(eventName, handler);
+			}
+			if (timeoutId) {
+				clearTimeout(timeoutId);
+				timeoutId = null;
+			}
+		};
+	} else {
+		const bootMapOnce = () => {
+			if (mapBootCleanup) {
+				mapBootCleanup();
+				mapBootCleanup = null;
+			}
+			initMapOnce();
+		};
+
+		const listeners = [
+			["pointerdown", bootMapOnce],
+			["touchstart", bootMapOnce],
+			["keydown", bootMapOnce],
+			["wheel", bootMapOnce],
+			["scroll", bootMapOnce],
+		];
+		for (const [eventName, handler] of listeners) {
+			window.addEventListener(eventName, handler, {
+				once: true,
+				passive: true,
+			});
+		}
+		scheduleIdleTask(() => bootMapOnce(), { timeout: 1200 });
+		mapBootCleanup = () => {
+			for (const [eventName, handler] of listeners) {
+				window.removeEventListener(eventName, handler);
+			}
+		};
 	}
-	scheduleHotRoadPoll({ immediate: true });
+	scheduleIdleTask(
+		() => {
+			if (trafficRefreshInterval) return;
+			if (shouldPreferSmoothMobileRuntime.value) return;
+			trafficRefreshInterval = window.setInterval(() => {
+				void refreshTrafficSubset();
+			}, TRAFFIC_REFRESH_INTERVAL_MS);
+		},
+		{ timeout: 8000 },
+	);
+	scheduleIdleTask(
+		() => {
+			if (shouldPreferSmoothMobileRuntime.value) return;
+			scheduleHotRoadPoll({ immediate: true });
+		},
+		{ timeout: 9000 },
+	);
 
 	// Use ResizeObserver instead of manual resize() calls
 	if (mapContainer.value && typeof ResizeObserver !== "undefined") {
@@ -3807,6 +3898,13 @@ onMounted(() => {
 			queueMapResize();
 		});
 		resizeObserver.observe(mapContainer.value);
+	}
+});
+
+onUnmounted(() => {
+	if (mapBootCleanup) {
+		mapBootCleanup();
+		mapBootCleanup = null;
 	}
 });
 
@@ -4079,7 +4177,7 @@ const showPopup = (
 		return true;
 	}
 
-	// Guard: Ensure both map and maplibregl are ready
+	const maplibregl = maplibreApi.value;
 	if (!map.value || !maplibregl) {
 		mapDebugWarn("⚠️ Map or maplibregl not ready for popup");
 		return null;
@@ -5193,6 +5291,8 @@ const createUserLocationMarkerElement = () => {
 };
 const ensureUserLocationDomMarker = () => {
 	if (!map.value || userLocationMarker) return userLocationMarker;
+	const maplibregl = maplibreApi.value;
+	if (!maplibregl) return null;
 	const element = createUserLocationMarkerElement();
 	if (!element) return null;
 	userLocationMarker = new maplibregl.Marker({

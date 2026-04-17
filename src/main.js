@@ -25,6 +25,14 @@ import {
 	shouldSuppressUnhandledRuntimeRejection,
 } from "./utils/runtimeErrorGuards";
 
+const bootPerf =
+	typeof performance !== "undefined" && performance && performance.mark
+		? performance
+		: null;
+try {
+	bootPerf?.mark("vc:bootstrap:start");
+} catch {}
+
 const app = createApp(App);
 const head = createHead();
 
@@ -230,6 +238,21 @@ import vHaptic from "./directives/vHaptic.js";
 app.directive("haptic", vHaptic);
 
 app.mount("#app");
+try {
+	bootPerf?.mark("vc:bootstrap:mounted");
+	bootPerf?.measure(
+		"vc:bootstrap",
+		"vc:bootstrap:start",
+		"vc:bootstrap:mounted",
+	);
+	if (typeof window !== "undefined") {
+		window.__vibecityPerf = window.__vibecityPerf || {};
+		const last = bootPerf?.getEntriesByName?.("vc:bootstrap")?.slice(-1)?.[0];
+		if (last) {
+			window.__vibecityPerf.bootstrapMs = Number(last.duration.toFixed(2));
+		}
+	}
+} catch {}
 
 // ✅ Cleanup Supabase Realtime channels and store subscriptions on page unload
 if (typeof window !== "undefined") {

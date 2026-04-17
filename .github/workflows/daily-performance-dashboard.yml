@@ -1,0 +1,73 @@
+name: Daily Performance Dashboard
+
+on:
+  schedule:
+    - cron: "20 1 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-performance-dashboard
+  cancel-in-progress: true
+
+jobs:
+  daily-dashboard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build preview bundle
+        run: npm run build:e2e
+        env:
+          VIBECITY_REUSE_EXISTING_LOCALHOST_SNAPSHOT: "1"
+
+      - name: Start preview
+        run: npm run preview:e2e -- --host 127.0.0.1 --port 5417 &
+
+      - name: Wait for preview
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:5417/en > /dev/null 2>&1; then
+              echo "Preview ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Preview failed to boot in time"
+          exit 1
+
+      - name: Capture runtime profile (mobile)
+        run: node scripts/performance/profile-home-runtime.mjs --url http://127.0.0.1:5417/en --device mobile-chrome --steps home --output-dir reports/performance
+
+      - name: Capture HAR (mobile)
+        run: node scripts/performance/capture-har.mjs --url http://127.0.0.1:5417/en --output reports/performance/mobile-chrome-en.har
+
+      - name: Build daily dashboard + threshold alerts
+        run: node scripts/ci/build-daily-performance-dashboard.mjs
+
+      - name: Upload dashboard artifacts
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-performance-dashboard
+          path: |
+            reports/ci/daily-performance-dashboard.json
+            reports/performance/home-runtime-profile.latest.json
+            reports/performance/home-runtime-trace.latest.json
+            reports/performance/mobile-chrome-en.har
+          retention-days: 14
+          if-no-files-found: error

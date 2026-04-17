@@ -96,12 +96,21 @@ const parseArgs = (argv) => {
 		device: DEFAULT_DEVICE,
 		headed: false,
 		timeoutMs: 45_000,
+		steps: "home",
+		skipCarousel: false,
+		skipDetail: false,
+		skipMarker: false,
+		help: false,
 	};
 
 	for (let i = 0; i < argv.length; i += 1) {
 		const token = argv[i];
 		const next = argv[i + 1];
 		switch (token) {
+			case "--help":
+			case "-h":
+				result.help = true;
+				break;
 			case "--url":
 				if (next) {
 					result.url = next;
@@ -129,6 +138,23 @@ const parseArgs = (argv) => {
 					i += 1;
 				}
 				break;
+			case "--steps":
+				if (next) {
+					result.steps = String(next || "home")
+						.trim()
+						.toLowerCase();
+					i += 1;
+				}
+				break;
+			case "--skip-carousel":
+				result.skipCarousel = true;
+				break;
+			case "--skip-detail":
+				result.skipDetail = true;
+				break;
+			case "--skip-marker":
+				result.skipMarker = true;
+				break;
 			case "--headed":
 				result.headed = true;
 				break;
@@ -138,6 +164,26 @@ const parseArgs = (argv) => {
 	}
 
 	return result;
+};
+
+const printUsage = () => {
+	const lines = [
+		"Usage: node scripts/performance/profile-home-runtime.mjs [options]",
+		"",
+		"Options:",
+		"  --url <url>                 Target URL (default: localhost preview)",
+		"  --device <device>           desktop | mobile-chrome (default) ",
+		"  --timeout-ms <ms>           Navigation timeout (default: 45000)",
+		"  --output-dir <dir>          Output directory (default: reports/performance)",
+		"  --steps <home|full>         home=load only, full=carousel+detail+marker",
+		"  --skip-carousel             Skip carousel scroll stage",
+		"  --skip-detail               Skip opening detail from active card",
+		"  --skip-marker               Skip map marker click stage",
+		"  --headed                    Run with visible browser",
+		"  --help, -h                  Show help",
+		"",
+	];
+	console.log(lines.join("\n"));
 };
 
 const getDeviceProfile = (device) => {
@@ -391,12 +437,11 @@ const waitForHomeReady = async (page, url, timeoutMs) => {
 	await page.waitForSelector('[data-testid="vibe-carousel"]', {
 		timeout: timeoutMs,
 	});
-	await page.waitForSelector(
-		'[data-testid="map-shell"][data-map-ready="true"]',
-		{
-			timeout: timeoutMs,
-		},
-	);
+	await page
+		.waitForSelector('[data-testid="map-shell"][data-map-ready="true"]', {
+			timeout: Math.min(timeoutMs, 12_000),
+		})
+		.catch(() => null);
 
 	const previewOpenWebgl = page
 		.locator('[data-testid="dev-preview-open-webgl"]')
@@ -459,9 +504,17 @@ const openDetailFromActiveCard = async (page) => {
 	const activeCard = page
 		.locator('[data-testid="shop-card"][data-active="true"]')
 		.first();
-	await activeCard.waitFor({ state: "visible", timeout: 15_000 });
-	await activeCard.focus();
-	await activeCard.press("Enter");
+	const activeVisible = await activeCard
+		.isVisible({ timeout: 15_000 })
+		.catch(() => false);
+	if (activeVisible) {
+		await activeCard.focus().catch(() => {});
+		await activeCard.press("Enter").catch(() => {});
+	} else {
+		const fallbackCard = page.locator('[data-testid="shop-card"]').first();
+		await fallbackCard.waitFor({ state: "visible", timeout: 15_000 });
+		await fallbackCard.click({ force: true }).catch(() => {});
+	}
 
 	const detailSelectors = [
 		'[data-testid="vibe-modal"]',
@@ -494,6 +547,66 @@ const clickFirstMapMarker = async (page) => {
 	return null;
 };
 
+const collectResourceSummary = async (page) =>
+	page.evaluate(() => {
+		const nav = performance.getEntriesByType("navigation")[0];
+		const dcl = nav ? Number(nav.domContentLoadedEventEnd || 0) : 0;
+		const resources = performance.getEntriesByType("resource") || [];
+		const rows = resources
+			.map((entry) => {
+				const url = String(entry.name || "");
+				const initiatorType = String(entry.initiatorType || "");
+				const duration = Number(entry.duration || 0);
+				const startTime = Number(entry.startTime || 0);
+				const endTime = startTime + duration;
+				const transferSize =
+					typeof entry.transferSize === "number" ? entry.transferSize : null;
+				const decodedBodySize =
+					typeof entry.decodedBodySize === "number"
+						? entry.decodedBodySize
+						: null;
+				const renderBlockingStatus =
+					typeof entry.renderBlockingStatus === "string"
+						? entry.renderBlockingStatus
+						: null;
+
+				const isCss = url.includes(".css");
+				const renderBlockingCandidate =
+					renderBlockingStatus === "blocking" ||
+					(isCss && startTime < dcl) ||
+					(initiatorType === "script" && startTime < dcl && endTime > dcl);
+
+				return {
+					url,
+					initiatorType,
+					startTime: Number(startTime.toFixed(2)),
+					duration: Number(duration.toFixed(2)),
+					endTime: Number(endTime.toFixed(2)),
+					transferSize,
+					decodedBodySize,
+					renderBlockingStatus,
+					renderBlockingCandidate,
+				};
+			})
+			.filter((row) => row.duration >= 1)
+			.sort((a, b) => b.duration - a.duration);
+
+		const slowOver1s = rows.filter((row) => row.duration >= 1000).slice(0, 50);
+		const renderBlocking = rows
+			.filter((row) => row.renderBlockingCandidate)
+			.slice(0, 50);
+
+		return {
+			totalResources: resources.length,
+			slowOver1sCount: rows.filter((row) => row.duration >= 1000).length,
+			renderBlockingCandidatesCount: rows.filter(
+				(row) => row.renderBlockingCandidate,
+			).length,
+			slowOver1s,
+			renderBlocking,
+		};
+	});
+
 const collectBrowserMetrics = async (page, client) => {
 	const perfMetrics = await client
 		.send("Performance.getMetrics")
@@ -516,6 +629,7 @@ const collectBrowserMetrics = async (page, client) => {
 					}
 				: null,
 			mapMetrics: window.__mapMetrics || null,
+			vibecityPerf: window.__vibecityPerf || null,
 			runtimeProfile: window.__homeRuntimeProfile || null,
 			performanceMetrics: metricSnapshot,
 		};
@@ -532,6 +646,10 @@ const writeJson = async (targetPath, payload) => {
 
 const main = async () => {
 	const options = parseArgs(process.argv.slice(2));
+	if (options.help) {
+		printUsage();
+		process.exit(0);
+	}
 	const timestamp = makeTimestamp();
 	const outputDir = options.outputDir;
 	const tracePath = path.join(
@@ -587,25 +705,37 @@ const main = async () => {
 		await pushMark(page, "home_ready");
 		await sleep(600);
 
-		await animateCarousel(page);
-		await pushMark(page, "carousel_scroll_complete");
-		await sleep(800);
+		const shouldRunFull = options.steps === "full";
+		if (shouldRunFull && !options.skipCarousel) {
+			await animateCarousel(page);
+			await pushMark(page, "carousel_scroll_complete");
+			await sleep(800);
+		}
 
-		const openedDetailSelector = await openDetailFromActiveCard(page);
-		await pushMark(page, "detail_open_attempt_complete");
-		await sleep(1_200);
+		let openedDetailSelector = null;
+		if (shouldRunFull && !options.skipDetail) {
+			openedDetailSelector = await openDetailFromActiveCard(page);
+			await pushMark(page, "detail_open_attempt_complete");
+			await sleep(1_200);
+		}
 
-		const clickedMarkerSelector = await clickFirstMapMarker(page);
-		await pushMark(
-			page,
-			clickedMarkerSelector
-				? "marker_click_complete"
-				: "post_detail_idle_complete",
-		);
-		await sleep(1_200);
+		let clickedMarkerSelector = null;
+		if (shouldRunFull && !options.skipMarker) {
+			clickedMarkerSelector = await clickFirstMapMarker(page);
+			await pushMark(
+				page,
+				clickedMarkerSelector
+					? "marker_click_complete"
+					: "post_detail_idle_complete",
+			);
+			await sleep(1_200);
+		}
 
 		const traceText = await stopTracing(client);
 		const browserMetrics = await collectBrowserMetrics(page, client);
+		const resourceSummary = await collectResourceSummary(page).catch(
+			() => null,
+		);
 		const runtimeProfile = browserMetrics.runtimeProfile || {
 			marks: [],
 			longTasks: [],
@@ -629,8 +759,12 @@ const main = async () => {
 			consoleMessages,
 			navigation: browserMetrics.navigation,
 			mapMetrics: browserMetrics.mapMetrics,
+			resourceSummary,
 			longTaskSummary: {
 				count: longTasksByStage.length,
+				blockedOver200ms: longTasksByStage.filter(
+					(entry) => Number(entry.duration || 0) >= 200,
+				).length,
 				maxDuration: Number(
 					Math.max(
 						0,
