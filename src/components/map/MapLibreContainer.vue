@@ -967,8 +967,13 @@ const initMapOnce = (styleOverride = null) => {
 	currentStyleUrl.value = initialStyleUrl;
 	mapTeardownDone = false;
 	sentientDisposed = false;
-	initMap(initialCenter, initialZoom, initialStyleUrl);
-	armStrictStyleGate();
+
+	// Phase 2: Lazy Hydration via requestIdleCallback
+	// Yields the main thread so Vue can paint the VibeSkeleton/MapPlaceholder immediately!
+	queueMapIdleTask(() => {
+		initMap(initialCenter, initialZoom, initialStyleUrl);
+		armStrictStyleGate();
+	}, 200);
 };
 
 const updateSelectedPinLayerFilter = (highlightedId) => {

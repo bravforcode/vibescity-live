@@ -4,8 +4,22 @@ import piniaPluginPersistedstate from "pinia-plugin-persistedstate";
 import { createApp } from "vue";
 import App from "./App.vue";
 import "./assets/css/main.postcss";
-import "./assets/vibe-animations.css";
 import "./design-system/tokens.css";
+
+// vibe-animations.css: decorative map/UI animations — not needed for first paint.
+// Defer to idle time to eliminate render-blocking and reduce TBT.
+const loadDeferredStyles = () => {
+	import("./assets/vibe-animations.css").catch(() => {});
+};
+
+if (typeof requestIdleCallback === "function") {
+	requestIdleCallback(loadDeferredStyles, { timeout: 2000 });
+} else if (typeof window !== "undefined") {
+	// Safari < 16.4 fallback
+	window.addEventListener("load", () => setTimeout(loadDeferredStyles, 100), {
+		once: true,
+	});
+}
 
 import { headSymbol } from "@unhead/vue";
 import { createHead } from "@unhead/vue/client";

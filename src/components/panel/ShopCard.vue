@@ -245,7 +245,7 @@ watch(
     tabindex="0"
     :aria-label="cardAriaLabel"
     :class="[
-      'shop-card-panel group relative w-full min-h-[300px] md:min-h-[340px] aspect-[4/5] rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1',
+      'shop-card-panel @container group relative w-full min-h-[300px] @md:min-h-[340px] aspect-[4/5] rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1',
       isActive
         ? 'card-active-glow ring-1 ring-white/50 shadow-2xl scale-[1.01]'
         : 'shadow-lg hover:shadow-2xl',
@@ -441,7 +441,7 @@ watch(
             <!-- Header -->
             <div class="shop-header">
               <h3
-                class="text-4xl font-black text-black leading-tight tracking-tight font-sans line-clamp-1 flex-1"
+                class="text-2xl @xs:text-3xl @sm:text-4xl font-black text-white leading-tight tracking-tight font-sans line-clamp-1 flex-1"
               >
                 {{ shop.name }}
               </h3>
@@ -512,11 +512,11 @@ watch(
             </div>
 
             <!-- Action Buttons -->
-            <div class="grid grid-cols-2 gap-2 mt-1">
+            <div class="flex flex-col @sm:flex-row gap-2 mt-1">
               <button
                 v-if="useRideButton"
                 @click.stop="emit('open-ride', shop)"
-                class="shop-cta shop-cta--primary col-span-2 active:scale-95 transition-[transform,filter,box-shadow]"
+                class="shop-cta shop-cta--primary w-full active:scale-95 transition-[transform,filter,box-shadow]"
               >
                 {{ t("shop.call_ride") }}
               </button>
@@ -524,13 +524,13 @@ watch(
               <template v-else>
                 <button
                   @click.stop="emit('open-detail', shop)"
-                  class="shop-cta shop-cta--secondary transition-colors"
+                  class="shop-cta shop-cta--secondary w-full transition-colors"
                 >
                   {{ t("shop.details") }}
                 </button>
                 <button
                   @click.stop="openGoogleMaps"
-                  class="shop-cta shop-cta--nav transition-colors"
+                  class="shop-cta shop-cta--nav w-full transition-colors"
                 >
                   {{ t("shop.navigate") }}
                 </button>

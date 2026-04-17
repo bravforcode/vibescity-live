@@ -117,6 +117,8 @@ export default defineConfig({
 				iconify: /node_modules[\\/]@iconify/,
 				// Utilities
 				utils: /node_modules[\\/](@vueuse|dayjs|zod)/,
+				// Deferrable global animations
+				"vibe-animations": /src[\\/]assets[\\/]vibe-animations\.css/,
 			},
 		},
 		// Performance hints
