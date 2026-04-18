@@ -70,6 +70,8 @@ const VISITOR_BOOTSTRAP_DEV_ENABLED =
 const DIRECTIONS_DEV_ENABLED = import.meta.env?.VITE_DIRECTIONS_DEV === "true";
 const WS_REQUIRED = import.meta.env?.VITE_WS_REQUIRED === "true";
 const WS_DEV_AUTOCONNECT = import.meta.env?.VITE_WS_DEV_AUTOCONNECT === "true";
+const WS_PUBLIC_AUTOCONNECT =
+	import.meta.env?.VITE_WS_PUBLIC_AUTOCONNECT === "true";
 const WS_CONFIG_DEBUG = import.meta.env?.VITE_WS_CONFIG_DEBUG === "true";
 const LOCAL_DEV_REAL_GEO_ENABLED = parseEnvBoolean(
 	import.meta.env?.VITE_LOCAL_DEV_REAL_GEO,
@@ -250,6 +252,29 @@ export const shouldAvoidCrossOriginApiOnPublicHost = ({
 	}
 };
 
+export const shouldAvoidWebSocketOnPublicHost = ({
+	wsUrl = "",
+	currentOrigin = typeof window !== "undefined" ? window.location.origin : "",
+	currentHostname = typeof window !== "undefined"
+		? window.location.hostname
+		: "",
+	isProd = import.meta.env.PROD,
+	isRequired = WS_REQUIRED,
+	publicAutoconnect = WS_PUBLIC_AUTOCONNECT,
+} = {}) => {
+	if (!isProd || isRequired || publicAutoconnect) return false;
+	if (!currentOrigin || !currentHostname) return false;
+	if (!isPublicBrowserHostname(currentHostname)) return false;
+
+	try {
+		const parsed = new URL(wsUrl);
+		const current = new URL(currentOrigin);
+		return parsed.hostname !== current.hostname || parsed.port !== current.port;
+	} catch {
+		return false;
+	}
+};
+
 export const getDirectApiBaseUrl = () => resolveExplicitApiBaseUrl();
 
 export const isFrontendOnlyDevMode = () =>
@@ -366,6 +391,15 @@ export const getWebSocketUrl = () => {
 			console.warn(
 				"⚠️ VITE_WS_URL points to localhost in production - realtime disabled",
 			);
+		return "";
+	}
+
+	if (shouldAvoidWebSocketOnPublicHost({ wsUrl: ws })) {
+		if (WS_CONFIG_DEBUG) {
+			console.warn(
+				"⚠️ VITE_WS_URL points to a cross-origin public production host - realtime disabled",
+			);
+		}
 		return "";
 	}
 

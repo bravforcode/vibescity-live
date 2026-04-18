@@ -1,5 +1,5 @@
 {
-	"generated_at": "2026-04-17T19:04:45.121Z",
+	"generated_at": "2026-04-18T13:57:59.579Z",
 	"source_path": "supabase:venues+venue_photos_any_real_media",
 	"selection_strategy": "thailand_grid_round_robin_any_real_media_plus_major_city_coverage",
 	"thailand_bounds": {
@@ -15,9 +15,9 @@
 	"major_city_anchor_count": 7,
 	"major_city_coverage_count": 104,
 	"grid_step_degrees": 1,
-	"source_row_count": 161697,
+	"source_row_count": 161707,
 	"complete_media_index_count": 47186,
-	"nationwide_pool_count": 32623,
+	"nationwide_pool_count": 32622,
 	"selected_bucket_count": 69,
 	"limit": 180,
 	"rows": [
