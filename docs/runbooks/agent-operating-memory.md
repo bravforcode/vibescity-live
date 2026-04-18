@@ -3,7 +3,7 @@
 > Read this file before every work session in `C:\vibecity.live`.
 
 - Last updated: 2026-04-17
-- Current focus: Keep `vibescity.live` stable on Vercel `frontend` production deployment `dpl_CedME52k9iNK67zYURYcQe52WEWh`, keep `www.vibescity.live` redirected through the tiny `vercel-domain-redirect` deployment, keep the Vercel-side `vibecity.live` redirect project ready while external DNS still points elsewhere, and preserve the latest video playback, map location marker, interaction idempotency, refreshed venue snapshot, browser analytics/Clarity, and public-host fallbacks.
+- Current focus: Keep `vibescity.live` stable on Vercel `frontend` production deployment `dpl_EadqeF4VgUYrnMC919bj9XafFRwS`, keep the `frontend` production Vite env set populated, keep `www.vibescity.live` redirected through the tiny `vercel-domain-redirect` deployment, keep the Vercel-side `vibecity.live` redirect project ready while external DNS still points elsewhere, and preserve the latest Composition API refactor, map placeholder/loading behavior, refreshed venue snapshot, browser analytics/Clarity, and public-host fallbacks.
 - Canonical skill: `.agents/skills/vibecity-session-handoff/SKILL.md`
 
 ## Start Every Session
@@ -187,12 +187,12 @@
 - Plain `vercel deploy -y` hit the free-tier `api-upload-free` limit on 2026-04-06; use `vercel deploy --archive=tgz -y` for preview deploys and `vercel deploy --prod --archive=tgz -y --force` for production deploys from this workspace.
 - Best current live deploy pattern: create a clean git worktree from the target commit, link that worktree to Vercel project `frontend`, run `vercel deploy --prod --archive=tgz -y --force`, then remove the worktree. This avoids uploading local caches and preserves the workspace root `.vercel/project.json`.
 - The linked Vercel project in `.vercel/project.json` remains `vibecity.live` (`prj_iHipyu1Egd903Uvb6aZYirWB7ULE`); deploying from the workspace root targets the Vercel-side redirect project, not the live public app project.
-- The current live `frontend` production deployment is `dpl_CedME52k9iNK67zYURYcQe52WEWh` at `https://frontend-b16l86zv4-phirawits-projects.vercel.app`, serving `https://vibescity.live`.
+- The current live `frontend` production deployment is `dpl_EadqeF4VgUYrnMC919bj9XafFRwS` at `https://frontend-ig5pp4cbr-phirawits-projects.vercel.app`, serving `https://vibescity.live`.
 - The current live redirect deployment is `dpl_DUPtU8mUvZsi7F4YfTXLD9ixumW7` at `https://vercel-domain-redirect-i9ywt93sl-phirawits-projects.vercel.app`, aliased to `https://www.vibescity.live`.
 - The Vercel-side `vibecity.live` project auto-deploys on pushes to `main` and aliases inside Vercel to `https://vibecity.live`; treat it as the redirect/legacy-side project, not the live public app. Use `vercel list --scope phirawits-projects --meta githubCommitSha=<sha>` when the exact latest docs-only deployment ID matters.
 - A workspace-root preview deploy for `vibecity.live` also completed as `dpl_FeawpTHj52eYFNiXm1d1i4rYwknV` at `https://vibecitylive-nneiobig3-phirawits-projects.vercel.app`; this is not the live `vibescity.live` app.
 - After deploying `frontend`, Vercel temporarily assigned `www.vibescity.live` to the new `frontend` deployment. `vercel alias set vercel-domain-redirect-i9ywt93sl-phirawits-projects.vercel.app www.vibescity.live --scope phirawits-projects` restored the intended redirect alias.
-- Production, development, and preview Vercel env vars for `SUPABASE_*` and `VITE_SUPABASE_*` now point to `https://rukyitpjfmzhqjlfmbie.supabase.co`.
+- Production Vercel env vars for the `frontend` project were repopulated from `.env.production.vercel` on 2026-04-18 after the project env list was empty and production/preview bundles crashed on missing `VITE_SUPABASE_*` / `VITE_API_URL`; `VITE_SUPABASE_*` still points to `https://rukyitpjfmzhqjlfmbie.supabase.co`.
 - The latest Vercel `frontend` production build could not pull a fresh Supabase snapshot during remote build (`SUPABASE_SNAPSHOT_UNAVAILABLE`) and preserved the committed authoritative media artifacts from `4d4bbaf`; local `bun run build` did regenerate them successfully before commit.
 - The latest Vercel `frontend` production build skipped venue prerender because remote build env exposed no `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`; this is current behavior to keep in mind if SEO prerender coverage needs to be enforced remotely.
 - Public production still bypasses direct browser-side Supabase reads on non-local production hosts for venue feed/detail, feature flags, local ads, and anonymous gamification status; it relies on snapshot/default/local fallbacks instead.
@@ -217,29 +217,24 @@
 
 ## Current Snapshot
 
-- Last modified: 2026-04-12
-- Focus of this session: merge, commit, push, validate, and deploy the frontend runtime fix batch to Vercel production
+- Last modified: 2026-04-18
+- Focus of this session: push and deploy commit `bc56402` to the live `frontend` Vercel project for `https://vibescity.live` only
 - Files touched:
-  - `.gitignore` — Added `.cursor/` and `.windsurf/` so local tool folders stay out of git status.
-  - `.vercelignore` — Added `.cursor/` and `.windsurf/` so local tool folders stay out of Vercel upload packages.
-  - `.planning/fix-map-video-jank.md` — Committed the runtime fix plan artifact.
-  - `public/data/venues-localhost-snapshot.json` — Regenerated during local build; source rows now `161555`, complete media index `47186`.
-  - `public/data/venues-real-media-index.json` — Regenerated during local build from authoritative media source.
-  - `docs/runbooks/agent-operating-memory.md` — Recorded this merge/commit/deploy handoff.
+  - `docs/runbooks/agent-operating-memory.md` — Recorded the production deployment/env handoff.
 - Behavior changed:
-  - No new runtime app code changed in this deploy commit; it ships the already-committed video, map marker, map interaction, and drag-scroll fixes plus refreshed venue data artifacts.
-  - `vibescity.live` now points at Vercel `frontend` production deployment `dpl_CedME52k9iNK67zYURYcQe52WEWh`.
-  - `www.vibescity.live` was restored to the standalone redirect deployment after the `frontend` production deploy.
+  - No runtime app code changed during this handoff; it ships already-pushed commit `bc56402` with the Composition API refactor, map placeholder/loading behavior, `.vercelignore` upload exclusions, and generated venue artifacts.
+  - `frontend` production env was repopulated with 23 non-empty `VITE_*` keys from `.env.production.vercel`.
+  - `vibescity.live` now points at Vercel `frontend` production deployment `dpl_EadqeF4VgUYrnMC919bj9XafFRwS`.
+  - `www.vibescity.live` remains aliased to the standalone redirect deployment, not the app deployment.
 - Validation:
-  - `python .agent/scripts/checklist.py .`: passed 6/6 checks, 0 failed
-  - `bun run check`: 0 errors, 0 warnings (311 files, all locale keys green)
-  - `bun run build`: exit 0 — Total 990.1 kB gzip locally
-  - `python .agent/scripts/verify_all.py . --url http://127.0.0.1:3000`: passed 13/15 checks, 0 failed, 2 skipped because optional scripts were missing (`Dependency Analysis`, `Bundle Analysis`)
-  - `git push origin main`: pushed `4d4bbaf` and prior runtime fix commits to `origin/main`; GitHub warned `public/data/venues-real-media-index.json` is 61.47 MB
-  - Vercel `frontend` production deploy: `dpl_CedME52k9iNK67zYURYcQe52WEWh`, `https://frontend-b16l86zv4-phirawits-projects.vercel.app`, aliased to `https://vibescity.live`
-  - Redirect alias restore: `https://www.vibescity.live` points to `https://vercel-domain-redirect-i9ywt93sl-phirawits-projects.vercel.app`
-  - Vercel-side `vibecity.live` docs-only production auto-deploys reached Ready; these are redirect-side deployments, not the live public app deployment.
-  - Commits shipped: 99e01dc, dc5916f, cd8a747, 8de883b, 7e7e62f, 4d4bbaf
+  - `git push origin HEAD:perf/stabilize-e2e-smoke`: already up to date at `bc56402`.
+  - Vercel preview `dpl_5tvjShzn6Y83KbCswPhZXkGv7n8V` reached Ready but exposed preview protection/env issues; production deploy was performed separately.
+  - Initial production deploy `dpl_2T3qVzgKd5DrFwD1vX4TQM9CzFvG` reached Ready but was built before env repopulation and surfaced missing `VITE_API_URL`.
+  - Final Vercel `frontend` production deploy: `dpl_EadqeF4VgUYrnMC919bj9XafFRwS`, `https://frontend-ig5pp4cbr-phirawits-projects.vercel.app`, aliased to `https://vibescity.live`.
+  - Browser smoke on `https://vibescity.live/?deploy=ig5pp4cbr`: page loads and redirects to `/th`; `/manifest.json` returns `200`; no missing `VITE_SUPABASE_*` or `VITE_API_URL` crash; no Vercel feedback script on the custom domain.
+  - Remaining console issue: backend realtime WebSocket `wss://vibecity-api.fly.dev/api/v1/vibes/vibe-stream/n` returns `403`; this is separate from the Vercel frontend deploy/env fix.
+  - Alias check: `vibescity.live` -> `frontend-ig5pp4cbr-phirawits-projects.vercel.app`; `www.vibescity.live` -> `vercel-domain-redirect-i9ywt93sl-phirawits-projects.vercel.app`.
+  - Commit shipped: `bc56402`
 ## Update Protocol
 
 Replace the `Current focus`, `Current Resume Items`, and `Current Snapshot` sections instead of appending endless history. Keep updates factual and short.
