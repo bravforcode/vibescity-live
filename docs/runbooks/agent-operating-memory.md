@@ -2,8 +2,8 @@
 
 > Read this file before every work session in `C:\vibecity.live`.
 
-- Last updated: 2026-04-17
-- Current focus: Keep `vibescity.live` stable on Vercel `frontend` production deployment `dpl_4wAWosCra6USiEVpmeD6dGHQ8LDj`, keep public production WebSocket auto-connect disabled unless explicitly opted in, keep the `frontend` production Vite env set populated, keep `www.vibescity.live` redirected through the tiny `vercel-domain-redirect` deployment, keep the Vercel-side `vibecity.live` redirect project ready while external DNS still points elsewhere, and preserve the latest Composition API refactor, map placeholder/loading behavior, refreshed venue snapshot, browser analytics/Clarity, and public-host fallbacks.
+- Last updated: 2026-04-19
+- Current focus: Keep `vibescity.live` stable on Vercel `frontend` production deployment `dpl_8Nkh4xP3SGFZM6wYabcXsMX36Ewt`, keep public production WebSocket auto-connect enabled only with the verified `VITE_WS_PUBLIC_AUTOCONNECT=true` + clean `VITE_WS_URL` configuration, keep the 61MB media index under Git LFS, keep `www.vibescity.live` redirected through the tiny `vercel-domain-redirect` deployment, and preserve the latest Composition API refactor, map placeholder/loading behavior, refreshed venue snapshot, browser analytics/Clarity, and public-host fallbacks.
 - Canonical skill: `.agents/skills/vibecity-session-handoff/SKILL.md`
 
 ## Start Every Session
@@ -182,65 +182,54 @@
 
 ## Current Resume Items
 
-- The latest deployed app/data commit is `4d4bbaf146df3b226594b169c54f58ecdd75b958` (`chore(deploy): refresh venue snapshots`); `main` also includes memory-only docs commits after it, which do not affect the app bundle because docs are excluded from Vercel uploads.
-- `.cursor/` and `.windsurf/` are now ignored in `.gitignore` and `.vercelignore`; keep local tool folders outside git and deploy scope.
-- Plain `vercel deploy -y` hit the free-tier `api-upload-free` limit on 2026-04-06; use `vercel deploy --archive=tgz -y` for preview deploys and `vercel deploy --prod --archive=tgz -y --force` for production deploys from this workspace.
-- Best current live deploy pattern: create a clean git worktree from the target commit, link that worktree to Vercel project `frontend`, run `vercel deploy --prod --archive=tgz -y --force`, then remove the worktree. This avoids uploading local caches and preserves the workspace root `.vercel/project.json`.
-- The linked Vercel project in `.vercel/project.json` remains `vibecity.live` (`prj_iHipyu1Egd903Uvb6aZYirWB7ULE`); deploying from the workspace root targets the Vercel-side redirect project, not the live public app project.
-- The current live `frontend` production deployment is `dpl_4wAWosCra6USiEVpmeD6dGHQ8LDj` at `https://frontend-58d5uzmgt-phirawits-projects.vercel.app`, serving `https://vibescity.live`.
-- The current live redirect deployment is `dpl_DUPtU8mUvZsi7F4YfTXLD9ixumW7` at `https://vercel-domain-redirect-i9ywt93sl-phirawits-projects.vercel.app`, aliased to `https://www.vibescity.live`.
-- The Vercel-side `vibecity.live` project auto-deploys on pushes to `main` and aliases inside Vercel to `https://vibecity.live`; treat it as the redirect/legacy-side project, not the live public app. Use `vercel list --scope phirawits-projects --meta githubCommitSha=<sha>` when the exact latest docs-only deployment ID matters.
-- A workspace-root preview deploy for `vibecity.live` also completed as `dpl_FeawpTHj52eYFNiXm1d1i4rYwknV` at `https://vibecitylive-nneiobig3-phirawits-projects.vercel.app`; this is not the live `vibescity.live` app.
-- After deploying `frontend`, Vercel temporarily assigned `www.vibescity.live` to the new `frontend` deployment. `vercel alias set vercel-domain-redirect-i9ywt93sl-phirawits-projects.vercel.app www.vibescity.live --scope phirawits-projects` restored the intended redirect alias.
-- Production Vercel env vars for the `frontend` project were repopulated from `.env.production.vercel` on 2026-04-18 after the project env list was empty and production/preview bundles crashed on missing `VITE_SUPABASE_*` / `VITE_API_URL`; `VITE_SUPABASE_*` still points to `https://rukyitpjfmzhqjlfmbie.supabase.co`.
-- The latest Vercel `frontend` production build could not pull a fresh Supabase snapshot during remote build (`SUPABASE_SNAPSHOT_UNAVAILABLE`) and preserved the committed authoritative media artifacts from `4d4bbaf`; local `bun run build` did regenerate them successfully before commit.
-- The latest Vercel `frontend` production build skipped venue prerender because remote build env exposed no `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`; this is current behavior to keep in mind if SEO prerender coverage needs to be enforced remotely.
-- Public production still bypasses direct browser-side Supabase reads on non-local production hosts for venue feed/detail, feature flags, local ads, and anonymous gamification status; it relies on snapshot/default/local fallbacks instead.
-- Public production also skips cross-origin Fly review and density browser requests on public hosts, so `shopStore` returns quiet/review-unavailable fallbacks instead of surfacing browser CORS noise while Fly remains undeployed.
-- Public production also skips cross-origin Fly WebSocket auto-connect by default when `VITE_WS_URL` points off-origin; set `VITE_WS_PUBLIC_AUTOCONNECT=true` only after the backend WebSocket handshake accepts the public origin without 403s.
-- Browser-side Supabase image transform query strings on the custom-domain production host can trigger Chromium `ERR_BLOCKED_BY_ORB`; keep public media requests on canonical object URLs unless the storage lane is redesigned.
-- The browser Supabase client strips custom visitor headers only for `supabase/functions/v1/*` requests, and production analytics stay gated by `VITE_ANALYTICS_ENABLED` plus user consent.
-- `analytics-ingest` version `10` on project `rukyitpjfmzhqjlfmbie` accepts the custom visitor headers, fails open when `analytics_sessions` is unavailable, and writes best-effort rows into `analytics_logs`.
-- `BottomFeed.vue` now owns the compact mobile/public card footprint at `198x272` with a taller carousel rail so full compact-copy details fit without clipping.
-- `SwipeCard.vue` now keeps the category chip on its own row, restores `IMG/VID` counts on narrow cards, reserves a top-left safe area when live/promo/giant badges are present, re-clamps compact titles to three lines on narrow cards, and prevents long names from colliding with the badge stack.
-- `BottomFeed.vue`, `useScrollSync.js`, and `useAppLogic.js` now block cold-start carousel commits until there is real user carousel intent or an explicit deep-link/selection context, so opening the app no longer auto-selects a random Chiang Mai venue before the user touches the feed.
-- `useAppLogic.js` still requests a startup geolocation prompt only when no real stored location exists, and `locationStore.js` still keeps tracking after the first successful prompted fix so the saved real location is reused on revisit without another startup geolocation API call.
-- `App.vue` and `MapLibreContainer.vue` now start silent background watching only when permission is already granted.
-- `VibeModal.vue` now registers passive `touchstart`/`touchmove` listeners for the detail sheet.
-- `ReloadPrompt.vue` now keeps only the update/reload path and never shows the passive `Ready for Offline` toast.
-- The production basemap visibility fix lives in `public/map-styles/vibecity-neon.json` and `src/components/map/MapLibreContainer.vue`; the style palette is brighter and the selection vignette is softer so detail routes do not black out the map.
-- `useSDFClusters` still waits for both source `pins_source` and layer `unclustered-pins` before inserting `sdf-cluster-layer`, preventing the MapLibre layer-order race on production detail/map views.
-- `vercel.json` allows `https://c.bing.com` in `img-src`, which keeps the Clarity Bing-backed beacon from tripping CSP on the custom-domain production host.
-- The backend Fly CORS allowlist patch for `https://www.vibescity.live` and `https://vibescity.live` exists locally in `backend/app/core/config.py` and `backend/app/main.py`, but the actual Fly deploy is still blocked by overdue invoices, so the live mitigation remains frontend-side.
-- The Antigravity validation scripts require `PYTHONIOENCODING=utf-8` on this Windows host.
-- `vibescity.live` remains a third-party-managed Vercel domain (current nameservers still outside Vercel), and `www.vibescity.live` now points to the standalone `vercel-domain-redirect` deployment instead of the app deployment.
-- `vibecity.live` is now attached and aliased inside the Vercel project, but public DNS is still outside Vercel and currently resolves to the old `198.*` targets, so real browser traffic still bypasses the Vercel redirect and lands on the legacy Squarespace-controlled lane until DNS is cut over.
+- The latest deployed app/data commit is `3f2a456e012bb52cf0635ccc338178fa009575b6` (`fix: inline production realtime websocket env`) on branch `perf/stabilize-e2e-smoke`.
+- `public/data/venues-real-media-index.json` is now tracked through Git LFS. Future pushes avoid the 61MB GitHub warning, but old Git history still contains the original large blob until an explicit history cleanup is approved.
+- Plain `vercel deploy -y` can hit the free-tier upload limit; use `vercel deploy --prod --archive=tgz --force --skip-domain -y --scope phirawits-projects` from a clean worktree linked to Vercel project `frontend`.
+- The workspace root `.vercel/project.json` still links to the Vercel-side `vibecity.live` project, not the live public app. Do not deploy production from the workspace root.
+- The current live `frontend` production deployment is `dpl_8Nkh4xP3SGFZM6wYabcXsMX36Ewt` at `https://frontend-8rvf5891m-phirawits-projects.vercel.app`, serving `https://vibescity.live`.
+- The current live redirect deployment remains `dpl_DUPtU8mUvZsi7F4YfTXLD9ixumW7` at `https://vercel-domain-redirect-i9ywt93sl-phirawits-projects.vercel.app`, aliased to `https://www.vibescity.live`.
+- `frontend` production env includes `VITE_WS_URL=wss://vibecity-api.fly.dev/api/v1/vibes/vibe-stream` and `VITE_WS_PUBLIC_AUTOCONNECT=true`; keep both clean of literal `\n`.
+- Backend WebSocket handshake was verified from origin `https://vibescity.live`; the public browser now opens the Fly realtime socket without console errors.
+- Direct browser-side Supabase reads, cross-origin Fly reviews, and density requests remain guarded/fallback-based on public production hosts.
+- Local `bun run build` without `VIBECITY_REUSE_EXISTING_LOCALHOST_SNAPSHOT=1` can still die with exit code `9` while regenerating the 161k-row snapshot. Use the reuse flag for deployment verification unless intentionally refreshing Supabase artifacts.
+- Antigravity validation requires `PYTHONIOENCODING=utf-8` on this Windows host. `security_scan.py` skips generated/tool/vendor folders and the LFS media index; `lint_runner.py` avoids Windows `shell=True` list invocation.
+- `vibescity.live` remains the app custom domain. `www.vibescity.live` must stay on the standalone redirect deployment, not the app deployment.
+- `vibecity.live` is still a separate Vercel-side/legacy domain path; public DNS for that domain remains outside the live `vibescity.live` app path.
 
 ## Current Snapshot
 
-- Last modified: 2026-04-18
-- Focus of this session: finish production deploy cleanup by disabling noisy cross-origin WebSocket auto-connect and redeploying `https://vibescity.live`
+- Last modified: 2026-04-19
+- Focus of this session: enable verified public production realtime, keep the media index under Git LFS, and redeploy only the Vercel `frontend` production app behind `https://vibescity.live`.
 - Files touched:
-  - `src/lib/runtimeConfig.js` — Added public-production WebSocket guard with `VITE_WS_PUBLIC_AUTOCONNECT` opt-in.
-  - `tests/unit/runtimeConfig.spec.js` — Covered the public WebSocket guard.
-  - `public/data/venues-localhost-snapshot.json` — Regenerated by production build.
-  - `public/data/venues-real-media-index.json` — Regenerated by production build.
+  - `.gitattributes` — Tracks `public/data/venues-real-media-index.json` with Git LFS.
+  - `scripts/ci/check-vite-public-secrets.mjs` — Allows public realtime env names.
+  - `rsbuild.config.ts` — Injects realtime public env values from process env during production builds.
+  - `src/lib/runtimeConfig.js` — Uses direct `import.meta.env` reads for WebSocket env values so Rsbuild inlines the production opt-in.
+  - `.agent/skills/vulnerability-scanner/scripts/security_scan.py` — Skips generated/tool/vendor folders and oversized generated data.
+  - `.agent/skills/lint-and-validate/scripts/lint_runner.py` — Avoids Windows `shell=True` list invocation.
+  - `public/data/venues-localhost-snapshot.json` — Regenerated metadata for the current snapshot.
+  - `public/data/venues-real-media-index.json` — Updated LFS object.
   - `docs/runbooks/agent-operating-memory.md` — Recorded the production deployment/env handoff.
 - Behavior changed:
-  - Public production no longer attempts a cross-origin WebSocket handshake to `vibecity-api.fly.dev` by default, eliminating the frontend console `403` while the backend realtime lane remains unavailable.
-  - `frontend` production env was repopulated with 23 non-empty `VITE_*` keys from `.env.production.vercel`.
-  - `vibescity.live` now points at Vercel `frontend` production deployment `dpl_4wAWosCra6USiEVpmeD6dGHQ8LDj`.
+  - Public production now opens the verified Fly WebSocket lane only when `VITE_WS_PUBLIC_AUTOCONNECT=true`.
+  - The deployed bundle contains `wss://vibecity-api.fly.dev/api/v1/vibes/vibe-stream`, has no literal `\n` near the API/WS env values, and inlines the public autoconnect default as `true`.
+  - `vibescity.live` now points at Vercel `frontend` production deployment `dpl_8Nkh4xP3SGFZM6wYabcXsMX36Ewt`.
   - `www.vibescity.live` remains aliased to the standalone redirect deployment, not the app deployment.
 - Validation:
-  - `npx biome check --write src/lib/runtimeConfig.js tests/unit/runtimeConfig.spec.js`: passed.
+  - `npx biome check --write src/lib/runtimeConfig.js tests/unit/runtimeConfig.spec.js rsbuild.config.ts scripts/ci/check-vite-public-secrets.mjs`: passed.
+  - `node scripts/ci/check-vite-public-secrets.mjs`: passed.
   - `npx vitest run tests/unit/runtimeConfig.spec.js tests/unit/socketService.spec.js`: 2 files / 8 tests passed.
-  - `bun run build`: passed; regenerated 180-row localhost snapshot, 47,186-row real media index, and 10,124 prerendered pages.
+  - `bun run build` with `VIBECITY_REUSE_EXISTING_LOCALHOST_SNAPSHOT=1`, clean realtime env, and production API URL: passed; 10,124 prerendered pages.
+  - Initial `bun run build` without reuse failed with exit code `9` during the 161,712-row snapshot generation step; use reuse unless intentionally refreshing artifacts.
   - `$env:PYTHONIOENCODING='utf-8'; python .agent/scripts/checklist.py .`: passed 6/6 checks, 0 failed.
-  - `git push origin HEAD:perf/stabilize-e2e-smoke`: pushed `2d5a8c6`.
-  - Vercel `frontend` production deploy: `dpl_4wAWosCra6USiEVpmeD6dGHQ8LDj`, `https://frontend-58d5uzmgt-phirawits-projects.vercel.app`, aliased to `https://vibescity.live`.
-  - Browser smoke on `https://vibescity.live/?deploy=58d5uzmgt`: page loads and redirects to `/th`; `/manifest.json` returns `200`; console has 0 errors and 0 warnings; no Vercel feedback script; no WebSocket resources opened.
-  - Alias check: `vibescity.live` -> `frontend-58d5uzmgt-phirawits-projects.vercel.app`; `www.vibescity.live` -> `vercel-domain-redirect-i9ywt93sl-phirawits-projects.vercel.app`.
-  - Commit shipped: `2d5a8c6`
+  - `git push origin HEAD:perf/stabilize-e2e-smoke`: pushed through `3f2a456`.
+  - Vercel `frontend` production deploy: `dpl_8Nkh4xP3SGFZM6wYabcXsMX36Ewt`, `https://frontend-8rvf5891m-phirawits-projects.vercel.app`, aliased to `https://vibescity.live`.
+  - `curl -I https://vibescity.live/manifest.json`: `200`.
+  - `curl -I https://www.vibescity.live/`: `301` to `https://vibescity.live/`.
+  - Browser smoke on `https://vibescity.live/en?deploy=8rvf5891m`: title loaded, `h1=VIBESCITY`, console has 0 errors and 0 warnings, page errors 0, WebSocket opened to `wss://vibecity-api.fly.dev/api/v1/vibes/vibe-stream` and stayed open.
+  - Live bundle check: `/manifest.json` `200`, index script `https://vibescity.live/static/js/index.ea3d217f.js`, API/WS host present, public autoconnect true, no literal `\n` near API host.
+  - Backend WebSocket smoke: connected to `wss://vibecity-api.fly.dev/api/v1/vibes/vibe-stream` with origin `https://vibescity.live`.
+  - Commit shipped: `3f2a456`
 ## Update Protocol
 
 Replace the `Current focus`, `Current Resume Items`, and `Current Snapshot` sections instead of appending endless history. Keep updates factual and short.
