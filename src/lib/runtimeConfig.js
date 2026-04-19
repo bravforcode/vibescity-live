@@ -68,11 +68,11 @@ const API_DEV_PROXY_ENABLED = import.meta.env?.VITE_API_PROXY_DEV === "true";
 const VISITOR_BOOTSTRAP_DEV_ENABLED =
 	import.meta.env?.VITE_VISITOR_BOOTSTRAP_DEV === "true";
 const DIRECTIONS_DEV_ENABLED = import.meta.env?.VITE_DIRECTIONS_DEV === "true";
-const WS_REQUIRED = import.meta.env?.VITE_WS_REQUIRED === "true";
-const WS_DEV_AUTOCONNECT = import.meta.env?.VITE_WS_DEV_AUTOCONNECT === "true";
+const WS_REQUIRED = import.meta.env.VITE_WS_REQUIRED === "true";
+const WS_DEV_AUTOCONNECT = import.meta.env.VITE_WS_DEV_AUTOCONNECT === "true";
 const WS_PUBLIC_AUTOCONNECT =
-	import.meta.env?.VITE_WS_PUBLIC_AUTOCONNECT === "true";
-const WS_CONFIG_DEBUG = import.meta.env?.VITE_WS_CONFIG_DEBUG === "true";
+	import.meta.env.VITE_WS_PUBLIC_AUTOCONNECT === "true";
+const WS_CONFIG_DEBUG = import.meta.env.VITE_WS_CONFIG_DEBUG === "true";
 const LOCAL_DEV_REAL_GEO_ENABLED = parseEnvBoolean(
 	import.meta.env?.VITE_LOCAL_DEV_REAL_GEO,
 );
