@@ -144,7 +144,6 @@ def run_linter(linter: dict, cwd: Path) -> dict:
             encoding='utf-8',
             errors='replace',
             timeout=120,
-            shell=platform.system() == "Windows" # Shell=True often helps with path resolution on Windows
         )
         
         result["output"] = proc.stdout[:2000] if proc.stdout else ""
