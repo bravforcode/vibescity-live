@@ -8,6 +8,7 @@ import {
 	isLocalBrowserHostname,
 	isPublicBrowserHostname,
 	shouldAvoidCrossOriginApiOnPublicHost,
+	shouldAvoidWebSocketOnPublicHost,
 } from "../../src/lib/runtimeConfig";
 
 describe("runtimeConfig local host detection", () => {
@@ -58,6 +59,45 @@ describe("runtimeConfig local host detection", () => {
 		expect(
 			shouldAvoidCrossOriginApiOnPublicHost({
 				baseUrl: "https://vibecity-api.fly.dev/api/v1",
+				currentOrigin: "http://localhost:5173",
+				currentHostname: "localhost",
+				isProd: false,
+			}),
+		).toBe(false);
+	});
+
+	it("keeps public production websocket auto-connect opt-in for cross-origin backends", () => {
+		expect(
+			shouldAvoidWebSocketOnPublicHost({
+				wsUrl: "wss://vibecity-api.fly.dev/api/v1/vibes/vibe-stream",
+				currentOrigin: "https://vibescity.live",
+				currentHostname: "vibescity.live",
+				isProd: true,
+			}),
+		).toBe(true);
+
+		expect(
+			shouldAvoidWebSocketOnPublicHost({
+				wsUrl: "wss://vibecity-api.fly.dev/api/v1/vibes/vibe-stream",
+				currentOrigin: "https://vibescity.live",
+				currentHostname: "vibescity.live",
+				isProd: true,
+				publicAutoconnect: true,
+			}),
+		).toBe(false);
+
+		expect(
+			shouldAvoidWebSocketOnPublicHost({
+				wsUrl: "wss://vibescity.live/api/v1/vibes/vibe-stream",
+				currentOrigin: "https://vibescity.live",
+				currentHostname: "vibescity.live",
+				isProd: true,
+			}),
+		).toBe(false);
+
+		expect(
+			shouldAvoidWebSocketOnPublicHost({
+				wsUrl: "wss://vibecity-api.fly.dev/api/v1/vibes/vibe-stream",
 				currentOrigin: "http://localhost:5173",
 				currentHostname: "localhost",
 				isProd: false,

@@ -1,25 +1,24 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 
 const assertNoLegacyPrefixClasses = async (
 	target: Locator,
 	prefix: string,
 	label: string,
 ) => {
-	const legacy = await target.evaluate(
-		(node, pfx) => {
-			const out = new Set<string>();
-			const walk = document.createTreeWalker(node, NodeFilter.SHOW_ELEMENT);
-			while (walk.nextNode()) {
-				const current = walk.currentNode as Element;
-				for (const cls of Array.from(current.classList || [])) {
-					if (cls.startsWith(pfx)) out.add(cls);
-				}
+	const legacy = await target.evaluate((node, pfx) => {
+		const out = new Set<string>();
+		const walk = document.createTreeWalker(node, NodeFilter.SHOW_ELEMENT);
+		while (walk.nextNode()) {
+			const current = walk.currentNode as Element;
+			for (const cls of Array.from(current.classList || [])) {
+				if (cls.startsWith(pfx)) out.add(cls);
 			}
-			return Array.from(out).sort();
-		},
-		prefix,
+		}
+		return Array.from(out).sort();
+	}, prefix);
+	expect(legacy, `${label} still contains legacy ${prefix}* classes`).toEqual(
+		[],
 	);
-	expect(legacy, `${label} still contains legacy ${prefix}* classes`).toEqual([]);
 };
 
 const seedOwnerCanarySession = async (page: Page) => {
@@ -140,7 +139,7 @@ test.describe("Dashboard UI canary matrix", { tag: "@smoke" }, () => {
 		page,
 	}) => {
 		await openOwnerDashboard(page);
-		await expect(page.getByTestId("owner-source-badge")).toBeVisible();
+		await expect(page.getByText(/Merchant Portal/i)).toBeVisible();
 		await assertNoLegacyPrefixClasses(
 			page.getByTestId("owner-dashboard-root").first(),
 			"od-",
@@ -205,12 +204,9 @@ test.describe("Dashboard UI canary matrix", { tag: "@smoke" }, () => {
 		} catch {
 			await tabs.nth(1).click({ force: true });
 		}
-		await expect(
-			page.getByRole("combobox", { name: /^Bank Country$/i }),
-		).toBeVisible();
-		await expect(
-			page.getByRole("textbox", { name: /^SWIFT Code$/i }),
-		).toBeVisible();
-		await expect(page.getByRole("textbox", { name: /^IBAN$/i })).toBeVisible();
+		await expect(page.getByTestId("partner-bank-provider")).toBeVisible();
+		await expect(page.getByTestId("partner-bank-account-name")).toBeVisible();
+		await expect(page.getByTestId("partner-bank-account-number")).toBeVisible();
+		await expect(page.getByTestId("partner-bank-promptpay")).toBeVisible();
 	});
 });

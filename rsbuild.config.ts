@@ -3,9 +3,32 @@ import { defineConfig, loadEnv } from "@rsbuild/core";
 import { pluginVue } from "@rsbuild/plugin-vue";
 import { injectManifest } from "workbox-build";
 
-const { publicVars } = loadEnv({ prefixes: ["VITE_"] });
+const { publicVars: loadedPublicVars } = loadEnv({ prefixes: ["VITE_"] });
 const { version } = JSON.parse(readFileSync("./package.json", "utf8")) as {
 	version: string;
+};
+
+const realtimePublicEnvNames = [
+	"VITE_WS_URL",
+	"VITE_WS_PUBLIC_AUTOCONNECT",
+] as const;
+
+const processRealtimePublicVars = Object.fromEntries(
+	realtimePublicEnvNames.flatMap((name) => {
+		const value = process.env[name];
+		if (typeof value !== "string") return [];
+
+		const serialized = JSON.stringify(value);
+		return [
+			[`import.meta.env.${name}`, serialized],
+			[`process.env.${name}`, serialized],
+		];
+	}),
+);
+
+const publicVars = {
+	...loadedPublicVars,
+	...processRealtimePublicVars,
 };
 
 export default defineConfig({
@@ -117,6 +140,8 @@ export default defineConfig({
 				iconify: /node_modules[\\/]@iconify/,
 				// Utilities
 				utils: /node_modules[\\/](@vueuse|dayjs|zod)/,
+				// Deferrable global animations
+				"vibe-animations": /src[\\/]assets[\\/]vibe-animations\.css/,
 			},
 		},
 		// Performance hints

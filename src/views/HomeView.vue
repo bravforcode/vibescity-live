@@ -37,12 +37,15 @@ const IS_STRICT_MAP_E2E = import.meta.env.VITE_E2E_MAP_REQUIRED === "true";
 const VibeSkeleton = defineResilientAsync(
 	() => import("../components/ui/VibeSkeleton.vue"),
 );
+
+import MapPlaceholder from "../components/map/MapPlaceholder.vue";
+
 // Lazy-load the map component (444 kB gzipped) to unblock initial parse.
-// Shows VibeSkeleton while map loads (45s timeout for slow networks).
+// Shows MapPlaceholder while map loads (45s timeout for slow networks).
 const MapContainer = defineResilientAsync(
 	() => import("../components/map/MapLibreContainer.vue"),
 	{
-		loadingComponent: VibeSkeleton,
+		loadingComponent: MapPlaceholder,
 		errorComponent: MapErrorFallback,
 		timeout: 45000,
 	},

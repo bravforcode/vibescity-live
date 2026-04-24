@@ -1,4 +1,3 @@
-import maplibregl from "maplibre-gl";
 import { shallowRef } from "vue";
 import {
 	createGiantPinElement,
@@ -65,7 +64,7 @@ const createRegularPinElement = (shop) => {
 	});
 };
 
-export function useMapMarkers(map) {
+export function useMapMarkers(map, maplibreApi = null) {
 	// Fix 3D: inject CSS once at composable init, not inside marker loop
 	injectCoinFlipCSS();
 
@@ -93,6 +92,8 @@ export function useMapMarkers(map) {
 	// which handles clustering, coin animations, and boost styling natively.
 	const updateMarkers = (shops, highlightedShopId, options = {}) => {
 		if (!map.value) return;
+		const maplibregl = maplibreApi?.value || null;
+		if (!maplibregl) return;
 
 		// Update smart markers with current shops
 		smartMarkers.updateMarkerStates(shops);
@@ -290,6 +291,8 @@ export function useMapMarkers(map) {
 		{ onOpenBuilding, pinsVisible = true },
 	) => {
 		if (!map.value) return;
+		const maplibregl = maplibreApi?.value || null;
+		if (!maplibregl) return;
 
 		const currentMarkers = eventMarkersMap.value;
 		const eventIds = new Set(

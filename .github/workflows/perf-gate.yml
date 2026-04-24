@@ -38,6 +38,8 @@ jobs:
           VITE_MAPBOX_TOKEN: ${{ secrets.VITE_MAPBOX_TOKEN }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_PERF_AUDIT: "true"
+          VIBECITY_REUSE_EXISTING_LOCALHOST_SNAPSHOT: "1"
 
       - name: Start preview server (background)
         run: npm run preview &
@@ -46,7 +48,7 @@ jobs:
         run: |
           echo "Waiting for preview server on port 4173..."
           for i in $(seq 1 20); do
-            if curl -sf http://localhost:4173/ > /dev/null 2>&1; then
+            if curl -sf http://localhost:4173/en > /dev/null 2>&1; then
               echo "Server ready after ${i}s"
               break
             fi
@@ -61,7 +63,11 @@ jobs:
           configPath: "./lighthouserc.json"
           uploadArtifacts: true
           temporaryPublicStorage: true
-          runs: 3
+          runs: 5
+
+      - name: Evaluate p75 budgets (LCP/TBT)
+        if: always()
+        run: node scripts/ci/evaluate-lighthouse-perf-gate.mjs
 
       - name: Upload Lighthouse results
         if: always()
@@ -80,7 +86,8 @@ jobs:
           {
             echo "## Performance Gate (Lighthouse CI)"
             echo "- Result: ${LH_OUTCOME}"
-            echo "- Budget: FCP score >= 0.80, LCP score >= 0.80, TBT <= 300ms, CLS <= 0.1"
+            echo "- Budget (p75): LCP <= 2500ms, TBT <= 200ms"
+            echo "- Required: Performance score >= 0.95"
             if [ "${LH_OUTCOME}" = "success" ]; then
               echo "- Status: PASSED — all budget assertions met"
             else
@@ -92,5 +99,5 @@ jobs:
         if: steps.lighthouse.outcome == 'failure'
         run: |
           echo "Lighthouse CI budget assertions failed. Check the uploaded artifacts for details."
-          echo "Targets: FCP score >= 0.80, LCP score >= 0.80, TBT <= 300ms, CLS <= 0.1"
+          echo "Targets: LCP <= 2500ms (p75), TBT <= 200ms (p75), Performance score >= 0.95"
           exit 1

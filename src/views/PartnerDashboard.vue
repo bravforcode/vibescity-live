@@ -1205,6 +1205,7 @@ onUnmounted(() => {
                   <label class="text-[11px] font-bold uppercase tracking-wider text-white/40 ml-1">Bank Provider</label>
                   <select
                     v-model="bankForm.bankCode"
+                      data-testid="partner-bank-provider"
                     class="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-blue-500/50 transition-colors"
                     :disabled="isSavingBank || isStartingSubscription"
                   >
@@ -1223,6 +1224,7 @@ onUnmounted(() => {
                     <label class="text-[11px] font-bold uppercase tracking-wider text-white/40 ml-1">Account Name</label>
                     <input
                       v-model.trim="bankForm.accountName"
+                        data-testid="partner-bank-account-name"
                       type="text"
                       class="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-blue-500/50 transition-colors"
                       :disabled="isSavingBank || isStartingSubscription"
@@ -1233,6 +1235,7 @@ onUnmounted(() => {
                     <label class="text-[11px] font-bold uppercase tracking-wider text-white/40 ml-1">Account Number</label>
                     <input
                       v-model.trim="bankForm.accountNumber"
+                        data-testid="partner-bank-account-number"
                       type="text"
                       class="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 font-mono text-sm text-white outline-none focus:border-blue-500/50 transition-colors"
                       :disabled="isSavingBank || isStartingSubscription"
@@ -1244,6 +1247,7 @@ onUnmounted(() => {
                   <label class="text-[11px] font-bold uppercase tracking-wider text-white/40 ml-1">PromptPay ID</label>
                   <input
                     v-model.trim="bankForm.promptpayId"
+                      data-testid="partner-bank-promptpay"
                     type="text"
                     class="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 font-mono text-sm text-white outline-none focus:border-blue-500/50 transition-colors"
                     placeholder="Mobile or Tax ID"

@@ -1,5 +1,3 @@
-import maplibregl from "maplibre-gl";
-
 /**
  * WebGL-based Weather Layer for Mapbox GL JS
  * Renders high-performance rain/snow/fog using raw WebGL instancing.

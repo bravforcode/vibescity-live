@@ -198,6 +198,10 @@ jobs:
     if: ${{ github.event_name == 'pull_request' }}
     needs: [frontend, backend-tests]
     runs-on: ubuntu-latest
+    env:
+      VITE_API_URL: http://localhost:8000
+      VITE_SUPABASE_URL: https://example.supabase.co
+      VITE_SUPABASE_ANON_KEY: test-anon-key-ci
     steps:
       - uses: actions/checkout@v4
 
@@ -234,6 +238,10 @@ jobs:
     if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
     needs: [frontend, backend-tests]
     runs-on: ubuntu-latest
+    env:
+      VITE_API_URL: http://localhost:8000
+      VITE_SUPABASE_URL: https://example.supabase.co
+      VITE_SUPABASE_ANON_KEY: test-anon-key-ci
     steps:
       - uses: actions/checkout@v4
 
@@ -270,6 +278,10 @@ jobs:
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     needs: [frontend, backend-tests]
     runs-on: ubuntu-latest
+    env:
+      VITE_API_URL: http://localhost:8000
+      VITE_SUPABASE_URL: https://example.supabase.co
+      VITE_SUPABASE_ANON_KEY: test-anon-key-ci
     steps:
       - uses: actions/checkout@v4
 
@@ -306,6 +318,10 @@ jobs:
     if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
     needs: [frontend, backend-tests, map-quarantine-sla, e2e-map-preflight]
     runs-on: ubuntu-latest
+    env:
+      VITE_API_URL: http://localhost:8000
+      VITE_SUPABASE_URL: https://example.supabase.co
+      VITE_SUPABASE_ANON_KEY: test-anon-key-ci
     steps:
       - uses: actions/checkout@v4
 
@@ -351,6 +367,10 @@ jobs:
     if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
     needs: [frontend, backend-tests, map-quarantine-sla]
     runs-on: ubuntu-latest
+    env:
+      VITE_API_URL: http://localhost:8000
+      VITE_SUPABASE_URL: https://example.supabase.co
+      VITE_SUPABASE_ANON_KEY: test-anon-key-ci
     steps:
       - uses: actions/checkout@v4
 
@@ -397,6 +417,10 @@ jobs:
     needs: [frontend, backend-tests, map-quarantine-sla]
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      VITE_API_URL: http://localhost:8000
+      VITE_SUPABASE_URL: https://example.supabase.co
+      VITE_SUPABASE_ANON_KEY: test-anon-key-ci
     steps:
       - uses: actions/checkout@v4
 
@@ -442,6 +466,10 @@ jobs:
     if: ${{ needs.e2e-full.result == 'failure' }}
     needs: [e2e-full]
     runs-on: ubuntu-latest
+    env:
+      VITE_API_URL: http://localhost:8000
+      VITE_SUPABASE_URL: https://example.supabase.co
+      VITE_SUPABASE_ANON_KEY: test-anon-key-ci
     steps:
       - uses: actions/checkout@v4
 
