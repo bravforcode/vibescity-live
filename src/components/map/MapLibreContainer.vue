@@ -4056,6 +4056,13 @@ const keepPopupAbovePin = (popup, item, { surface = "preview" } = {}) => {
 		overflowBottom,
 	};
 };
+const setPopupVisibilityState = (popup, state, { revealed = false } = {}) => {
+	const popupEl = popup?.getElement?.();
+	if (!popupEl) return;
+	popupEl.dataset.popupSettleState = String(state || "idle");
+	popupEl.style.opacity = revealed ? "1" : "0";
+	popupEl.style.pointerEvents = revealed ? "auto" : "none";
+};
 
 // ✅ Show Popup for Item (Fixed button handling)
 const showPopup = (
@@ -4102,6 +4109,7 @@ const showPopup = (
 		.setLngLat([lng, lat])
 		.setHTML(getPopupHTML(item))
 		.addTo(map.value);
+	setPopupVisibilityState(popup, "popup-mounting", { revealed: false });
 
 	activePopup.value = popup;
 	activePopupShopId.value = shopId;
@@ -4223,6 +4231,7 @@ const settlePopupAfterMount = async (
 	if (!popup) return false;
 	clearPopupRepairTimer();
 	popupSettleState.value = "popup-settling";
+	setPopupVisibilityState(popup, "popup-settling", { revealed: false });
 	const runRepairPass = async () => {
 		await new Promise((resolve) => {
 			requestAnimationFrame(() => {
@@ -4281,6 +4290,7 @@ const settlePopupAfterMount = async (
 				? "settled-clamped"
 				: "settled-with-overflow"
 			: "settled";
+	setPopupVisibilityState(popup, popupSettleState.value, { revealed: true });
 	return true;
 };
 
