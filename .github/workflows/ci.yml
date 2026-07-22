@@ -65,7 +65,7 @@ jobs:
         run: npm run lint
 
       - name: Unit tests
-        run: npm run test:unit
+        run: npm run test:unit:coverage
 
       - name: Build (prerender)
         run: npm run build
@@ -78,20 +78,16 @@ jobs:
 
       - name: Install gitleaks
         run: |
-          curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/install.sh | sh -s -- -b /usr/local/bin v8.24.2 || echo "⚠️ Gitleaks install failed (network issue)"
-        continue-on-error: true
+          curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/install.sh | sh -s -- -b /usr/local/bin v8.24.2
 
       - name: Secret scan (gitleaks)
-        run: npm run ci:secret-scan:gitleaks || echo "⚠️ Secret scan failed (may be missing gitleaks)"
-        continue-on-error: true
+        run: npm run ci:secret-scan:gitleaks
 
       - name: Secret scan (Stripe patterns)
-        run: npm run ci:secret-scan || echo "⚠️ Stripe pattern scan failed"
-        continue-on-error: true
+        run: npm run ci:secret-scan
 
       - name: Guard SQL runlist safety rules
-        run: node scripts/ci/check-runlist-guards.mjs || echo "⚠️ SQL runlist check failed"
-        continue-on-error: true
+        run: node scripts/ci/check-runlist-guards.mjs
 
   data-quality:
     needs: [repo-hygiene]
@@ -147,7 +143,7 @@ jobs:
           ENV: testing
           METRICS_ENABLED: "true"
           OTEL_ENABLED: "false"
-        run: python -m pytest backend/tests
+        run: python -m pytest backend/tests --cov=app --cov-report=term-missing --cov-report=xml:coverage.xml
 
   enterprise-updates:
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}

@@ -1,5 +1,6 @@
 <script setup>
-import { onMounted, watch } from "vue";
+import { computed, onMounted, watch } from "vue";
+import { useRoute } from "vue-router";
 import ReloadPrompt from "@/components/pwa/ReloadPrompt.vue";
 import ErrorBoundary from "@/components/ui/ErrorBoundary.vue";
 import StickyOfflineBanner from "@/components/ui/StickyOfflineBanner.vue";
@@ -15,11 +16,25 @@ import { useLocationStore } from "@/store/locationStore";
 import { isAppDebugLoggingEnabled } from "@/utils/debugFlags";
 
 const locationStore = useLocationStore();
+const route = useRoute();
 const { setHomeBase, hasHomeBase } = useHomeBase();
 useNetworkResilience();
 useVisualViewport();
 
 const analyticsEnabled = isBrowserAnalyticsEnabled();
+const homeOwnedSkipLinkRouteNames = new Set([
+	"Home",
+	"HomeLocale",
+	"Venue",
+	"VenueLocale",
+	"VenueSlug",
+	"VenueSlugLocale",
+	"Category",
+	"CategoryLocale",
+]);
+const showAppSkipLink = computed(
+	() => !homeOwnedSkipLinkRouteNames.has(String(route.name || "")),
+);
 
 const trackSessionIfAllowed = () => {
 	if (!analyticsEnabled) return;
@@ -53,7 +68,7 @@ watch(
 
 <template>
   <!-- Skip Link for Keyboard Accessibility -->
-  <a href="#main-content" class="skip-link">{{ $t("a11y.skip_to_content") }}</a>
+  <a v-if="showAppSkipLink" href="#main-content" class="skip-link">{{ $t("a11y.skip_to_content") }}</a>
   <StickyOfflineBanner />
   <ReloadPrompt />
   <main id="main-content">

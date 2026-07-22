@@ -1,62 +1,111 @@
-# VibeCity
+# VibeCity 🏙️
 
-โปรเจกต์ VibeCity ประกอบด้วย:
-- Frontend: Vue 3 + Rsbuild
-- Backend: FastAPI
-- Database/Auth/Storage: Supabase
+> Thai restaurant discovery & review platform — Map-first, mobile-optimized, real-time.
 
-## Quick Setup
+## Tech Stack
 
-```bash
-bun install
-bun run dev
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Vue 3.6 + Rsbuild + Pinia + Tailwind CSS |
+| Backend | FastAPI (Python 3.12) + Uvicorn |
+| Database | Supabase (PostgreSQL + PostGIS) |
+| Auth | Supabase Auth + RLS policies |
+| Storage | Supabase Storage |
+| Payments | Stripe (checkout + webhooks) |
+| Maps | MapLibre GL + OpenStreetMap |
+| CI/CD | GitHub Actions + Fly.io + Vercel |
+| Monitoring | OpenTelemetry + Prometheus + Sentry |
+
+## Project Structure
+
+```
+├── src/                    # Frontend (Vue 3)
+│   ├── components/         # 98 Vue components
+│   ├── composables/        # 86 composables (hooks)
+│   ├── store/              # 10 Pinia stores
+│   ├── services/           # 27 API services
+│   ├── views/              # 40+ page views
+│   └── utils/              # Utility functions
+├── backend/                # Backend (FastAPI)
+│   ├── app/
+│   │   ├── api/routers/    # 24 API routers
+│   │   ├── services/       # 21 business logic services
+│   │   ├── core/           # 18 core modules
+│   │   └── middleware/     # Security middleware
+│   ├── migrations/         # 99 database migrations
+│   └── tests/              # Backend tests
+├── tests/                  # Frontend tests (Vitest)
+│   └── unit/
+│       ├── composables/    # Composable tests
+│       ├── services/       # Service tests
+│       ├── stores/         # Store tests
+│       └── components/     # Component tests
+└── .github/workflows/      # 23 CI/CD workflows
 ```
 
-ดูขั้นตอนใช้งานแบบละเอียดได้ที่ `QUICKSTART.md`
+## Quick Start
+
+```bash
+# Frontend
+bun install
+bun dev
+
+# Backend
+cd backend
+uv pip install -r requirements.txt
+python run_backend.py
+```
+
+## Testing
+
+```bash
+# Run all tests
+bun run test:unit
+
+# Run with coverage
+bun run test:unit:coverage
+
+# Run specific test file
+bun vitest run tests/unit/composables/useCurrency.spec.js
+```
+
+### Coverage Thresholds
+
+| Module | Statements | Functions |
+|--------|-----------|-----------|
+| `src/store/**` | 25% | 24% |
+| `src/utils/**` | 14% | 13% |
+| `src/services/**` | 5% | 4% |
+| `src/composables/**` | 1% | 1% |
+
+## CI/CD Pipeline
+
+The CI pipeline runs on every PR and push to main:
+
+1. **Repo Hygiene** — Check for forbidden files
+2. **Security Scan** — Bandit + Semgrep + Gitleaks
+3. **Frontend** — Lint + Format + Test + Build
+4. **Backend** — Tests + Coverage
+5. **E2E Smoke** — Playwright tests
+6. **SonarCloud** — Code quality + Coverage upload
+
+## Deployment
+
+- **Frontend**: Vercel (auto-deploy from main)
+- **Backend**: Fly.io (sin region, 3 processes)
+- **Database**: Supabase (managed PostgreSQL)
+
+## Environment Variables
+
+See `.env.example` for required environment variables.
 
 ## WSL (Windows) Note
 
-ถ้าใช้งานผ่าน WSL ให้ติดตั้ง dependencies ด้วยคำสั่งนี้:
-
+If using WSL, install deps with:
 ```bash
 bun install --os linux --cpu x64
 ```
 
-## Enterprise Deployment (Production)
+## Enterprise Deployment
 
-ระบบรองรับการทำงานระดับ Enterprise แบบอัตโนมัติ 100% ผ่าน CI/CD (GitHub Actions)
-
-### สิ่งที่ต้องเตรียมใน GitHub Secrets
-เพื่อให้ระบบทำงานได้สมบูรณ์ในระดับ Production ให้เพิ่ม Secrets เหล่านี้ใน **GitHub Repository -> Settings -> Secrets and variables -> Actions**:
-- `DATABASE_URL`: สำหรับรัน Migration และตั้งค่า Cron Job อัตโนมัติ (ดึงจาก Supabase)
-- `GOOGLE_MAPS_API_KEY`: สำหรับระบบดึงภาพหน้าร้านค้า (Street View Backfill)
-- `SUPABASE_URL` และ `SUPABASE_SERVICE_ROLE_KEY`: สำหรับ Validation
-
-#### วิธีการขอรับ GOOGLE_MAPS_API_KEY:
-1. ไปที่ [Google Cloud Console](https://console.cloud.google.com/)
-2. สร้างโปรเจกต์ใหม่ (หรือเลือกโปรเจกต์ที่มีอยู่)
-3. ไปที่เมนู **APIs & Services > Library**
-4. ค้นหาและเปิดใช้งาน (Enable) 2 APIs ต่อไปนี้:
-   - **Street View Static API** (สำหรับดึงรูปภาพ)
-   - **Places API** (หรือ Geocoding API เผื่อไว้ใช้หาพิกัด)
-5. ไปที่เมนู **APIs & Services > Credentials**
-6. คลิก **Create Credentials > API key**
-7. คัดลอก API Key ที่ได้มา นำไปใส่ใน:
-   - **GitHub Secrets** (ชื่อ `GOOGLE_MAPS_API_KEY`)
-   - **Fly.io Secrets** (รันคำสั่ง `fly secrets set GOOGLE_MAPS_API_KEY="your_api_key_here"`)
-   - ไฟล์ `.env` ในเครื่องของคุณ (สำหรับการทดสอบแบบ Local)
-
-เมื่อ Merge โค้ดเข้า `main` ระบบจะทำการรันสคริปต์ `execute_enterprise_updates.py` โดยอัตโนมัติ ซึ่งรวมถึง:
-1. การสร้าง Materialized View เพื่อเพิ่มความเร็ว PostGIS
-2. ตั้งค่า Cron Job เพื่อ Refresh Geodata ทุก 15 นาที
-3. ดึงรูปร้านค้าที่ขาดหายไปจาก Google Street View
-
-## WSL Bootstrap
-
-รันคำสั่งเดียวเพื่อ setup Bun/Linux dependencies และตรวจ Biome พร้อมใช้งาน:
-
-```bash
-bash scripts/dev/wsl-bootstrap.sh
-```
-
-Biome troubleshooting แบบตรงจุดอยู่ที่ `docs/wsl-biome-troubleshooting.md`
+See `FLY_DEPLOYMENT_GUIDE.md` for production deployment instructions.
