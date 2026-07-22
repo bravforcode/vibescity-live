@@ -18,7 +18,7 @@
 
 ## Project Structure
 
-```
+```text
 ├── src/                    # Frontend (Vue 3)
 │   ├── components/         # 98 Vue components
 │   ├── composables/        # 86 composables (hooks)

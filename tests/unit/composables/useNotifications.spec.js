@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
 
 import { useNotifications } from "../../../src/composables/useNotifications";
@@ -10,6 +10,10 @@ describe("useNotifications", () => {
     const { state } = useNotifications();
     state.queue.splice(0);
     state.counter = 0;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe("state", () => {

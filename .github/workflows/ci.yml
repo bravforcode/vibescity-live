@@ -78,7 +78,7 @@ jobs:
 
       - name: Install gitleaks
         run: |
-          curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/install.sh | sh -s -- -b /usr/local/bin v8.24.2
+          curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/185b023f382e7e66eae11e2b72e630c7b2e5e8b5/install.sh | sh -s -- -b /usr/local/bin v8.24.2
 
       - name: Secret scan (gitleaks)
         run: npm run ci:secret-scan:gitleaks

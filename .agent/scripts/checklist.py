@@ -29,7 +29,8 @@ from typing import List, Optional
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-except Exception:
+except (OSError, ValueError):
+    # Stream reconfiguration not supported on this platform; encoding stays as-is
     pass
 
 # ANSI colors for terminal output

@@ -33,7 +33,7 @@ const homeOwnedSkipLinkRouteNames = new Set([
 	"CategoryLocale",
 ]);
 const showAppSkipLink = computed(
-	() => !homeOwnedSkipLinkRouteNames.has(String(route.name || "")),
+	() => homeOwnedSkipLinkRouteNames.has(String(route.name || "")),
 );
 
 const trackSessionIfAllowed = () => {
