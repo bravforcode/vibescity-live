@@ -54,7 +54,7 @@ six==1.17.0
 slowapi==0.1.9
 sortedcontainers==2.4.0
 starlette==0.50.0
-storage3==2.27.2
+storage3==2.28.3
 StrEnum==0.4.15
 strictyaml==1.7.3
 stripe==14.3.0
