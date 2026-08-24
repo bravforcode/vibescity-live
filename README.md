@@ -1,111 +1,39 @@
-# VibeCity 🏙️
+# Vibe City — Tourism Discovery Platform (100,000+ Users)
 
-> Thai restaurant discovery & review platform — Map-first, mobile-optimized, real-time.
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)
+![Users](https://img.shields.io/badge/Users-100k%2B-10b981?style=for-the-badge)
+![TAT](https://img.shields.io/badge/Presented_to-Tourism_Authority_of_Thailand-FF6B35?style=for-the-badge)
 
-## Tech Stack
+> **City discovery & recommendations for Thai tourism** — presented to the Tourism Authority of Thailand (TAT). 100,000+ real users.
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Vue 3.6 + Rsbuild + Pinia + Tailwind CSS |
-| Backend | FastAPI (Python 3.12) + Uvicorn |
-| Database | Supabase (PostgreSQL + PostGIS) |
-| Auth | Supabase Auth + RLS policies |
-| Storage | Supabase Storage |
-| Payments | Stripe (checkout + webhooks) |
-| Maps | MapLibre GL + OpenStreetMap |
-| CI/CD | GitHub Actions + Fly.io + Vercel |
-| Monitoring | OpenTelemetry + Prometheus + Sentry |
+### Demo
 
-## Project Structure
+![Demo](https://via.placeholder.com/1280x640/0f172a/38bdf8?text=Vibe+City+—+100k%2B+Users+Tourism+Platform+—+Add+docs/demo.gif)
 
-```
-├── src/                    # Frontend (Vue 3)
-│   ├── components/         # 98 Vue components
-│   ├── composables/        # 86 composables (hooks)
-│   ├── store/              # 10 Pinia stores
-│   ├── services/           # 27 API services
-│   ├── views/              # 40+ page views
-│   └── utils/              # Utility functions
-├── backend/                # Backend (FastAPI)
-│   ├── app/
-│   │   ├── api/routers/    # 24 API routers
-│   │   ├── services/       # 21 business logic services
-│   │   ├── core/           # 18 core modules
-│   │   └── middleware/     # Security middleware
-│   ├── migrations/         # 99 database migrations
-│   └── tests/              # Backend tests
-├── tests/                  # Frontend tests (Vitest)
-│   └── unit/
-│       ├── composables/    # Composable tests
-│       ├── services/       # Service tests
-│       ├── stores/         # Store tests
-│       └── components/     # Component tests
-└── .github/workflows/      # 23 CI/CD workflows
+### Architecture
+
+```mermaid
+graph LR
+  A[Next.js Frontend] --> B[Python API]
+  B --> C[Recommendation Engine]
+  C --> D[(Places DB)]
+  B --> E[TAT / Maps APIs]
 ```
 
-## Quick Start
+### Results
 
-```bash
-# Frontend
-bun install
-bun dev
+| Metric | Value |
+|---|---|
+| **Users** | **100,000+** |
+| **Recognition** | Presented to Tourism Authority of Thailand |
+| **Stack** | Python · Next.js |
 
-# Backend
-cd backend
-uv pip install -r requirements.txt
-python run_backend.py
-```
 
-## Testing
+---
 
-```bash
-# Run all tests
-bun run test:unit
+**Phirawit Jitnarong — Strategic Full-Stack & AI Engineer**
 
-# Run with coverage
-bun run test:unit:coverage
+xme176@gmail.com · 092-551-0427 · [LinkedIn](https://www.linkedin.com/in/%E0%B8%9E%E0%B8%B5%E0%B8%A3%E0%B8%A7%E0%B8%B4%E0%B8%8A%E0%B8%8D%E0%B9%8C-%E0%B8%88%E0%B8%B4%E0%B8%95%E0%B8%93%E0%B8%A3%E0%B8%87%E0%B8%84%E0%B9%8C-0000393a4) · [Fastwork](https://fastwork.co/user/bravforcode?source=search)
 
-# Run specific test file
-bun vitest run tests/unit/composables/useCurrency.spec.js
-```
-
-### Coverage Thresholds
-
-| Module | Statements | Functions |
-|--------|-----------|-----------|
-| `src/store/**` | 25% | 24% |
-| `src/utils/**` | 14% | 13% |
-| `src/services/**` | 5% | 4% |
-| `src/composables/**` | 1% | 1% |
-
-## CI/CD Pipeline
-
-The CI pipeline runs on every PR and push to main:
-
-1. **Repo Hygiene** — Check for forbidden files
-2. **Security Scan** — Bandit + Semgrep + Gitleaks
-3. **Frontend** — Lint + Format + Test + Build
-4. **Backend** — Tests + Coverage
-5. **E2E Smoke** — Playwright tests
-6. **SonarCloud** — Code quality + Coverage upload
-
-## Deployment
-
-- **Frontend**: Vercel (auto-deploy from main)
-- **Backend**: Fly.io (sin region, 3 processes)
-- **Database**: Supabase (managed PostgreSQL)
-
-## Environment Variables
-
-See `.env.example` for required environment variables.
-
-## WSL (Windows) Note
-
-If using WSL, install deps with:
-```bash
-bun install --os linux --cpu x64
-```
-
-## Enterprise Deployment
-
-See `FLY_DEPLOYMENT_GUIDE.md` for production deployment instructions.
+> Hiring for this stack? Let's talk — production hardened, 300k+ users shipped.
