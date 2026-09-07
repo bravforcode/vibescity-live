@@ -1,10 +1,28 @@
-import maplibregl from "maplibre-gl";
-import "maplibre-gl/dist/maplibre-gl.css";
 import { markRaw, onUnmounted, ref, shallowRef } from "vue";
 import { frontendObservabilityService } from "../../services/frontendObservabilityService";
 import { useInteractionState } from "../useInteractionState";
 import { isMapContentReadyForMode } from "./mapContentReadiness";
 import { normalizeMapStyleMode } from "./mapStyleMode";
+
+let maplibreModulePromise = null;
+let maplibreCssPromise = null;
+const loadMaplibre = async () => {
+	if (!maplibreCssPromise) {
+		maplibreCssPromise = import("maplibre-gl/dist/maplibre-gl.css").catch(
+			() => null,
+		);
+	}
+	if (!maplibreModulePromise) {
+		maplibreModulePromise = import("maplibre-gl").then(
+			(mod) => mod?.default ?? mod,
+		);
+	}
+	const [maplibregl] = await Promise.all([
+		maplibreModulePromise,
+		maplibreCssPromise,
+	]);
+	return maplibregl;
+};
 
 // Public runtime must stay on the same-origin neon style unless callers opt into
 // something else explicitly via useMapCore options.
@@ -109,6 +127,7 @@ const uninstallMaplibreWarnFilter = () => {
 
 export function useMapCore(containerRef, options = {}) {
 	const map = shallowRef(null);
+	const maplibreApi = shallowRef(null);
 	const isMapReady = ref(false);
 	const isMapLoaded = ref(false);
 	const isMapContentReady = ref(false);
@@ -400,12 +419,20 @@ export function useMapCore(containerRef, options = {}) {
 		});
 	};
 
-	const initMap = (
+	const initMap = async (
 		initialCenter = [98.968, 18.7985],
 		initialZoom = 15,
 		style = PRIMARY_STYLE_URL,
 	) => {
 		if (!containerRef.value) return;
+		const mapInitStart =
+			typeof performance !== "undefined" ? performance.now() : 0;
+		if (typeof window !== "undefined") {
+			window.__mapMetrics = window.__mapMetrics || {};
+			if (!Number.isFinite(window.__mapMetrics.initStartAt)) {
+				window.__mapMetrics.initStartAt = Math.round(mapInitStart);
+			}
+		}
 		installMaplibreWarnFilter();
 
 		// ✅ Clear container to prevent "should be empty" warnings and duplicate canvases on hot reload
@@ -419,6 +446,8 @@ export function useMapCore(containerRef, options = {}) {
 			typeof navigator !== "undefined" &&
 			((navigator.hardwareConcurrency ?? 4) <= 4 ||
 				(navigator.deviceMemory ?? 8) <= 4);
+		const maplibregl = await loadMaplibre();
+		maplibreApi.value = maplibregl;
 		map.value = markRaw(
 			new maplibregl.Map({
 				container: containerRef.value,
@@ -445,6 +474,31 @@ export function useMapCore(containerRef, options = {}) {
 				fadeDuration: 0, // Eliminate tile fade-in stutter on mobile
 				maxTileCacheSize: isLowEnd ? 40 : 100, // Fewer cached tiles = less RAM on low-end
 				transformRequest: (url, _resourceType) => {
+					if (typeof window !== "undefined") {
+						const resourceType = String(_resourceType || "")
+							.trim()
+							.toLowerCase();
+						if (resourceType) {
+							window.__mapMetrics = window.__mapMetrics || {};
+							window.__mapMetrics.firstResourceAt =
+								window.__mapMetrics.firstResourceAt || {};
+							if (
+								!Number.isFinite(
+									window.__mapMetrics.firstResourceAt[resourceType],
+								)
+							) {
+								const at =
+									typeof performance !== "undefined" ? performance.now() : 0;
+								window.__mapMetrics.firstResourceAt[resourceType] =
+									Math.round(at);
+								try {
+									if (performance?.mark) {
+										performance.mark(`vc:map:resource:${resourceType}`);
+									}
+								} catch {}
+							}
+						}
+					}
 					// Suppress noisy 404 tileset fetches that some custom styles reference.
 					if (isSuppressedTilesetRequest(url)) {
 						return { url: EMPTY_VECTOR_TILE_DATA_URI };
@@ -454,6 +508,31 @@ export function useMapCore(containerRef, options = {}) {
 			}),
 		);
 		syncMapDebugHandle(map.value);
+
+		try {
+			if (map.value?.once) {
+				map.value.once("load", () => {
+					const at = typeof performance !== "undefined" ? performance.now() : 0;
+					if (typeof window !== "undefined") {
+						window.__mapMetrics = window.__mapMetrics || {};
+						window.__mapMetrics.styleLoadedAt = Math.round(at);
+					}
+					try {
+						if (performance?.mark) performance.mark("vc:map:style:loaded");
+					} catch {}
+				});
+				map.value.once("render", () => {
+					const at = typeof performance !== "undefined" ? performance.now() : 0;
+					if (typeof window !== "undefined") {
+						window.__mapMetrics = window.__mapMetrics || {};
+						window.__mapMetrics.firstRenderAt = Math.round(at);
+					}
+					try {
+						if (performance?.mark) performance.mark("vc:map:first:render");
+					} catch {}
+				});
+			}
+		} catch {}
 
 		const canvas = map.value.getCanvas?.() || null;
 		const canvasContainer = map.value.getCanvasContainer?.() || null;
@@ -696,6 +775,7 @@ export function useMapCore(containerRef, options = {}) {
 			map.value.remove();
 			map.value = null;
 		}
+		maplibreApi.value = null;
 		syncMapDebugHandle(null);
 		clearContentReadyTimers();
 		uninstallMaplibreWarnFilter();
@@ -703,6 +783,7 @@ export function useMapCore(containerRef, options = {}) {
 
 	return {
 		map,
+		maplibreApi,
 		isMapReady,
 		isMapLoaded,
 		isMapContentReady,

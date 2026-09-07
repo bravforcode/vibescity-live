@@ -43,7 +43,7 @@ backend/.venv/
 node_modules/
 
 # Build Output
-# dist/
+dist/
 dist-ssr/
 
 # Local Environment Variables
@@ -61,6 +61,11 @@ pnpm-debug.log*
 .DS_Store
 backend/.venv/
 backend/.pytest_cache/
+.artifacts/
+.vercel_python_packages/
+reports/
+coverage/
+test-results*/
 
 # Data files (Exclude extremely large ones if needed)
 # public/data/*.geojson

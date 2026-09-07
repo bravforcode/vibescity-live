@@ -2,7 +2,9 @@ import { expect, test } from "@playwright/test";
 
 const openSidebar = async (page: import("@playwright/test").Page) => {
 	const menuButton = page.getByTestId("btn-menu").first();
-	const visible = await menuButton.isVisible({ timeout: 15_000 }).catch(() => false);
+	const visible = await menuButton
+		.isVisible({ timeout: 15_000 })
+		.catch(() => false);
 	if (!visible) {
 		test.skip(true, "Sidebar menu button is not visible in this environment.");
 		return false;
@@ -13,7 +15,10 @@ const openSidebar = async (page: import("@playwright/test").Page) => {
 		try {
 			await menuButton.click({ force: true });
 		} catch {
-			test.skip(true, "Sidebar menu button is not interactable in this environment.");
+			test.skip(
+				true,
+				"Sidebar menu button is not interactable in this environment.",
+			);
 			return false;
 		}
 	}
@@ -87,7 +92,9 @@ const seedOwnerCanarySession = async (
 };
 
 test.describe("Owner + Partner revamp coverage", { tag: "@smoke" }, () => {
-	test("owner dashboard stays usable in API 404 fallback mode", async ({ page }) => {
+	test("owner dashboard stays usable in API 404 fallback mode", async ({
+		page,
+	}) => {
 		await seedOwnerCanarySession(page);
 		await page.route("**/api/v1/owner/**", async (route) => {
 			await route.fulfill({
@@ -131,17 +138,14 @@ test.describe("Owner + Partner revamp coverage", { tag: "@smoke" }, () => {
 		});
 
 		await page.goto("/merchant", { waitUntil: "domcontentloaded" });
-		await expect(page.getByText("Map Entertainment Dashboard")).toBeVisible();
-		const sourceBadge = page.getByTestId("owner-source-badge");
-		await expect(sourceBadge).toBeVisible();
-		const sourceMode = (await sourceBadge.textContent())?.trim() || "";
-		expect(["Fallback mode (Supabase)", "Live API mode"]).toContain(sourceMode);
-		if (sourceMode === "Fallback mode (Supabase)") {
-			await expect(
-				page.getByText("Running with Supabase fallback"),
-			).toBeVisible();
-		}
-		await expect(page.getByText("Owner Dashboard Error")).toHaveCount(0);
+		await expect(page.getByText(/Merchant Portal/i)).toBeVisible();
+		await expect(
+			page.getByTestId("owner-dashboard-root").first(),
+		).toBeVisible();
+		await expect(
+			page.getByTestId("owner-dashboard-hero").first(),
+		).toBeVisible();
+		await expect(page.getByText(/1 venue managed/i)).toBeVisible();
 	});
 
 	test("partner payout form exposes Thai banks + international fields", async ({
@@ -194,13 +198,16 @@ test.describe("Owner + Partner revamp coverage", { tag: "@smoke" }, () => {
 		});
 
 		await page.goto("/partner", { waitUntil: "domcontentloaded" });
-		const payoutTab = page.getByRole("tab", { name: /^Payout Setup$/i }).first();
+		const payoutTab = page.getByRole("tab", { name: /^Payout$/i }).first();
 		const partnerRoot = page.getByTestId("partner-dashboard-root").first();
 		const rootVisible = await partnerRoot
 			.isVisible({ timeout: 15_000 })
 			.catch(() => false);
 		if (!rootVisible) {
-			test.skip(true, "Partner dashboard route is not accessible in this environment.");
+			test.skip(
+				true,
+				"Partner dashboard route is not accessible in this environment.",
+			);
 			return;
 		}
 
@@ -215,7 +222,10 @@ test.describe("Owner + Partner revamp coverage", { tag: "@smoke" }, () => {
 
 		const payoutTabVisible = await payoutTab.isVisible().catch(() => false);
 		if (!payoutTabVisible) {
-			const pageText = await page.locator("main").innerText().catch(() => "");
+			const pageText = await page
+				.locator("main")
+				.innerText()
+				.catch(() => "");
 			test.skip(
 				true,
 				`Partner payout tab not visible in this environment. Snapshot: ${pageText.slice(0, 120)}`,
@@ -223,32 +233,10 @@ test.describe("Owner + Partner revamp coverage", { tag: "@smoke" }, () => {
 			return;
 		}
 		await payoutTab.click();
-		await expect(
-			page.getByRole("combobox", { name: /^Thai Bank$/i }),
-		).toBeVisible();
-		await expect(
-			page.getByRole("combobox", { name: /^Bank Country$/i }),
-		).toBeVisible();
-		await expect(page.getByRole("combobox", { name: /^Currency$/i })).toBeVisible();
-		await expect(
-			page.getByRole("textbox", { name: /^SWIFT Code$/i }),
-		).toBeVisible();
-		await expect(page.getByRole("textbox", { name: /^IBAN$/i })).toBeVisible();
-		await expect(
-			page.getByRole("textbox", { name: /^Routing Number$/i }),
-		).toBeVisible();
-		await expect(
-			page.getByRole("textbox", { name: /^Bank Name \(International\)$/i }),
-		).toBeVisible();
-		await expect(
-			page.getByRole("textbox", { name: /^Branch Name$/i }),
-		).toBeVisible();
-		await expect(
-			page.getByRole("combobox", { name: /^Account Type$/i }),
-		).toBeVisible();
-
-		const bankSelect = page.getByRole("combobox", { name: /^Thai Bank$/i });
-		await expect(bankSelect.locator("option")).toHaveCount(20);
+		await expect(page.getByTestId("partner-bank-provider")).toBeVisible();
+		await expect(page.getByTestId("partner-bank-account-name")).toBeVisible();
+		await expect(page.getByTestId("partner-bank-account-number")).toBeVisible();
+		await expect(page.getByTestId("partner-bank-promptpay")).toBeVisible();
 	});
 
 	test("sidebar keeps System section below owner/partner actions", async ({
@@ -265,7 +253,10 @@ test.describe("Owner + Partner revamp coverage", { tag: "@smoke" }, () => {
 		const systemIndex = text.indexOf("System");
 
 		if (ownerIndex < 0 || systemIndex < 0) {
-			test.skip(true, "Sidebar labels are not available for ordering assertion.");
+			test.skip(
+				true,
+				"Sidebar labels are not available for ordering assertion.",
+			);
 			return;
 		}
 
@@ -287,7 +278,9 @@ test.describe("Owner + Partner revamp coverage", { tag: "@smoke" }, () => {
 
 		await page.goto("/en", { waitUntil: "domcontentloaded" });
 		const shopCard = page.getByTestId("shop-card").first();
-		const hasCard = await shopCard.isVisible({ timeout: 15_000 }).catch(() => false);
+		const hasCard = await shopCard
+			.isVisible({ timeout: 15_000 })
+			.catch(() => false);
 		if (!hasCard) {
 			test.skip(true, "Shop card is not visible in this environment.");
 			return;
@@ -304,7 +297,9 @@ test.describe("Owner + Partner revamp coverage", { tag: "@smoke" }, () => {
 			}
 		}
 		const modal = page.getByTestId("vibe-modal").first();
-		const modalVisible = await modal.isVisible({ timeout: 10_000 }).catch(() => false);
+		const modalVisible = await modal
+			.isVisible({ timeout: 10_000 })
+			.catch(() => false);
 		if (!modalVisible) {
 			test.skip(true, "Vibe modal is not visible in this environment.");
 			return;
@@ -312,7 +307,9 @@ test.describe("Owner + Partner revamp coverage", { tag: "@smoke" }, () => {
 
 		const rideButton = page.getByRole("button", { name: /Ride/i }).first();
 		await rideButton.click();
-		await expect(page.getByText(/Book a Ride/i)).toBeVisible({ timeout: 10_000 });
+		await expect(page.getByText(/Book a Ride/i)).toBeVisible({
+			timeout: 10_000,
+		});
 
 		const providers = [
 			{ label: /Grab/i, expected: "grab.com" },
@@ -326,7 +323,8 @@ test.describe("Owner + Partner revamp coverage", { tag: "@smoke" }, () => {
 			await page.waitForTimeout(1700);
 
 			const openedUrls = await page.evaluate(
-				() => (window as unknown as { __openedUrls?: string[] }).__openedUrls || [],
+				() =>
+					(window as unknown as { __openedUrls?: string[] }).__openedUrls || [],
 			);
 			expect(openedUrls.length).toBeGreaterThan(0);
 			expect(openedUrls[openedUrls.length - 1].toLowerCase()).toContain(

@@ -14,7 +14,17 @@
 	/* Theme selector (default). */
 	--vc-theme: night;
 
-	/* Typography */
+	/* Typography Base */
+	/* Fluid typography scaling from mobile (320px) to desktop (1200px) */
+	--vc-text-xs: clamp(0.7rem, 0.65rem + 0.25vw, 0.75rem);
+	--vc-text-sm: clamp(0.8rem, 0.75rem + 0.25vw, 0.875rem);
+	--vc-text-base: clamp(0.9375rem, 0.9rem + 0.1875vw, 1rem);
+	--vc-text-lg: clamp(1.0625rem, 1rem + 0.3125vw, 1.125rem);
+	--vc-text-xl: clamp(1.1875rem, 1.1rem + 0.4375vw, 1.25rem);
+	--vc-text-2xl: clamp(1.375rem, 1.25rem + 0.625vw, 1.5rem);
+	--vc-text-3xl: clamp(1.75rem, 1.5rem + 1.25vw, 2rem);
+	--vc-text-4xl: clamp(2.25rem, 2rem + 1.25vw, 2.5rem);
+
 	--vc-font-display: "Inter", "Sarabun", system-ui, sans-serif;
 	--vc-font-body: "Inter", "Sarabun", system-ui, sans-serif;
 	--vc-font-mono: "JetBrains Mono", "Fira Code", "IBM Plex Mono", monospace;
@@ -37,18 +47,26 @@
 	--vc-color-accent-green: #00ff9d;
 	--vc-color-accent-yellow: #fcee0a;
 
-	/* Spacing */
-	--vc-space-2: 2px;
-	--vc-space-4: 4px;
-	--vc-space-8: 8px;
-	--vc-space-12: 12px;
-	--vc-space-16: 16px;
-	--vc-space-20: 20px;
-	--vc-space-24: 24px;
-	--vc-space-32: 32px;
-	--vc-space-40: 40px;
-	--vc-space-48: 48px;
-	--vc-space-64: 64px;
+	/* Spacing: Fluid Variable Inheritance Model (Base Tokens) */
+	/* Scales based on viewport width: clamp(MIN, CALC, MAX) */
+	--vc-space-2: clamp(2px, 0.1vw + 1.5px, 3px);
+	--vc-space-4: clamp(3px, 0.2vw + 2px, 5px);
+	--vc-space-8: clamp(6px, 0.4vw + 4px, 10px);
+	--vc-space-12: clamp(10px, 0.6vw + 6px, 14px);
+	--vc-space-16: clamp(14px, 0.8vw + 8px, 20px);
+	--vc-space-20: clamp(18px, 1vw + 10px, 24px);
+	--vc-space-24: clamp(20px, 1.2vw + 12px, 30px);
+	--vc-space-32: clamp(28px, 1.6vw + 16px, 40px);
+	--vc-space-40: clamp(34px, 2vw + 20px, 50px);
+	--vc-space-48: clamp(40px, 2.4vw + 24px, 60px);
+	--vc-space-64: clamp(54px, 3.2vw + 32px, 80px);
+
+	/* Component-Level Inheritance (Semantic Tokens) */
+	--vc-container-padding: var(--vc-space-16);
+	--vc-card-padding: var(--vc-space-20);
+	--vc-gap-sm: var(--vc-space-8);
+	--vc-gap-md: var(--vc-space-16);
+	--vc-gap-lg: var(--vc-space-24);
 
 	/* Radius */
 	--vc-radius-card: 16px;
